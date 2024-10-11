@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.19, 1.20]
+        go-version: [1.23]
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
@@ -37,14 +37,14 @@ jobs:
 
     - name: Upload build artifacts
       if: success()
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ${{ matrix.os }}-build
         path: build/
 
     - name: Upload coverage report
       if: success()
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: coverage-report
         path: coverage.out
