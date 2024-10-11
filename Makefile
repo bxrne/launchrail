@@ -14,7 +14,7 @@ build-windows:
 build-linux:
 	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME) $(SRC_DIR)
 
-build-macos:
+build-darwin:
 	GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME) $(SRC_DIR)
 
 test:
