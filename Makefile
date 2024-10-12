@@ -15,7 +15,7 @@ build-windows:
 
 build-linux:
 	@echo "Installing Linux dependencies..."
-	@sudo apt-get install libgl1-mesa-dev libxcursor-dev libxrandr-dev libxinerama-dev -y
+	@sudo apt-get install libgl1-mesa-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev -y
 	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME) $(SRC_DIR)
 
 build-darwin:
@@ -37,5 +37,4 @@ dev:
 	go run $(SRC_DIR)
 
 .PHONY: all build build-windows build-linux build-darwin test clean dev
-
 
