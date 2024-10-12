@@ -6,23 +6,23 @@ all: build
 
 build:
 	@echo "Building the project..."
-	GOOS=$(shell go env GOOS) GOARCH=$(shell go env GOARCH) go build -o $(BUILD_DIR)/$(BINARY_NAME) $(SRC_DIR)
+	CGO_ENABLED=1 GOOS=$(shell go env GOOS) GOARCH=$(shell go env GOARCH) go build -o $(BUILD_DIR)/$(BINARY_NAME) $(SRC_DIR)
 
 build-windows:
 	@echo "Installing Windows dependencies..."
 	@go get -u github.com/go-gl/glfw/v3.3/glfw
-	GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME).exe $(SRC_DIR)
+	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME).exe $(SRC_DIR)
 
 build-linux:
 	@echo "Installing Linux dependencies..."
 	@sudo apt-get install libgl1-mesa-dev -y
-	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME) $(SRC_DIR)
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME) $(SRC_DIR)
 
 build-darwin:
 	@echo "Installing macOS dependencies..."
 	@brew install glew
 	@go get -u github.com/go-gl/gl/v4.1-core/gl
-	GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME) $(SRC_DIR)
+	CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME) $(SRC_DIR)
 
 test:
 	@echo "Running tests..."
@@ -37,4 +37,5 @@ dev:
 	go run $(SRC_DIR)
 
 .PHONY: all build build-windows build-linux build-darwin test clean dev
+
 
