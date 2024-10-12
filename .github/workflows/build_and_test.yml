@@ -1,4 +1,4 @@
-name: Build, Test, and Release
+name: Build and Test
 
 on:
   push:
@@ -17,7 +17,6 @@ jobs:
       matrix:
         go-version: [1.23]
         os: [ubuntu-latest, windows-latest, macos-latest]
-        osNames: [linux, windows, darwin]
 
     steps:
     - name: Checkout code
@@ -45,14 +44,24 @@ jobs:
       run: |
         brew install glew
 
-    - name: Build
+    - name: Install dependencies
       run: |
         go mod download -x
-        make build-${{ matrix.osNames }}
+
+    - name: Build
+      if: matrix.os == 'ubuntu-latest'
+        run: |
+          make build-linux
+      if: matrix.os == 'windows-latest'
+        run: |
+          make build-windows
+      if: matrix.os == 'macos-latest'
+        run: |
+          make build-darwin
 
     - name: Run tests
       run: |
-        make test
+        go test -v -coverprofile=coverage.out ./...
 
     - name: Upload build artifacts
       if: success()
@@ -68,46 +77,4 @@ jobs:
         name: coverage-report
         path: coverage.out
 
-  release:
-    needs: build_and_test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-
-    - name: Set up Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.23
-
-    - name: Bump version and create tag
-      id: bump_version
-      run: |
-        git config --global user.name 'github-actions'
-        git config --global user.email 'github-actions@github.com'
-        git fetch --tags
-        latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
-        echo "Latest tag: $latest_tag"
-        if [ -z "$latest_tag" ]; then
-          new_tag="v0.1.0"
-        else
-          new_tag=$(echo $latest_tag | awk -F. -v OFS=. '{$NF++;print}')
-        fi
-        echo "New tag: $new_tag"
-        git tag $new_tag
-        git push origin $new_tag
-        echo "::set-output name=tag::$new_tag"
-
-    - name: Create GitHub Release
-      uses: actions/create-release@v1
-      with:
-        tag_name: ${{ steps.bump_version.outputs.tag }}
-        release_name: Release ${{ steps.bump_version.outputs.tag }}
-        body: |
-          Changes in this release:
-          - Description of changes
-        draft: false
-        prerelease: false
-
+ 
