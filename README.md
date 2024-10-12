@@ -1,6 +1,8 @@
 # launchrail
 
-[![Build and Test](https://github.com/bxrne/launchrail/actions/workflows/build_and_test.yml/badge.svg?branch=main)](https://github.com/bxrne/launchrail/actions/workflows/build_and_test.yml)
+[![Build and Test](https://github.com/bxrne/launchrail/actions/workflows/build_and_test.yml/badge.svg)](https://github.com/bxrne/launchrail/actions/workflows/build_and_test.yml)
+
++ [![cov](https://bxrne.github.io/launchrail/badges/coverage.svg)](https://github.com/bxrne/launchrail/actions)
 
 Experimenting with the idea of creating a 6-DOF High Power Rocketry simulator. This is a work in progress and is not yet functional.
 
