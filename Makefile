@@ -9,12 +9,16 @@ build:
 	GOOS=$(shell go env GOOS) GOARCH=$(shell go env GOARCH) go build -o $(BUILD_DIR)/$(BINARY_NAME) $(SRC_DIR)
 
 build-windows:
+	@go get -u github.com/go-gl/glfw/v3.3/glfw
+	@mingw-w64-x86_64-glew
 	GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME).exe $(SRC_DIR)
 
 build-linux:
+	@sudo apt-get install libgl1-mesa-dev -y
 	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME) $(SRC_DIR)
 
 build-darwin:
+	@brew install glew
 	GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME) $(SRC_DIR)
 
 test:
