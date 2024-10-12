@@ -57,7 +57,7 @@ jobs:
     - name: Build (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        CGO_ENABLED=1 make build-windows
+        $env:CGO_ENABLED=1; make build-windows
 
     - name: Build (macOS)
       if: matrix.os == 'macos-latest'
@@ -81,5 +81,6 @@ jobs:
       with:
         name: coverage-report
         path: coverage.out
+
 
 
