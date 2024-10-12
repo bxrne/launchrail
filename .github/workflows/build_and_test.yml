@@ -48,16 +48,20 @@ jobs:
       run: |
         go mod download -x
 
-    - name: Build
+    - name: Build (Linux)
       if: matrix.os == 'ubuntu-latest'
-        run: |
-          make build-linux
+      run: |
+        make build-linux
+
+    - name: Build (Windows)
       if: matrix.os == 'windows-latest'
-        run: |
-          make build-windows
+      run: |
+        make build-windows
+
+    - name: Build (macOS)
       if: matrix.os == 'macos-latest'
-        run: |
-          make build-darwin
+      run: |
+        make build-darwin
 
     - name: Run tests
       run: |
