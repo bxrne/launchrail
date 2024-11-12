@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/pkg/logger"
 	"github.com/pkg/errors"
 )
 

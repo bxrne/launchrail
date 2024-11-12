@@ -16,13 +16,16 @@ var (
 // NOTE: Returns the singleton logger instance
 func GetLogger() *log.Logger {
 	once.Do(func() {
-		instance = log.NewWithOptions(os.Stderr, log.Options{
+		logFile, err := os.OpenFile("launchrail.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			panic(err)
+		}
+		instance = log.NewWithOptions(logFile, log.Options{
 			ReportCaller:    true,
 			ReportTimestamp: true,
 			TimeFormat:      time.ANSIC,
 			Level:           log.DebugLevel,
 		})
 	})
-
 	return instance
 }
