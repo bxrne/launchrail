@@ -3,229 +3,107 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
-	"time"
 
-	"github.com/bxrne/launchrail/pkg/entities"
 	"github.com/bxrne/launchrail/pkg/logger"
-	"github.com/bxrne/launchrail/pkg/ork"
-	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-type state int
-
 const (
-	statePickingOrk state = iota
-	statePickingThrust
-	stateAssembling
-	stateComplete
-	stateError
+	version    = "v0.0"
+	githubLink = "https://github.com/bxrne/launchrail"
+	license    = "GNU GPL-3.0"
 )
 
 var (
-	titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF06B7")).
-			Bold(true).
-			MarginLeft(2)
-
-	subtitleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#04B575")).
-			MarginLeft(2)
-
-	infoStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#04B575")).
-			MarginLeft(2)
-
-	errorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF0000")).
-			MarginLeft(2)
-
-	filePickerStyle = lipgloss.NewStyle().
-			MarginLeft(2).
-			MarginTop(1)
+	accentColor     = lipgloss.Color("#FFA500")
+	titleStyle      = lipgloss.NewStyle().Foreground(accentColor).Bold(true).Padding(1, 2).MarginBottom(1)
+	headerStyle     = lipgloss.NewStyle().Bold(true).Padding(0, 2)
+	footerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Align(lipgloss.Center).Padding(0, 2)
+	footerLinkStyle = lipgloss.NewStyle().Foreground(accentColor).Underline(true).Padding(0, 2)
+	containerStyle  = lipgloss.NewStyle().Margin(1, 2)
+	contentStyle    = lipgloss.NewStyle().Padding(1, 2).Margin(1, 2)
 )
 
 type model struct {
-	filePicker filepicker.Model
-	spinner    spinner.Model
-	state      state
-	err        error
-	assembly   *entities.Assembly
-	orkFile    string
-	thrustFile string
+	spinner spinner.Model
+	width   int
+	height  int
 }
 
 func initialModel() model {
-	fp := filepicker.New()
-	fp.CurrentDirectory, _ = os.Getwd()
-	fp.AllowedTypes = []string{".ork"}
-	fp.ShowHidden = false
-	fp.Height = 10
-
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
+	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return model{
-		filePicker: fp,
-		spinner:    s,
-		state:      statePickingOrk,
+		spinner: sp,
 	}
 }
 
-type assemblyMsg struct {
-	assembly *entities.Assembly
-	err      error
+func headerView() string {
+	title := titleStyle.Render("🚀 Launchrail")
+	versionText := headerStyle.Render("Risk-neutral trajectory simulation for sounding rockets via the Black-Scholes model.\n'ctrl+c' or 'q' to quit.")
+	return fmt.Sprintf("%s\n%s\n", title, versionText)
 }
 
-type tickMsg time.Time
+func footerView() string {
+	githubText := footerLinkStyle.Render(githubLink)
+	licenseText := footerStyle.Render(license)
+	versionText := footerStyle.Render(version)
+	return fmt.Sprintf("%s | %s | %s\n", versionText, licenseText, githubText)
+}
 
 func (m model) Init() tea.Cmd {
-	return m.filePicker.Init()
+	return m.spinner.Tick
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
+	log := logger.GetLogger()
+	log.Debugf("Update called with message: %v", msg)
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		log.Debugf("KeyMsg received: %s", msg.String())
 		switch msg.String() {
 		case "ctrl+c", "q":
+			log.Info("Exiting application")
 			return m, tea.Quit
-		case "esc":
-			if m.state == statePickingThrust {
-				m.state = statePickingOrk
-				m.filePicker.AllowedTypes = []string{".ork"}
-				m.filePicker.CurrentDirectory = filepath.Dir(m.orkFile)
-				return m, m.filePicker.Init()
-			}
 		}
-
-	case assemblyMsg:
-		if msg.err != nil {
-			m.err = msg.err
-			m.state = stateError
-			return m, nil
-		}
-		m.assembly = msg.assembly
-		m.state = stateComplete
-		return m, nil
-
-	case tickMsg:
-		if m.state == stateAssembling {
-			var cmd tea.Cmd
-			m.spinner, cmd = m.spinner.Update(msg)
-			return m, cmd
-		}
+	case tea.WindowSizeMsg:
+		log.Debugf("WindowSizeMsg received: width=%d, height=%d", msg.Width, msg.Height)
+		m.width = msg.Width
+		m.height = msg.Height
 	}
 
-	switch m.state {
-	case statePickingOrk, statePickingThrust:
-		var cmd tea.Cmd
-		m.filePicker, cmd = m.filePicker.Update(msg)
-		cmds = append(cmds, cmd)
-
-		if didSelect, path := m.filePicker.DidSelectFile(msg); didSelect {
-			switch m.state {
-			case statePickingOrk:
-				if filepath.Ext(path) == ".ork" {
-					m.orkFile = path
-					m.state = statePickingThrust
-					m.filePicker.AllowedTypes = []string{".eng"}
-					m.filePicker.CurrentDirectory = filepath.Dir(path)
-					cmds = append(cmds, m.filePicker.Init())
-				}
-			case statePickingThrust:
-				if filepath.Ext(path) == ".eng" {
-					m.thrustFile = path
-					m.state = stateAssembling
-					return m, tea.Batch(
-						m.spinner.Tick,
-						m.performAssembly,
-					)
-				}
-			}
-		}
-	}
-
-	return m, tea.Batch(cmds...)
+	var cmd tea.Cmd
+	m.spinner, cmd = m.spinner.Update(msg)
+	return m, cmd
 }
 
 func (m model) View() string {
-	var b strings.Builder
-
-	b.WriteString(titleStyle.Render("🚀 Launchrail (dev)"))
-	b.WriteString("\n\n")
-
-	switch m.state {
-	case statePickingOrk:
-		b.WriteString(subtitleStyle.Render("Select OpenRocket file (.ork):"))
-		b.WriteString("\n")
-		b.WriteString(filePickerStyle.Render(m.filePicker.View()))
-		b.WriteString("\n")
-		b.WriteString(infoStyle.Render("Press q to quit, enter to select"))
-
-	case statePickingThrust:
-		b.WriteString(subtitleStyle.Render("OpenRocket file: " + m.orkFile))
-		b.WriteString("\n\n")
-		b.WriteString(subtitleStyle.Render("Select thrust curve for Solid Motor (.eng):"))
-		b.WriteString("\n")
-		b.WriteString(filePickerStyle.Render(m.filePicker.View()))
-		b.WriteString("\n")
-		b.WriteString(infoStyle.Render("Press esc to go back, q to quit, enter to select"))
-
-	case stateAssembling:
-		b.WriteString(fmt.Sprintf("%s Assembling rocket...", m.spinner.View()))
-
-	case stateComplete:
-		b.WriteString(subtitleStyle.Render("Assembly Complete! 🎉"))
-		b.WriteString("\n\n")
-		b.WriteString(infoStyle.Render("Details:"))
-		b.WriteString("\n")
-		b.WriteString(infoStyle.Render(m.assembly.Info()))
-		b.WriteString("\n\n")
-		b.WriteString(infoStyle.Render("Press q to quit"))
-
-	case stateError:
-		b.WriteString(errorStyle.Render("Error: " + m.err.Error()))
-		b.WriteString("\n")
-		b.WriteString(infoStyle.Render("Press q to quit"))
-	}
-
-	return b.String()
-}
-
-func (m model) performAssembly() tea.Msg {
 	log := logger.GetLogger()
+	log.Debug("View called")
 
-	orkData, err := ork.Decompress(m.orkFile)
-	if err != nil {
-		return assemblyMsg{
-			err: fmt.Errorf("failed to decompress OpenRocket file: %w", err),
-		}
-	}
+	header := containerStyle.Render(headerView())
+	footer := containerStyle.Render(footerView())
+	contentHeight := m.height - lipgloss.Height(header) - lipgloss.Height(footer) - 2 // Adjust for padding
+	content := contentStyle.Height(contentHeight).Render(m.spinner.View())
 
-	assembly, err := entities.NewRocket(*orkData, m.thrustFile)
-	if err != nil {
-		return assemblyMsg{
-			err: fmt.Errorf("failed to create rocket assembly: %w", err),
-		}
-	}
-
-	log.Infof("Assembly complete for %s", assembly.Info())
-	return assemblyMsg{
-		assembly: assembly,
-	}
+	return fmt.Sprintf("%s\n%s\n%s", header, content, footer)
 }
 
 func main() {
-	p := tea.NewProgram(initialModel())
+	log := logger.GetLogger()
+	log.Info("Starting Launchrail application")
+
+	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
+		log.Errorf("Error running program: %v", err)
 		fmt.Printf("Error running program: %v", err)
 		os.Exit(1)
 	}
+
+	log.Info("Exiting Launchrail application")
 }

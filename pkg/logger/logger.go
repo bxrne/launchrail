@@ -20,6 +20,7 @@ func GetLogger() *log.Logger {
 		if err != nil {
 			panic(err)
 		}
+
 		instance = log.NewWithOptions(logFile, log.Options{
 			ReportCaller:    true,
 			ReportTimestamp: true,
@@ -29,3 +30,4 @@ func GetLogger() *log.Logger {
 	})
 	return instance
 }
+
