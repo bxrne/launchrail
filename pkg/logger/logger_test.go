@@ -6,48 +6,38 @@ import (
 
 	"github.com/bxrne/launchrail/pkg/logger"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
-// Mock for os.File
-type MockFile struct {
-	mock.Mock
+// TEST: GIVEN the logger is requested WHEN it is the first time THEN it should create a new instance
+func TestGetLogger_FirstTime(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "launchrail*.log")
+	assert.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	log := logger.GetLogger(tmpFile.Name())
+	assert.NotNil(t, log, "Expected logger instance to be created")
 }
 
-func (m *MockFile) Write(p []byte) (n int, err error) {
-	args := m.Called(p)
-	return args.Int(0), args.Error(1)
+// TEST: GIVEN the logger is requested WHEN it is not the first time THEN it should return the existing instance
+func TestGetLogger_SubsequentCalls(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "launchrail*.log")
+	assert.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	firstInstance := logger.GetLogger(tmpFile.Name())
+	secondInstance := logger.GetLogger(tmpFile.Name())
+
+	assert.Equal(t, firstInstance, secondInstance, "Expected the same logger instance to be returned")
 }
 
-func (m *MockFile) Close() error {
-	args := m.Called()
-	return args.Error(0)
-}
+// TEST: GIVEN the logger is requested WHEN it is created THEN it should create a log file
+func TestGetLogger_LogFileCreation(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "launchrail*.log")
+	assert.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
 
-func (m *MockFile) Sync() error {
-	args := m.Called()
-	return args.Error(0)
-}
+	logger.GetLogger(tmpFile.Name())
 
-// TEST: GIVEN a mocked file WHEN GetLogger is called THEN it should return a non-nil logger instance
-func TestGetLogger(t *testing.T) {
-	originalOpenFile := os.OpenFile
-	defer func() { os.OpenFile = originalOpenFile }()
-
-	mockFile := new(MockFile)
-	mockFile.On("Write", mock.Anything).Return(0, nil)
-	mockFile.On("Close").Return(nil)
-	mockFile.On("Sync").Return(nil)
-
-	os.OpenFile = func(name string, flag int, perm os.FileMode) (*os.File, error) {
-		return mockFile, nil
-	}
-
-	logInstance := logger.GetLogger()
-	assert.NotNil(t, logInstance, "Expected logger instance to be non-nil")
-
-	logInstance2 := logger.GetLogger()
-	assert.Equal(t, logInstance, logInstance2, "Expected the same logger instance to be returned")
-
-	mockFile.AssertExpectations(t)
+	_, err = os.Stat(tmpFile.Name())
+	assert.False(t, os.IsNotExist(err), "Expected log file to be created")
 }

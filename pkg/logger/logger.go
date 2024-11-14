@@ -14,9 +14,9 @@ var (
 )
 
 // NOTE: Returns the singleton logger instance
-func GetLogger() *log.Logger {
+func GetLogger(logFilePath string) *log.Logger {
 	once.Do(func() {
-		logFile, err := os.OpenFile("launchrail.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
 			panic(err)
 		}
@@ -30,4 +30,3 @@ func GetLogger() *log.Logger {
 	})
 	return instance
 }
-

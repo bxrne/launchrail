@@ -6,14 +6,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/bxrne/launchrail/pkg/logger"
+	"github.com/charmbracelet/log"
 	"github.com/pkg/errors"
 )
 
 // WARNING: The .ork is actually a zip file with the extension changed to .ork
-func DecompressTo(filePath string, outputFilePath string) error {
-	log := logger.GetLogger()
-
+func DecompressTo(log *log.Logger, filePath string, outputFilePath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Errorf("could not open file: %s", err)
@@ -73,8 +71,7 @@ func DecompressTo(filePath string, outputFilePath string) error {
 	return errors.Errorf("'rocket.ork' not found in the zip archive")
 }
 
-func Decompress(filePath string) (*Openrocket, error) {
-	log := logger.GetLogger()
+func Decompress(log *log.Logger, filePath string) (*Openrocket, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Errorf("could not open file: %s", err)

@@ -5,40 +5,59 @@ import (
 	"os"
 
 	"github.com/bxrne/launchrail/pkg/logger"
+	"github.com/bxrne/launchrail/pkg/utils"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
 )
 
+// INFO: Exec constants
 const (
-	version    = "v0.0"
-	githubLink = "https://github.com/bxrne/launchrail"
-	license    = "GNU GPL-3.0"
+	version     = "v0.0"
+	githubLink  = "https://github.com/bxrne/launchrail"
+	license     = "GNU GPL-3.0"
+	logFilePath = "launchrail.log"
 )
 
+// INFO: Lipgloss styles
 var (
 	accentColor     = lipgloss.Color("#FFA500")
 	titleStyle      = lipgloss.NewStyle().Foreground(accentColor).Bold(true).Padding(1, 2).MarginBottom(1)
 	headerStyle     = lipgloss.NewStyle().Bold(true).Padding(0, 2)
 	footerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Align(lipgloss.Center).Padding(0, 2)
 	footerLinkStyle = lipgloss.NewStyle().Foreground(accentColor).Underline(true).Padding(0, 2)
-	containerStyle  = lipgloss.NewStyle().Margin(1, 2)
-	contentStyle    = lipgloss.NewStyle().Padding(1, 2).Margin(1, 2)
+	containerStyle  = lipgloss.NewStyle().Margin(1, 2)               // INFO: Layout container
+	contentStyle    = lipgloss.NewStyle().Padding(1, 2).Margin(1, 2) // INFO: Layout container
+	logStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Padding(1, 2).Margin(1, 2).Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("#444444"))
+	logPanelHeight  = 16
 )
+
+type logData struct {
+	logger       *log.Logger
+	logs         []string
+	showLogPanel bool
+}
 
 type model struct {
 	spinner spinner.Model
 	width   int
 	height  int
+	logData logData
 }
 
-func initialModel() model {
+func initialModel(logger *log.Logger) model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return model{
 		spinner: sp,
+		logData: logData{
+			logger:       logger,
+			logs:         []string{},
+			showLogPanel: false,
+		},
 	}
 }
 
@@ -60,19 +79,24 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	log := logger.GetLogger()
-	log.Debugf("Update called with message: %v", msg)
+	m.logData.logger.Debugf("Update called with message: %v", msg)
+	m.logData.logs = append(m.logData.logs, fmt.Sprintf("Update called with message: %v", msg))
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		log.Debugf("KeyMsg received: %s", msg.String())
+		m.logData.logger.Debugf("KeyMsg received: %s", msg.String())
+		m.logData.logs = append(m.logData.logs, fmt.Sprintf("KeyMsg received: %s", msg.String()))
 		switch msg.String() {
 		case "ctrl+c", "q":
-			log.Info("Exiting application")
+			m.logData.logger.Info("Exiting application")
+			m.logData.logs = append(m.logData.logs, "Exiting application")
 			return m, tea.Quit
+		case "l":
+			m.logData.showLogPanel = !m.logData.showLogPanel
 		}
 	case tea.WindowSizeMsg:
-		log.Debugf("WindowSizeMsg received: width=%d, height=%d", msg.Width, msg.Height)
+		m.logData.logger.Debugf("WindowSizeMsg received: width=%d, height=%d", msg.Width, msg.Height)
+		m.logData.logs = append(m.logData.logs, fmt.Sprintf("WindowSizeMsg received: width=%d, height=%d", msg.Width, msg.Height))
 		m.width = msg.Width
 		m.height = msg.Height
 	}
@@ -83,22 +107,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	log := logger.GetLogger()
-	log.Debug("View called")
+	m.logData.logger.Debug("View called")
+	m.logData.logs = append(m.logData.logs, "View called")
 
 	header := containerStyle.Render(headerView())
 	footer := containerStyle.Render(footerView())
 	contentHeight := m.height - lipgloss.Height(header) - lipgloss.Height(footer) - 2 // Adjust for padding
-	content := contentStyle.Height(contentHeight).Render(m.spinner.View())
 
-	return fmt.Sprintf("%s\n%s\n%s", header, content, footer)
+	var content string
+	if m.logData.showLogPanel {
+		logPanel := logStyle.Render(utils.Tail(m.logData.logs, 10))
+		contentHeight = contentHeight - logPanelHeight
+
+		content = contentStyle.Height(contentHeight).Render(m.spinner.View())
+		return fmt.Sprintf("%s\n%s\n%s\n%s", header, content, logPanel, footer)
+	} else {
+		content = contentStyle.Height(contentHeight).Render(m.spinner.View())
+		return fmt.Sprintf("%s\n%s\n%s", header, content, footer)
+	}
 }
 
 func main() {
-	log := logger.GetLogger()
+	log := logger.GetLogger(logFilePath)
 	log.Info("Starting Launchrail application")
 
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	p := tea.NewProgram(initialModel(log), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		log.Errorf("Error running program: %v", err)
 		fmt.Printf("Error running program: %v", err)
