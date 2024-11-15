@@ -12,6 +12,18 @@ import (
 	charm_log "github.com/charmbracelet/log"
 )
 
+var (
+	accentColor     = lipgloss.Color("#FFA500")
+	titleStyle      = lipgloss.NewStyle().Foreground(accentColor).Bold(true).Padding(1, 2).MarginBottom(1)
+	headerStyle     = lipgloss.NewStyle().Bold(true).Padding(0, 2)
+	footerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Align(lipgloss.Center).Padding(0, 2)
+	footerLinkStyle = lipgloss.NewStyle().Foreground(accentColor).Underline(true).Padding(0, 2)
+	containerStyle  = lipgloss.NewStyle().Margin(1, 2)               // INFO: Layout container
+	contentStyle    = lipgloss.NewStyle().Padding(1, 2).Margin(1, 2) // INFO: Layout container
+	logStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Padding(1, 2).Margin(1, 2).Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("#444444"))
+	logPanelHeight  = 16
+)
+
 type model struct {
 	spinner spinner.Model
 	width   int
@@ -54,6 +66,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.spinner, cmd = m.spinner.Update(msg)
 	return m, cmd
+}
+
+func (m *model) headerView() string {
+	title := titleStyle.Render("🚀 Launchrail")
+	desc := headerStyle.Render("Risk-neutral trajectory simulation for sounding rockets via the Black-Scholes model.\n'ctrl+c' or 'q' to quit.")
+	return fmt.Sprintf("%s\n%s\n", title, desc)
+}
+
+func (m *model) footerView() string {
+	githubText := footerLinkStyle.Render(m.cfg.App.Repo)
+	licenseText := footerStyle.Render(m.cfg.App.License)
+	versionText := footerStyle.Render(m.cfg.App.Version)
+	return fmt.Sprintf("%s | %s | %s\n", versionText, licenseText, githubText)
 }
 
 func (m model) View() string {
