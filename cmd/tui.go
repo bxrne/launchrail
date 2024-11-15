@@ -37,15 +37,15 @@ type promptedData struct {
 }
 
 var (
-	accentStyle    = lipgloss.Color("#FFA500")
-	secondaryStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
-	promptStyle    = lipgloss.NewStyle().Foreground(accentStyle).Margin(0, 2)
-	titleStyle     = lipgloss.NewStyle().Foreground(accentStyle).Bold(true)
+	accentColor    = lipgloss.Color("#FFA500")
+	promptStyle    = lipgloss.NewStyle().Foreground(accentColor)
+	titleStyle     = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
 	descStyle      = lipgloss.NewStyle().Bold(true).PaddingTop(1)
-	linkStyle      = lipgloss.NewStyle().Foreground(accentStyle).Underline(true).Align(lipgloss.Center)
-	textInputStyle = lipgloss.NewStyle().Foreground(accentStyle).Bold(true)
-	textStyle      = lipgloss.NewStyle().Foreground(accentStyle).Bold(true)
-	containerStyle = lipgloss.NewStyle().Padding(0).Margin(1, 2)
+	linkStyle      = lipgloss.NewStyle().Foreground(accentColor).Underline(true)
+	textStyle      = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
+	containerStyle = lipgloss.NewStyle().Padding(0).MarginTop(1).MarginLeft(1)
+	footerStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	textInputStyle = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
 )
 
 func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
@@ -102,8 +102,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	header := m.headerView()
-	footer := m.footerView()
+	header := containerStyle.Render(m.headerView())
+	footer := containerStyle.Render(m.footerView())
 
 	var content string
 	switch m.phase {
@@ -112,16 +112,18 @@ func (m model) View() string {
 		m.filePicker.FileAllowed = true
 		m.filePicker.DirAllowed = false
 		m.filePicker.AllowedTypes = []string{"ork"}
-		content = promptStyle.Render("Pick an OpenRocket design file (.ork):")
-		content = lipgloss.JoinVertical(lipgloss.Top, content, m.filePicker.View())
+
+		q := containerStyle.Render(promptStyle.Render("Pick an OpenRocket design file (.ork):"))
+		content = lipgloss.JoinVertical(lipgloss.Top, q, m.filePicker.View())
 
 	case selectMotorThrustFile:
 		m.filePicker.Height = m.height - 4
 		m.filePicker.FileAllowed = true
 		m.filePicker.DirAllowed = false
 		m.filePicker.AllowedTypes = []string{"eng"}
-		content = promptStyle.Render("Pick Motor thrust curve file (.eng):")
-		content = lipgloss.JoinVertical(lipgloss.Top, content, m.filePicker.View())
+
+		q := containerStyle.Render(promptStyle.Render("Pick Motor thrust curve file (.eng):"))
+		content = lipgloss.JoinVertical(lipgloss.Top, q, m.filePicker.View())
 
 	case finalPhase:
 		content = m.finalView()
@@ -136,10 +138,10 @@ func (m model) headerView() string {
 	return fmt.Sprintf("%s\n%s", title, desc)
 }
 
-func (m model) footerView() string {
+func (m *model) footerView() string {
 	githubText := linkStyle.Render(m.cfg.App.Repo)
-	licenseText := secondaryStyle.Render(m.cfg.App.License)
-	versionText := secondaryStyle.Render(m.cfg.App.Version)
+	licenseText := footerStyle.Render(m.cfg.App.License)
+	versionText := footerStyle.Render(m.cfg.App.Version)
 	return fmt.Sprintf("%s | %s | %s\n", versionText, licenseText, githubText)
 }
 
@@ -154,5 +156,5 @@ func (m model) finalView() string {
 		return fmt.Sprintf("Error creating Rocket: %v", err)
 	}
 
-	return rocket.Info()
+	return containerStyle.Render(rocket.Info())
 }
