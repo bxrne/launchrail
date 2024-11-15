@@ -1,6 +1,6 @@
 # launchrail
 
-[![Build and Test](https://github.com/bxrne/launchrail/actions/workflows/ci.yaml/badge.svg)](https://github.com/bxrne/launchrail/actions/workflows/ci.yaml) [![codecov](https://codecov.io/gh/bxrne/launchrail/graph/badge.svg?token=HDTJQK087F)](https://codecov.io/gh/bxrne/launchrail) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=bxrne_launchrail&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bxrne_launchrail)
+[![Build and Test](https://github.com/bxrne/launchrail/actions/workflows/ci.yaml/badge.svg)](https://github.com/bxrne/launchrail/actions/workflows/ci.yaml) [![codecov](https://codecov.io/gh/bxrne/launchrail/graph/badge.svg?token=HDTJQK087F)](https://codecov.io/gh/bxrne/launchrail)
 
 > ”Can the Black-Scholes model be adapted to simulate risk-neutral baseline trajectories for high powered rocket launches?”
 
