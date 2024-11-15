@@ -18,6 +18,21 @@ go test ./pkg/...
 go run ./cmd
 ```
 
+## Configuration
+
+Application can be configured via the `config.yaml` file in the root directory. The configuration file is in YAML format and contains the following fields:
+
+Note: Go allows using `testdata` directory for testing purposes, so the configuration file is loaded from the `testdata` directory in testing.
+
+```yaml
+app:
+  version: "0.0.1"
+  license: "GNU GPL v3"
+  repo: "https://github.com/bxrne/launchrail"
+logs:
+  file: "launchrail.log"
+```
+
 ## Literature Review (WIP)
 
 There is a lot of literature in aerospace simulation, notably for aerospace vehicle simulation and analysis under 6 degrees of freedom [1] and for sounding rockets the simulation and analysis of their results such as landing zones and construction error risk impact on stability [2]. The intersection of options pricing and aerospace design is the integrating of economic principles of cost, return, risk, flexibility, and other concepts from Black-Scholes option pricing theory and the multiplicative binomial process [3]. There is a gap to produce a risk-neutral baseline simulation method for sub orbital rockets that will improve mission and vehicle design via comparison in simulation.

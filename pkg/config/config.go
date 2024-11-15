@@ -9,7 +9,6 @@ import (
 
 type Config struct {
 	App struct {
-		Name    string `mapstructure:"name"`
 		Version string `mapstructure:"version"`
 		License string `mapstructure:"license"`
 		Repo    string `mapstructure:"repo"`
