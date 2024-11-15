@@ -5,127 +5,118 @@ import (
 	"encoding/xml"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/charmbracelet/log"
 	"github.com/pkg/errors"
 )
 
-// WARNING: The .ork is actually a zip file with the extension changed to .ork
-func DecompressTo(log *log.Logger, filePath string, outputFilePath string) error {
-	file, err := os.Open(filePath)
-	if err != nil {
-		log.Errorf("could not open file: %s", err)
-		return err
-	}
-
-	defer func() {
-		if cerr := file.Close(); cerr != nil {
-			log.Errorf("error closing file: %s", cerr)
-		}
-	}()
-
-	info, err := file.Stat()
-	if err != nil {
-		log.Errorf("could not get file info: %s", err)
-		return err
-	}
-
-	reader, err := zip.NewReader(file, info.Size())
-	if err != nil {
-		log.Errorf("could not open as zip file: %s", err)
-		return err
-	}
-
-	for _, f := range reader.File {
-		if f.Name == "rocket.ork" { // WARNING: File now exists in the zip archive (weird)
-			rc, err := f.Open()
-			if err != nil {
-				log.Errorf("could not open 'rocket.ork': %s", err)
-				return err
-			}
-			defer func() {
-				if cerr := rc.Close(); cerr != nil {
-					log.Errorf("error closing zip file entry: %s", cerr)
-				}
-			}()
-
-			xmlData, err := io.ReadAll(rc)
-			if err != nil {
-				log.Errorf("could not read XML data: %s", err)
-				return err
-			}
-
-			err = os.WriteFile(outputFilePath, xmlData, 0644)
-			if err != nil {
-				log.Errorf("could not write XML data: %s", err)
-				return err
-			}
-
-			log.Infof("Decompressed %s to %s", filePath, outputFilePath)
-
-			return nil
-		}
-	}
-
-	log.Errorf("'rocket.ork' not found in the zip archive")
-	return errors.Errorf("'rocket.ork' not found in the zip archive")
+type orkFile struct {
+	file       *os.File
+	zipReader  *zip.Reader
+	rocketFile *zip.File
 }
 
-func Decompress(filePath string) (*Openrocket, error) {
-	file, err := os.Open(filePath)
+func openOrkFile(path string) (*orkFile, error) {
+	file, err := os.Open(path)
 	if err != nil {
-		log.Errorf("could not open file: %s", err)
-		return nil, err
+		return nil, errors.Wrap(err, "opening file")
 	}
-	defer func() {
-		if cerr := file.Close(); cerr != nil {
-			log.Errorf("error closing file: %s", cerr)
-		}
-	}()
 
 	info, err := file.Stat()
 	if err != nil {
-		log.Errorf("could not get file info: %s", err)
-		return nil, err
+		file.Close()
+		return nil, errors.Wrap(err, "getting file info")
 	}
 
 	reader, err := zip.NewReader(file, info.Size())
 	if err != nil {
-		log.Errorf("could not open as zip file: %s", err)
-		return nil, err
+		file.Close()
+		return nil, errors.Wrap(err, "creating zip reader")
 	}
 
+	var rocketFile *zip.File
 	for _, f := range reader.File {
-		if f.Name == "rocket.ork" { // WARNING: File now exists in the zip archive (weird)
-			rc, err := f.Open()
-			if err != nil {
-				log.Errorf("could not open 'rocket.ork': %s", err)
-				return nil, err
-			}
-			defer func() {
-				if cerr := rc.Close(); cerr != nil {
-					log.Errorf("error closing zip file entry: %s", cerr)
-				}
-			}()
-
-			xmlData, err := io.ReadAll(rc)
-			if err != nil {
-				log.Errorf("could not read XML data: %s", err)
-				return nil, err
-			}
-
-			var rocket Openrocket
-			err = xml.Unmarshal(xmlData, &rocket)
-			if err != nil {
-				log.Errorf("could not unmarshal XML data: %s", err)
-				return nil, err
-			}
-
-			return &rocket, nil
+		if f.Name == "rocket.ork" {
+			rocketFile = f
+			break
 		}
 	}
 
-	log.Errorf("'rocket.ork' not found in the zip archive")
-	return nil, errors.Errorf("'rocket.ork' not found in the zip archive")
+	if rocketFile == nil {
+		file.Close()
+		return nil, errors.New("rocket.ork not found in archive")
+	}
 
+	return &orkFile{
+		file:       file,
+		zipReader:  reader,
+		rocketFile: rocketFile,
+	}, nil
+}
+
+func (o *orkFile) Close() error {
+	return o.file.Close()
+}
+
+func (o *orkFile) readRocketData() ([]byte, error) {
+	rc, err := o.rocketFile.Open()
+	if err != nil {
+		return nil, errors.Wrap(err, "opening rocket.ork")
+	}
+	defer rc.Close()
+
+	return io.ReadAll(rc)
+}
+
+// DecompressTo extracts rocket.ork data to the specified output file
+func DecompressTo(logger *log.Logger, filePath string, outputFilePath string) error {
+	ork, err := openOrkFile(filePath)
+	if err != nil {
+		logger.Error("failed to open ork file", "error", err)
+		return err
+	}
+	defer ork.Close()
+
+	xmlData, err := ork.readRocketData()
+	if err != nil {
+		logger.Error("failed to read rocket data", "error", err)
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(outputFilePath), 0755); err != nil {
+		logger.Error("failed to create output directory", "error", err)
+		return errors.Wrap(err, "creating output directory")
+	}
+
+	if err := os.WriteFile(outputFilePath, xmlData, 0644); err != nil {
+		logger.Error("failed to write output file", "error", err)
+		return errors.Wrap(err, "writing output file")
+	}
+
+	logger.Info("successfully decompressed file",
+		"input", filePath,
+		"output", outputFilePath)
+	return nil
+}
+
+// Decompress extracts and parses the rocket.ork file into an Openrocket struct
+func Decompress(filePath string) (*Openrocket, error) {
+	ork, err := openOrkFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer ork.Close()
+
+	xmlData, err := ork.readRocketData()
+	if err != nil {
+		return nil, err
+	}
+
+	var rocket Openrocket
+	if err := xml.Unmarshal(xmlData, &rocket); err != nil {
+		return nil, errors.Wrap(err, "unmarshaling XML")
+	}
+
+	return &rocket, nil
 }

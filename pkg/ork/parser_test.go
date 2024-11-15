@@ -4,91 +4,106 @@ import (
 	"archive/zip"
 	"bytes"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/bxrne/launchrail/pkg/ork"
 	"github.com/charmbracelet/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// TEST: GIVEN a valid .ork file WHEN DecompressTo is called THEN it should extract the XML data correctly
+func createTestZip(t *testing.T, content []byte) string {
+	dir := t.TempDir()
+	zipPath := filepath.Join(dir, "test.ork")
+
+	// Create a buffer to write our zip to
+	buf := new(bytes.Buffer)
+	w := zip.NewWriter(buf)
+
+	// Add rocket.ork file to the zip
+	f, err := w.Create("rocket.ork")
+	require.NoError(t, err)
+
+	if content != nil {
+		_, err = f.Write(content)
+		require.NoError(t, err)
+	}
+
+	err = w.Close()
+	require.NoError(t, err)
+
+	// Write the zip file
+	err = os.WriteFile(zipPath, buf.Bytes(), 0644)
+	require.NoError(t, err)
+
+	return zipPath
+}
+
+// TEST: GIVEN a valid ork file WHEN DecompressTo is called THEN it should extract the rocket data correctly
 func TestDecompressTo_ValidFile(t *testing.T) {
-	inputFilePath := "../../testdata/ULR3.ork"
-	outputFile, err := os.CreateTemp("", "output_*.xml")
-	assert.NoError(t, err)
-	defer os.Remove(outputFile.Name())
+	logger := log.New(os.Stderr)
+	input := createTestZip(t, []byte(`<openrocket>test</openrocket>`))
+	output := filepath.Join(t.TempDir(), "output.xml")
 
-	logger := log.NewWithOptions(nil, log.Options{})
-	err = ork.DecompressTo(logger, inputFilePath, outputFile.Name())
+	err := ork.DecompressTo(logger, input, output)
 	assert.NoError(t, err)
 
-	_, err = os.ReadFile(outputFile.Name())
-	assert.NoError(t, err)
-	assert.NotNil(t, outputFile)
+	content, err := os.ReadFile(output)
+	require.NoError(t, err)
+	assert.Equal(t, "<openrocket>test</openrocket>", string(content))
 }
 
-// TEST: GIVEN a non-existent .ork file WHEN DecompressTo is called THEN it should return an error
-func TestDecompressTo_FileNotFound(t *testing.T) {
-	logger := log.NewWithOptions(nil, log.Options{})
-	err := ork.DecompressTo(logger, "non_existent_file.ork", "output.xml")
+// TEST: GIVEN a nonexistent file WHEN DecompressTo is called THEN it should return an error
+func TestDecompressTo_NonexistentFile(t *testing.T) {
+	logger := log.New(os.Stderr)
+	err := ork.DecompressTo(logger, "nonexistent.ork", "output.xml")
 	assert.Error(t, err)
 }
 
-// TEST: GIVEN a .ork file without rocket.ork WHEN DecompressTo is called THEN it should return an error
-func TestDecompressTo_MissingRocketFile(t *testing.T) {
-	buf := new(bytes.Buffer)
-	zipWriter := zip.NewWriter(buf)
-	_, err := zipWriter.Create("otherfile.txt")
-	assert.NoError(t, err)
-	err = zipWriter.Close()
-	assert.NoError(t, err)
+// TEST: GIVEN an invalid zip file WHEN DecompressTo is called THEN it should return an error
+func TestDecompressTo_InvalidZip(t *testing.T) {
+	logger := log.New(os.Stderr)
+	invalidFile := filepath.Join(t.TempDir(), "invalid.ork")
+	require.NoError(t, os.WriteFile(invalidFile, []byte("not a zip file"), 0644))
 
-	tmpFile, err := os.CreateTemp("", "test_*.ork")
-	assert.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
-
-	_, err = tmpFile.Write(buf.Bytes())
-	assert.NoError(t, err)
-	tmpFile.Close()
-
-	logger := log.NewWithOptions(nil, log.Options{})
-	err = ork.DecompressTo(logger, tmpFile.Name(), "output.xml")
+	err := ork.DecompressTo(logger, invalidFile, "output.xml")
 	assert.Error(t, err)
 }
 
-// TEST: GIVEN a valid .ork file WHEN Decompress is called THEN it should return the correct Openrocket struct
+// TEST: GIVEN a zip file without rocket.ork WHEN DecompressTo is called THEN it should return an error
+func TestDecompressTo_MissingRocketOrk(t *testing.T) {
+	logger := log.New(os.Stderr)
+	input := createTestZip(t, nil)
+
+	err := ork.DecompressTo(logger, input, "output.xml")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "rocket.ork not found")
+}
+
+// TEST: GIVEN a valid ork file WHEN Decompress is called THEN it should parse the XML data correctly
 func TestDecompress_ValidFile(t *testing.T) {
-	inputFilePath := "../../testdata/ULR3.ork"
+	input := createTestZip(t, []byte(`<openrocket version="1.0"><rocket><name>Test Rocket</name></rocket></openrocket>`))
 
-	orkData, err := ork.Decompress(inputFilePath)
+	rocket, err := ork.Decompress(input)
 	assert.NoError(t, err)
-	assert.NotNil(t, orkData)
-	assert.Equal(t, "ULR3", orkData.Rocket.Name)
+	assert.NotNil(t, rocket)
+	assert.Equal(t, "1.0", rocket.Version)
+	assert.Equal(t, "Test Rocket", rocket.Rocket.Name)
 }
 
-// TEST: GIVEN a non-existent .ork file WHEN Decompress is called THEN it should return an error
-func TestDecompress_FileNotFound(t *testing.T) {
-	_, err := ork.Decompress("non_existent_file.ork")
+// TEST: GIVEN an invalid XML content WHEN Decompress is called THEN it should return an error
+func TestDecompress_InvalidXML(t *testing.T) {
+	input := createTestZip(t, []byte(`invalid xml content`))
+
+	rocket, err := ork.Decompress(input)
 	assert.Error(t, err)
+	assert.Nil(t, rocket)
 }
 
-// TEST: GIVEN a .ork file without rocket.ork WHEN Decompress is called THEN it should return an error
-func TestDecompress_MissingRocketFile(t *testing.T) {
-	buf := new(bytes.Buffer)
-	zipWriter := zip.NewWriter(buf)
-	_, err := zipWriter.Create("otherfile.txt")
-	assert.NoError(t, err)
-	err = zipWriter.Close()
-	assert.NoError(t, err)
-
-	tmpFile, err := os.CreateTemp("", "test_*.ork")
-	assert.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
-
-	_, err = tmpFile.Write(buf.Bytes())
-	assert.NoError(t, err)
-	tmpFile.Close()
-
-	_, err = ork.Decompress(tmpFile.Name())
+// TEST: GIVEN a nonexistent file WHEN Decompress is called THEN it should return an error
+func TestDecompress_NonexistentFile(t *testing.T) {
+	rocket, err := ork.Decompress("nonexistent.ork")
 	assert.Error(t, err)
+	assert.Nil(t, rocket)
 }
