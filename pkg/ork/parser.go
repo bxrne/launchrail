@@ -71,7 +71,7 @@ func DecompressTo(log *log.Logger, filePath string, outputFilePath string) error
 	return errors.Errorf("'rocket.ork' not found in the zip archive")
 }
 
-func Decompress(log *log.Logger, filePath string) (*Openrocket, error) {
+func Decompress(filePath string) (*Openrocket, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Errorf("could not open file: %s", err)
