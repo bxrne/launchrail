@@ -103,27 +103,29 @@ logs:
 	assert.Equal(t, cfg1, cfg2)
 }
 
-// TEST: GIVEN an invalid config file WHEN LoadConfig is called THEN it should return an error and nil instance
-func TestLoadConfig_Invalid(t *testing.T) {
+// TEST: GIVEN a config file with invalid structure WHEN LoadConfig is called THEN it should return an error while unmarshalling
+func TestLoadConfig_InvalidStructure(t *testing.T) {
 	resetSingleton()
 
-	configContent := `
-app
-  version: "0.0.1"
-  license: "GNU GPL v3"
-  repo: "https://github.com/bxrne/launchrail"
+	// This YAML is valid format-wise but has values that cannot be marshalled into the expected struct
+	invalidConfigContent := `
+app:
+  version: 0.0.1  # should be a string
+  license: 123    # should be a string
+  repo: true      # should be a string
 logs:
-  file: "launchrail.log"
+  file: []        # should be a string
 `
-	tmpFile, err := os.CreateTemp("", "config_test_*.yaml")
+
+	tmpFile, err := os.CreateTemp("", "config_test_invalid_structure_*.yaml")
 	assert.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
-	_, err = tmpFile.Write([]byte(configContent))
+	_, err = tmpFile.Write([]byte(invalidConfigContent))
 	assert.NoError(t, err)
 	tmpFile.Close()
 
-	cfg1, err := LoadConfig(tmpFile.Name())
+	_, err = LoadConfig(tmpFile.Name())
 	assert.Error(t, err)
-	assert.Nil(t, cfg1)
+	assert.Contains(t, err.Error(), "unable to decode config into struct")
 }
