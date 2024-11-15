@@ -18,8 +18,8 @@ func TestNewAssembly_ValidInput(t *testing.T) {
 	assembly, err := entities.NewAssembly(*orkConfig, thrustCurvePath)
 	assert.NoError(t, err)
 	assert.NotNil(t, assembly)
-	assert.Equal(t, "Test Rocket", assembly.Rocket.Name)
-	assert.Equal(t, "Test Designer", assembly.Rocket.Designer)
+	assert.Equal(t, "ULR3", assembly.Rocket.Name)
+	assert.Equal(t, "Daire ", assembly.Rocket.Designer)
 	assert.NotNil(t, assembly.Rocket.Motor)
 }
 
@@ -47,5 +47,5 @@ func TestAssembly_Info(t *testing.T) {
 	assert.NotNil(t, assembly)
 
 	info := assembly.Info()
-	assert.Equal(t, "Test Rocket by Test Designer", info)
+	assert.Equal(t, "ULR3 by Daire ", info)
 }
