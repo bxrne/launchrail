@@ -1,4 +1,4 @@
-package tui
+package main
 
 import (
 	"fmt"
@@ -46,7 +46,7 @@ var (
 	containerStyle = lipgloss.NewStyle().Padding(0).Margin(1, 2)
 )
 
-func New(cfg *config.Config, logger *charm_log.Logger) *tea.Program {
+func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
 	fp := filepicker.New()
 
 	ti := textinput.New()
@@ -55,14 +55,13 @@ func New(cfg *config.Config, logger *charm_log.Logger) *tea.Program {
 	ti.TextStyle = textStyle
 	ti.Focus()
 
-	m := model{
+	return model{
 		filePicker: fp,
 		textInput:  ti,
 		logger:     logger,
 		cfg:        cfg,
 		phase:      selectOpenRocketFile,
 	}
-	return tea.NewProgram(m)
 }
 
 func (m model) Init() tea.Cmd {
