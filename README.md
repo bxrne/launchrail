@@ -1,6 +1,6 @@
 # launchrail
 
-[![gobuild](https://github.com/bxrne/launchrail/actions/workflows/gobuild.yml/badge.svg)](https://github.com/bxrne/launchrail/actions/workflows/gobuild.yml)
+[![ci](https://github.com/bxrne/launchrail/actions/workflows/ci.yml/badge.svg)](https://github.com/bxrne/launchrail/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/bxrne/launchrail/graph/badge.svg?token=HDTJQK087F)](https://codecov.io/gh/bxrne/launchrail)
 
 > ”Can the Black-Scholes model be adapted to simulate risk-neutral baseline trajectories for high powered rocket launches?”
 
