@@ -39,3 +39,9 @@ func GetLogger(fileOutPath string) (*log.Logger, error) {
 
 	return instance, nil
 }
+
+// WARN: Do not use. It is for testing
+func Reset() {
+	instance = nil
+	once = sync.Once{}
+}

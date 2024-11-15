@@ -4,11 +4,11 @@ import "github.com/bxrne/launchrail/pkg/ork"
 
 type Assembly struct {
 	config ork.Openrocket
-	rocket Rocket
+	Rocket Rocket
 }
 
 func (a *Assembly) Info() string {
-	return a.rocket.Name + " by " + a.rocket.Designer
+	return a.Rocket.Name + " by " + a.Rocket.Designer
 }
 
 func NewAssembly(orkConfig ork.Openrocket, thrustCurvePath string) (*Assembly, error) {
@@ -18,7 +18,7 @@ func NewAssembly(orkConfig ork.Openrocket, thrustCurvePath string) (*Assembly, e
 		return nil, err
 	}
 
-	assembly.rocket = Rocket{
+	assembly.Rocket = Rocket{
 		Name:     orkConfig.Rocket.Name,
 		Designer: orkConfig.Rocket.Designer,
 		Motor:    motor,

@@ -16,7 +16,6 @@ import (
 type model struct {
 	filePicker   filepicker.Model
 	textInput    textinput.Model
-	width        int
 	height       int
 	logger       *charm_log.Logger
 	cfg          *config.Config
