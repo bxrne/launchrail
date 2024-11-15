@@ -12,8 +12,8 @@ Final Year Project for BSc component of MSc (3+1) Immersive Software Engineering
 git clone https://github.com/bxrne/launchrail.git
 cd launchrail
 
-go mod tidy
-go test ./pkg/...
+go mod download
+go test ./...
 
 go run ./cmd
 ```
