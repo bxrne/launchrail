@@ -12,12 +12,6 @@ import (
 	charm_log "github.com/charmbracelet/log"
 )
 
-type Data struct {
-	rocketFile string
-	motorFile  string
-}
-
-// model struct to hold the state
 type model struct {
 	spinner    spinner.Model
 	filePicker filepicker.Model
@@ -27,27 +21,24 @@ type model struct {
 	logger     *charm_log.Logger
 	cfg        *config.Config
 	phase      phase
-	data       Data
+	data       promptedData
 }
 
 type phase int
 
 const (
-	selectRocketFile phase = iota
-	selectMotorFile
+	selectOpenRocketFile phase = iota
+	selectMotorThrustFile
 	finalPhase
 )
 
-// Initial model to start with spinner and file picker
-func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
-	sp := spinner.New()
-	sp.Spinner = spinner.Dot
-	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+type promptedData struct {
+	rocketFile string
+	motorFile  string
+}
 
+func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
 	fp := filepicker.New()
-	fp.AllowedTypes = []string{".ork", ".eng"} // Allowed file types
-	fp.FileAllowed = true
-	fp.DirAllowed = false
 
 	ti := textinput.New()
 	ti.Placeholder = "Enter value here..."
@@ -56,12 +47,11 @@ func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
 	ti.Focus()
 
 	return model{
-		spinner:    sp,
 		filePicker: fp,
 		textInput:  ti,
 		logger:     logger,
 		cfg:        cfg,
-		phase:      selectRocketFile,
+		phase:      selectOpenRocketFile,
 	}
 }
 
@@ -76,35 +66,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			m.logger.Debug("Ctrl+C or 'q' pressed, quitting")
 			return m, tea.Quit
-
-		case "enter":
-			switch m.phase {
-			case selectRocketFile:
-				if m.filePicker.FileSelected != "" {
-					m.data.rocketFile = m.filePicker.FileSelected
-					fmt.Println("Rocket design file:", m.data.rocketFile)
-					m.phase = selectMotorFile
-				}
-			case selectMotorFile:
-				if m.filePicker.FileSelected != "" {
-					m.data.motorFile = m.filePicker.FileSelected
-					fmt.Println("Motor thrust curve file:", m.data.motorFile)
-					m.phase = finalPhase
-					return m, tea.Quit
-				}
-			}
 		}
 	}
 
 	var cmds []tea.Cmd
-	if m.phase == selectRocketFile || m.phase == selectMotorFile {
-		newFilePicker, cmd := m.filePicker.Update(msg)
-		m.filePicker = newFilePicker
-		cmds = append(cmds, cmd)
+
+	var fpCmd tea.Cmd
+	m.filePicker, fpCmd = m.filePicker.Update(msg)
+	cmds = append(cmds, fpCmd)
+
+	selected, file := m.filePicker.DidSelectFile(msg)
+	if selected {
+		switch m.phase {
+		case selectOpenRocketFile:
+			m.data.rocketFile = file
+			m.phase = selectMotorThrustFile
+		case selectMotorThrustFile:
+			m.data.motorFile = file
+			m.phase = finalPhase
+		}
 	}
 
-	newSpinner, spinnerCmd := m.spinner.Update(msg)
-	m.spinner = newSpinner
+	var spinnerCmd tea.Cmd
+	m.spinner, spinnerCmd = m.spinner.Update(msg)
 	cmds = append(cmds, spinnerCmd)
 
 	return m, tea.Batch(cmds...)
@@ -116,10 +100,17 @@ func (m model) View() string {
 
 	var content string
 	switch m.phase {
-	case selectRocketFile:
+	case selectOpenRocketFile:
 		m.filePicker.Height = m.height - 4
+		m.filePicker.FileAllowed = true
+		m.filePicker.DirAllowed = false
+		m.filePicker.AllowedTypes = []string{"ork"}
 		content = m.filePicker.View()
-	case selectMotorFile:
+	case selectMotorThrustFile:
+		m.filePicker.Height = m.height - 4
+		m.filePicker.FileAllowed = true
+		m.filePicker.DirAllowed = false
+		m.filePicker.AllowedTypes = []string{"eng"}
 		content = m.filePicker.View()
 	case finalPhase:
 		content = m.finalView()
