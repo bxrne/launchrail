@@ -50,6 +50,8 @@ var (
 
 func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
 	fp := filepicker.New()
+	fp.AutoHeight = false
+	fp.Height = 5
 
 	ti := textinput.New()
 	ti.Placeholder = "Enter value here..."
@@ -134,8 +136,9 @@ func (m model) View() string {
 
 func (m model) headerView() string {
 	title := titleStyle.Render("🚀 Launchrail")
-	desc := descStyle.Render("Risk-neutral trajectory simulation for sounding rockets.\nPress 'ctrl+c' or 'q' to quit.\n")
-	return fmt.Sprintf("%s\n%s", title, desc)
+	desc := descStyle.Render("Risk-neutral trajectory simulation for sounding rockets.")
+	instructions := "Press 'ctrl+c' or 'q' to quit.\n"
+	return fmt.Sprintf("%s\n%s\n%s", title, desc, instructions)
 }
 
 func (m *model) footerView() string {
