@@ -14,12 +14,17 @@ var (
 )
 
 // NOTE: Returns the singleton logger instance
-func GetLogger() *log.Logger {
+func GetLogger(fileOutPath string) (*log.Logger, error) {
+	var err error
+
 	once.Do(func() {
-		logFile, err := os.OpenFile("launchrail.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		var logFile *os.File
+
+		logFile, err = os.OpenFile(fileOutPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
-			panic(err)
+			return
 		}
+
 		instance = log.NewWithOptions(logFile, log.Options{
 			ReportCaller:    true,
 			ReportTimestamp: true,
@@ -27,5 +32,16 @@ func GetLogger() *log.Logger {
 			Level:           log.DebugLevel,
 		})
 	})
-	return instance
+
+	if err != nil {
+		return nil, err
+	}
+
+	return instance, nil
+}
+
+// WARN: Do not use. It is for testing
+func Reset() {
+	instance = nil
+	once = sync.Once{}
 }

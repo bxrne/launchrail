@@ -1,47 +1,80 @@
 package entities_test
 
 import (
+	"os"
 	"testing"
 	"time"
 
 	"github.com/bxrne/launchrail/pkg/entities"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestNewSolidMotor(t *testing.T) {
-	motor, err := entities.NewSolidMotor("../../testdata/cesaroni-l645.eng")
-	if err != nil {
-		t.Fatalf("Failed to create SolidMotor: %v", err)
-	}
+// TEST: GIVEN a valid motor file WHEN NewSolidMotor is called THEN it should parse the motor data correctly
+func TestNewSolidMotor_ValidFile(t *testing.T) {
+	motorFileContent := `
+; This is a comment
+M1234 54 100 APCP 500 250 ManufacturerX
+0.0 0
+0.5 100
+1.0 200
+1.5 150
+2.0 0
+`
+	tmpFile, err := os.CreateTemp("", "motor_test_*.eng")
+	assert.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
 
-	if motor.Manufacturer != "CTI" {
-		t.Errorf("Expected Manufacturer 'CTI', got '%s'", motor.Manufacturer)
-	}
+	_, err = tmpFile.Write([]byte(motorFileContent))
+	assert.NoError(t, err)
+	tmpFile.Close()
 
-	if motor.Designation != "3419-L645-GR-P" {
-		t.Errorf("Expected Designation '3419-L645-GR-P', got '%s'", motor.Designation)
-	}
+	motor, err := entities.NewSolidMotor(tmpFile.Name())
+	assert.NoError(t, err)
+	assert.NotNil(t, motor)
 
-	if motor.Diameter != 75 {
-		t.Errorf("Expected Diameter 75, got %f", motor.Diameter)
-	}
+	assert.Equal(t, "M1234", motor.Designation)
+	assert.Equal(t, 54.0, motor.Diameter)
+	assert.Equal(t, 100.0, motor.Length)
+	assert.Equal(t, "APCP", motor.Propellant)
+	assert.Equal(t, 500.0, motor.TotalImpulse)
+	assert.Equal(t, 250.0, motor.AverageThrust)
+	assert.Equal(t, "ManufacturerX", motor.Manufacturer)
+	assert.Equal(t, 2*time.Second, motor.BurnTime)
+	assert.Len(t, motor.ThrustCurve, 5)
+}
 
-	if motor.Length != 486 {
-		t.Errorf("Expected Length 486, got %f", motor.Length)
-	}
+// TEST: GIVEN a non-existent motor file WHEN NewSolidMotor is called THEN it should return an error
+func TestNewSolidMotor_FileNotFound(t *testing.T) {
+	_, err := entities.NewSolidMotor("non_existent_file.eng")
+	assert.Error(t, err)
+}
 
-	if motor.TotalImpulse != 2.1441 {
-		t.Errorf("Expected TotalImpulse 2.1441, got %f", motor.TotalImpulse)
-	}
+// TEST: GIVEN a motor file with missing data WHEN NewSolidMotor is called THEN it should handle the missing data gracefully
+func TestNewSolidMotor_MissingData(t *testing.T) {
+	motorFileContent := `
+; This is a comment
+M1234 54 100 APCP 500 250 ManufacturerX
+`
+	tmpFile, err := os.CreateTemp("", "motor_test_missing_data_*.eng")
+	assert.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
 
-	if motor.Propellant != "P" {
-		t.Errorf("Expected Propellant 'P', got '%s'", motor.Propellant)
-	}
+	_, err = tmpFile.Write([]byte(motorFileContent))
+	assert.NoError(t, err)
+	tmpFile.Close()
 
-	if motor.AverageThrust != 3.7518 {
-		t.Errorf("Expected AverageThrust 3.7518, got %f", motor.AverageThrust)
-	}
+	motor, err := entities.NewSolidMotor(tmpFile.Name())
+	assert.NoError(t, err)
+	assert.NotNil(t, motor)
 
-	if motor.BurnTime != 5*time.Second+390*time.Millisecond {
-		t.Errorf("Expected BurnTime 5.39s, got %v", motor.BurnTime)
-	}
+	assert.Equal(t, "M1234", motor.Designation)
+	assert.Equal(t, 54.0, motor.Diameter)
+	assert.Equal(t, 100.0, motor.Length)
+	assert.Equal(t, "APCP", motor.Propellant)
+	assert.Equal(t, 500.0, motor.TotalImpulse)
+	assert.Equal(t, 250.0, motor.AverageThrust)
+	assert.Equal(t, "ManufacturerX", motor.Manufacturer)
+	assert.Equal(t, 0*time.Second, motor.BurnTime)
+	assert.Len(t, motor.ThrustCurve, 0)
 }
