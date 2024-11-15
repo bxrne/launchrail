@@ -102,3 +102,28 @@ logs:
 
 	assert.Equal(t, cfg1, cfg2)
 }
+
+// TEST: GIVEN an invalid config file WHEN LoadConfig is called THEN it should return an error and nil instance
+func TestLoadConfig_Invalid(t *testing.T) {
+	resetSingleton()
+
+	configContent := `
+app
+  version: "0.0.1"
+  license: "GNU GPL v3"
+  repo: "https://github.com/bxrne/launchrail"
+logs:
+  file: "launchrail.log"
+`
+	tmpFile, err := os.CreateTemp("", "config_test_*.yaml")
+	assert.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.Write([]byte(configContent))
+	assert.NoError(t, err)
+	tmpFile.Close()
+
+	cfg1, err := LoadConfig(tmpFile.Name())
+	assert.Error(t, err)
+	assert.Nil(t, cfg1)
+}
