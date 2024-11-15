@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/bxrne/launchrail/pkg/config"
+	"github.com/bxrne/launchrail/pkg/entities"
+	"github.com/bxrne/launchrail/pkg/ork"
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -12,14 +14,14 @@ import (
 )
 
 type model struct {
-	filePicker filepicker.Model
-	textInput  textinput.Model
-	width      int
-	height     int
-	logger     *charm_log.Logger
-	cfg        *config.Config
-	phase      phase
-	data       promptedData
+	filePicker   filepicker.Model
+	textInput    textinput.Model
+	width        int
+	height       int
+	logger       *charm_log.Logger
+	cfg          *config.Config
+	phase        phase
+	promptedData promptedData
 }
 
 type phase int
@@ -88,10 +90,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if selected {
 		switch m.phase {
 		case selectOpenRocketFile:
-			m.data.rocketFile = file
+			m.promptedData.rocketFile = file
 			m.phase = selectMotorThrustFile
 		case selectMotorThrustFile:
-			m.data.motorFile = file
+			m.promptedData.motorFile = file
 			m.phase = finalPhase
 		}
 	}
@@ -142,5 +144,15 @@ func (m model) footerView() string {
 }
 
 func (m model) finalView() string {
-	return fmt.Sprintf("Final Rocket Configuration:\nRocket File: %s\nMotor File: %s", m.data.rocketFile, m.data.motorFile)
+	orkData, err := ork.Decompress(m.promptedData.rocketFile)
+	if err != nil {
+		return fmt.Sprintf("Error reading OpenRocket file: %v", err)
+	}
+
+	rocket, err := entities.NewAssembly(*orkData, m.promptedData.motorFile)
+	if err != nil {
+		return fmt.Sprintf("Error creating Rocket: %v", err)
+	}
+
+	return rocket.Info()
 }

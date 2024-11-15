@@ -24,8 +24,8 @@ func main() {
 
 	log.Info("Starting Launchrail application")
 
-	tp := tea.NewProgram(initialModel(cfg, log))
-	if _, err := tp.Run(); err != nil {
+	_, err = tea.NewProgram(initialModel(cfg, log)).Run()
+	if err != nil {
 		log.Errorf("Error starting Launchrail application: %v", err)
 		os.Exit(1) // WARNING: Process exit
 	}

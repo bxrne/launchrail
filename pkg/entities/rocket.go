@@ -17,7 +17,7 @@ func (a *Assembly) Info() string {
 	return a.rocket.Name + " by " + a.rocket.Designer
 }
 
-func NewRocket(orkConfig ork.Openrocket, thrustCurvePath string) (*Assembly, error) {
+func NewAssembly(orkConfig ork.Openrocket, thrustCurvePath string) (*Assembly, error) {
 	assembly := &Assembly{config: orkConfig}
 	motor, err := NewSolidMotor(thrustCurvePath)
 	if err != nil {
