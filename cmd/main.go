@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/bxrne/launchrail/pkg/config"
 	"github.com/bxrne/launchrail/pkg/logger"
-	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	charm_log "github.com/charmbracelet/log"
@@ -18,59 +19,156 @@ var (
 	headerStyle     = lipgloss.NewStyle().Bold(true).Padding(0, 2)
 	footerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Align(lipgloss.Center).Padding(0, 2)
 	footerLinkStyle = lipgloss.NewStyle().Foreground(accentColor).Underline(true).Padding(0, 2)
-	containerStyle  = lipgloss.NewStyle().Margin(1, 2)               // INFO: Layout container
-	contentStyle    = lipgloss.NewStyle().Padding(1, 2).Margin(1, 2) // INFO: Layout container
-	logStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Padding(1, 2).Margin(1, 2).Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("#444444"))
-	logPanelHeight  = 16
+	containerStyle  = lipgloss.NewStyle().Margin(1, 2)
+	contentStyle    = lipgloss.NewStyle().Padding(1, 2).Margin(1, 2)
+)
+
+type Phase int
+
+const (
+	PhaseNumericInput Phase = iota
+	PhaseTextInput
+	PhaseDateInput
+	PhaseSummary
 )
 
 type model struct {
-	spinner spinner.Model
-	width   int
-	height  int
-	logger  *charm_log.Logger
-	cfg     *config.Config
+	width  int
+	height int
+	logger *charm_log.Logger
+	cfg    *config.Config
+	phase  Phase
+	// Inputs
+	numericInput textinput.Model
+	textInput    textinput.Model
+	dateInput    textinput.Model
+	// Collected values
+	numericValue float64
+	textValue    string
+	dateValue    time.Time
 }
 
 func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
-	sp := spinner.New()
-	sp.Spinner = spinner.Dot
-	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	numericInput := textinput.New()
+	numericInput.Placeholder = "Enter a number"
+	numericInput.Focus()
+	numericInput.CharLimit = 20
+	numericInput.Width = 20
 
 	return model{
-		spinner: sp,
-		logger:  logger,
-		cfg:     cfg,
+		logger:       logger,
+		cfg:          cfg,
+		phase:        PhaseNumericInput,
+		numericInput: numericInput,
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return m.spinner.Tick
+	return textinput.Blink
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			m.logger.Debug("Ctrl+C or 'q' pressed, quitting")
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyEsc:
 			return m, tea.Quit
-		}
+		case tea.KeyEnter:
+			switch m.phase {
+			case PhaseNumericInput:
+				// Validate numeric input
+				var value float64
+				_, err := fmt.Sscanf(m.numericInput.Value(), "%f", &value)
+				if err != nil {
+					m.numericInput.SetValue("")
+					m.numericInput.Placeholder = "Invalid number, please enter again"
+					return m, nil
+				}
+				m.numericValue = value
+				m.phase = PhaseTextInput
 
+				m.textInput = textinput.New()
+				m.textInput.Placeholder = "Enter text"
+				m.textInput.Focus()
+				m.textInput.CharLimit = 100
+				m.textInput.Width = 40
+
+			case PhaseTextInput:
+				m.textValue = m.textInput.Value()
+				if m.textValue == "" {
+					m.textInput.Placeholder = "Please enter some text"
+					return m, nil
+				}
+				m.phase = PhaseDateInput
+
+				m.dateInput = textinput.New()
+				m.dateInput.Placeholder = "Enter date (YYYY-MM-DD)"
+				m.dateInput.Focus()
+				m.dateInput.CharLimit = 10
+				m.dateInput.Width = 20
+
+			case PhaseDateInput:
+				dateStr := m.dateInput.Value()
+				date, err := time.Parse("2006-01-02", dateStr)
+				if err != nil {
+					m.dateInput.SetValue("")
+					m.dateInput.Placeholder = "Invalid date, please enter YYYY-MM-DD"
+					return m, nil
+				}
+				m.dateValue = date
+				m.phase = PhaseSummary
+			case PhaseSummary:
+				return m, tea.Quit
+			}
+		}
 	case tea.WindowSizeMsg:
-		m.logger.Debug("Window size message received")
 		m.width = msg.Width
 		m.height = msg.Height
 	}
 
-	var cmd tea.Cmd
-	m.spinner, cmd = m.spinner.Update(msg)
+	switch m.phase {
+	case PhaseNumericInput:
+		m.numericInput, cmd = m.numericInput.Update(msg)
+	case PhaseTextInput:
+		m.textInput, cmd = m.textInput.Update(msg)
+	case PhaseDateInput:
+		m.dateInput, cmd = m.dateInput.Update(msg)
+	}
+
 	return m, cmd
 }
+func (m model) View() string {
+	header := m.headerView()
+	footer := m.footerView()
+	var content string
 
+	switch m.phase {
+	case PhaseNumericInput:
+		content = "Please enter a number:\n\n" + m.numericInput.View()
+	case PhaseTextInput:
+		content = "Please enter text:\n\n" + m.textInput.View()
+	case PhaseDateInput:
+		content = "Please enter a date (YYYY-MM-DD):\n\n" + m.dateInput.View()
+	case PhaseSummary:
+		content = fmt.Sprintf(
+			"Summary:\n\nNumber: %f\nText: %s\nDate: %s",
+			m.numericValue, m.textValue, m.dateValue.Format("2006-01-02"),
+		)
+	}
+
+	// Apply contentStyle to the content
+	content = contentStyle.Render(content)
+
+	// Wrap the entire view with containerStyle
+	return containerStyle.Render(
+		lipgloss.JoinVertical(lipgloss.Left, header, content, footer),
+	)
+}
 func (m *model) headerView() string {
 	title := titleStyle.Render("🚀 Launchrail")
-	desc := headerStyle.Render("Risk-neutral trajectory simulation for sounding rockets via the Black-Scholes model.\n'ctrl+c' or 'q' to quit.")
+	desc := headerStyle.Render("Risk-neutral trajectory simulation for sounding rockets via the Black-Scholes model.\n'Esc' or 'Ctrl+c' to quit.")
 	return fmt.Sprintf("%s\n%s\n", title, desc)
 }
 
@@ -79,18 +177,6 @@ func (m *model) footerView() string {
 	licenseText := footerStyle.Render(m.cfg.App.License)
 	versionText := footerStyle.Render(m.cfg.App.Version)
 	return fmt.Sprintf("%s | %s | %s\n", versionText, licenseText, githubText)
-}
-
-func (m model) View() string {
-	header := containerStyle.Render(m.headerView())
-	footer := containerStyle.Render(m.footerView())
-	contentHeight := m.height - lipgloss.Height(header) - lipgloss.Height(footer) - 2 // Adjust for padding
-
-	var content string
-	content = contentStyle.Height(contentHeight).Render(m.spinner.View())
-
-	return fmt.Sprintf("%s\n%s\n%s", header, content, footer)
-
 }
 
 func main() {
