@@ -38,10 +38,11 @@ type promptedData struct {
 
 var (
 	accentStyle    = lipgloss.Color("#FFA500")
-	promptStyle    = lipgloss.NewStyle().Foreground(accentStyle)
+	secondaryStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	promptStyle    = lipgloss.NewStyle().Foreground(accentStyle).Margin(0, 2)
 	titleStyle     = lipgloss.NewStyle().Foreground(accentStyle).Bold(true)
 	descStyle      = lipgloss.NewStyle().Bold(true).PaddingTop(1)
-	footerStyle    = lipgloss.NewStyle().Foreground(accentStyle).Underline(true)
+	linkStyle      = lipgloss.NewStyle().Foreground(accentStyle).Underline(true).Align(lipgloss.Center)
 	textInputStyle = lipgloss.NewStyle().Foreground(accentStyle).Bold(true)
 	textStyle      = lipgloss.NewStyle().Foreground(accentStyle).Bold(true)
 	containerStyle = lipgloss.NewStyle().Padding(0).Margin(1, 2)
@@ -126,7 +127,7 @@ func (m model) View() string {
 		content = m.finalView()
 	}
 
-	return containerStyle.Render(lipgloss.JoinVertical(lipgloss.Top, header, content, footer))
+	return containerStyle.Render(header, content, footer)
 }
 
 func (m model) headerView() string {
@@ -136,9 +137,9 @@ func (m model) headerView() string {
 }
 
 func (m model) footerView() string {
-	githubText := footerStyle.Render(m.cfg.App.Repo)
-	licenseText := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(m.cfg.App.License)
-	versionText := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(m.cfg.App.Version)
+	githubText := linkStyle.Render(m.cfg.App.Repo)
+	licenseText := secondaryStyle.Render(m.cfg.App.License)
+	versionText := secondaryStyle.Render(m.cfg.App.Version)
 	return fmt.Sprintf("%s | %s | %s\n", versionText, licenseText, githubText)
 }
 
