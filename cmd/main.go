@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bxrne/launchrail/pkg/config"
-	"github.com/bxrne/launchrail/pkg/logger"
+	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/internal/logger"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

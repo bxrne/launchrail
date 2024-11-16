@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/bxrne/launchrail/pkg/logger"
+	"github.com/bxrne/launchrail/internal/logger"
 
 	"github.com/stretchr/testify/assert"
 )
