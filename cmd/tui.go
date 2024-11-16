@@ -6,6 +6,8 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/entities"
 	"github.com/bxrne/launchrail/pkg/ork"
+	"github.com/bxrne/launchrail/pkg/simulation"
+	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -154,10 +156,17 @@ func (m model) finalView() string {
 		return fmt.Sprintf("Error reading OpenRocket file: %v", err)
 	}
 
-	rocket, err := entities.NewAssembly(*orkData, m.promptedData.motorFile)
+	assembly, err := entities.NewAssembly(*orkData, m.promptedData.motorFile)
 	if err != nil {
-		return fmt.Sprintf("Error creating Rocket: %v", err)
+		return fmt.Sprintf("Error creating Assembly: %v", err)
 	}
 
-	return containerStyle.Render(rocket.Info())
+	simConfig := simulation.SimulationConfig{
+		Assembly: *assembly,
+		Mode:     types.ThreeDOF,
+		TimeStep: 0.01,
+		MaxTime:  300.0,
+	}
+
+	return containerStyle.Render(simConfig.Assembly.Info())
 }
