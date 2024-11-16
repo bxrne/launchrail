@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/bxrne/launchrail/pkg/config"
+	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/entities"
 	"github.com/bxrne/launchrail/pkg/ork"
 	"github.com/charmbracelet/bubbles/filepicker"
