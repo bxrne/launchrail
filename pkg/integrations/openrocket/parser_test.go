@@ -1,4 +1,4 @@
-package ork_test
+package openrocket_test
 
 import (
 	"archive/zip"
@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/bxrne/launchrail/pkg/ork"
+	"github.com/bxrne/launchrail/pkg/integrations/openrocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,7 +43,7 @@ func createTestZip(t *testing.T, content []byte) string {
 func TestDecompress_ValidFile(t *testing.T) {
 	input := createTestZip(t, []byte(`<openrocket version="1.0"><rocket><name>Test Rocket</name></rocket></openrocket>`))
 
-	rocket, err := ork.Decompress(input)
+	rocket, err := openrocket.Decompress(input)
 	assert.NoError(t, err)
 	assert.NotNil(t, rocket)
 	assert.Equal(t, "1.0", rocket.Version)
@@ -54,14 +54,14 @@ func TestDecompress_ValidFile(t *testing.T) {
 func TestDecompress_InvalidXML(t *testing.T) {
 	input := createTestZip(t, []byte(`invalid xml content`))
 
-	rocket, err := ork.Decompress(input)
+	rocket, err := openrocket.Decompress(input)
 	assert.Error(t, err)
 	assert.Nil(t, rocket)
 }
 
 // TEST: GIVEN a nonexistent file WHEN Decompress is called THEN it should return an error
 func TestDecompress_NonexistentFile(t *testing.T) {
-	rocket, err := ork.Decompress("nonexistent.ork")
+	rocket, err := openrocket.Decompress("nonexistent.ork")
 	assert.Error(t, err)
 	assert.Nil(t, rocket)
 }

@@ -1,4 +1,4 @@
-package entities
+package components
 
 type Environment struct {
 	Latitude         float64
