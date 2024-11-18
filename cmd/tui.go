@@ -97,6 +97,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.earthList.SetSize(msg.Width, msg.Height-5)
+		m.atmosphereList.SetSize(msg.Width, msg.Height-5)
+	}
+
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -146,8 +152,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	header := m.headerView()
-	footer := m.footerView()
+	title := titleStyle.Render("🚀 Launchrail")
+	desc := descriptionStyle.Render("Risk-neutral trajectory simulation for sounding rockets.")
+	header := fmt.Sprintf("%s\n%s", title, desc)
+
+	githubText := linkStyle.Render(m.cfg.App.Repo)
+	licenseText := footerStyle.Render(m.cfg.App.License)
+	versionText := footerStyle.Render(m.cfg.App.Version)
+	footer := fmt.Sprintf("%s | %s | %s", versionText, licenseText, githubText)
 
 	var content string
 	switch m.phase {
@@ -164,19 +176,6 @@ func (m model) View() string {
 	}
 
 	return containerStyle.Render(lipgloss.JoinVertical(lipgloss.Top, header, content, footer))
-}
-
-func (m model) headerView() string {
-	title := titleStyle.Render("🚀 Launchrail")
-	desc := descriptionStyle.Render("Risk-neutral trajectory simulation for sounding rockets.")
-	return fmt.Sprintf("%s\n%s", title, desc)
-}
-
-func (m *model) footerView() string {
-	githubText := linkStyle.Render(m.cfg.App.Repo)
-	licenseText := footerStyle.Render(m.cfg.App.License)
-	versionText := footerStyle.Render(m.cfg.App.Version)
-	return fmt.Sprintf("%s | %s | %s", versionText, licenseText, githubText)
 }
 
 func (m model) renderFilePicker(prompt string, allowedTypes []string) string {

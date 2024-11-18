@@ -12,22 +12,27 @@ import (
 func main() {
 	cfg, err := config.LoadConfig("config.yaml")
 	if err != nil {
-		fmt.Printf("Error loading configuration: %v", err)
-		os.Exit(1) // WARNING: Process exit
+		fmt.Printf("Error loading configuration: %v\n", err)
+		os.Exit(1)
 	}
 
 	log, err := logger.GetLogger(cfg.Logs.File)
 	if err != nil {
-		fmt.Printf("Error getting logger: %v", err)
-		os.Exit(1) // WARNING: Process exit
+		fmt.Printf("Error getting logger: %v\n", err)
+		os.Exit(1)
 	}
 
 	log.Info("Starting Launchrail application")
 
-	_, err = tea.NewProgram(initialModel(cfg, log)).Run()
+	program := tea.NewProgram(
+		initialModel(cfg, log),
+		tea.WithAltScreen(),
+	)
+
+	_, err = program.Run()
 	if err != nil {
-		log.Errorf("Error starting Launchrail application: %v", err)
-		os.Exit(1) // WARNING: Process exit
+		log.Errorf("Error running Launchrail application: %v\n", err)
+		os.Exit(1)
 	}
 
 	log.Info("Exiting Launchrail application")
