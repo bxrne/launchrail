@@ -2,31 +2,30 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/integrations/openrocket"
 	"github.com/bxrne/launchrail/pkg/simulation"
 	"github.com/charmbracelet/bubbles/filepicker"
-	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	charm_log "github.com/charmbracelet/log"
 )
 
 type model struct {
-	filePicker            filepicker.Model
-	textInput             textinput.Model
-	logger                *charm_log.Logger
-	cfg                   *config.Config
-	height                int
-	phase                 phase
-	promptedData          promptedData
-	earthChoices          []components.Earth
-	selectedEarth         int
-	atmosphericalChoices  []components.Atmosphere
-	selectedAtmospherical int
+	logger         *charm_log.Logger
+	cfg            *config.Config
+	height         int
+	phase          phase
+	promptedData   promptedData
+	earthList      list.Model
+	atmosphereList list.Model
+	help           help.Model
+	keys           keyMap
+	filePicker     filepicker.Model
 }
 
 type phase int
@@ -47,15 +46,15 @@ type promptedData struct {
 }
 
 var (
-	accentColor    = lipgloss.Color("#FFA500")
-	promptStyle    = lipgloss.NewStyle().Foreground(accentColor)
-	titleStyle     = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
-	descStyle      = lipgloss.NewStyle().Bold(true).PaddingTop(1)
-	linkStyle      = lipgloss.NewStyle().Foreground(accentColor).Underline(true)
-	textStyle      = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
-	containerStyle = lipgloss.NewStyle().Padding(0).MarginTop(1).MarginLeft(1)
-	footerStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
-	textInputStyle = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
+	accentColor      = lipgloss.Color("#FFA500")
+	titleStyle       = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
+	descriptionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).MarginBottom(1)
+	promptStyle      = lipgloss.NewStyle().Foreground(accentColor)
+	linkStyle        = lipgloss.NewStyle().Foreground(accentColor).Underline(true)
+	textStyle        = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
+	footerStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	textInputStyle   = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
+	containerStyle   = lipgloss.NewStyle().Padding(1, 2)
 )
 
 func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
@@ -63,64 +62,77 @@ func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
 	fp.AutoHeight = false
 	fp.Height = 5
 
+	earthItems := []list.Item{
+		listItem(components.FlatEarth.String()),
+		listItem(components.SphericalEarth.String()),
+		listItem(components.TopographicalEarth.String()),
+	}
+	earthList := list.New(earthItems, list.NewDefaultDelegate(), 30, 8)
+	earthList.Title = "Choose an Earth model"
+
+	atmosphereItems := []list.Item{
+		listItem(components.StandardAtmosphere.String()),
+		listItem(components.ForecastAtmosphere.String()),
+	}
+	atmosphereList := list.New(atmosphereItems, list.NewDefaultDelegate(), 30, 8)
+	atmosphereList.Title = "Choose an Atmosphere model"
+
 	return model{
-		filePicker: fp,
-		logger:     logger,
-		cfg:        cfg,
-		phase:      selectOpenRocketFile,
-		earthChoices: []components.Earth{
-			components.FlatEarth,
-			components.SphericalEarth,
-			components.TopographicalEarth,
-		},
-		selectedEarth: 0,
-		atmosphericalChoices: []components.Atmosphere{
-			components.StandardAtmosphere,
-			components.ForecastAtmosphere,
-		},
-		selectedAtmospherical: 0,
+		filePicker:     fp,
+		logger:         logger,
+		cfg:            cfg,
+		phase:          selectOpenRocketFile,
+		earthList:      earthList,
+		atmosphereList: atmosphereList,
+		help:           help.New(),
 	}
 }
+
+type listItem string
+
+func (i listItem) Title() string       { return string(i) }
+func (i listItem) Description() string { return "" }
+func (i listItem) FilterValue() string { return string(i) }
 
 func (m model) Init() tea.Cmd {
 	return tea.Batch(m.filePicker.Init())
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.help.Width = msg.Width
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			m.logger.Debug("Ctrl+C or 'q' pressed, quitting")
 			return m, tea.Quit
-		case "up":
-			if m.phase == selectEarthModel && m.selectedEarth > 0 {
-				m.selectedEarth--
-			}
-			if m.phase == selectAtmosphericalModel && m.selectedAtmospherical > 0 {
-				m.selectedAtmospherical--
-			}
-		case "down":
-			if m.phase == selectEarthModel && m.selectedEarth < len(m.earthChoices)-1 {
-				m.selectedEarth++
-			}
-			if m.phase == selectAtmosphericalModel && m.selectedAtmospherical < len(m.atmosphericalChoices)-1 {
-				m.selectedAtmospherical++
-			}
 
 		case "enter":
 			switch m.phase {
 			case selectEarthModel:
-				m.promptedData.earthModel = m.earthChoices[m.selectedEarth]
+				m.promptedData.earthModel = components.Earth(m.earthList.Index())
 				m.phase = selectAtmosphericalModel
 			case selectAtmosphericalModel:
-				m.promptedData.atmosphericModel = m.atmosphericalChoices[m.selectedAtmospherical]
+				m.promptedData.atmosphericModel = components.Atmosphere(m.atmosphereList.Index())
 				m.phase = confirmPhase
 			}
 		}
-	}
 
-	var cmds []tea.Cmd
+		switch m.phase {
+		case selectEarthModel:
+			var cmd tea.Cmd
+			m.earthList, cmd = m.earthList.Update(msg)
+			cmds = append(cmds, cmd)
+		case selectAtmosphericalModel:
+			var cmd tea.Cmd
+			m.atmosphereList, cmd = m.atmosphereList.Update(msg)
+			cmds = append(cmds, cmd)
+		}
+	}
 
 	var fpCmd tea.Cmd
 	m.filePicker, fpCmd = m.filePicker.Update(msg)
@@ -142,72 +154,45 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	header := containerStyle.Render(m.headerView())
-	footer := containerStyle.Render(m.footerView())
+	header := m.headerView()
+	footer := m.footerView()
 
 	var content string
 	switch m.phase {
 	case selectOpenRocketFile:
-		m.filePicker.Height = m.height - 4
-		m.filePicker.FileAllowed = true
-		m.filePicker.DirAllowed = false
-		m.filePicker.AllowedTypes = []string{"ork"}
-
-		q := containerStyle.Render(promptStyle.Render("Pick an OpenRocket design file (.ork):"))
-		content = lipgloss.JoinVertical(lipgloss.Top, q, m.filePicker.View())
-
+		content = m.renderFilePicker("Pick an OpenRocket design file (.ork):", []string{"ork"})
 	case selectMotorThrustFile:
-		m.filePicker.Height = m.height - 4
-		m.filePicker.FileAllowed = true
-		m.filePicker.DirAllowed = false
-		m.filePicker.AllowedTypes = []string{"eng"}
-
-		q := containerStyle.Render(promptStyle.Render("Pick Motor thrust curve file (.eng):"))
-		content = lipgloss.JoinVertical(lipgloss.Top, q, m.filePicker.View())
-
+		content = m.renderFilePicker("Pick Motor thrust curve file (.eng):", []string{"eng"})
 	case selectEarthModel:
-		q := containerStyle.Render(promptStyle.Render("Choose an Earth model:"))
-		options := make([]string, len(m.earthChoices))
-		for i, choice := range m.earthChoices {
-			prefix := "  "
-			if i == m.selectedEarth {
-				prefix = "➤ "
-			}
-			options[i] = fmt.Sprintf("%s%s", prefix, choice)
-		}
-		content = lipgloss.JoinVertical(lipgloss.Top, q, strings.Join(options, "\n"))
-
+		content = m.earthList.View()
 	case selectAtmosphericalModel:
-		q := containerStyle.Render(promptStyle.Render("Choose an Atmosphere model:"))
-		options := make([]string, len(m.atmosphericalChoices))
-		for i, choice := range m.atmosphericalChoices {
-			prefix := "  "
-			if i == m.selectedAtmospherical {
-				prefix = "➤ "
-			}
-			options[i] = fmt.Sprintf("%s%s", prefix, choice)
-		}
-		content = lipgloss.JoinVertical(lipgloss.Top, q, strings.Join(options, "\n"))
-
+		content = m.atmosphereList.View()
 	case confirmPhase:
 		content = m.confirmView()
 	}
 
-	return containerStyle.Render(header, content, footer)
+	return containerStyle.Render(lipgloss.JoinVertical(lipgloss.Top, header, content, footer))
 }
 
 func (m model) headerView() string {
 	title := titleStyle.Render("🚀 Launchrail")
-	desc := descStyle.Render("Risk-neutral trajectory simulation for sounding rockets.")
-	instructions := "Press 'ctrl+c' or 'q' to quit.\n"
-	return fmt.Sprintf("%s\n%s\n%s", title, desc, instructions)
+	desc := descriptionStyle.Render("Risk-neutral trajectory simulation for sounding rockets.")
+	return fmt.Sprintf("%s\n%s", title, desc)
 }
 
 func (m *model) footerView() string {
 	githubText := linkStyle.Render(m.cfg.App.Repo)
 	licenseText := footerStyle.Render(m.cfg.App.License)
 	versionText := footerStyle.Render(m.cfg.App.Version)
-	return fmt.Sprintf("%s | %s | %s\n", versionText, licenseText, githubText)
+	return fmt.Sprintf("%s | %s | %s", versionText, licenseText, githubText)
+}
+
+func (m model) renderFilePicker(prompt string, allowedTypes []string) string {
+	m.filePicker.FileAllowed = true
+	m.filePicker.DirAllowed = false
+	m.filePicker.AllowedTypes = allowedTypes
+	q := promptStyle.Render(prompt)
+	return lipgloss.JoinVertical(lipgloss.Top, q, m.filePicker.View())
 }
 
 func (m model) confirmView() string {
@@ -224,5 +209,5 @@ func (m model) confirmView() string {
 	rocket := components.NewRocket(orkData, motorData)
 	environment := simulation.NewEnvironment(0, 0, 0, 9.81, 101325, &m.promptedData.atmosphericModel, &m.promptedData.earthModel)
 	sim := simulation.NewSimulation(rocket, *environment)
-	return containerStyle.Render(sim.Info())
+	return sim.Info()
 }
