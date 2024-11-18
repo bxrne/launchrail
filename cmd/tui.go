@@ -34,6 +34,10 @@ const (
 type promptedData struct {
 	rocketFile string
 	motorFile  string
+	latitudeValue float64
+	longitudeValue float64
+	altitudeValue float64
+	
 }
 
 var (
