@@ -8,7 +8,6 @@ import (
 	"github.com/bxrne/launchrail/pkg/integrations/openrocket"
 	"github.com/bxrne/launchrail/pkg/simulation"
 	"github.com/charmbracelet/bubbles/filepicker"
-	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -18,13 +17,10 @@ import (
 type model struct {
 	logger         *charm_log.Logger
 	cfg            *config.Config
-	height         int
 	phase          phase
 	promptedData   promptedData
 	earthList      list.Model
 	atmosphereList list.Model
-	help           help.Model
-	keys           keyMap
 	filePicker     filepicker.Model
 }
 
@@ -84,7 +80,6 @@ func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
 		phase:          selectOpenRocketFile,
 		earthList:      earthList,
 		atmosphereList: atmosphereList,
-		help:           help.New(),
 	}
 }
 
@@ -102,9 +97,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.help.Width = msg.Width
-
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
