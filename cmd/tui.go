@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/components"
@@ -22,6 +23,8 @@ type model struct {
 	earthList      list.Model
 	atmosphereList list.Model
 	filePicker     filepicker.Model
+	windowWidth    int
+	windowHeight   int
 }
 
 type phase int
@@ -55,22 +58,21 @@ var (
 
 func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
 	fp := filepicker.New()
-	fp.AutoHeight = false
-	fp.Height = 5
+	fp.AutoHeight = false // INFO: Controlled in update
 
 	earthItems := []list.Item{
 		listItem(components.FlatEarth.String()),
 		listItem(components.SphericalEarth.String()),
 		listItem(components.TopographicalEarth.String()),
 	}
-	earthList := list.New(earthItems, list.NewDefaultDelegate(), 30, 8)
+	earthList := list.New(earthItems, list.NewDefaultDelegate(), 15, 4)
 	earthList.Title = "Choose an Earth model"
 
 	atmosphereItems := []list.Item{
 		listItem(components.StandardAtmosphere.String()),
 		listItem(components.ForecastAtmosphere.String()),
 	}
-	atmosphereList := list.New(atmosphereItems, list.NewDefaultDelegate(), 30, 8)
+	atmosphereList := list.New(atmosphereItems, list.NewDefaultDelegate(), 15, 4)
 	atmosphereList.Title = "Choose an Atmosphere model"
 
 	return model{
@@ -98,11 +100,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.earthList.SetSize(msg.Width, msg.Height-5)
-		m.atmosphereList.SetSize(msg.Width, msg.Height-5)
-	}
+		m.windowHeight = msg.Height
+		m.windowWidth = msg.Width
+		contentHeight := m.contentHeight()
 
-	switch msg := msg.(type) {
+		m.filePicker.Height = contentHeight - 1 // WARN: -1 for the prompt
+		m.earthList.SetSize(msg.Width, contentHeight)
+		m.atmosphereList.SetSize(msg.Width, contentHeight)
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -201,4 +206,22 @@ func (m model) confirmView() string {
 	environment := simulation.NewEnvironment(0, 0, 0, 9.81, 101325, &m.promptedData.atmosphericModel, &m.promptedData.earthModel)
 	sim := simulation.NewSimulation(rocket, *environment)
 	return sim.Info()
+}
+
+func (m model) headerHeight() int {
+	title := titleStyle.Render("🚀 Launchrail")
+	desc := descriptionStyle.Render("Risk-neutral trajectory simulation for sounding rockets.")
+	header := fmt.Sprintf("%s\n%s", title, desc)
+	return strings.Count(header, "\n") + 1
+}
+
+func (m model) footerHeight() int {
+	return 1 // Footer is single line
+}
+
+func (m model) contentHeight() int {
+	headerH := m.headerHeight()
+	footerH := m.footerHeight()
+	paddingV := containerStyle.GetPaddingTop() + containerStyle.GetPaddingBottom()
+	return m.windowHeight - headerH - footerH - paddingV
 }
