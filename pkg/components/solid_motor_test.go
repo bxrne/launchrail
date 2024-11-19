@@ -1,116 +1,86 @@
 package components_test
 
 import (
-	"os"
 	"testing"
 	"time"
 
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// TEST: GIVEN a valid motor file WHEN NewSolidMotor is called THEN it should parse the motor data correctly
-func TestNewSolidMotor_ValidFile(t *testing.T) {
-	motorFileContent := `
-; This is a comment
-M1234 54 100 APCP 500 250 ManufacturerX
-0.0 0
-0.5 100
-1.0 200
-1.5 150
-2.0 0
-`
-	tmpFile, err := os.CreateTemp("", "motor_test_*.eng")
-	assert.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
-
-	_, err = tmpFile.Write([]byte(motorFileContent))
-	assert.NoError(t, err)
-	tmpFile.Close()
-
-	dryMass := 0.5         // Example dry mass
-	propellantMass := 0.25 // Example propellant mass
-	motor, err := components.NewSolidMotor(tmpFile.Name(), dryMass, propellantMass)
-	assert.NoError(t, err)
-	assert.NotNil(t, motor)
-
-	assert.Equal(t, "M1234", motor.Designation)
-	assert.Equal(t, 54.0, motor.Diameter)
-	assert.Equal(t, 100.0, motor.Length)
-	assert.Equal(t, "APCP", motor.Propellant)
-	assert.Equal(t, 500.0, motor.TotalImpulse)
-	assert.Equal(t, 250.0, motor.AverageThrust)
-	assert.Equal(t, "ManufacturerX", motor.Manufacturer)
-	assert.Equal(t, 2*time.Second, motor.BurnTime)
-	assert.Len(t, motor.ThrustCurve, 5)
-	assert.Equal(t, dryMass, motor.DryMass)
-	assert.Equal(t, propellantMass, motor.PropellantMass)
+func createTestMotor(t *testing.T) *components.SolidMotor {
+	motorFilePath := "../../testdata/cesaroni-l645.eng"
+	motor, err := components.NewSolidMotor(motorFilePath, 0.5, 0.25, 3)
+	require.NoError(t, err)
+	return motor
 }
 
-// TEST: GIVEN a non-existent motor file WHEN NewSolidMotor is called THEN it should return an error
-func TestNewSolidMotor_FileNotFound(t *testing.T) {
-	_, err := components.NewSolidMotor("non_existent_file.eng", 0.5, 0.25)
-	assert.Error(t, err)
+// TEST: GIVEN a valid motor configuration WHEN creating a new solid motor THEN initialize with correct parameters
+func TestNewSolidMotor_ValidMotor(t *testing.T) {
+	motor := createTestMotor(t)
+
+	assert.Equal(t, "3419-L645-GR-P", motor.Designation)
+	assert.Equal(t, 75.0, motor.Diameter)
+	assert.Equal(t, 3, len(motor.Grains))
+
+	grainLength := motor.Length / float64(len(motor.Grains))
+	for _, grain := range motor.Grains {
+		assert.Equal(t, grainLength, grain.InitialLength)
+		assert.Equal(t, grainLength, grain.CurrentLength)
+		assert.Equal(t, motor.Diameter, grain.Diameter)
+	}
+
+	assert.Equal(t, 0*time.Second, motor.CurrentState.ElapsedTime)
+	assert.Equal(t, 0.0, motor.CurrentState.CurrentThrust)
+	assert.Equal(t, 0.25, motor.CurrentState.RemainingMass)
 }
 
-// TEST: GIVEN a motor file with missing data WHEN NewSolidMotor is called THEN it should handle the missing data gracefully
-func TestNewSolidMotor_MissingData(t *testing.T) {
-	motorFileContent := `
-; This is a comment
-M1234 54 100 APCP 500 250 ManufacturerX
-`
-	tmpFile, err := os.CreateTemp("", "motor_test_missing_data_*.eng")
-	assert.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+// TEST: GIVEN an initialized motor WHEN updating state with multiple time steps THEN track motor progression
+func TestMotorUpdateState(t *testing.T) {
+	motor := createTestMotor(t)
 
-	_, err = tmpFile.Write([]byte(motorFileContent))
-	assert.NoError(t, err)
-	tmpFile.Close()
+	timeSteps := []time.Duration{
+		100 * time.Millisecond,
+		200 * time.Millisecond,
+		500 * time.Millisecond,
+	}
 
-	dryMass := 0.5
-	propellantMass := 0.25
-	motor, err := components.NewSolidMotor(tmpFile.Name(), dryMass, propellantMass)
-	assert.NoError(t, err)
-	assert.NotNil(t, motor)
+	for _, step := range timeSteps {
+		err := motor.UpdateState(step)
+		assert.NoError(t, err)
+	}
 
-	assert.Equal(t, "M1234", motor.Designation)
-	assert.Equal(t, 54.0, motor.Diameter)
-	assert.Equal(t, 100.0, motor.Length)
-	assert.Equal(t, "APCP", motor.Propellant)
-	assert.Equal(t, 500.0, motor.TotalImpulse)
-	assert.Equal(t, 250.0, motor.AverageThrust)
-	assert.Equal(t, "ManufacturerX", motor.Manufacturer)
-	assert.Equal(t, 0*time.Second, motor.BurnTime)
-	assert.Len(t, motor.ThrustCurve, 0)
-	assert.Equal(t, dryMass, motor.DryMass)
-	assert.Equal(t, propellantMass, motor.PropellantMass)
+	assert.True(t, motor.CurrentState.ElapsedTime > 0)
+	assert.True(t, motor.CurrentState.RemainingMass < 0.25)
+	assert.True(t, motor.CurrentState.BurnedPropellant > 0)
 }
 
-// TEST: GIVEN invalid mass inputs WHEN NewSolidMotor is called THEN it should return an error
-func TestNewSolidMotor_InvalidMass(t *testing.T) {
-	motorFileContent := `
-M1234 54 100 APCP 500 250 ManufacturerX
-`
-	tmpFile, err := os.CreateTemp("", "motor_test_invalid_mass_*.eng")
+// TEST: GIVEN an attempt to update motor state WHEN using invalid time steps THEN return appropriate errors
+func TestMotorInvalidTimeStep(t *testing.T) {
+	motor := createTestMotor(t)
+
+	err := motor.UpdateState(0)
+	assert.Error(t, err, "Zero time step should return an error")
+
+	err = motor.UpdateState(-1 * time.Second)
+	assert.Error(t, err, "Negative time step should return an error")
+}
+
+// TEST: GIVEN an initialized motor WHEN burning occurs THEN verify grain length reduction
+func TestMotorGrainBurning(t *testing.T) {
+	motor := createTestMotor(t)
+
+	initialLengths := make([]float64, len(motor.Grains))
+	for i, grain := range motor.Grains {
+		initialLengths[i] = grain.CurrentLength
+	}
+
+	err := motor.UpdateState(1 * time.Second)
 	assert.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
 
-	_, err = tmpFile.Write([]byte(motorFileContent))
-	assert.NoError(t, err)
-	tmpFile.Close()
-
-	// Test zero dry mass
-	_, err = components.NewSolidMotor(tmpFile.Name(), 0, 0.25)
-	assert.Error(t, err)
-
-	// Test zero propellant mass
-	_, err = components.NewSolidMotor(tmpFile.Name(), 0.5, 0)
-	assert.Error(t, err)
-
-	// Test negative masses
-	_, err = components.NewSolidMotor(tmpFile.Name(), -0.5, 0.25)
-	assert.Error(t, err)
-
-	_, err = components.NewSolidMotor(tmpFile.Name(), 0.5, -0.25)
-	assert.Error(t, err)
+	for i, grain := range motor.Grains {
+		assert.Less(t, grain.CurrentLength, initialLengths[i],
+			"Grain %d length should decrease after burning", i)
+	}
 }

@@ -1,19 +1,45 @@
 package simulation
 
-import "github.com/bxrne/launchrail/pkg/components"
+import (
+	"fmt"
+	"time"
+
+	"github.com/bxrne/launchrail/pkg/components"
+)
 
 type Simulation struct {
-	Rocket      *components.Rocket
-	Environment Environment
+	rocket      *components.Rocket
+	environment Environment
+	timeStep    time.Duration
+	elapsedTime time.Duration
 }
 
-func NewSimulation(rocket *components.Rocket, environment Environment) *Simulation {
+func NewSimulation(rocket *components.Rocket, environment Environment, timeStepNS int) *Simulation {
 	return &Simulation{
-		Rocket:      rocket,
-		Environment: environment,
+		rocket:      rocket,
+		environment: environment,
+		timeStep:    time.Duration(timeStepNS),
 	}
 }
 
+func (s *Simulation) Run() error {
+	err := s.rocket.Motor.UpdateState(s.timeStep)
+	if err != nil {
+		return fmt.Errorf("motor update error: %v", err)
+	}
+
+	// TODO: Implement rocket flight physics calculations
+
+	s.elapsedTime += s.timeStep
+
+	return nil
+}
+
 func (s *Simulation) Info() string {
-	return s.Rocket.Info() + "\n" + s.Environment.Info()
+	return fmt.Sprintf("%s\n%s\nElapsed Time: %s\nMotor State:\n%s",
+		s.rocket.Info(),
+		s.environment.Info(),
+		s.elapsedTime,
+		s.rocket.Motor.String(),
+	)
 }

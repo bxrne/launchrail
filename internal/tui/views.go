@@ -94,14 +94,14 @@ func (m model) confirmView() string {
 		return fmt.Sprintf("Error reading OpenRocket file: %v", err)
 	}
 
-	motorData, err := components.NewSolidMotor(m.promptedData.motorFile, m.promptedData.motorDryMass, m.promptedData.motorPropellantMass)
+	motorData, err := components.NewSolidMotor(m.promptedData.motorFile, m.promptedData.motorDryMass, m.promptedData.motorPropellantMass, 3)
 	if err != nil {
 		return fmt.Sprintf("Error reading Motor file: %v", err)
 	}
 
 	rocket := components.NewRocket(orkData, motorData)
 	environment := simulation.NewEnvironment(0, 0, 0, 9.81, 101325, &m.promptedData.atmosphericModel, &m.promptedData.earthModel)
-	sim := simulation.NewSimulation(rocket, *environment)
+	sim := simulation.NewSimulation(rocket, *environment, m.cfg.Engine.TimeStepNS)
 	return sim.Info()
 }
 

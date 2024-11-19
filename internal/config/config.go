@@ -16,6 +16,9 @@ type Config struct {
 	Logs struct {
 		File string `mapstructure:"file"`
 	} `mapstructure:"logs"`
+	Engine struct {
+		TimeStepNS int `mapstructure:"timestep_ns"`
+	} `mapstructure:"engine"`
 }
 
 var (

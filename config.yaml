@@ -4,3 +4,5 @@ app:
   repo: "https://github.com/bxrne/launchrail"
 logs:
   file: "launchrail.log"
+engine:
+  timestep_ns: 10000000 # 10ms
