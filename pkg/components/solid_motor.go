@@ -2,6 +2,7 @@ package components
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -14,16 +15,19 @@ type ThrustPoint struct {
 }
 
 type SolidMotor struct {
-	Manufacturer  string
-	Designation   string
-	Diameter      float64
-	Length        float64
-	TotalImpulse  float64
-	Propellant    string
-	AverageThrust float64
-	MaxThrust     float64
-	BurnTime      time.Duration
-	ThrustCurve   []ThrustPoint
+	Manufacturer string
+	Designation  string
+
+	Mass           float64
+	PropellantMass float64
+	Diameter       float64
+	Length         float64
+	TotalImpulse   float64
+	Propellant     string
+	AverageThrust  float64
+	MaxThrust      float64
+	BurnTime       time.Duration
+	ThrustCurve    []ThrustPoint
 }
 
 func NewSolidMotor(filePath string) (*SolidMotor, error) {
@@ -73,4 +77,9 @@ func NewSolidMotor(filePath string) (*SolidMotor, error) {
 	}
 
 	return &motor, nil
+}
+
+func (m *SolidMotor) String() string {
+	return fmt.Sprintf("Manufacturer: %s\nDesignation: %s\nDiameter: %.2f mm\nLength: %.2f mm\nPropellant: %s\nTotal Impulse: %.2f Ns\nAverage Thrust: %.2f N\nBurn Time: %s\n",
+		m.Manufacturer, m.Designation, m.Diameter, m.Length, m.Propellant, m.TotalImpulse, m.AverageThrust, m.BurnTime)
 }

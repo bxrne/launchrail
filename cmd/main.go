@@ -6,7 +6,7 @@ import (
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
-	tea "github.com/charmbracelet/bubbletea"
+	"github.com/bxrne/launchrail/internal/tui"
 )
 
 func main() {
@@ -24,14 +24,10 @@ func main() {
 
 	log.Info("Starting Launchrail application")
 
-	program := tea.NewProgram(
-		initialModel(cfg, log),
-		tea.WithAltScreen(),
-	)
-
-	_, err = program.Run()
+	t := tui.New(cfg, log)
+	_, err = t.Run()
 	if err != nil {
-		log.Errorf("Error running Launchrail application: %v\n", err)
+		log.Errorf("Error running TUI: %v", err)
 		os.Exit(1)
 	}
 
