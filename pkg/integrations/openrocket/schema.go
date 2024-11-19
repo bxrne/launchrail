@@ -1,4 +1,4 @@
-package ork
+package openrocket
 
 import (
 	"encoding/xml"

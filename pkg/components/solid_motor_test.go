@@ -1,11 +1,11 @@
-package entities_test
+package components_test
 
 import (
 	"os"
 	"testing"
 	"time"
 
-	"github.com/bxrne/launchrail/pkg/entities"
+	"github.com/bxrne/launchrail/pkg/components"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -29,7 +29,7 @@ M1234 54 100 APCP 500 250 ManufacturerX
 	assert.NoError(t, err)
 	tmpFile.Close()
 
-	motor, err := entities.NewSolidMotor(tmpFile.Name())
+	motor, err := components.NewSolidMotor(tmpFile.Name())
 	assert.NoError(t, err)
 	assert.NotNil(t, motor)
 
@@ -46,7 +46,7 @@ M1234 54 100 APCP 500 250 ManufacturerX
 
 // TEST: GIVEN a non-existent motor file WHEN NewSolidMotor is called THEN it should return an error
 func TestNewSolidMotor_FileNotFound(t *testing.T) {
-	_, err := entities.NewSolidMotor("non_existent_file.eng")
+	_, err := components.NewSolidMotor("non_existent_file.eng")
 	assert.Error(t, err)
 }
 
@@ -64,7 +64,7 @@ M1234 54 100 APCP 500 250 ManufacturerX
 	assert.NoError(t, err)
 	tmpFile.Close()
 
-	motor, err := entities.NewSolidMotor(tmpFile.Name())
+	motor, err := components.NewSolidMotor(tmpFile.Name())
 	assert.NoError(t, err)
 	assert.NotNil(t, motor)
 
