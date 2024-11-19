@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bxrne/launchrail/internal/integrations/openrocket"
+	"github.com/bxrne/launchrail/internal/openrocket"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/simulation"
 	"github.com/charmbracelet/lipgloss"
