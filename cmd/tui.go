@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/bxrne/launchrail/internal/config"
@@ -10,9 +11,11 @@ import (
 	"github.com/bxrne/launchrail/pkg/simulation"
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	charm_log "github.com/charmbracelet/log"
+	"github.com/flopp/go-coordsparser"
 )
 
 type model struct {
@@ -23,6 +26,7 @@ type model struct {
 	earthList      list.Model
 	atmosphereList list.Model
 	filePicker     filepicker.Model // WARN: independent file picker
+	textInput      textinput.Model
 	windowWidth    int
 	windowHeight   int
 }
@@ -34,6 +38,8 @@ const (
 	selectMotorThrustFile
 	selectEarthModel
 	selectAtmosphericalModel
+	enterLatLong
+	enterElevation
 	confirmPhase
 )
 
@@ -42,6 +48,9 @@ type promptedData struct {
 	motorFile        string
 	earthModel       components.Earth
 	atmosphericModel components.Atmosphere
+	latitude         float64
+	longitude        float64
+	elevation        float64
 }
 
 var (
@@ -58,12 +67,11 @@ var (
 )
 
 func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
-	listd := list.NewDefaultDelegate()
-
 	fp := filepicker.New()
 	fp.AutoHeight = false // INFO: Controlled in update
 	fp.Height = 5
 
+	listd := list.NewDefaultDelegate()
 	earthItems := []list.Item{
 		components.FlatEarth,
 		components.SphericalEarth,
@@ -79,6 +87,11 @@ func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
 	atmosphereList := list.New(atmosphereItems, listd, 15, 4)
 	atmosphereList.Title = "Choose an Atmosphere model"
 
+	textInput := textinput.New()
+	textInput.Placeholder = "Enter a value"
+	textInput.Prompt = "Enter a value:"
+	textInput.Focus()
+
 	return model{
 		filePicker:     fp,
 		logger:         logger,
@@ -86,6 +99,7 @@ func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
 		phase:          selectOpenRocketFile,
 		earthList:      earthList,
 		atmosphereList: atmosphereList,
+		textInput:      textInput,
 	}
 }
 
@@ -117,8 +131,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case selectEarthModel:
 				m.promptedData.earthModel = components.Earth(m.earthList.Index())
 				m.phase = selectAtmosphericalModel
+
 			case selectAtmosphericalModel:
 				m.promptedData.atmosphericModel = components.Atmosphere(m.atmosphereList.Index())
+				m.phase = enterLatLong
+
+			case enterLatLong:
+				lat, long, err := coordsparser.ParseHDMS(m.textInput.Value())
+				if err != nil {
+					m.logger.Fatalf("Error parsing coordinates: %v", err)
+				}
+
+				m.textInput.Reset()
+				m.promptedData.latitude = lat
+				m.promptedData.longitude = long
+				m.phase = enterElevation
+
+			case enterElevation:
+				elevationValue := m.textInput.Value()
+				elev, err := strconv.ParseFloat(elevationValue, 64)
+				if err != nil {
+					m.logger.Fatalf("Error parsing elevation: %v", err)
+				}
+
+				m.textInput.Reset()
+				m.promptedData.elevation = elev
 				m.phase = confirmPhase
 			}
 		}
@@ -134,6 +171,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 	}
+
+	var tiCmd tea.Cmd
+	m.textInput, tiCmd = m.textInput.Update(msg)
+	cmds = append(cmds, tiCmd)
 
 	var fpCmd tea.Cmd
 	m.filePicker, fpCmd = m.filePicker.Update(msg)
@@ -174,6 +215,14 @@ func (m model) View() string {
 		content = m.earthList.View()
 	case selectAtmosphericalModel:
 		content = m.atmosphereList.View()
+	case enterLatLong:
+		m.textInput.Prompt = "Enter launch coordinates (HDMS):"
+		m.textInput.Placeholder = "N 40 45 36.0 W 73 59 02.4"
+		content = m.textInput.View()
+	case enterElevation:
+		m.textInput.Prompt = "Enter Elevation (m):"
+		m.textInput.Placeholder = "42"
+		content = m.textInput.View()
 	case confirmPhase:
 		content = m.confirmView()
 	}
