@@ -33,5 +33,7 @@ app:
   repo: "https://github.com/bxrne/launchrail"
 logs:
   file: "launchrail.log"
+engine:
+  timestep_ns: 1000000000 
 ```
 

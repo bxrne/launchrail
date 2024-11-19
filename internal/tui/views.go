@@ -64,7 +64,7 @@ func (m model) renderContent() string {
 		m.textInput.Placeholder = " 42"
 		return m.textInput.View()
 	case confirmPhase:
-		return m.confirmView()
+		return m.simView()
 	default:
 		return ""
 	}
@@ -88,7 +88,7 @@ func (m model) fillRemainingSpace(content string, remainingHeight int) string {
 	return content + strings.Repeat("\n", emptyLines)
 }
 
-func (m model) confirmView() string {
+func (m model) simView() string {
 	orkData, err := openrocket.Decompress(m.promptedData.rocketFile)
 	if err != nil {
 		return fmt.Sprintf("Error reading OpenRocket file: %v", err)
