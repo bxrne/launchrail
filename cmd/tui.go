@@ -22,7 +22,7 @@ type model struct {
 	promptedData   promptedData
 	earthList      list.Model
 	atmosphereList list.Model
-	filePicker     filepicker.Model
+	filePicker     filepicker.Model // WARN: independent file picker
 	windowWidth    int
 	windowHeight   int
 }
@@ -45,34 +45,38 @@ type promptedData struct {
 }
 
 var (
-	accentColor      = lipgloss.Color("#FFA500")
+	accentColor      = lipgloss.Color("#5a56e0")
+	secondaryColor   = lipgloss.Color("#888888")
 	titleStyle       = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
-	descriptionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).MarginBottom(1)
+	descriptionStyle = lipgloss.NewStyle().Foreground(secondaryColor).MarginBottom(1)
 	promptStyle      = lipgloss.NewStyle().Foreground(accentColor)
 	linkStyle        = lipgloss.NewStyle().Foreground(accentColor).Underline(true)
 	textStyle        = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
-	footerStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	footerStyle      = lipgloss.NewStyle().Foreground(secondaryColor)
 	textInputStyle   = lipgloss.NewStyle().Foreground(accentColor).Bold(true)
 	containerStyle   = lipgloss.NewStyle().Padding(1, 2)
 )
 
 func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
+	listd := list.NewDefaultDelegate()
+
 	fp := filepicker.New()
 	fp.AutoHeight = false // INFO: Controlled in update
+	fp.Height = 5
 
 	earthItems := []list.Item{
 		components.FlatEarth,
 		components.SphericalEarth,
 		components.TopographicalEarth,
 	}
-	earthList := list.New(earthItems, list.NewDefaultDelegate(), 15, 4)
+	earthList := list.New(earthItems, listd, 0, 0)
 	earthList.Title = "Choose an Earth model"
 
 	atmosphereItems := []list.Item{
 		components.StandardAtmosphere,
 		components.ForecastAtmosphere,
 	}
-	atmosphereList := list.New(atmosphereItems, list.NewDefaultDelegate(), 15, 4)
+	atmosphereList := list.New(atmosphereItems, listd, 15, 4)
 	atmosphereList.Title = "Choose an Atmosphere model"
 
 	return model{

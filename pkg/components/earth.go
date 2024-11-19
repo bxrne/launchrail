@@ -35,4 +35,4 @@ func (e Earth) Description() string {
 		return ""
 	}
 }
-func (e Earth) FilterValue() string { return e.String()}
+func (e Earth) FilterValue() string { return e.String() }
