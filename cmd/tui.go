@@ -260,6 +260,7 @@ func (m model) renderContent() string {
 }
 
 func (m model) renderFilePicker(prompt string, allowedTypes []string) string {
+	m.filePicker.Init()
 	m.filePicker.FileAllowed = true
 	m.filePicker.DirAllowed = false
 	m.filePicker.AllowedTypes = allowedTypes
