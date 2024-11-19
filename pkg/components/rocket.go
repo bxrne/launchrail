@@ -1,6 +1,6 @@
 package components
 
-import "github.com/bxrne/launchrail/pkg/integrations/openrocket"
+import "github.com/bxrne/launchrail/internal/integrations/openrocket"
 
 type Rocket struct {
 	Design *openrocket.Openrocket

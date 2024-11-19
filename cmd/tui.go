@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/internal/integrations/openrocket"
 	"github.com/bxrne/launchrail/pkg/components"
-	"github.com/bxrne/launchrail/pkg/integrations/openrocket"
 	"github.com/bxrne/launchrail/pkg/simulation"
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/list"
