@@ -18,20 +18,22 @@ type SolidMotor struct {
 	Manufacturer string
 	Designation  string
 
-	Mass           float64
+	DryMass        float64
 	PropellantMass float64
-	Diameter       float64
-	Length         float64
-	TotalImpulse   float64
-	Propellant     string
-	AverageThrust  float64
-	MaxThrust      float64
-	BurnTime       time.Duration
-	ThrustCurve    []ThrustPoint
+
+	// parsed
+	Diameter      float64
+	Length        float64
+	TotalImpulse  float64
+	Propellant    string
+	AverageThrust float64
+	MaxThrust     float64
+	BurnTime      time.Duration
+	ThrustCurve   []ThrustPoint
 }
 
-func NewSolidMotor(filePath string) (*SolidMotor, error) {
-	file, err := os.Open(filePath)
+func NewSolidMotor(thrustCurveFilePath string, dryMass float64, propellantMass float64) (*SolidMotor, error) {
+	file, err := os.Open(thrustCurveFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +77,16 @@ func NewSolidMotor(filePath string) (*SolidMotor, error) {
 	if len(motor.ThrustCurve) > 0 {
 		motor.BurnTime = motor.ThrustCurve[len(motor.ThrustCurve)-1].Time
 	}
+
+	if dryMass <= 0 {
+		return nil, fmt.Errorf("Dry mass must be greater than 0")
+	}
+	motor.DryMass = dryMass
+
+	if propellantMass <= 0 {
+		return nil, fmt.Errorf("Propellant mass must be greater than 0")
+	}
+	motor.PropellantMass = propellantMass
 
 	return &motor, nil
 }

@@ -71,21 +71,32 @@ func (m *model) handleFileSelection(file string) {
 		m.phase = selectMotorThrustFile
 	case selectMotorThrustFile:
 		m.promptedData.motorFile = file
-		m.phase = enterMotorMass
+		m.phase = enterMotorDryMass
 	}
 }
 
 func (m *model) handleEnterKey() tea.Cmd {
 	switch m.phase {
-	case enterMotorMass:
+	case enterMotorDryMass:
 		massValue := m.textInput.Value()
 		mass, err := strconv.ParseFloat(massValue, 64)
 		if err != nil {
-			m.logger.Fatalf("Error parsing mass: %v", err)
+			m.logger.Fatalf("Error parsing motor dry mass: %v", err)
 		}
 
 		m.textInput.Reset()
-		m.promptedData.motorMass = mass
+		m.promptedData.motorDryMass = mass
+		m.phase = enterMotorPropellantMass
+
+	case enterMotorPropellantMass:
+		massValue := m.textInput.Value()
+		mass, err := strconv.ParseFloat(massValue, 64)
+		if err != nil {
+			m.logger.Fatalf("Error parsing motor propellant mass: %v", err)
+		}
+
+		m.textInput.Reset()
+		m.promptedData.motorPropellantMass = mass
 		m.phase = selectEarthModel
 
 	case selectEarthModel:

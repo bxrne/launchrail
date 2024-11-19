@@ -15,7 +15,8 @@ func (m model) View() string {
 	content := m.renderContent()
 	footer := m.renderFooter()
 
-	if m.phase == enterLatLong || m.phase == enterElevation || m.phase == enterMotorMass {
+	// TODO: This is a bit hacky, but it works for now
+	if m.phase == enterLatLong || m.phase == enterElevation || m.phase == enterMotorDryMass || m.phase == enterMotorPropellantMass {
 		remainingHeight := m.windowHeight - m.headerHeight() - m.footerHeight() - containerStyle.GetPaddingTop() - containerStyle.GetPaddingBottom()
 		content = m.fillRemainingSpace(content, remainingHeight-1) // -1 for the text input line
 	}
@@ -42,9 +43,13 @@ func (m model) renderContent() string {
 		return m.renderFilePicker("Pick an OpenRocket design file (.ork):", []string{"ork"})
 	case selectMotorThrustFile:
 		return m.renderFilePicker("Pick Motor thrust curve file (.eng):", []string{"eng"})
-	case enterMotorMass:
-		m.textInput.Prompt = "Enter Motor Mass (kg):"
+	case enterMotorDryMass:
+		m.textInput.Prompt = "Enter Motor Dry Mass (kg):"
 		m.textInput.Placeholder = " 1.5"
+		return m.textInput.View()
+	case enterMotorPropellantMass:
+		m.textInput.Prompt = "Enter Motor Propellant Mass (kg):"
+		m.textInput.Placeholder = " 0.5"
 		return m.textInput.View()
 	case selectEarthModel:
 		return m.earthList.View()
@@ -89,7 +94,7 @@ func (m model) confirmView() string {
 		return fmt.Sprintf("Error reading OpenRocket file: %v", err)
 	}
 
-	motorData, err := components.NewSolidMotor(m.promptedData.motorFile)
+	motorData, err := components.NewSolidMotor(m.promptedData.motorFile, m.promptedData.motorDryMass, m.promptedData.motorPropellantMass)
 	if err != nil {
 		return fmt.Sprintf("Error reading Motor file: %v", err)
 	}

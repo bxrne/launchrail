@@ -16,7 +16,8 @@ type phase int
 const (
 	selectOpenRocketFile phase = iota
 	selectMotorThrustFile
-	enterMotorMass
+	enterMotorDryMass
+	enterMotorPropellantMass
 	selectEarthModel
 	selectAtmosphericalModel
 	enterLatLong
@@ -25,14 +26,15 @@ const (
 )
 
 type promptedData struct {
-	rocketFile       string
-	motorFile        string
-	motorMass        float64
-	earthModel       components.Earth
-	atmosphericModel components.Atmosphere
-	latitude         float64
-	longitude        float64
-	elevation        float64
+	rocketFile          string
+	motorFile           string
+	motorDryMass        float64
+	motorPropellantMass float64
+	earthModel          components.Earth
+	atmosphericModel    components.Atmosphere
+	latitude            float64
+	longitude           float64
+	elevation           float64
 }
 
 type model struct {
