@@ -61,16 +61,16 @@ func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
 	fp.AutoHeight = false // INFO: Controlled in update
 
 	earthItems := []list.Item{
-		listItem(components.FlatEarth.String()),
-		listItem(components.SphericalEarth.String()),
-		listItem(components.TopographicalEarth.String()),
+		components.FlatEarth,
+		components.SphericalEarth,
+		components.TopographicalEarth,
 	}
 	earthList := list.New(earthItems, list.NewDefaultDelegate(), 15, 4)
 	earthList.Title = "Choose an Earth model"
 
 	atmosphereItems := []list.Item{
-		listItem(components.StandardAtmosphere.String()),
-		listItem(components.ForecastAtmosphere.String()),
+		components.StandardAtmosphere,
+		components.ForecastAtmosphere,
 	}
 	atmosphereList := list.New(atmosphereItems, list.NewDefaultDelegate(), 15, 4)
 	atmosphereList.Title = "Choose an Atmosphere model"
@@ -85,12 +85,6 @@ func initialModel(cfg *config.Config, logger *charm_log.Logger) model {
 	}
 }
 
-type listItem string
-
-func (i listItem) Title() string       { return string(i) }
-func (i listItem) Description() string { return "" }
-func (i listItem) FilterValue() string { return string(i) }
-
 func (m model) Init() tea.Cmd {
 	return tea.Batch(m.filePicker.Init())
 }
@@ -104,7 +98,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.windowWidth = msg.Width
 		contentHeight := m.contentHeight()
 
-		m.filePicker.Height = contentHeight - 1 // WARN: -1 for the prompt
+		m.filePicker.Height = contentHeight - 2 // WARN: -1 for the prompt
 		m.earthList.SetSize(msg.Width, contentHeight)
 		m.atmosphereList.SetSize(msg.Width, contentHeight)
 

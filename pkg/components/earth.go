@@ -20,3 +20,19 @@ func (e Earth) String() string {
 		return "Unknown Earth Model"
 	}
 }
+
+// INFO: Implementing the list.Item interface
+func (e Earth) Title() string { return e.String() }
+func (e Earth) Description() string {
+	switch e {
+	case FlatEarth:
+		return "No elevation data, constant gravity, no curvature"
+	case SphericalEarth:
+		return "No elevation data, constant gravity, spherical curvature"
+	case TopographicalEarth:
+		return "Elevation data, variable gravity, spherical curvature"
+	default:
+		return ""
+	}
+}
+func (e Earth) FilterValue() string { return e.String()}
