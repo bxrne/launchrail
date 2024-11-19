@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/bxrne/launchrail/pkg/integrations/openrocket"
+	"github.com/bxrne/launchrail/internal/openrocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
