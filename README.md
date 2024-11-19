@@ -1,5 +1,7 @@
 # launchrail
 
+<img width="800" src="./assets/cover.png" alt="Cover picture with demo" />
+
 [![Build and Test](https://github.com/bxrne/launchrail/actions/workflows/ci.yaml/badge.svg)](https://github.com/bxrne/launchrail/actions/workflows/ci.yaml) [![codecov](https://codecov.io/gh/bxrne/launchrail/graph/badge.svg?token=HDTJQK087F)](https://codecov.io/gh/bxrne/launchrail) [![Go Reference](https://pkg.go.dev/badge/github.com/bxrne/launchrail.svg)](https://pkg.go.dev/github.com/bxrne/launchrail)
 
 > ”Can the Black-Scholes model be adapted to simulate risk-neutral baseline trajectories for high powered rocket launches?”
