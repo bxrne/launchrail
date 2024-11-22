@@ -8,12 +8,27 @@ import (
 	"github.com/charmbracelet/log"
 )
 
+// Global singleton instances for logger management
+// INFO: These variables are package-level to maintain singleton pattern
 var (
 	once     sync.Once
 	instance *log.Logger
 )
 
-// NOTE: Returns the singleton logger instance
+// GetLogger returns a singleton instance of the logger configured with the specified output file.
+// It ensures thread-safe initialization using sync.Once.
+//
+// INFO: This is the primary method for obtaining a logger instance throughout the application
+//
+// Parameters:
+//   - fileOutPath: The file path where logs will be written
+//
+// Returns:
+//   - *log.Logger: Configured logger instance
+//   - error: Any error encountered during initialization
+//
+// TODO: Consider adding log rotation support
+// TODO: Add support for different log levels based on environment
 func GetLogger(fileOutPath string) (*log.Logger, error) {
 	var err error
 
@@ -40,7 +55,13 @@ func GetLogger(fileOutPath string) (*log.Logger, error) {
 	return instance, nil
 }
 
-// WARN: Do not use. It is for testing
+// Reset clears the logger instance and resets the singleton state.
+// This should only be used in testing scenarios.
+//
+// WARN: This method is dangerous in production and should only be used in tests
+// WARN: Calling this while other goroutines are using the logger may cause panic
+//
+// TODO: Consider adding mutex protection for Reset operation
 func Reset() {
 	instance = nil
 	once = sync.Once{}

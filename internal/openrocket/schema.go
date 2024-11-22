@@ -1,3 +1,7 @@
+// Package openrocket provides the data structures for OpenRocket file format.
+// INFO: The schema represents OpenRocket XML format version 1.0
+// TODO: Implement version detection and multiple schema support
+// WARN: This schema is auto-generated and may need manual updates for new OpenRocket versions
 package openrocket
 
 import (

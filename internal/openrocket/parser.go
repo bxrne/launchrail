@@ -1,3 +1,5 @@
+// Package openrocket provides functionality to parse and interact with OpenRocket (.ork) files.
+// INFO: OpenRocket files are XML documents compressed in ZIP format.
 package openrocket
 
 import (
@@ -7,6 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// openOrkFile opens an OpenRocket file and returns a zip reader.
+// WARN: Caller must ensure to close the returned ReadCloser.
 func openOrkFile(input string) (*zip.ReadCloser, error) {
 	r, err := zip.OpenReader(input)
 	if err != nil {
@@ -15,7 +19,10 @@ func openOrkFile(input string) (*zip.ReadCloser, error) {
 	return r, nil
 }
 
-// INFO: OpenRocket files .ork are actually xml but zipped
+// Decompress takes a filepath to an OpenRocket file (.ork) and returns the parsed rocket data.
+// INFO: The function handles both unzipping and XML parsing in one step.
+// TODO: Consider adding validation for the XML schema version
+// TODO: Add support for multiple rocket configurations in a single file
 func Decompress(filePath string) (*Openrocket, error) {
 	ork_rc, err := openOrkFile(filePath)
 	if err != nil {
