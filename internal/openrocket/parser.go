@@ -21,8 +21,6 @@ func openOrkFile(input string) (*zip.ReadCloser, error) {
 
 // Decompress takes a filepath to an OpenRocket file (.ork) and returns the parsed rocket data.
 // INFO: The function handles both unzipping and XML parsing in one step.
-// TODO: Consider adding validation for the XML schema version
-// TODO: Add support for multiple rocket configurations in a single file
 func Decompress(filePath string) (*Openrocket, error) {
 	ork_rc, err := openOrkFile(filePath)
 	if err != nil {

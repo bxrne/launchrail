@@ -44,8 +44,6 @@ var (
 //   - error: Any error encountered during loading or unmarshaling
 //
 // WARN: Subsequent calls with different configPath values will not reload the config
-// TODO: Consider adding support for hot reloading of configuration
-// TODO: Add validation for required configuration fields
 func LoadConfig(configPath string) (*Config, error) {
 	once.Do(func() {
 		viper.SetConfigFile(configPath)

@@ -26,9 +26,6 @@ var (
 // Returns:
 //   - *log.Logger: Configured logger instance
 //   - error: Any error encountered during initialization
-//
-// TODO: Consider adding log rotation support
-// TODO: Add support for different log levels based on environment
 func GetLogger(fileOutPath string) (*log.Logger, error) {
 	var err error
 
@@ -60,8 +57,6 @@ func GetLogger(fileOutPath string) (*log.Logger, error) {
 //
 // WARN: This method is dangerous in production and should only be used in tests
 // WARN: Calling this while other goroutines are using the logger may cause panic
-//
-// TODO: Consider adding mutex protection for Reset operation
 func Reset() {
 	instance = nil
 	once = sync.Once{}

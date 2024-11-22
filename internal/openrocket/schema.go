@@ -1,14 +1,9 @@
-// Package openrocket provides the data structures for OpenRocket file format.
-// INFO: The schema represents OpenRocket XML format version 1.0
-// TODO: Implement version detection and multiple schema support
-// WARN: This schema is auto-generated and may need manual updates for new OpenRocket versions
 package openrocket
 
 import (
 	"encoding/xml"
 )
 
-// TODO: Do the below a better way that will handle OpenRocket updates or else do versions?
 // Openrocket was generated 2024-10-18 00:32:31 by https://xml-to-go.github.io/ in Ukraine.
 type Openrocket struct {
 	XMLName xml.Name `xml:"openrocket"`
