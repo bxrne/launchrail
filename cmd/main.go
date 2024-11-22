@@ -6,7 +6,6 @@ import (
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
-	"github.com/bxrne/launchrail/internal/tui"
 )
 
 func main() {
@@ -24,12 +23,6 @@ func main() {
 
 	log.Info("Starting Launchrail application")
 
-	t := tui.New(cfg, log)
-	_, err = t.Run()
-	if err != nil {
-		log.Errorf("Error running TUI: %v", err)
-		os.Exit(1)
-	}
-
+	// 	sim := simulation.NewSimulation([]entity.Entity{}, []entity.System{})
 	log.Info("Exiting Launchrail application")
 }

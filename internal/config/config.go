@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Config represents the application configuration structure.
+// INFO: All fields are mapped using mapstructure tags for Viper compatibility
 type Config struct {
 	App struct {
 		Version string `mapstructure:"version"`
@@ -21,12 +23,29 @@ type Config struct {
 	} `mapstructure:"engine"`
 }
 
+// Global singleton instances for configuration management
+// INFO: These variables are package-level to maintain singleton pattern
 var (
 	once     sync.Once
 	instance *Config
 	err      error
 )
 
+// LoadConfig loads the configuration from the specified file path and returns a singleton instance.
+// It uses Viper for configuration management and ensures thread-safe initialization.
+//
+// INFO: This is the primary method for obtaining configuration throughout the application
+//
+// Parameters:
+//   - configPath: Path to the configuration file
+//
+// Returns:
+//   - *Config: Populated configuration instance
+//   - error: Any error encountered during loading or unmarshaling
+//
+// WARN: Subsequent calls with different configPath values will not reload the config
+// TODO: Consider adding support for hot reloading of configuration
+// TODO: Add validation for required configuration fields
 func LoadConfig(configPath string) (*Config, error) {
 	once.Do(func() {
 		viper.SetConfigFile(configPath)
