@@ -3,7 +3,7 @@ package simulation
 import (
 	"fmt"
 
-	"github.com/bxrne/launchrail/pkg/components"
+	"github.com/bxrne/launchrail/pkg/entities"
 )
 
 type Environment struct {
@@ -13,19 +13,17 @@ type Environment struct {
 	Gravity   float64
 	Pressure  float64
 
-	Atmosphere *components.Atmosphere
-	Earth      *components.Earth
+	Earth *entities.Earth
 }
 
-func NewEnvironment(lat, lon, elev, grav, press float64, atm *components.Atmosphere, earth *components.Earth) *Environment {
+func NewEnvironment(lat, lon, elev, grav, press float64, earth *entities.Earth) *Environment {
 	return &Environment{
-		Latitude:   lat,
-		Longitude:  lon,
-		Elevation:  elev,
-		Gravity:    grav,
-		Pressure:   press,
-		Atmosphere: atm,
-		Earth:      earth,
+		Latitude:  lat,
+		Longitude: lon,
+		Elevation: elev,
+		Gravity:   grav,
+		Pressure:  press,
+		Earth:     earth,
 	}
 }
 

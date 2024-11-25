@@ -50,7 +50,7 @@
                 <name>Drogue Parachute</name>
                 <id>8610fe37-2e85-49ab-93cf-72082fc7a47b</id>
                 <axialoffset method="middle">0.13</axialoffset>
-                <position type="middle">0.13</position>
+                <position type="mid edle">0.13</position>
                 <packedlength>0.025</packedlength>
                 <packedradius>0.0125</packedradius>
                 <radialposition>0.0</radialposition>

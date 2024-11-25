@@ -136,7 +136,7 @@ func NewSolidMotor(thrustCurveFilePath string, dryMass float64, propellantMass f
 	return &motor, nil
 }
 
-func (m *SolidMotor) UpdateState(timeStep time.Duration) error {
+func (m *SolidMotor) Update(timeStep time.Duration) error {
 	if timeStep <= 0 {
 		return fmt.Errorf("time step must be positive")
 	}
@@ -174,22 +174,5 @@ func (m *SolidMotor) UpdateState(timeStep time.Duration) error {
 
 func (m *SolidMotor) String() string {
 	return fmt.Sprintf(
-		"Manufacturer: %s\n"+
-			"Designation: %s\n"+
-			"Diameter: %.2f mm\n"+
-			"Length: %.2f mm\n"+
-			"Propellant: %s\n"+
-			"Total Impulse: %.2f Ns\n"+
-			"Average Thrust: %.2f N\n"+
-			"Burn Time: %s\n"+
-			"Current State:\n"+
-			"  Elapsed Time: %s\n"+
-			"  Current Thrust: %.2f N\n"+
-			"  Remaining Mass: %.2f kg\n"+
-			"  Burned Propellant: %.2f kg",
-		m.Manufacturer, m.Designation, m.Diameter, m.Length,
-		m.Propellant, m.TotalImpulse, m.AverageThrust, m.BurnTime,
-		m.CurrentState.ElapsedTime, m.CurrentState.CurrentThrust,
-		m.CurrentState.RemainingMass, m.CurrentState.BurnedPropellant,
-	)
+		"Designation=%s Diameter=%f Length=%f TotalImpulse=%f Propellant=%s AverageThrust=%f MaxThrust=%f BurnTime=%s", m.Designation, m.Diameter, m.Length, m.TotalImpulse, m.Propellant, m.AverageThrust, m.MaxThrust, m.BurnTime)
 }

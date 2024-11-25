@@ -37,7 +37,7 @@ func TestNewSolidMotor_ValidMotor(t *testing.T) {
 }
 
 // TEST: GIVEN an initialized motor WHEN updating state with multiple time steps THEN track motor progression
-func TestMotorUpdateState(t *testing.T) {
+func TestMotorUpdate(t *testing.T) {
 	motor := createTestMotor(t)
 
 	timeSteps := []time.Duration{
@@ -47,7 +47,7 @@ func TestMotorUpdateState(t *testing.T) {
 	}
 
 	for _, step := range timeSteps {
-		err := motor.UpdateState(step)
+		err := motor.Update(step)
 		assert.NoError(t, err)
 	}
 
@@ -60,10 +60,10 @@ func TestMotorUpdateState(t *testing.T) {
 func TestMotorInvalidTimeStep(t *testing.T) {
 	motor := createTestMotor(t)
 
-	err := motor.UpdateState(0)
+	err := motor.Update(0)
 	assert.Error(t, err, "Zero time step should return an error")
 
-	err = motor.UpdateState(-1 * time.Second)
+	err = motor.Update(-1 * time.Second)
 	assert.Error(t, err, "Negative time step should return an error")
 }
 
@@ -76,7 +76,7 @@ func TestMotorGrainBurning(t *testing.T) {
 		initialLengths[i] = grain.CurrentLength
 	}
 
-	err := motor.UpdateState(1 * time.Second)
+	err := motor.Update(1 * time.Second)
 	assert.NoError(t, err)
 
 	for i, grain := range motor.Grains {

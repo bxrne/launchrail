@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bxrne/launchrail/pkg/components"
+	"github.com/bxrne/launchrail/pkg/entities"
 )
 
 type Simulation struct {
-	rocket      *components.Rocket
+	rocket      *entities.Rocket
 	environment Environment
 	timeStep    time.Duration
 	elapsedTime time.Duration
 }
 
-func NewSimulation(rocket *components.Rocket, environment Environment, timeStepNS int) *Simulation {
+func NewSimulation(rocket *entities.Rocket, environment Environment, timeStepNS int) *Simulation {
 	return &Simulation{
 		rocket:      rocket,
 		environment: environment,
@@ -23,7 +23,7 @@ func NewSimulation(rocket *components.Rocket, environment Environment, timeStepN
 }
 
 func (s *Simulation) Run() error {
-	err := s.rocket.Motor.UpdateState(s.timeStep)
+	err := s.rocket.Motor.Update(s.timeStep)
 	if err != nil {
 		return fmt.Errorf("motor update error: %v", err)
 	}
