@@ -21,6 +21,9 @@ type Config struct {
 	Engine struct {
 		TimeStepNS int `mapstructure:"timestep_ns"`
 	} `mapstructure:"engine"`
+	Dev struct {
+		ORKFile string `mapstructure:"orkFile"`
+	} `mapstructure:"dev"`
 }
 
 // Global singleton instances for configuration management
