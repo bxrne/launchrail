@@ -56,7 +56,9 @@ func (o *Openrocket) ConvertToECS() *entities.ECS {
 			Mass:     component.Mass,
 			Position: component.Position,
 		}
-		ecs.AddComponent(entity, rocketComponent)
+		ecs.AddComponent(entity, rocketComponent, "RocketComponent")
+		ecs.AddComponent(entity, &components.Velocity{}, "Velocity")
+		ecs.AddComponent(entity, &components.Position{}, "Position")
 	}
 
 	for _, stage := range o.Rocket.Stages {
@@ -64,7 +66,9 @@ func (o *Openrocket) ConvertToECS() *entities.ECS {
 		stageComponent := &components.Stage{
 			Name: stage.Name,
 		}
-		ecs.AddComponent(entity, stageComponent)
+		ecs.AddComponent(entity, stageComponent, "Stage")
+		ecs.AddComponent(entity, &components.Velocity{}, "Velocity")
+		ecs.AddComponent(entity, &components.Position{}, "Position")
 	}
 
 	for _, finSet := range o.Rocket.FinSets {
@@ -74,7 +78,9 @@ func (o *Openrocket) ConvertToECS() *entities.ECS {
 			FinCount: finSet.FinCount,
 			FinShape: finSet.FinShape,
 		}
-		ecs.AddComponent(entity, finSetComponent)
+		ecs.AddComponent(entity, finSetComponent, "FinSet")
+		ecs.AddComponent(entity, &components.Velocity{}, "Velocity")
+		ecs.AddComponent(entity, &components.Position{}, "Position")
 	}
 
 	for _, bodyTube := range o.Rocket.BodyTubes {
@@ -84,7 +90,9 @@ func (o *Openrocket) ConvertToECS() *entities.ECS {
 			Radius: bodyTube.Radius,
 			Length: bodyTube.Length,
 		}
-		ecs.AddComponent(entity, bodyTubeComponent)
+		ecs.AddComponent(entity, bodyTubeComponent, "BodyTube")
+		ecs.AddComponent(entity, &components.Velocity{}, "Velocity")
+		ecs.AddComponent(entity, &components.Position{}, "Position")
 	}
 
 	for _, noseCone := range o.Rocket.NoseCones {
@@ -92,7 +100,9 @@ func (o *Openrocket) ConvertToECS() *entities.ECS {
 		noseConeComponent := &components.NoseCone{
 			Name: noseCone.Name,
 		}
-		ecs.AddComponent(entity, noseConeComponent)
+		ecs.AddComponent(entity, noseConeComponent, "NoseCone")
+		ecs.AddComponent(entity, &components.Velocity{}, "Velocity")
+		ecs.AddComponent(entity, &components.Position{}, "Position")
 	}
 
 	for _, transition := range o.Rocket.Transitions {
@@ -100,7 +110,9 @@ func (o *Openrocket) ConvertToECS() *entities.ECS {
 		transitionComponent := &components.Transition{
 			Name: transition.Name,
 		}
-		ecs.AddComponent(entity, transitionComponent)
+		ecs.AddComponent(entity, transitionComponent, "Transition")
+		ecs.AddComponent(entity, &components.Velocity{}, "Velocity")
+		ecs.AddComponent(entity, &components.Position{}, "Position")
 	}
 
 	for _, launchLug := range o.Rocket.LaunchLugs {
@@ -109,7 +121,9 @@ func (o *Openrocket) ConvertToECS() *entities.ECS {
 			Name:    launchLug.Name,
 			LugType: launchLug.LugType,
 		}
-		ecs.AddComponent(entity, launchLugComponent)
+		ecs.AddComponent(entity, launchLugComponent, "LaunchLug")
+		ecs.AddComponent(entity, &components.Velocity{}, "Velocity")
+		ecs.AddComponent(entity, &components.Position{}, "Position")
 	}
 
 	for _, trapezoidal := range o.Rocket.Trapezoidal {
@@ -118,7 +132,9 @@ func (o *Openrocket) ConvertToECS() *entities.ECS {
 			Name:             trapezoidal.Name,
 			TrapezoidalShape: trapezoidal.TrapezoidalShape,
 		}
-		ecs.AddComponent(entity, trapezoidalComponent)
+		ecs.AddComponent(entity, trapezoidalComponent, "TrapezoidalFinSet")
+		ecs.AddComponent(entity, &components.Velocity{}, "Velocity")
+		ecs.AddComponent(entity, &components.Position{}, "Position")
 	}
 
 	for _, elliptical := range o.Rocket.Elliptical {
@@ -127,7 +143,9 @@ func (o *Openrocket) ConvertToECS() *entities.ECS {
 			Name:            elliptical.Name,
 			EllipticalShape: elliptical.EllipticalShape,
 		}
-		ecs.AddComponent(entity, ellipticalComponent)
+		ecs.AddComponent(entity, ellipticalComponent, "EllipticalFinSet")
+		ecs.AddComponent(entity, &components.Velocity{}, "Velocity")
+		ecs.AddComponent(entity, &components.Position{}, "Position")
 	}
 
 	for _, freeform := range o.Rocket.Freeform {
@@ -136,7 +154,9 @@ func (o *Openrocket) ConvertToECS() *entities.ECS {
 			Name:          freeform.Name,
 			FreeformShape: freeform.FreeformShape,
 		}
-		ecs.AddComponent(entity, freeformComponent)
+		ecs.AddComponent(entity, freeformComponent, "FreeformFinSet")
+		ecs.AddComponent(entity, &components.Velocity{}, "Velocity")
+		ecs.AddComponent(entity, &components.Position{}, "Position")
 	}
 
 	return ecs

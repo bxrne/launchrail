@@ -7,6 +7,21 @@ type RocketComponent struct {
 	Position float64
 }
 
+// Velocity represents the velocity of an entity.
+type Velocity struct {
+	X, Y, Z float64
+}
+
+// Position represents the position of an entity.
+type Position struct {
+	X, Y, Z float64
+}
+
+// Acceleration represents the acceleration of an entity.
+type Acceleration struct {
+	X, Y, Z float64
+}
+
 // Stage represents a rocket stage.
 type Stage struct {
 	Name string

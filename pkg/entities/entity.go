@@ -1,17 +1,9 @@
 package entities
 
-import (
-	"strconv"
-	"sync"
-)
+import "sync"
 
 // Entity is a unique identifier for an entity.
 type Entity uint64
-
-// String implements the Stringer interface and returns the string representation of the Entity
-func (e Entity) String() string {
-	return strconv.FormatUint(uint64(e), 10)
-}
 
 // ECS is the entity component system.
 type ECS struct {
@@ -43,22 +35,26 @@ func (ecs *ECS) CreateEntity() Entity {
 }
 
 // AddComponent adds a component to an entity.
-func (ecs *ECS) AddComponent(entity Entity, component interface{}) {
+func (ecs *ECS) AddComponent(entity Entity, component interface{}, componentName string) {
 	ecs.mu.Lock()
 	defer ecs.mu.Unlock()
 
-	ecs.components[entity]["component"] = component
+	ecs.components[entity][componentName] = component
 }
 
-// GetComponent retrieves a component by entity.
-func (ecs *ECS) GetComponent(entity Entity) interface{} {
+// GetComponent retrieves a component by entity and component name.
+func (ecs *ECS) GetComponent(entity Entity, componentName string) interface{} {
 	ecs.mu.Lock()
 	defer ecs.mu.Unlock()
 
-	return ecs.components[entity]["component"]
+	return ecs.components[entity][componentName]
 }
 
-// GetNextEntity retrieves the next entity
+// GetNextEntity returns the next entity
 func (ecs *ECS) GetNextEntity() Entity {
+	ecs.mu.Lock()
+	defer ecs.mu.Unlock()
+
 	return ecs.nextEntity
+
 }

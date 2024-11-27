@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bxrne/launchrail/internal/openrocket"
-	"github.com/bxrne/launchrail/pkg/report"
-	"github.com/bxrne/launchrail/pkg/systems"
-
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/internal/openrocket"
+	"github.com/bxrne/launchrail/pkg/components"
+	"github.com/bxrne/launchrail/pkg/entities"
+	"github.com/bxrne/launchrail/pkg/report"
+	"github.com/bxrne/launchrail/pkg/systems"
 )
 
 func main() {
@@ -31,16 +32,27 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	ecs := rocketData.ConvertToECS()
 
-	// Run sim
-	simulation := systems.NewSimulation(ecs)
-	log.Info("Simulation starting")
-	simulation.Run()
-	log.Info("Simulation finished")
+	// Initialize velocity, position, and acceleration components
+	for entity := entities.Entity(1); entity < ecs.GetNextEntity(); entity++ {
+		ecs.AddComponent(entity, &components.Velocity{}, "Velocity")
+		ecs.AddComponent(entity, &components.Position{}, "Position")
+		ecs.AddComponent(entity, &components.Acceleration{}, "Acceleration")
+	}
 
-	// Crunch nums
-	report.Generate(ecs, cfg.Dev.OutFile)
-	log.Infof("Report saved to %v, exiting.", cfg.Dev.OutFile)
+	// Run the simulation
+	simulation := systems.NewSimulation(ecs)
+	simulation.Run()
+
+	// Get the stored states from the physics system
+	states := simulation.GetStates()
+
+	// Generate report
+	err = report.Generate(states, "simulation_report.csv")
+	if err != nil {
+		log.Fatalf("Error generating report: %v\n", err)
+	}
+
+	log.Info("Simulation completed and report generated.")
 }
