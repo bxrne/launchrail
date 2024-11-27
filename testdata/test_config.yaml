@@ -5,4 +5,7 @@ app:
 logs:
   file: "launchrail.log"
 engine:
-  timestep_ns: 10000000 
+  timestep_ns: 10000000 # 10ms
+dev:
+  orkFile: "testdata/ULR3.ork"
+  outFile: "simulation_report.csv"

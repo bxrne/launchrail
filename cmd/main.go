@@ -4,32 +4,43 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/bxrne/launchrail/internal/openrocket"
+	"github.com/bxrne/launchrail/pkg/report"
+	"github.com/bxrne/launchrail/pkg/systems"
+
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
-	"github.com/bxrne/launchrail/internal/tui"
 )
 
 func main() {
 	cfg, err := config.LoadConfig("config.yaml")
 	if err != nil {
-		fmt.Printf("Error loading configuration: %v\n", err)
+		fmt.Printf("Error loading configuration: %v", err)
 		os.Exit(1)
 	}
 
 	log, err := logger.GetLogger(cfg.Logs.File)
 	if err != nil {
-		fmt.Printf("Error getting logger: %v\n", err)
+		fmt.Printf("Error intialising logger: %v", err)
 		os.Exit(1)
 	}
+	log.Debug("Initialised")
 
-	log.Info("Starting Launchrail application")
-
-	t := tui.New(cfg, log)
-	_, err = t.Run()
+	// Parse .ork
+	rocketData, err := openrocket.Decompress(cfg.Dev.ORKFile)
 	if err != nil {
-		log.Errorf("Error running TUI: %v", err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
-	log.Info("Exiting Launchrail application")
+	ecs := rocketData.ConvertToECS()
+
+	// Run sim
+	simulation := systems.NewSimulation(ecs)
+	log.Info("Simulation starting")
+	simulation.Run()
+	log.Info("Simulation finished")
+
+	// Crunch nums
+	report.Generate(ecs, cfg.Dev.OutFile)
+	log.Infof("Report saved to %v, exiting.", cfg.Dev.OutFile)
 }
