@@ -23,6 +23,7 @@ type Config struct {
 	} `mapstructure:"engine"`
 	Dev struct {
 		ORKFile string `mapstructure:"orkFile"`
+		OutFile string `mapstructure:"outFile"`
 	} `mapstructure:"dev"`
 }
 
