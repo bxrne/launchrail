@@ -1,0 +1,10 @@
+app:
+  name: "launchrail-dev"
+  version: "0.0.1"
+
+logging:
+  level: "debug"
+
+dev:
+  ork_file: "testdata/l1.ork"
+  motor_designation: "269H110-14A"
