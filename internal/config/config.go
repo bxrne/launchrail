@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// INFO: Singleton configuration instance.
 var (
 	once     sync.Once
 	instance *Config
@@ -46,19 +47,19 @@ func validateConfig(cfg *Config) error {
 
 	if cfg.App.Name == "" {
 		err := fmt.Errorf("app.name is required")
-		log.Error().Err(err).Msg("Validation error")
+		log.Error().Err(err)
 		return err
 	}
 
 	if cfg.App.Version == "" {
 		err := fmt.Errorf("app.version is required")
-		log.Error().Err(err).Msg("Validation error")
+		log.Error().Err(err)
 		return err
 	}
 
 	if cfg.Logging.Level == "" {
 		err := fmt.Errorf("logging.level is required")
-		log.Error().Err(err).Msg("Validation error")
+		log.Error().Err(err)
 		return err
 	}
 
