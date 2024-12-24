@@ -17,7 +17,7 @@ go run ./cmd/launchrail/...
 
 ### Testing
 
-Run locally with the command below, runs on change for PRs and on main push (see [.github/workflows/build_test.yaml](.github/workflows/build_test.yaml)).
+Run locally with the command below, runs on change for PRs and on main push (see [build and test CI](.github/workflows/build_test.yaml)).
 
 ```bash
 go test ./...
