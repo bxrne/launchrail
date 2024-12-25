@@ -64,3 +64,43 @@ func TestDescribe_InvalidDesignation(t *testing.T) {
 	assert.Error(t, err)
 	assert.Empty(t, description)
 }
+
+// TEST: GIVEN an empty designation WHEN New is called THEN an error is returned
+func TestDefaultDesignationValidator_New_Empty(t *testing.T) {
+	validator := &designation.DefaultDesignationValidator{}
+	input := ""
+
+	d, err := validator.New(input)
+	assert.Error(t, err)
+	assert.Empty(t, d)
+}
+
+// TEST: GIVEN a very long invalid designation WHEN New is called THEN an error is returned
+func TestDefaultDesignationValidator_New_TooLong(t *testing.T) {
+	validator := &designation.DefaultDesignationValidator{}
+	input := "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ-1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	d, err := validator.New(input)
+	assert.Error(t, err)
+	assert.Empty(t, d)
+}
+
+// TEST: GIVEN a valid designation WHEN Describe is called AND parsing errors occur THEN an error is returned
+func TestDescribe_ParsingError(t *testing.T) {
+	// Simulate a valid-looking designation but with invalid numeric parts
+	d := designation.Designation("ABCDEF-GHIJ")
+
+	description, err := d.Describe()
+	assert.Error(t, err)
+	assert.Empty(t, description)
+}
+
+// TEST: GIVEN a designation with partial valid format WHEN Validate is called THEN false is returned
+func TestValidate_PartialValid(t *testing.T) {
+	validator := &designation.DefaultDesignationValidator{}
+	d := designation.Designation("123AB")
+
+	valid, err := validator.Validate(d)
+	assert.NoError(t, err)
+	assert.False(t, valid)
+}
