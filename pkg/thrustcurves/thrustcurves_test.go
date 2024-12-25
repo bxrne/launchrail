@@ -6,24 +6,15 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/pkg/designation"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-// Mock HTTP Client
-type MockHTTPClient struct {
-	mock.Mock
-}
-
-func (m *MockHTTPClient) Post(url, contentType string, body *bytes.Buffer) (*http.Response, error) {
-	args := m.Called(url, contentType, body)
-	return args.Get(0).(*http.Response), args.Error(1)
-}
-
-func TestGetMotorID_ValidResponse(t *testing.T) {
-	mockHTTP := new(MockHTTPClient)
+func TestLoadMotor_ValidResponse(t *testing.T) {
+	mockHTTP := new(http_client.MockHTTPClient)
 
 	mockSearchResponse := `{"results":[{"motorId":"motor123"}]}`
 	mockHTTP.On("Post", "https://www.thrustcurve.org/api/v1/search.json", "application/json", mock.Anything).
@@ -37,4 +28,12 @@ func TestGetMotorID_ValidResponse(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "motor123", motorData.ID)
 	assert.Equal(t, [][]float64{{0.1, 10.0}, {0.2, 20.0}}, motorData.Thrust)
+}
+
+func TestLoadMotor_InvalidDesignation(t *testing.T) {
+	mockHTTP := new(http_client.MockHTTPClient)
+
+	motorData, err := thrustcurves.Load("<invalid>", mockHTTP, &designation.DefaultDesignationValidator{})
+	assert.Error(t, err)
+	assert.Nil(t, motorData)
 }
