@@ -10,8 +10,8 @@ import (
 )
 
 // NOTE: Assemble motor data from the ThrustCurve API.
-func Load(raw_designation string, client http_client.HTTPClient, validator designation.DesignationValidator) (*MotorData, error) {
-	designation, err := validator.New(raw_designation)
+func Load(designationString string, client http_client.HTTPClient, validator designation.DesignationValidator) (*MotorData, error) {
+	designation, err := validator.New(designationString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create motor designation: %s", err)
 	}
