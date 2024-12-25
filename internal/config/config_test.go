@@ -168,8 +168,11 @@ func TestValidateConfigInvalidOpenRocketFile(t *testing.T) {
 			t.Error("Expected an error, got nil")
 		}
 
-		if err.Error() != "options.openrocket_file is invalid: stat test/resources/invalid.ork: no such file or directory" {
-			t.Errorf("Expected error to be 'options.openrocket_file is invalid: stat test/resources/invalid.ork: no such file or directory', got: %s", err)
+		unixErr := "options.openrocket_file is invalid: stat test/resources/invalid.ork: no such file or directory"
+		winErr := "options.openrocket_file is invalid: CreateFile test/resources/invalid.ork: The system cannot find the path specified."
+
+		if err.Error() != unixErr && err.Error() != winErr {
+			t.Errorf("Expected error to be '%s' or '%s', got: %s", unixErr, winErr, err)
 		}
 
 		cfg.Options.OpenRocketFile = "test/resources/rocket.ork" // Reset options.open_rocket_file
