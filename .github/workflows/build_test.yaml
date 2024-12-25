@@ -35,6 +35,7 @@ jobs:
         run: go test -cover -coverprofile=coverage.out ./...
 
       - name: SonarQube Scan
+        if: matrix.os == 'ubuntu-latest'
         uses: SonarSource/sonarqube-scan-action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
