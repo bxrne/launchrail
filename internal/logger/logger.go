@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"io"
 	"sync"
 	"time"
 
@@ -25,4 +26,10 @@ func GetLogger() *logf.Logger {
 	})
 
 	return &logger
+}
+
+// SetLoggerOutput sets the output destination for the logger (used for testing).
+func SetLoggerOutput(w io.Writer) {
+	opts.Writer = w
+	logger = logf.New(opts)
 }
