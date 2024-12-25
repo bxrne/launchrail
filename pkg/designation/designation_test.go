@@ -7,50 +7,60 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNew_ValidDesignation(t *testing.T) {
+// TEST: GIVEN a valid designation WHEN New is called THEN the designation is returned
+func TestDefaultDesignationValidator_New_Valid(t *testing.T) {
+	validator := &designation.DefaultDesignationValidator{}
 	input := "269H110-14A"
-	expected := designation.Designation(input)
 
-	d, err := designation.New(input)
+	d, err := validator.New(input)
 	assert.NoError(t, err)
-	assert.Equal(t, expected, d)
+	assert.Equal(t, designation.Designation(input), d)
 }
 
-func TestNew_InvalidDesignation(t *testing.T) {
-	invalidInput := "<invalid>"
-	d, err := designation.New(invalidInput)
+// TEST: GIVEN an invalid designation WHEN New is called THEN an error is returned
+func TestDefaultDesignationValidator_New_Invalid(t *testing.T) {
+	validator := &designation.DefaultDesignationValidator{}
+	input := "<invalid>"
+
+	d, err := validator.New(input)
 	assert.Error(t, err)
 	assert.Empty(t, d)
 }
 
-func TestValidate_ValidDesignation(t *testing.T) {
+// TEST: GIVEN a valid designation WHEN Validate is called THEN true is returned
+func TestDefaultDesignationValidator_Validate_Valid(t *testing.T) {
+	validator := &designation.DefaultDesignationValidator{}
 	d := designation.Designation("269H110-14A")
-	valid, err := d.Validate()
 
+	valid, err := validator.Validate(d)
 	assert.NoError(t, err)
 	assert.True(t, valid)
 }
 
-func TestValidate_InvalidDesignation(t *testing.T) {
+// TEST: GIVEN an invalid designation WHEN Validate is called THEN false is returned
+func TestDefaultDesignationValidator_Validate_Invalid(t *testing.T) {
+	validator := &designation.DefaultDesignationValidator{}
 	d := designation.Designation("<invalid>")
-	valid, err := d.Validate()
 
+	valid, err := validator.Validate(d)
 	assert.NoError(t, err)
 	assert.False(t, valid)
 }
 
+// TEST: GIVEN a valid designation WHEN Describe is called THEN the description is returned
 func TestDescribe_ValidDesignation(t *testing.T) {
 	d := designation.Designation("269H110-14A")
-	description, err := d.Describe()
 
+	description, err := d.Describe()
 	assert.NoError(t, err)
 	assert.Equal(t, "Total Impulse: 269.00 Ns, Class: H, Average Thrust: 110.00 N, Delay Time: 14.00 s, Variant: A", description)
 }
 
+// TEST: GIVEN an invalid designation WHEN Describe is called THEN an error is returned
 func TestDescribe_InvalidDesignation(t *testing.T) {
-	d := designation.Designation("Invalid123")
-	description, err := d.Describe()
+	d := designation.Designation("<invalid>")
 
+	description, err := d.Describe()
 	assert.Error(t, err)
 	assert.Empty(t, description)
 }
