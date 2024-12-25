@@ -202,23 +202,24 @@ func TestWorld_AddSystem(t *testing.T) {
 func TestWorld_Update(t *testing.T) {
 	world := ecs.NewWorld()
 
-	// Add multiple systems with different priorities
-	systems := []systems.MockSystem{
-		*systems.NewMockSystem(1),
-		*systems.NewMockSystem(2),
-		*systems.NewMockSystem(3),
+	// Create pointers to systems instead of copying them
+	mockSystems := []*systems.MockSystem{
+		systems.NewMockSystem(1),
+		systems.NewMockSystem(2),
+		systems.NewMockSystem(3),
 	}
 
-	for _, sys := range systems {
-		world.AddSystem(&sys)
+	// Add the system pointers to the world
+	for _, sys := range mockSystems {
+		world.AddSystem(sys)
 	}
 
 	// Update world
 	dt := 0.016
 	world.Update(dt)
 
-	// Verify all systems were updated
-	for i, sys := range systems {
+	// Verify all systems were updated - now checking the actual system instances
+	for i, sys := range mockSystems {
 		if !sys.GetUpdateCalled() {
 			t.Errorf("System %d was not updated", i)
 		}
