@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/bxrne/launchrail/pkg/designation"
 )
 
 type SearchResponse struct {
@@ -23,7 +25,7 @@ type DownloadResponse struct {
 }
 
 // NOTE: Search for the motor ID using the designation via the ThrustCurve API.
-func getMotorID(designation string) (string, error) {
+func getMotorID(designation designation.Designation) (string, error) {
 	url := "https://www.thrustcurve.org/api/v1/search.json"
 	requestBody := map[string]interface{}{
 		"designation": designation,
