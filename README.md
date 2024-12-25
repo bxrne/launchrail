@@ -1,6 +1,6 @@
 # launchrail
 
-[![Build and Test](https://github.com/bxrne/launchrail/actions/workflows/build_test.yaml/badge.svg)](https://github.com/bxrne/launchrail/actions/workflows/build_test.yaml)[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=bxrne_launchrail&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bxrne_launchrail)
+[![Build and Test](https://github.com/bxrne/launchrail/actions/workflows/build_test.yaml/badge.svg)](https://github.com/bxrne/launchrail/actions/workflows/build_test.yaml) [![Lint and Vet](https://github.com/bxrne/launchrail/actions/workflows/lint_vet.yaml/badge.svg)](https://github.com/bxrne/launchrail/actions/workflows/lint_vet.yaml) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=bxrne_launchrail&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bxrne_launchrail) [![Go Reference](https://pkg.go.dev/badge/github.com/bxrne/launchrail.svg)](https://pkg.go.dev/github.com/bxrne/launchrail)
 
 Launchrail is an open-source GNU General Public License v3.0 (GPL-3.0) project that aims to create a 6DOF Student High-Powered Rocket Simulator. The project aims to leverage [OpenRocket](http://openrocket.info/) design files to reduce config and uses [ThrustCurve](https://www.thrustcurve.org/) API for motor curves. The project is also testing the question of whether atmospheric turbulence can be better modelled by using financial algorithms over the standard ISA model.
 
