@@ -9,7 +9,7 @@ func main() {
 	cfg := config.GetConfig("config")
 
 	// NOTE: Get thrust curve from API
-	_ = thrustcurves.Load(cfg.Dev.MotorDesignation)
+	_ = thrustcurves.Load(cfg.Options.MotorDesignation)
 
 	// TODO: Get rocket configuration from OpenRocket
 

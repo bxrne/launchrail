@@ -1,9 +1,0 @@
-app:
-  name: "launchrail-test"
-  version: "0.0.1"
-
-logging:
-  level: "debug"
-
-dev:
-  motor_designation: "269H110-14A"

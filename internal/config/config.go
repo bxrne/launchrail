@@ -63,8 +63,8 @@ func validateConfig(cfg *Config) error {
 		return err
 	}
 
-	if cfg.Dev.MotorDesignation == "" {
-		err := fmt.Errorf("dev.motor_designation is required")
+	if cfg.Options.MotorDesignation == "" {
+		err := fmt.Errorf("options.motor_designation is required")
 		log.Fatal("Failed to validate configuration", "error", err)
 		return err
 	}

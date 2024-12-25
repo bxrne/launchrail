@@ -9,9 +9,9 @@ type Config struct {
 	Logging struct {
 		Level string `mapstructure:"level"`
 	} `mapstructure:"logging"`
-	Dev struct {
+	Options struct {
 		MotorDesignation string `mapstructure:"motor_designation"`
-	} `mapstructure:"dev"`
+	} `mapstructure:"options"`
 }
 
 // Marshal to map structure for logging.
@@ -20,6 +20,6 @@ func (c *Config) String() map[string]string {
 	marshalled["app.name"] = c.App.Name
 	marshalled["app.version"] = c.App.Version
 	marshalled["logging.level"] = c.Logging.Level
-	marshalled["dev.motor_designation"] = c.Dev.MotorDesignation
+	marshalled["options.motor_designation"] = c.Options.MotorDesignation
 	return marshalled
 }

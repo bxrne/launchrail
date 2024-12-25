@@ -5,5 +5,5 @@ app:
 logging:
   level: "debug"
 
-dev:
+options:
   motor_designation: "269H110-14A"
