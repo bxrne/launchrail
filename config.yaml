@@ -5,6 +5,5 @@ app:
 logging:
   level: "debug"
 
-dev:
-  ork_file: "testdata/l1.ork"
+options:
   motor_designation: "269H110-14A"

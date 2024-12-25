@@ -7,6 +7,21 @@ import (
 	"net/http"
 )
 
+type SearchResponse struct {
+	Results []struct {
+		MotorID string `json:"motorId"`
+	} `json:"results"`
+}
+
+type DownloadResponse struct {
+	Results []struct {
+		Samples []struct {
+			Time   float64 `json:"time"`
+			Thrust float64 `json:"thrust"`
+		} `json:"samples"`
+	} `json:"results"`
+}
+
 // NOTE: Search for the motor ID using the designation via the ThrustCurve API.
 func getMotorID(designation string) (string, error) {
 	url := "https://www.thrustcurve.org/api/v1/search.json"
@@ -30,7 +45,7 @@ func getMotorID(designation string) (string, error) {
 	}
 
 	if len(searchResponse.Results) == 0 {
-		return "", fmt.Errorf("no motor found with designation %s", designation)
+		return "", fmt.Errorf("no motor found for designation %s", designation)
 	}
 
 	return searchResponse.Results[0].MotorID, nil
