@@ -15,29 +15,29 @@ var (
 )
 
 // GetConfig returns the singleton instance of the configuration.
-func GetConfig() *Config {
+func GetConfig(name string) *Config {
 	log := logger.GetLogger()
-
 	once.Do(func() {
 		v := viper.New()
-		v.SetConfigName("config")
+		v.SetConfigName(name)
 		v.SetConfigType("yaml")
 		v.AddConfigPath(".")
 
-		// v.AutomaticEnv()
-
 		if err := v.ReadInConfig(); err != nil {
-			log.Fatal().Err(err).Msg("Failed to read configuration")
+			log.Fatal("Failed to read configuration", "error", err)
 		}
 
 		if err := v.Unmarshal(&instance); err != nil {
-			log.Fatal().Err(err).Msg("Failed to unmarshal configuration")
+			log.Fatal("Failed to unmarshal configuration", "error", err)
 		}
 
 		if err := validateConfig(instance); err != nil {
-			log.Fatal().Err(err).Msg("Failed to validate configuration")
+			log.Fatal("Failed to validate configuration", "error", err)
 		}
+
+		log.Info("Configuration loaded", "config", instance.String())
 	})
+
 	return instance
 }
 
@@ -47,27 +47,35 @@ func validateConfig(cfg *Config) error {
 
 	if cfg.App.Name == "" {
 		err := fmt.Errorf("app.name is required")
-		log.Error().Err(err)
+		log.Fatal("Failed to validate configuration", "error", err)
 		return err
 	}
 
 	if cfg.App.Version == "" {
 		err := fmt.Errorf("app.version is required")
-		log.Error().Err(err)
+		log.Fatal("Failed to validate configuration", "error", err)
 		return err
 	}
 
 	if cfg.Logging.Level == "" {
 		err := fmt.Errorf("logging.level is required")
-		log.Error().Err(err)
+		log.Fatal("Failed to validate configuration", "error", err)
+		return err
+	}
+
+	if cfg.Dev.MotorDesignation == "" {
+		err := fmt.Errorf("dev.motor_designation is required")
+		log.Fatal("Failed to validate configuration", "error", err)
 		return err
 	}
 
 	return nil
 }
 
-// ResetConfig resets the singleton instance for testing purposes.
+// WARNING: ResetConfig resets the singleton instance for testing purposes.
 func ResetConfig() {
 	once = sync.Once{}
 	instance = nil
+	log := logger.GetLogger()
+	log.Info("Configuration reset")
 }

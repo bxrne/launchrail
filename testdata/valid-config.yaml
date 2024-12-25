@@ -1,5 +1,5 @@
 app:
-  name: "launchrail-dev"
+  name: "launchrail-test"
   version: "0.0.1"
 
 logging:

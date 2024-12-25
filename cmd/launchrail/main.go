@@ -2,20 +2,26 @@ package main
 
 import (
 	"github.com/bxrne/launchrail/internal/config"
-	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 )
 
 func main() {
-	log := logger.GetLogger()
-	cfg := config.GetConfig()
+	cfg := config.GetConfig("config")
 
-	log.Info().Str("app_name", cfg.App.Name).Str("app_version", cfg.App.Version).Msg("Application configuration")
+	// NOTE: Get thrust curve from API
+	_ = thrustcurves.Load(cfg.Dev.MotorDesignation)
 
-	motor, err := thrustcurves.Load(cfg.Dev.MotorDesignation)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to load motor data")
-	}
+	// TODO: Get rocket configuration from OpenRocket
 
-	log.Info().Str("motor", motor.String()).Msg("Motor data loaded")
+	// TODO: Get launch configuration from OpenRocket
+
+	// TODO: Get conditions
+
+	// TODO: Setup simulation
+
+	// TODO: Run simulation
+
+	// TODO: Output results
+
+	// TODO: Cleanup
 }

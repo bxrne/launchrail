@@ -13,3 +13,13 @@ type Config struct {
 		MotorDesignation string `mapstructure:"motor_designation"`
 	} `mapstructure:"dev"`
 }
+
+// Marshal to map structure for logging.
+func (c *Config) String() map[string]string {
+	marshalled := make(map[string]string)
+	marshalled["app.name"] = c.App.Name
+	marshalled["app.version"] = c.App.Version
+	marshalled["logging.level"] = c.Logging.Level
+	marshalled["dev.motor_designation"] = c.Dev.MotorDesignation
+	return marshalled
+}
