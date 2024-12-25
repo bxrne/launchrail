@@ -35,11 +35,4 @@ jobs:
       - name: Run tests
         run: go test ./... -v -coverprofile=coverage.txt
 
-      - name: Export as JUnit report for GitHub
-        run: go get -u github.com/jstemmer/go-junit-report && go-junit-report < coverage.txt > junit.xml
 
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
