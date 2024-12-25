@@ -19,10 +19,10 @@ var (
 )
 
 // GetLogger returns the singleton instance of the logger.
-func GetLogger() logf.Logger {
+func GetLogger() *logf.Logger {
 	once.Do(func() {
 		logger = logf.New(opts)
 	})
 
-	return logger
+	return &logger
 }
