@@ -1,10 +1,12 @@
 package logger_test
 
 import (
-	"github.com/bxrne/launchrail/internal/logger"
 	"testing"
+
+	"github.com/bxrne/launchrail/internal/logger"
 )
 
+// TEST: GIVEN GetLogger is called THEN a non-nil logger is returned
 func TestGetLogger(t *testing.T) {
 	log := logger.GetLogger()
 	if log == nil {
@@ -12,6 +14,7 @@ func TestGetLogger(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN GetLogger is called multiple times THEN the logger is a singleton
 func TestGetLoggerSingleton(t *testing.T) {
 	log1 := logger.GetLogger()
 	log2 := logger.GetLogger()

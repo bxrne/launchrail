@@ -1,82 +1,51 @@
 package config
 
 import (
+	"errors"
 	"fmt"
-	"sync"
 
-	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/spf13/viper"
 )
 
-// INFO: Singleton configuration instance.
-var (
-	once     sync.Once
-	instance *Config
-)
-
 // GetConfig returns the singleton instance of the configuration.
-func GetConfig(name string) *Config {
-	log := logger.GetLogger()
-	once.Do(func() {
-		v := viper.New()
-		v.SetConfigName(name)
-		v.SetConfigType("yaml")
-		v.AddConfigPath(".")
+func GetConfig() (*Config, error) {
+	var cfg *Config
+	v := viper.New()
+	v.SetConfigName("config")
+	v.SetConfigType("yaml")
+	v.AddConfigPath(".")
 
-		if err := v.ReadInConfig(); err != nil {
-			log.Fatal("Failed to read configuration", "error", err)
-		}
+	if err := v.ReadInConfig(); err != nil {
+		return nil, errors.New("failed to read config file")
+	}
 
-		if err := v.Unmarshal(&instance); err != nil {
-			log.Fatal("Failed to unmarshal configuration", "error", err)
-		}
+	if err := v.Unmarshal(&cfg); err != nil {
+		return nil, errors.New("failed to unmarshal config")
+	}
 
-		if err := validateConfig(instance); err != nil {
-			log.Fatal("Failed to validate configuration", "error", err)
-		}
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 
-		log.Info("Configuration loaded", "config", instance.String())
-	})
-
-	return instance
+	return cfg, nil
 }
 
-// validateConfig validates the configuration struct.
-func validateConfig(cfg *Config) error {
-	log := logger.GetLogger()
-	msg := "Failed to validate configuration"
-
+func (cfg *Config) Validate() error {
 	if cfg.App.Name == "" {
-		err := fmt.Errorf("app.name is required")
-		log.Fatal(msg, "error", err)
-		return err
+		return fmt.Errorf("app.name is required")
 	}
 
 	if cfg.App.Version == "" {
-		err := fmt.Errorf("app.version is required")
-		log.Fatal(msg, "error", err)
-		return err
+		return fmt.Errorf("app.version is required")
 	}
 
 	if cfg.Logging.Level == "" {
-		err := fmt.Errorf("logging.level is required")
-		log.Fatal(msg, "error", err)
-		return err
+		return fmt.Errorf("logging.level is required")
 	}
 
 	if cfg.Options.MotorDesignation == "" {
-		err := fmt.Errorf("options.motor_designation is required")
-		log.Fatal(msg, "error", err)
-		return err
+		return fmt.Errorf("options.motor_designation is required")
 	}
 
 	return nil
-}
-
-// WARNING: ResetConfig resets the singleton instance for testing purposes.
-func ResetConfig() {
-	once = sync.Once{}
-	instance = nil
-	log := logger.GetLogger()
-	log.Info("Configuration reset")
 }
