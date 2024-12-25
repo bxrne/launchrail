@@ -76,3 +76,17 @@ func TestMockHTTPClient_Post(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, `{"response":"mocked"}`, string(respBody))
 }
+
+// TEST: GIVEN a MockHTTPClient with an error WHEN making a POST request THEN the request fails.
+func TestMockHTTPClient_Post_Error(t *testing.T) {
+	mockClient := &MockHTTPClient{
+		Response: nil,
+		Err:      http.ErrHandlerTimeout,
+	}
+
+	reqBody := bytes.NewBuffer([]byte(`{"key":"value"}`))
+	resp, err := mockClient.Post("http://mock.url/test", "application/json", reqBody)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+}

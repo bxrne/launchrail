@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// TEST: GIVEN a valid motor designation WHEN Load is called THEN the motor data is returned.
 func TestLoadMotor_ValidResponse(t *testing.T) {
 	mockHTTP := new(http_client.MockHTTPClient)
 
@@ -30,6 +31,7 @@ func TestLoadMotor_ValidResponse(t *testing.T) {
 	assert.Equal(t, [][]float64{{0.1, 10.0}, {0.2, 20.0}}, motorData.Thrust)
 }
 
+// TEST: GIVEN an invalid motor designation WHEN Load is called THEN an error is returned.
 func TestLoadMotor_InvalidDesignation(t *testing.T) {
 	mockHTTP := new(http_client.MockHTTPClient)
 
