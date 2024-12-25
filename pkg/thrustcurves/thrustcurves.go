@@ -1,45 +1,39 @@
 package thrustcurves
 
 import (
-	"github.com/bxrne/launchrail/internal/logger"
+	"fmt"
 )
 
 // NOTE: Assemble motor data from the ThrustCurve API.
-func Load(designation string) *MotorData {
-	log := logger.GetLogger()
-
+func Load(designation string) (*MotorData, error) {
 	valid, err := validateDesignation(designation)
 	if !valid {
-		log.Fatal("Invalid motor designation", "designation", designation)
+		return nil, fmt.Errorf("invalid motor designation: %s", designation)
 	}
 
 	if err != nil {
-		log.Fatal("Failed to validate motor designation", "error", err)
+		return nil, fmt.Errorf("failed to validate motor designation: %s", err)
 	}
 
 	specification, err := designationToSpecification(designation)
 	if err != nil {
-		log.Fatal("Failed to parse motor designation", "error", err)
+		return nil, fmt.Errorf("failed to get motor specification: %s", err)
 	}
 
 	id, err := getMotorID(designation)
 	if err != nil {
-		log.Fatal("Failed to get motor ID", "error", err)
+		return nil, fmt.Errorf("failed to get motor ID: %s", err)
 	}
 
 	curve, err := getMotorCurve(id)
 	if err != nil {
-		log.Fatal("Failed to get motor curve", "error", err)
+		return nil, fmt.Errorf("failed to get motor curve: %s", err)
 	}
 
-	motor := &MotorData{
+	return &MotorData{
 		Designation:   designation,
 		ID:            id,
 		Thrust:        curve,
 		Specification: specification,
-	}
-
-	log.Info("Motor data loaded", "description", motor.String())
-
-	return motor
+	}, nil
 }

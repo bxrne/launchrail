@@ -15,7 +15,11 @@ func main() {
 	log.Info("Config loaded", "name", cfg.App.Name, "version", cfg.App.Version)
 
 	// NOTE: Get thrust curve from API
-	_ = thrustcurves.Load(cfg.Options.MotorDesignation)
+	motor, err := thrustcurves.Load(cfg.Options.MotorDesignation)
+	if err != nil {
+		log.Fatal("Failed to load motor data: %s", err)
+	}
+	log.Info("Motor loaded", "description", motor.String())
 
 	// TODO: Get rocket configuration from OpenRocket
 
