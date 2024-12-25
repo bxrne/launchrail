@@ -42,5 +42,4 @@ func Load(designation string) *MotorData {
 	log.Info("Motor data loaded", "description", motor.String())
 
 	return motor
-
 }
