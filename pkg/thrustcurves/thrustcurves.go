@@ -13,6 +13,10 @@ func Load(designation string) *MotorData {
 		log.Fatal("Invalid motor designation", "designation", designation)
 	}
 
+	if err != nil {
+		log.Fatal("Failed to validate motor designation", "error", err)
+	}
+
 	specification, err := designationToSpecification(designation)
 	if err != nil {
 		log.Fatal("Failed to parse motor designation", "error", err)
