@@ -44,28 +44,29 @@ func GetConfig(name string) *Config {
 // validateConfig validates the configuration struct.
 func validateConfig(cfg *Config) error {
 	log := logger.GetLogger()
+	msg := "Failed to validate configuration"
 
 	if cfg.App.Name == "" {
 		err := fmt.Errorf("app.name is required")
-		log.Fatal("Failed to validate configuration", "error", err)
+		log.Fatal(msg, "error", err)
 		return err
 	}
 
 	if cfg.App.Version == "" {
 		err := fmt.Errorf("app.version is required")
-		log.Fatal("Failed to validate configuration", "error", err)
+		log.Fatal(msg, "error", err)
 		return err
 	}
 
 	if cfg.Logging.Level == "" {
 		err := fmt.Errorf("logging.level is required")
-		log.Fatal("Failed to validate configuration", "error", err)
+		log.Fatal(msg, "error", err)
 		return err
 	}
 
 	if cfg.Options.MotorDesignation == "" {
 		err := fmt.Errorf("options.motor_designation is required")
-		log.Fatal("Failed to validate configuration", "error", err)
+		log.Fatal(msg, "error", err)
 		return err
 	}
 
