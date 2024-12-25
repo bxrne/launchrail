@@ -1,0 +1,12 @@
+coverage:
+  status:
+    project:
+      default:  
+        target: "80%" 
+        flags: 
+          - unit
+        paths: 
+          - "./..."
+        if_ci_failed: error #success, failure, error, ignore
+        informational: false
+        only_pulls: false
