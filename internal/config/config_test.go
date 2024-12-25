@@ -131,3 +131,47 @@ func TestValidateConfigMissingMotorDesignation(t *testing.T) {
 		cfg.Options.MotorDesignation = "A8" // Reset options.motor_designation
 	})
 }
+
+// TEST: GIVEN a configuration file with missing options.open_rocket_file WHEN GetConfig is called THEN an error is returned
+func TestValidateConfigMissingOpenRocketFile(t *testing.T) {
+	withWorkingDir(t, "../..", func() {
+		cfg, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.OpenRocketFile = ""
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		if err.Error() != "options.openrocket_file is required" {
+			t.Errorf("Expected error to be 'options.openrocket_file is required', got: %s", err)
+		}
+
+		cfg.Options.OpenRocketFile = "./testdata/openrocket/l1.ork" // Reset options.open_rocket_file
+	})
+}
+
+// TEST: GIVEN a configuration file with invalid options.open_rocket_file WHEN GetConfig is called THEN an error is returned
+func TestValidateConfigInvalidOpenRocketFile(t *testing.T) {
+	withWorkingDir(t, "../..", func() {
+		cfg, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.OpenRocketFile = "test/resources/invalid.ork"
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		if err.Error() != "options.openrocket_file is invalid: stat test/resources/invalid.ork: no such file or directory" {
+			t.Errorf("Expected error to be 'options.openrocket_file is invalid: stat test/resources/invalid.ork: no such file or directory', got: %s", err)
+		}
+
+		cfg.Options.OpenRocketFile = "test/resources/rocket.ork" // Reset options.open_rocket_file
+	})
+}

@@ -5,6 +5,7 @@ import (
 	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/pkg/designation"
+	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 )
 
@@ -28,17 +29,11 @@ func main() {
 	}
 	log.Info("Motor loaded", "description", motor_descripton)
 
-	// TODO: Get rocket configuration from OpenRocket
+	// NOTE: Get rocket configuration from OpenRocket
+	ork_data, err := openrocket.Load(cfg.Options.OpenRocketFile)
+	if err != nil {
+		log.Fatal("Failed to load OpenRocket data: %s", err)
+	}
+	log.Info("OpenRocket file loaded", "data", ork_data)
 
-	// TODO: Get launch configuration from OpenRocket
-
-	// TODO: Get conditions
-
-	// TODO: Setup simulation
-
-	// TODO: Run simulation
-
-	// TODO: Output results
-
-	// TODO: Cleanup
 }
