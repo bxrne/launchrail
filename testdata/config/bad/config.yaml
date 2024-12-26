@@ -1,5 +1,5 @@
 app:
-  name: "launchrail-dev"
+  name: ["launchrail-dev", "launchrail-prod"] 
   version: "0.0.1"
 
 logging:
@@ -10,4 +10,5 @@ external:
 
 options:
   motor_designation: "269H110-14A"
-  openrocket_file: "./testdata/openrocket/l1.ork"
+  openrocket_file: "../../openrocket/l1.ork"
+

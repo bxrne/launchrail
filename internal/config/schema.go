@@ -9,8 +9,12 @@ type Config struct {
 	Logging struct {
 		Level string `mapstructure:"level"`
 	} `mapstructure:"logging"`
+	External struct {
+		OpenRocketVersion string `mapstructure:"openrocket_version"`
+	} `mapstructure:"external"`
 	Options struct {
 		MotorDesignation string `mapstructure:"motor_designation"`
+		OpenRocketFile   string `mapstructure:"openrocket_file"`
 	} `mapstructure:"options"`
 }
 
@@ -20,6 +24,8 @@ func (c *Config) String() map[string]string {
 	marshalled["app.name"] = c.App.Name
 	marshalled["app.version"] = c.App.Version
 	marshalled["logging.level"] = c.Logging.Level
+	marshalled["external.openrocket_version"] = c.External.OpenRocketVersion
 	marshalled["options.motor_designation"] = c.Options.MotorDesignation
+	marshalled["options.openrocket_file"] = c.Options.OpenRocketFile
 	return marshalled
 }

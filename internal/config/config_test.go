@@ -44,7 +44,34 @@ func TestGetConfig(t *testing.T) {
 	})
 }
 
-// TEST: GIVEN a configuration file with missing app.name WHEN GetConfig is called THEN an error is returned
+// TEST: GIVEN an invalid config file WHEN GetConfig is called THEN the error 'failed to read config file' is returned
+func TestGetConfigInvalidConfigFile(t *testing.T) {
+	withWorkingDir(t, ".", func() {
+		_, err := config.GetConfig()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		if err.Error() != "failed to read config file" {
+			t.Errorf("Expected error to be 'failed to read config file', got: %s", err)
+		}
+	})
+}
+
+// TEST: GIVEN a bad config file WHEN GetConfig is called THEN the error 'failed to unmarshal config' is returned
+func TestGetConfigBadConfigFile(t *testing.T) {
+	withWorkingDir(t, "../../testdata/config/bad/", func() {
+		_, err := config.GetConfig()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+		if err.Error() != "failed to unmarshal config" {
+			t.Errorf("Expected error to be 'failed to unmarshal config', got: %s", err)
+		}
+	})
+}
+
+// TEST: GIVEN a configuration file with missing app.name WHEN Validate is called THEN an error is returned
 func TestValidateConfigMissingAppName(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
 		cfg, err := config.GetConfig()
@@ -110,6 +137,24 @@ func TestValidateConfigMissingLoggingLevel(t *testing.T) {
 	})
 }
 
+// TEST: GIVEN a configuration file with missing external.openrocket_version WHEN GetConfig is called THEN no error is returned
+func TestValidateConfigMissingOpenRocketVersion(t *testing.T) {
+	withWorkingDir(t, "../..", func() {
+		cfg, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.External.OpenRocketVersion = ""
+		err = cfg.Validate()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.External.OpenRocketVersion = "15.03" // Reset external.openrocket_version
+	})
+}
+
 // TEST: GIVEN a configuration file with missing options.motor_designation WHEN GetConfig is called THEN an error is returned
 func TestValidateConfigMissingMotorDesignation(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
@@ -129,5 +174,52 @@ func TestValidateConfigMissingMotorDesignation(t *testing.T) {
 		}
 
 		cfg.Options.MotorDesignation = "A8" // Reset options.motor_designation
+	})
+}
+
+// TEST: GIVEN a configuration file with missing options.open_rocket_file WHEN GetConfig is called THEN an error is returned
+func TestValidateConfigMissingOpenRocketFile(t *testing.T) {
+	withWorkingDir(t, "../..", func() {
+		cfg, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.OpenRocketFile = ""
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		if err.Error() != "options.openrocket_file is required" {
+			t.Errorf("Expected error to be 'options.openrocket_file is required', got: %s", err)
+		}
+
+		cfg.Options.OpenRocketFile = "./testdata/openrocket/l1.ork" // Reset options.open_rocket_file
+	})
+}
+
+// TEST: GIVEN a configuration file with invalid options.open_rocket_file WHEN GetConfig is called THEN an error is returned
+func TestValidateConfigInvalidOpenRocketFile(t *testing.T) {
+	withWorkingDir(t, "../..", func() {
+		cfg, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.OpenRocketFile = "test/resources/invalid.ork"
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		unixErr := "options.openrocket_file is invalid: stat test/resources/invalid.ork: no such file or directory"
+		winErr := "options.openrocket_file is invalid: CreateFile test/resources/invalid.ork: The system cannot find the path specified."
+
+		if err.Error() != unixErr && err.Error() != winErr {
+			t.Errorf("Expected error to be '%s' or '%s', got: %s", unixErr, winErr, err)
+		}
+
+		cfg.Options.OpenRocketFile = "test/resources/rocket.ork" // Reset options.open_rocket_file
 	})
 }

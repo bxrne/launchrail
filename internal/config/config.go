@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/spf13/viper"
 )
@@ -45,6 +46,14 @@ func (cfg *Config) Validate() error {
 
 	if cfg.Options.MotorDesignation == "" {
 		return fmt.Errorf("options.motor_designation is required")
+	}
+
+	if cfg.Options.OpenRocketFile == "" {
+		return fmt.Errorf("options.openrocket_file is required")
+	}
+
+	if _, err := os.Stat(cfg.Options.OpenRocketFile); err != nil {
+		return fmt.Errorf("options.openrocket_file is invalid: %s", err)
 	}
 
 	return nil
