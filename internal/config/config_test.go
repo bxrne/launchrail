@@ -71,7 +71,7 @@ func TestGetConfigBadConfigFile(t *testing.T) {
 	})
 }
 
-// TEST: GIVEN a configuration file with missing app.name WHEN GetConfig is called THEN an error is returned
+// TEST: GIVEN a configuration file with missing app.name WHEN Validate is called THEN an error is returned
 func TestValidateConfigMissingAppName(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
 		cfg, err := config.GetConfig()
