@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func Load(filename string) (*OpenrocketDocument, error) {
+func Load(filename string, version string) (*OpenrocketDocument, error) {
 	data, err := extractORK(filename)
 	if err != nil {
 		return nil, err
@@ -19,6 +19,12 @@ func Load(filename string) (*OpenrocketDocument, error) {
 	if err := xml.Unmarshal(data, &doc); err != nil {
 		return nil, err
 	}
+
+	// check version
+	if doc.Creator != fmt.Sprintf("OpenRocket %s", version) {
+		return nil, fmt.Errorf("invalid OpenRocket version: %s", doc.Creator)
+	}
+
 	return &doc, nil
 }
 

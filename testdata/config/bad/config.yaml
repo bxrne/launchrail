@@ -5,6 +5,9 @@ app:
 logging:
   level: "debug"
 
+external:
+  openrocket_version: "23.09"
+
 options:
   motor_designation: "269H110-14A"
   openrocket_file: "../../openrocket/l1.ork"

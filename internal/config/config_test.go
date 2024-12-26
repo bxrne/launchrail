@@ -137,6 +137,24 @@ func TestValidateConfigMissingLoggingLevel(t *testing.T) {
 	})
 }
 
+// TEST: GIVEN a configuration file with missing external.openrocket_version WHEN GetConfig is called THEN no error is returned
+func TestValidateConfigMissingOpenRocketVersion(t *testing.T) {
+	withWorkingDir(t, "../..", func() {
+		cfg, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.External.OpenRocketVersion = ""
+		err = cfg.Validate()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.External.OpenRocketVersion = "15.03" // Reset external.openrocket_version
+	})
+}
+
 // TEST: GIVEN a configuration file with missing options.motor_designation WHEN GetConfig is called THEN an error is returned
 func TestValidateConfigMissingMotorDesignation(t *testing.T) {
 	withWorkingDir(t, "../..", func() {

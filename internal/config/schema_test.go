@@ -17,6 +17,11 @@ func TestConfigString(t *testing.T) {
 			Name:    "launchrail-test",
 			Version: "0.0.0",
 		},
+		External: struct {
+			OpenRocketVersion string `mapstructure:"openrocket_version"`
+		}{
+			OpenRocketVersion: "15.03",
+		},
 		Logging: struct {
 			Level string `mapstructure:"level"`
 		}{
@@ -32,11 +37,12 @@ func TestConfigString(t *testing.T) {
 	}
 
 	expected := map[string]string{
-		"app.name":                  "launchrail-test",
-		"app.version":               "0.0.0",
-		"logging.level":             "info",
-		"options.motor_designation": "G80-7T",
-		"options.openrocket_file":   "test/fixtures/rocket.ork",
+		"app.name":                    "launchrail-test",
+		"app.version":                 "0.0.0",
+		"logging.level":               "info",
+		"external.openrocket_version": "15.03",
+		"options.motor_designation":   "G80-7T",
+		"options.openrocket_file":     "test/fixtures/rocket.ork",
 	}
 
 	actual := cfg.String()

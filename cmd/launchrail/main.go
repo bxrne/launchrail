@@ -32,7 +32,7 @@ func main() {
 	log.Info("Motor loaded", "Description", motor_descripton)
 
 	// NOTE: Get rocket configuration from OpenRocket
-	ork_data, err := openrocket.Load(cfg.Options.OpenRocketFile)
+	ork_data, err := openrocket.Load(cfg.Options.OpenRocketFile, cfg.External.OpenRocketVersion)
 	if err != nil {
 		log.Fatal("Failed to load OpenRocket data", "Error", err)
 	}
