@@ -58,6 +58,19 @@ func TestGetConfigInvalidConfigFile(t *testing.T) {
 	})
 }
 
+// TEST: GIVEN a bad config file WHEN GetConfig is called THEN the error 'failed to unmarshal config' is returned
+func TestGetConfigBadConfigFile(t *testing.T) {
+	withWorkingDir(t, "../../testdata/config/bad/", func() {
+		_, err := config.GetConfig()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+		if err.Error() != "failed to unmarshal config" {
+			t.Errorf("Expected error to be 'failed to unmarshal config', got: %s", err)
+		}
+	})
+}
+
 // TEST: GIVEN a configuration file with missing app.name WHEN GetConfig is called THEN an error is returned
 func TestValidateConfigMissingAppName(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
