@@ -50,7 +50,7 @@ type AxialOffset struct {
 
 // String returns full string representation of the AxialOffset
 func (a *AxialOffset) String() string {
-	return fmt.Sprintf("AxialOffset{Method=%s, Value=%f}", a.Method, a.Value)
+	return fmt.Sprintf("AxialOffset{Method=%s, Value=%.2f}", a.Method, a.Value)
 }
 
 // Position represents the position element of the XML document
@@ -62,7 +62,7 @@ type Position struct {
 
 // String returns full string representation of the Position
 func (p *Position) String() string {
-	return fmt.Sprintf("Position{Value=%f, Type=%s}", p.Value, p.Type)
+	return fmt.Sprintf("Position{Value=%.2f, Type=%s}", p.Value, p.Type)
 }
 
 // Stage represents motor configuration stages
@@ -87,5 +87,13 @@ type MotorConfiguration struct {
 
 // String returns full string representation of the MotorConfiguration
 func (m *MotorConfiguration) String() string {
-	return fmt.Sprintf("MotorConfiguration{ConfigID=%s, Default=%t, Stages=%v}", m.ConfigID, m.Default, m.Stages)
+	var stages string
+	for i, stage := range m.Stages {
+		stages += stage.String()
+		if i < len(m.Stages)-1 {
+			stages += ", "
+		}
+	}
+
+	return fmt.Sprintf("MotorConfiguration{ConfigID=%s, Default=%t, Stages=(%s)}", m.ConfigID, m.Default, stages)
 }
