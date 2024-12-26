@@ -17,26 +17,27 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to get configuration", "error", err)
 	}
-	log.Info("Config loaded", "name", cfg.App.Name, "version", cfg.App.Version)
+	log.Info("Config loaded", "Name", cfg.App.Name, "Version", cfg.App.Version)
 
 	// NOTE: Get thrust curve from API
 	motor_data, err := thrustcurves.Load(cfg.Options.MotorDesignation, &http_client.DefaultHTTPClient{}, &designation.DefaultDesignationValidator{})
 	if err != nil {
-		log.Fatal("Failed to load motor data", "error", err)
+		log.Fatal("Failed to load motor data", "Error", err)
 	}
 
 	motor_descripton, err := motor_data.Designation.Describe()
 	if err != nil {
-		log.Fatal("Failed to describe motor", "error", err)
+		log.Fatal("Failed to describe motor", "Error", err)
 	}
-	log.Info("Motor loaded", "description", motor_descripton)
+	log.Info("Motor loaded", "Description", motor_descripton)
 
 	// NOTE: Get rocket configuration from OpenRocket
 	ork_data, err := openrocket.Load(cfg.Options.OpenRocketFile)
 	if err != nil {
-		log.Fatal("Failed to load OpenRocket data", "error", err)
+		log.Fatal("Failed to load OpenRocket data", "Error", err)
 	}
-	log.Info("OpenRocket file loaded", "description", ork_data.Describe())
+	log.Info("OpenRocket file loaded", "Description", ork_data.Describe())
+	log.Debug("Openrocket data", "Data", ork_data.String())
 
 	log.Debug("Finished")
 }
