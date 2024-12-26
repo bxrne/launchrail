@@ -23,6 +23,8 @@ func main() {
 		log.Fatal("Failed to load motor data: %s", err)
 	}
 
+	//
+
 	motor_descripton, err := motor_data.Designation.Describe()
 	if err != nil {
 		log.Fatal("Failed to describe motor: %s", err)

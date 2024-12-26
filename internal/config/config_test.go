@@ -44,6 +44,20 @@ func TestGetConfig(t *testing.T) {
 	})
 }
 
+// TEST: GIVEN an invalid config file WHEN GetConfig is called THEN the error 'failed to read config file' is returned
+func TestGetConfigInvalidConfigFile(t *testing.T) {
+	withWorkingDir(t, ".", func() {
+		_, err := config.GetConfig()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		if err.Error() != "failed to read config file" {
+			t.Errorf("Expected error to be 'failed to read config file', got: %s", err)
+		}
+	})
+}
+
 // TEST: GIVEN a configuration file with missing app.name WHEN GetConfig is called THEN an error is returned
 func TestValidateConfigMissingAppName(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
