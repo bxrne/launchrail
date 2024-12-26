@@ -4,7 +4,6 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/internal/logger"
-	"github.com/bxrne/launchrail/pkg/designation"
 	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 )
@@ -20,7 +19,7 @@ func main() {
 	log.Info("Config loaded", "Name", cfg.App.Name, "Version", cfg.App.Version)
 
 	// NOTE: Get thrust curve from API
-	motor_data, err := thrustcurves.Load(cfg.Options.MotorDesignation, &http_client.DefaultHTTPClient{}, &designation.DefaultDesignationValidator{})
+	motor_data, err := thrustcurves.Load(cfg.Options.MotorDesignation, &http_client.DefaultHTTPClient{})
 	if err != nil {
 		log.Fatal("Failed to load motor data", "Error", err)
 	}

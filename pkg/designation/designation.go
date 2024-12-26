@@ -15,7 +15,7 @@ var schema = `^(\d+)([A-Z]+)(\d+)-(\d+)([A-Z]+)$`
 // New creates a new designation from a string
 func New(designation string) (Designation, error) {
 	d := Designation(designation)
-	valid, err := d.Validate()
+	valid, err := d.validate()
 	if !valid {
 		return "", errors.New("invalid designation")
 	}
@@ -26,7 +26,7 @@ func New(designation string) (Designation, error) {
 }
 
 // Validate the designation string
-func (d Designation) Validate() (bool, error) {
+func (d Designation) validate() (bool, error) {
 	// NOTE: TotalImpulse-Class-AverageThrust-DelayTime-Variant (e.g. "269H110-14A" is a valid designation)
 	exp := regexp.MustCompile(schema)
 	if !exp.MatchString(string(d)) {
