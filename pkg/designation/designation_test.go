@@ -53,7 +53,7 @@ func TestDescribe_ValidDesignation(t *testing.T) {
 
 	description, err := d.Describe()
 	assert.NoError(t, err)
-	assert.Equal(t, "Total Impulse: 269.00 Ns, Class: H, Average Thrust: 110.00 N, Delay Time: 14.00 s, Variant: A", description)
+	assert.Equal(t, "TotalImpulse=269.00, Class=H, AverageThrust=110.00, DelayTime=14.00, Variant=A", description)
 }
 
 // TEST: GIVEN an invalid designation WHEN Describe is called THEN an error is returned

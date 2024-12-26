@@ -11,6 +11,8 @@ import (
 
 func main() {
 	log := logger.GetLogger()
+	log.Debug("Starting...")
+
 	cfg, err := config.GetConfig()
 	if err != nil {
 		log.Fatal("Failed to get configuration", "error", err)
@@ -23,8 +25,6 @@ func main() {
 		log.Fatal("Failed to load motor data", "error", err)
 	}
 
-	//
-
 	motor_descripton, err := motor_data.Designation.Describe()
 	if err != nil {
 		log.Fatal("Failed to describe motor", "error", err)
@@ -36,5 +36,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to load OpenRocket data", "error", err)
 	}
-	log.Info("OpenRocket file loaded", "data", ork_data)
+	log.Info("OpenRocket file loaded", "description", ork_data.Describe())
+
+	log.Debug("Finished")
 }

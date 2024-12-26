@@ -12,7 +12,7 @@ var (
 	logger logf.Logger
 	opts   logf.Opts = logf.Opts{
 		EnableColor:     true,
-		EnableCaller:    true,
+		EnableCaller:    false,
 		TimestampFormat: time.RFC3339Nano,
 		Level:           logf.DebugLevel,
 	}

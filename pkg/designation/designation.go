@@ -65,5 +65,5 @@ func (d *Designation) Describe() (string, error) {
 	}
 	variant = matches[5]
 
-	return fmt.Sprintf("Total Impulse: %.2f Ns, Class: %s, Average Thrust: %.2f N, Delay Time: %.2f s, Variant: %s", totalImpulse, class, averageThrust, delayTime, variant), nil
+	return fmt.Sprintf("TotalImpulse=%.2f, Class=%s, AverageThrust=%.2f, DelayTime=%.2f, Variant=%s", totalImpulse, class, averageThrust, delayTime, variant), nil
 }
