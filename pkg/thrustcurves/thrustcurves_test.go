@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/bxrne/launchrail/internal/http_client"
-	"github.com/bxrne/launchrail/pkg/designation"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -25,7 +24,7 @@ func TestLoadMotor_ValidResponse(t *testing.T) {
 	mockHTTP.On("Post", "https://www.thrustcurve.org/api/v1/download.json", "application/json", mock.Anything).
 		Return(&http.Response{Body: io.NopCloser(bytes.NewBufferString(mockDownloadResponse))}, nil)
 
-	motorData, err := thrustcurves.Load("269H110-14A", mockHTTP, &designation.DefaultDesignationValidator{})
+	motorData, err := thrustcurves.Load("269H110-14A", mockHTTP)
 	assert.NoError(t, err)
 	assert.Equal(t, "motor123", motorData.ID)
 	assert.Equal(t, [][]float64{{0.1, 10.0}, {0.2, 20.0}}, motorData.Thrust)
@@ -35,7 +34,7 @@ func TestLoadMotor_ValidResponse(t *testing.T) {
 func TestLoadMotor_InvalidDesignation(t *testing.T) {
 	mockHTTP := new(http_client.MockHTTPClient)
 
-	motorData, err := thrustcurves.Load("<invalid>", mockHTTP, &designation.DefaultDesignationValidator{})
+	motorData, err := thrustcurves.Load("<invalid>", mockHTTP)
 	assert.Error(t, err)
 	assert.Nil(t, motorData)
 }
