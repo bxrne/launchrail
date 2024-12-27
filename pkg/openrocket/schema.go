@@ -34,11 +34,12 @@ type RocketDocument struct {
 	Revision           string             `xml:"revision"`
 	MotorConfiguration MotorConfiguration `xml:"motorconfiguration"`
 	ReferenceType      string             `xml:"referencetype"`
+	Subcomponents      Subcomponents      `xml:"subcomponents"`
 }
 
 // String returns full string representation of the RocketDocument
 func (r *RocketDocument) String() string {
-	return fmt.Sprintf("RocketDocument{Name=%s, ID=%s, AxialOffset=%s, Position=%s, Designer=%s, Revision=%s, MotorConfiguration=%s, ReferenceType=%s}", r.Name, r.ID, r.AxialOffset.String(), r.Position.String(), r.Designer, r.Revision, r.MotorConfiguration.String(), r.ReferenceType)
+	return fmt.Sprintf("RocketDocument{Name=%s, ID=%s, AxialOffset=%s, Position=%s, Designer=%s, Revision=%s, MotorConfiguration=%s, ReferenceType=%s, Subcomponents={%s}}", r.Name, r.ID, r.AxialOffset.String(), r.Position.String(), r.Designer, r.Revision, r.MotorConfiguration.String(), r.ReferenceType, r.Subcomponents.String())
 }
 
 // AxialOffset represents the axial offset element of the XML document
@@ -96,4 +97,35 @@ func (m *MotorConfiguration) String() string {
 	}
 
 	return fmt.Sprintf("MotorConfiguration{ConfigID=%s, Default=%t, Stages=(%s)}", m.ConfigID, m.Default, stages)
+}
+
+// Subcomponents represents the subcomponents element of the XML document
+type Subcomponents struct {
+	XMLName xml.Name      `xml:"subcomponents"`
+	Stages  []RocketStage `xml:"stage"`
+}
+
+// String returns full string representation of the Subcomponents
+func (s *Subcomponents) String() string {
+	var stages string
+	for i, stage := range s.Stages {
+		stages += stage.String()
+		if i < len(s.Stages)-1 {
+			stages += ", "
+		}
+	}
+
+	return fmt.Sprintf("Subcomponents{Stages=(%s)}", stages)
+}
+
+// RocketStage represents the stage subcomponent element of the XML document
+type RocketStage struct {
+	XMLName xml.Name `xml:"stage"`
+	Name    string   `xml:"name"`
+	ID      string   `xml:"id"`
+}
+
+// String returns full string representation of the RocketStage
+func (r *RocketStage) String() string {
+	return fmt.Sprintf("RocketStage{Name=%s, ID=%s}", r.Name, r.ID)
 }
