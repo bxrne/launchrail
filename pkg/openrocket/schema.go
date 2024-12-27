@@ -120,12 +120,62 @@ func (s *Subcomponents) String() string {
 
 // RocketStage represents the stage subcomponent element of the XML document
 type RocketStage struct {
-	XMLName xml.Name `xml:"stage"`
-	Name    string   `xml:"name"`
-	ID      string   `xml:"id"`
+	XMLName                xml.Name               `xml:"stage"`
+	Name                   string                 `xml:"name"`
+	ID                     string                 `xml:"id"`
+	SustainerSubcomponents SustainerSubcomponents `xml:"subcomponents"`
 }
 
 // String returns full string representation of the RocketStage
 func (r *RocketStage) String() string {
-	return fmt.Sprintf("RocketStage{Name=%s, ID=%s}", r.Name, r.ID)
+	return fmt.Sprintf("RocketStage{Name=%s, ID=%s, SustainerSubcomponents=%s}", r.Name, r.ID, r.SustainerSubcomponents.String())
+}
+
+// SustainerSubcomponents represents the sustainer subcomponents element of the XML document
+type SustainerSubcomponents struct {
+	XMLName  xml.Name `xml:"subcomponents"`
+	Nosecone Nosecone `xml:"nosecone"`
+}
+
+// String returns full string representation of the SustainerSubcomponents
+func (s *SustainerSubcomponents) String() string {
+	return fmt.Sprintf("SustainerSubcomponents{Nosecone=%s}", s.Nosecone.String())
+}
+
+// Nosecone represents the nosecone element of the XML document
+type Nosecone struct {
+	XMLName              xml.Name `xml:"nosecone"`
+	Name                 string   `xml:"name"`
+	ID                   string   `xml:"id"`
+	Finish               string   `xml:"finish"`
+	Material             Material `xml:"material"`
+	Length               float64  `xml:"length"`
+	Thickness            float64  `xml:"thickness"`
+	Shape                string   `xml:"shape"`
+	ShapeClipped         bool     `xml:"shapeclipped"`
+	ShapeParameter       float64  `xml:"shapeparameter"`
+	AftRadius            float64  `xml:"aftradius"`
+	AftShoulderRadius    float64  `xml:"aftshoulderradius"`
+	AftShoulderLength    float64  `xml:"aftshoulderlength"`
+	AftShoulderThickness float64  `xml:"aftshoulderthickness"`
+	AftShoulderCapped    bool     `xml:"aftshouldercapped"`
+	IsFlipped            bool     `xml:"isflipped"`
+}
+
+// String returns full string representation of the Nosecone
+func (n *Nosecone) String() string {
+	return fmt.Sprintf("Nosecone{Name=%s, ID=%s, Finish=%s, Material=%s, Length=%.2f, Thickness=%.2f, Shape=%s, ShapeClipped=%t, ShapeParameter=%.2f, AftRadius=%.2f, AftShoulderRadius=%.2f, AftShoulderLength=%.2f, AftShoulderThickness=%.2f, AftShoulderCapped=%t, IsFlipped=%t}", n.Name, n.ID, n.Finish, n.Material.String(), n.Length, n.Thickness, n.Shape, n.ShapeClipped, n.ShapeParameter, n.AftRadius, n.AftShoulderRadius, n.AftShoulderLength, n.AftShoulderThickness, n.AftShoulderCapped, n.IsFlipped)
+}
+
+// Material represents the material element of the XML document
+type Material struct {
+	XMLName xml.Name `xml:"material"`
+	Type    string   `xml:"type,attr"`
+	Density float64  `xml:"density,attr"`
+	Name    string   `xml:",chardata"`
+}
+
+// String returns full string representation of the Material
+func (m *Material) String() string {
+	return fmt.Sprintf("Material{Type=%s, Density=%.2f, Name=%s}", m.Type, m.Density, m.Name)
 }

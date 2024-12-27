@@ -27,6 +27,25 @@ func TestOpenrocketDocumentParsing(t *testing.T) {
     <stage>
       <name>Sustainer</name>
       <id>a353045a-b4cf-4a3f-bb7f-0aa6d1adfb64</id>
+			<subcomponents>
+				   <nosecone>
+            <name>Nose Cone</name>
+            <id>11513739-c45b-4c04-b28a-e1fd2b07eaed</id>
+            <finish>normal</finish>
+            <material type="bulk" density="1250.0">PLA - 100% infill</material>
+            <length>0.22</length>
+            <thickness>0.002</thickness>
+            <shape>power</shape>
+            <shapeclipped>false</shapeclipped>
+            <shapeparameter>0.5</shapeparameter>
+            <aftradius>0.033</aftradius>
+            <aftshoulderradius>0.032</aftshoulderradius>
+            <aftshoulderlength>0.064</aftshoulderlength>
+            <aftshoulderthickness>0.002</aftshoulderthickness>
+            <aftshouldercapped>false</aftshouldercapped>
+            <isflipped>false</isflipped>
+          </nosecone>
+			</subcomponents>
 		</stage>
 	</subcomponents>
 	</rocket>
@@ -107,6 +126,7 @@ func TestOpenrocketDocumentParsing(t *testing.T) {
 	if doc.Rocket.Subcomponents.Stages[0].ID != "a353045a-b4cf-4a3f-bb7f-0aa6d1adfb64" {
 		t.Errorf("Expected Subcomponent ID 'a353045a-b4cf-4a3f-bb7f-0aa6d1adfb64', got '%s'", doc.Rocket.Subcomponents.Stages[0].ID)
 	}
+
 }
 
 func TestDescribeMethod(t *testing.T) {
@@ -160,7 +180,7 @@ func TestStringMethod(t *testing.T) {
 		},
 	}
 
-	expected := "OpenrocketDocument{Version=1.0, Creator=TestCreator, Rocket=RocketDocument{Name=TestRocket, ID=12345, AxialOffset=AxialOffset{Method=static, Value=0.50}, Position=Position{Value=1.50, Type=absolute}, Designer=John Doe, Revision=1, MotorConfiguration=MotorConfiguration{ConfigID=config1, Default=true, Stages=(Stage{Number=1, Active=true}, Stage{Number=2, Active=false})}, ReferenceType=someType, Subcomponents={Subcomponents{Stages=(RocketStage{Name=Sustainer, ID=a353045a-b4cf-4a3f-bb7f-0aa6d1adfb64}, RocketStage{Name=Booster, ID=b353045a-b4cf-4a3f-bb7f-0aa6d1adfb64}, RocketStage{Name=Payload, ID=c353045a-b4cf-4a3f-bb7f-0aa6d1adfb64})}}}}"
+	expected := "OpenrocketDocument{Version=1.0, Creator=TestCreator, Rocket=RocketDocument{Name=TestRocket, ID=12345, AxialOffset=AxialOffset{Method=static, Value=0.50}, Position=Position{Value=1.50, Type=absolute}, Designer=John Doe, Revision=1, MotorConfiguration=MotorConfiguration{ConfigID=config1, Default=true, Stages=(Stage{Number=1, Active=true}, Stage{Number=2, Active=false})}, ReferenceType=someType, Subcomponents={Subcomponents{Stages=(RocketStage{Name=Sustainer, ID=a353045a-b4cf-4a3f-bb7f-0aa6d1adfb64, SustainerSubcomponents=SustainerSubcomponents{Nosecone=Nosecone{Name=, ID=, Finish=, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Shape=, ShapeClipped=false, ShapeParameter=0.00, AftRadius=0.00, AftShoulderRadius=0.00, AftShoulderLength=0.00, AftShoulderThickness=0.00, AftShoulderCapped=false, IsFlipped=false}}}, RocketStage{Name=Booster, ID=b353045a-b4cf-4a3f-bb7f-0aa6d1adfb64, SustainerSubcomponents=SustainerSubcomponents{Nosecone=Nosecone{Name=, ID=, Finish=, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Shape=, ShapeClipped=false, ShapeParameter=0.00, AftRadius=0.00, AftShoulderRadius=0.00, AftShoulderLength=0.00, AftShoulderThickness=0.00, AftShoulderCapped=false, IsFlipped=false}}}, RocketStage{Name=Payload, ID=c353045a-b4cf-4a3f-bb7f-0aa6d1adfb64, SustainerSubcomponents=SustainerSubcomponents{Nosecone=Nosecone{Name=, ID=, Finish=, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Shape=, ShapeClipped=false, ShapeParameter=0.00, AftRadius=0.00, AftShoulderRadius=0.00, AftShoulderLength=0.00, AftShoulderThickness=0.00, AftShoulderCapped=false, IsFlipped=false}}})}}}}"
 	if doc.String() != expected {
 		t.Errorf("Expected String output '%s', got '%s'", expected, doc.String())
 	}
