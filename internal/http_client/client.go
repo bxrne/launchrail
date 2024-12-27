@@ -17,3 +17,8 @@ type DefaultHTTPClient struct{}
 func (c *DefaultHTTPClient) Post(url, contentType string, body *bytes.Buffer) (*http.Response, error) {
 	return http.Post(url, contentType, body)
 }
+
+// NewHTTPClient creates a new HTTPClient.
+func NewHTTPClient() HTTPClient {
+	return &DefaultHTTPClient{}
+}

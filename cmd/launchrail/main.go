@@ -19,7 +19,7 @@ func main() {
 	log.Info("Config loaded", "Name", cfg.App.Name, "Version", cfg.App.Version)
 
 	// NOTE: Get thrust curve from API
-	motor_data, err := thrustcurves.Load(cfg.Options.MotorDesignation, &http_client.DefaultHTTPClient{})
+	motor_data, err := thrustcurves.Load(cfg.Options.MotorDesignation, http_client.NewHTTPClient())
 	if err != nil {
 		log.Fatal("Failed to load motor data", "Error", err)
 	}
