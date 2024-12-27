@@ -2,131 +2,92 @@ package openrocket_test
 
 import (
 	"encoding/xml"
+	"os"
 	"testing"
 
 	"github.com/bxrne/launchrail/pkg/openrocket"
 )
 
 func TestOpenrocketDocumentParsing(t *testing.T) {
-	// Sample OpenRocket XML data
-	xmlData := `
-<openrocket version="1.0" creator="TestCreator">
-	<rocket>
-		<name>TestRocket</name>
-		<id>12345</id>
-		<axialoffset method="static">0.5</axialoffset>
-		<position type="absolute">1.5</position>
-		<designer>John Doe</designer>
-		<revision>1</revision>
-		<motorconfiguration configid="config1" default="true">
-			<stage number="1" active="true"/>
-			<stage number="2" active="false"/>
-		</motorconfiguration>
-		<referencetype>someType</referencetype>
-   <subcomponents>
-    <stage>
-      <name>Sustainer</name>
-      <id>a353045a-b4cf-4a3f-bb7f-0aa6d1adfb64</id>
-			<subcomponents>
-				   <nosecone>
-            <name>Nose Cone</name>
-            <id>11513739-c45b-4c04-b28a-e1fd2b07eaed</id>
-            <finish>normal</finish>
-            <material type="bulk" density="1250.0">PLA - 100% infill</material>
-            <length>0.22</length>
-            <thickness>0.002</thickness>
-            <shape>power</shape>
-            <shapeclipped>false</shapeclipped>
-            <shapeparameter>0.5</shapeparameter>
-            <aftradius>0.033</aftradius>
-            <aftshoulderradius>0.032</aftshoulderradius>
-            <aftshoulderlength>0.064</aftshoulderlength>
-            <aftshoulderthickness>0.002</aftshoulderthickness>
-            <aftshouldercapped>false</aftshouldercapped>
-            <isflipped>false</isflipped>
-          </nosecone>
-			</subcomponents>
-		</stage>
-	</subcomponents>
-	</rocket>
-</openrocket>
-`
+	ork_xml := "../../testdata/openrocket/l1.xml"
 
-	// Unmarshal XML data into OpenrocketDocument
-	var doc openrocket.OpenrocketDocument
-	err := xml.Unmarshal([]byte(xmlData), &doc)
+	data, err := os.ReadFile(ork_xml)
 	if err != nil {
-		t.Fatalf("Failed to unmarshal XML: %v", err)
+		t.Errorf("Failed to read file: %s", err)
 	}
 
-	// Validate top-level attributes
-	if doc.Version != "1.0" {
-		t.Errorf("Expected Version '1.0', got '%s'", doc.Version)
-	}
-	if doc.Creator != "TestCreator" {
-		t.Errorf("Expected Creator 'TestCreator', got '%s'", doc.Creator)
+	var doc openrocket.OpenrocketDocument
+	if err := xml.Unmarshal(data, &doc); err != nil {
+		t.Errorf("Failed to unmarshal XML data: %s", err)
 	}
 
-	// Validate RocketDocument
-	if doc.Rocket.Name != "TestRocket" {
-		t.Errorf("Expected Rocket Name 'TestRocket', got '%s'", doc.Rocket.Name)
+	if doc.Version != "1.9" {
+		t.Errorf("Expected version '1.9', got '%s'", doc.Version)
 	}
-	if doc.Rocket.ID != "12345" {
-		t.Errorf("Expected Rocket ID '12345', got '%s'", doc.Rocket.ID)
+
+	if doc.Creator != "OpenRocket 23.09" {
+		t.Errorf("Expected creator 'OpenRocket 23.09', got '%s'", doc.Creator)
 	}
-	if doc.Rocket.AxialOffset.Method != "static" {
-		t.Errorf("Expected AxialOffset Method 'static', got '%s'", doc.Rocket.AxialOffset.Method)
+
+	if doc.Rocket.Name != "L1 Attempt" {
+		t.Errorf("Expected rocket name 'L1 Attempt', got '%s'", doc.Rocket.Name)
 	}
-	if doc.Rocket.AxialOffset.Value != 0.5 {
-		t.Errorf("Expected AxialOffset Value '0.5', got '%f'", doc.Rocket.AxialOffset.Value)
+
+	if doc.Rocket.ID != "0833142b-6d19-40d4-9443-954cbb7ef97b" {
+		t.Errorf("Expected rocket ID '0833142b-6d19-40d4-9443-954cbb7ef97b', got '%s'", doc.Rocket.ID)
 	}
+
+	if doc.Rocket.AxialOffset.Method != "absolute" {
+		t.Errorf("Expected axial offset method 'absolute', got '%s'", doc.Rocket.AxialOffset.Method)
+	}
+
+	if doc.Rocket.AxialOffset.Value != 0.0 {
+		t.Errorf("Expected axial offset value '0.0', got '%f'", doc.Rocket.AxialOffset.Value)
+	}
+
+	if doc.Rocket.Position.Value != 0.0 {
+		t.Errorf("Expected position value '0.0', got '%f'", doc.Rocket.Position.Value)
+	}
+
 	if doc.Rocket.Position.Type != "absolute" {
-		t.Errorf("Expected Position Type 'absolute', got '%s'", doc.Rocket.Position.Type)
-	}
-	if doc.Rocket.Position.Value != 1.5 {
-		t.Errorf("Expected Position Value '1.5', got '%f'", doc.Rocket.Position.Value)
-	}
-	if doc.Rocket.Designer != "John Doe" {
-		t.Errorf("Expected Designer 'John Doe', got '%s'", doc.Rocket.Designer)
-	}
-	if doc.Rocket.Revision != "1" {
-		t.Errorf("Expected Revision '1', got '%s'", doc.Rocket.Revision)
-	}
-	if doc.Rocket.ReferenceType != "someType" {
-		t.Errorf("Expected ReferenceType 'someType', got '%s'", doc.Rocket.ReferenceType)
+		t.Errorf("Expected position type 'absolute', got '%s'", doc.Rocket.Position.Type)
 	}
 
-	// Validate MotorConfiguration
-	if doc.Rocket.MotorConfiguration.ConfigID != "config1" {
-		t.Errorf("Expected MotorConfiguration ConfigID 'config1', got '%s'", doc.Rocket.MotorConfiguration.ConfigID)
-	}
-	if !doc.Rocket.MotorConfiguration.Default {
-		t.Errorf("Expected MotorConfiguration Default 'true', got '%t'", doc.Rocket.MotorConfiguration.Default)
-	}
-	if len(doc.Rocket.MotorConfiguration.Stages) != 2 {
-		t.Fatalf("Expected 2 Stages, got '%d'", len(doc.Rocket.MotorConfiguration.Stages))
-	}
-	if doc.Rocket.MotorConfiguration.Stages[0].Number != 1 || !doc.Rocket.MotorConfiguration.Stages[0].Active {
-		t.Errorf("Expected Stage 1 to be Active, got '%v'", doc.Rocket.MotorConfiguration.Stages[0])
-	}
-	if doc.Rocket.MotorConfiguration.Stages[1].Number != 2 || doc.Rocket.MotorConfiguration.Stages[1].Active {
-		t.Errorf("Expected Stage 2 to be Inactive, got '%v'", doc.Rocket.MotorConfiguration.Stages[1])
+	if doc.Rocket.Designer != "Adam Byrne" {
+		t.Errorf("Expected designer 'Adam Byrne', got '%s'", doc.Rocket.Designer)
 	}
 
-	// Validate Subcomponents
-	if len(doc.Rocket.Subcomponents.Stages) != 1 {
-		t.Fatalf("Expected 1 Subcomponent, got '%d'", len(doc.Rocket.Subcomponents.Stages))
+	if doc.Rocket.Revision != "Workshop" {
+		t.Errorf("Expected revision 'Workshop', got '%s'", doc.Rocket.Revision)
 	}
 
-	// Validate Subcomponent
+	if doc.Rocket.MotorConfiguration.ConfigID != "dd819b45-fa7f-47b8-9d31-cbe18f77381a" {
+		t.Errorf("Expected motor configuration ID 'dd819b45-fa7f-47b8-9d31-cbe18f77381a', got '%s'", doc.Rocket.MotorConfiguration.ConfigID)
+	}
+
+	if doc.Rocket.MotorConfiguration.Default != true {
+		t.Errorf("Expected motor configuration default 'true', got '%t'", doc.Rocket.MotorConfiguration.Default)
+	}
+
+	if doc.Rocket.MotorConfiguration.Stages[0].Number != 0 {
+		t.Errorf("Expected motor configuration stage 0 number '0', got '%d'", doc.Rocket.MotorConfiguration.Stages[0].Number)
+	}
+
+	if doc.Rocket.MotorConfiguration.Stages[0].Active != true {
+		t.Errorf("Expected motor configuration stage 0 active 'true', got '%t'", doc.Rocket.MotorConfiguration.Stages[0].Active)
+	}
+
+	if doc.Rocket.ReferenceType != "maximum" {
+		t.Errorf("Expected reference type 'maximum', got '%s'", doc.Rocket.ReferenceType)
+	}
+
 	if doc.Rocket.Subcomponents.Stages[0].Name != "Sustainer" {
-		t.Errorf("Expected Subcomponent Name 'Sustainer', got '%s'", doc.Rocket.Subcomponents.Stages[0].Name)
+		t.Errorf("Expected subcomponent stage 0 name 'Sustainer', got '%s'", doc.Rocket.Subcomponents.Stages[0].Name)
 	}
 
 	if doc.Rocket.Subcomponents.Stages[0].ID != "a353045a-b4cf-4a3f-bb7f-0aa6d1adfb64" {
-		t.Errorf("Expected Subcomponent ID 'a353045a-b4cf-4a3f-bb7f-0aa6d1adfb64', got '%s'", doc.Rocket.Subcomponents.Stages[0].ID)
+		t.Errorf("Expected subcomponent stage 0 ID 'a353045a-b4cf-4a3f-bb7f-0aa6d1adfb64', got '%s'", doc.Rocket.Subcomponents.Stages[0].ID)
 	}
-
 }
 
 func TestDescribeMethod(t *testing.T) {
