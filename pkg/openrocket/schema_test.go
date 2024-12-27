@@ -133,7 +133,7 @@ func TestStringMethod(t *testing.T) {
 		},
 	}
 
-	expected := "OpenrocketDocument{Version=1.0, Creator=TestCreator, Rocket=RocketDocument{Name=TestRocket, ID=12345, AxialOffset=AxialOffset{Method=static, Value=0.50}, Position=Position{Value=1.50, Type=absolute}, Designer=John Doe, Revision=1, MotorConfiguration=MotorConfiguration{ConfigID=config1, Default=true, Stages=(Stage{Number=1, Active=true}, Stage{Number=2, Active=false})}, ReferenceType=someType}}"
+	expected := "OpenrocketDocument{Version=1.0, Creator=TestCreator, Rocket=RocketDocument{Name=TestRocket, ID=12345, AxialOffset=AxialOffset{Method=static, Value=0.50}, Position=Position{Value=1.50, Type=absolute}, Designer=John Doe, Revision=1, MotorConfiguration=MotorConfiguration{ConfigID=config1, Default=true, Stages=(Stage{Number=1, Active=true}, Stage{Number=2, Active=false})}, ReferenceType=someType, Subcomponents={Subcomponents{Stages=()}}}}"
 	if doc.String() != expected {
 		t.Errorf("Expected String output '%s', got '%s'", expected, doc.String())
 	}
