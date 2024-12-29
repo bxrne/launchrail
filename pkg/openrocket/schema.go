@@ -135,11 +135,12 @@ func (r *RocketStage) String() string {
 type SustainerSubcomponents struct {
 	XMLName  xml.Name `xml:"subcomponents"`
 	Nosecone Nosecone `xml:"nosecone"`
+	BodyTube BodyTube `xml:"bodytube"`
 }
 
 // String returns full string representation of the SustainerSubcomponents
 func (s *SustainerSubcomponents) String() string {
-	return fmt.Sprintf("SustainerSubcomponents{Nosecone=%s}", s.Nosecone.String())
+	return fmt.Sprintf("SustainerSubcomponents{Nosecone=%s, BodyTube=%s}", s.Nosecone.String(), s.BodyTube.String())
 }
 
 // Nosecone represents the nosecone element of the XML document
@@ -233,4 +234,21 @@ type MassComponent struct {
 // String returns full string representation of the MassComponent
 func (m *MassComponent) String() string {
 	return fmt.Sprintf("MassComponent{Name=%s, ID=%s, AxialOffset=%s, Position=%s, PackedLength=%.2f, PackedRadius=%.2f, RadialPosition=%.2f, RadialDirection=%.2f, Mass=%.2f, Type=%s}", m.Name, m.ID, m.AxialOffset.String(), m.Position.String(), m.PackedLength, m.PackedRadius, m.RadialPosition, m.RadialDirection, m.Mass, m.Type)
+}
+
+// BodyTube represents the body tube element of the XML document
+type BodyTube struct {
+	XMLName   xml.Name `xml:"bodytube"`
+	Name      string   `xml:"name"`
+	ID        string   `xml:"id"`
+	Finish    string   `xml:"finish"`
+	Material  Material `xml:"material"`
+	Length    float64  `xml:"length"`
+	Thickness float64  `xml:"thickness"`
+	Radius    string   `xml:"radius"` // WARN: May be 'auto' and num
+}
+
+// String returns full string representation of the BodyTube
+func (b *BodyTube) String() string {
+	return fmt.Sprintf("BodyTube{Name=%s, ID=%s, Finish=%s, Material=%s, Length=%.2f, Thickness=%.2f, Radius=%s}", b.Name, b.ID, b.Finish, b.Material.String(), b.Length, b.Thickness, b.Radius)
 }
