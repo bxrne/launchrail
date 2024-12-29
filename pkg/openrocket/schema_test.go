@@ -90,7 +90,8 @@ func TestOpenrocketDocumentParsing(t *testing.T) {
 	}
 }
 
-func TestDescribeMethod(t *testing.T) {
+// TEST: GIVEN an OpenrocketDocument struct WHEN calling the String method THEN return a string representation of the OpenrocketDocument struct
+func TestOpenrocketDocumentDescribeMethod(t *testing.T) {
 	doc := &openrocket.OpenrocketDocument{
 		Version: "1.0",
 		Creator: "TestCreator",
@@ -104,45 +105,97 @@ func TestDescribeMethod(t *testing.T) {
 		t.Errorf("Expected Describe output '%s', got '%s'", expected, doc.Describe())
 	}
 }
-//
-// func TestStringMethod(t *testing.T) {
-// 	doc := &openrocket.OpenrocketDocument{
-// 		Version: "1.0",
-// 		Creator: "TestCreator",
-// 		Rocket: openrocket.RocketDocument{
-// 			Name: "TestRocket",
-// 			ID:   "12345",
-// 			AxialOffset: openrocket.AxialOffset{
-// 				Method: "static",
-// 				Value:  0.5,
-// 			},
-// 			Position: openrocket.Position{
-// 				Value: 1.5,
-// 				Type:  "absolute",
-// 			},
-// 			Designer: "John Doe",
-// 			Revision: "1",
-// 			MotorConfiguration: openrocket.MotorConfiguration{
-// 				ConfigID: "config1",
-// 				Default:  true,
-// 				Stages: []openrocket.Stage{
-// 					{Number: 1, Active: true},
-// 					{Number: 2, Active: false},
-// 				},
-// 			},
-// 			ReferenceType: "someType",
-// 			Subcomponents: openrocket.Subcomponents{
-// 				Stages: []openrocket.RocketStage{
-// 					{Name: "Sustainer", ID: "a353045a-b4cf-4a3f-bb7f-0aa6d1adfb64"},
-// 					{Name: "Booster", ID: "b353045a-b4cf-4a3f-bb7f-0aa6d1adfb64"},
-// 					{Name: "Payload", ID: "c353045a-b4cf-4a3f-bb7f-0aa6d1adfb64"},
-// 				},
-// 			},
-// 		},
-// 	}
-//
-// 	expected := "OpenrocketDocument{Version=1.0, Creator=TestCreator, Rocket=RocketDocument{Name=TestRocket, ID=12345, AxialOffset=AxialOffset{Method=static, Value=0.50}, Position=Position{Value=1.50, Type=absolute}, Designer=John Doe, Revision=1, MotorConfiguration=MotorConfiguration{ConfigID=config1, Default=true, Stages=(Stage{Number=1, Active=true}, Stage{Number=2, Active=false})}, ReferenceType=someType, Subcomponents={Subcomponents{Stages=(RocketStage{Name=Sustainer, ID=a353045a-b4cf-4a3f-bb7f-0aa6d1adfb64, SustainerSubcomponents=SustainerSubcomponents{Nosecone=Nosecone{Name=, ID=, Finish=, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Shape=, ShapeClipped=false, ShapeParameter=0.00, AftRadius=0.00, AftShoulderRadius=0.00, AftShoulderLength=0.00, AftShoulderThickness=0.00, AftShoulderCapped=false, IsFlipped=false}}}, RocketStage{Name=Booster, ID=b353045a-b4cf-4a3f-bb7f-0aa6d1adfb64, SustainerSubcomponents=SustainerSubcomponents{Nosecone=Nosecone{Name=, ID=, Finish=, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Shape=, ShapeClipped=false, ShapeParameter=0.00, AftRadius=0.00, AftShoulderRadius=0.00, AftShoulderLength=0.00, AftShoulderThickness=0.00, AftShoulderCapped=false, IsFlipped=false}}}, RocketStage{Name=Payload, ID=c353045a-b4cf-4a3f-bb7f-0aa6d1adfb64, SustainerSubcomponents=SustainerSubcomponents{Nosecone=Nosecone{Name=, ID=, Finish=, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Shape=, ShapeClipped=false, ShapeParameter=0.00, AftRadius=0.00, AftShoulderRadius=0.00, AftShoulderLength=0.00, AftShoulderThickness=0.00, AftShoulderCapped=false, IsFlipped=false}}})}}}}"
-// 	if doc.String() != expected {
-// 		t.Errorf("Expected String output '%s', got '%s'", expected, doc.String())
-// 	}
-// }
+
+// TEST: GIVEN an OpenrocketDocument struct WHEN calling the String method THEN return a string representation of the OpenrocketDocument struct
+func TestOpenrocketDocumentStringMethod(t *testing.T) {
+	doc := &openrocket.OpenrocketDocument{
+		Version: "1.0",
+		Creator: "TestCreator",
+		Rocket: openrocket.RocketDocument{
+			Name: "TestRocket",
+		},
+	}
+
+	expected := "OpenrocketDocument{Version=1.0, Creator=TestCreator, Rocket=RocketDocument{Name=TestRocket, ID=, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, Designer=, Revision=, MotorConfiguration=MotorConfiguration{ConfigID=, Default=false, Stages=()}, ReferenceType=, Subcomponents={Subcomponents{Stages=()}}}}"
+	if doc.String() != expected {
+		t.Errorf("Expected String output '%s', got '%s'", expected, doc.String())
+	}
+}
+
+// TEST: GIVEN a RocketDocument struct WHEN calling the String method THEN return a string representation of the RocketDocument struct
+func TestRocketDocumentStringMethod(t *testing.T) {
+	r := &openrocket.RocketDocument{
+		Name: "TestRocket",
+		ID:   "TestID",
+		AxialOffset: openrocket.AxialOffset{
+			Method: "absolute",
+			Value:  0.0,
+		},
+		Position: openrocket.Position{
+			Value: 0.0,
+			Type:  "absolute",
+		},
+		Designer:           "TestDesigner",
+		Revision:           "TestRevision",
+		MotorConfiguration: openrocket.MotorConfiguration{},
+		ReferenceType:      "TestReferenceType",
+		Subcomponents:      openrocket.Subcomponents{},
+	}
+
+	expected := "RocketDocument{Name=TestRocket, ID=TestID, AxialOffset=AxialOffset{Method=absolute, Value=0.00}, Position=Position{Value=0.00, Type=absolute}, Designer=TestDesigner, Revision=TestRevision, MotorConfiguration=MotorConfiguration{ConfigID=, Default=false, Stages=()}, ReferenceType=TestReferenceType, Subcomponents={Subcomponents{Stages=()}}}"
+	if r.String() != expected {
+		t.Errorf("Expected String output '%s', got '%s'", expected, r.String())
+	}
+}
+
+// TEST: GIVEN a Stage struct WHEN calling the String method THEN return a string representation of the Stage struct
+func TestStageStringMethod(t *testing.T) {
+	s := &openrocket.Stage{
+		Number: 0,
+		Active: true,
+	}
+
+	expected := "Stage{Number=0, Active=true}"
+	if s.String() != expected {
+		t.Errorf("Expected String output '%s', got '%s'", expected, s.String())
+	}
+}
+
+// TEST: GIVEN a MotorConfiguration struct WHEN calling the String method THEN return a string representation of the MotorConfiguration struct
+func TestMotorConfigurationStringMethod(t *testing.T) {
+	mc := &openrocket.MotorConfiguration{
+		ConfigID: "TestConfigID",
+		Default:  true,
+		Stages:   []openrocket.Stage{},
+	}
+
+	expected := "MotorConfiguration{ConfigID=TestConfigID, Default=true, Stages=()}"
+	if mc.String() != expected {
+		t.Errorf("Expected String output '%s', got '%s'", expected, mc.String())
+	}
+}
+
+// TEST: GIVEN a Subcomponents struct WHEN calling the String method THEN return a string representation of the Subcomponents struct
+func TestSubcomponentsStringMethod(t *testing.T) {
+	s := &openrocket.Subcomponents{
+		Stages: []openrocket.RocketStage{},
+	}
+
+	expected := "Subcomponents{Stages=()}"
+	if s.String() != expected {
+		t.Errorf("Expected String output '%s', got '%s'", expected, s.String())
+	}
+}
+
+// TEST: GIVEN a RocketStage struct WHEN calling the String method THEN return a string representation of the RocketStage struct
+func TestRocketStageStringMethod(t *testing.T) {
+	rs := &openrocket.RocketStage{
+		Name: "TestName",
+		ID:   "TestID",
+	}
+
+	expected := "RocketStage{Name=TestName, ID=TestID, SustainerSubcomponents=SustainerSubcomponents{Nosecone=Nosecone{Name=, ID=, Finish=, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Shape=, ShapeClipped=false, ShapeParameter=0.00, AftRadius=0.00, AftShoulderRadius=0.00, AftShoulderLength=0.00, AftShoulderThickness=0.00, AftShoulderCapped=false, IsFlipped=false, Subcomponents=NestedSubcomponents{CenteringRing=CenteringRing{Name=, ID=, InstanceCount=0, InstanceSeparation=0.00, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, RadialPosition=0.00, OuterRadius=, InnerRadius=}, MassComponent=MassComponent{Name=, ID=, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, PackedLength=0.00, PackedRadius=0.00, RadialPosition=0.00, RadialDirection=0.00, Mass=0.00, Type=}}}, BodyTube=BodyTube{Name=, ID=, Finish=, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Radius=}}}"
+	if rs.String() != expected {
+		t.Errorf("Expected String output '%s', got '%s'", expected, rs.String())
+	}
+}
