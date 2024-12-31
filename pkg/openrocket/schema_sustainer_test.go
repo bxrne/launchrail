@@ -22,10 +22,14 @@ func TestSchemaNestedSubcomponentsString(t *testing.T) {
 func TestSchemaSustainerSubcomponentsString(t *testing.T) {
 	ss := openrocket.SustainerSubcomponents{
 		Nosecone: openrocket.Nosecone{},
-		BodyTube: openrocket.BodyTube{},
+		BodyTube: openrocket.BodyTube{
+			Subcomponents: openrocket.BodyTubeSubcomponents{
+				InnerTube: openrocket.InnerTube{},
+			},
+		},
 	}
 
-	expected := "SustainerSubcomponents{Nosecone=Nosecone{Name=, ID=, Finish=, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Shape=, ShapeClipped=false, ShapeParameter=0.00, AftRadius=0.00, AftShoulderRadius=0.00, AftShoulderLength=0.00, AftShoulderThickness=0.00, AftShoulderCapped=false, IsFlipped=false, Subcomponents=NestedSubcomponents{CenteringRing=CenteringRing{Name=, ID=, InstanceCount=0, InstanceSeparation=0.00, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, RadialPosition=0.00, OuterRadius=, InnerRadius=}, MassComponent=MassComponent{Name=, ID=, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, PackedLength=0.00, PackedRadius=0.00, RadialPosition=0.00, RadialDirection=0.00, Mass=0.00, Type=}}}, BodyTube=BodyTube{Name=, ID=, Finish=, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Radius=}}"
+	expected := "SustainerSubcomponents{Nosecone=Nosecone{Name=, ID=, Finish=, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Shape=, ShapeClipped=false, ShapeParameter=0.00, AftRadius=0.00, AftShoulderRadius=0.00, AftShoulderLength=0.00, AftShoulderThickness=0.00, AftShoulderCapped=false, IsFlipped=false, Subcomponents=NestedSubcomponents{CenteringRing=CenteringRing{Name=, ID=, InstanceCount=0, InstanceSeparation=0.00, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, RadialPosition=0.00, OuterRadius=, InnerRadius=}, MassComponent=MassComponent{Name=, ID=, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, PackedLength=0.00, PackedRadius=0.00, RadialPosition=0.00, RadialDirection=0.00, Mass=0.00, Type=}}}, BodyTube=BodyTube{Name=, ID=, Finish=, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Radius=, Subcomponents=NestedSubcomponents{InnerTube=InnerTube{Name=, ID=, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, RadialPosition=0.00, RadialDirection=0.00, OuterRadius=0.00, Thickness=0.00, ClusterConfiguration=, ClusterScale=0.00, ClusterRotation=0.00, MotorMount=MotorMount{IgnitionEvent=, IgnitionDelay=0.00, Overhang=0.00, Motor=Motor{ConfigID=, Type=, Manufacturer=, Digest=, Designation=, Diameter=0.00, Length=0.00, Delay=}}}}}}"
 	if ss.String() != expected {
 		t.Errorf("Expected %s, got %s", expected, ss.String())
 	}
@@ -68,9 +72,27 @@ func TestSchemaBodyTubeString(t *testing.T) {
 		Length:    0.0,
 		Thickness: 0.0,
 		Radius:    "auto 0.0",
+		Subcomponents: openrocket.BodyTubeSubcomponents{
+			InnerTube: openrocket.InnerTube{
+				Name:                 "name",
+				ID:                   "id",
+				AxialOffset:          openrocket.AxialOffset{},
+				Position:             openrocket.Position{},
+				Material:             openrocket.Material{},
+				Length:               0.0,
+				RadialPosition:       0.0,
+				RadialDirection:      0.0,
+				OuterRadius:          0.0,
+				Thickness:            0.0,
+				ClusterConfiguration: "",
+				ClusterScale:         0.0,
+				ClusterRotation:      0.0,
+				MotorMount:           openrocket.MotorMount{},
+			},
+		},
 	}
 
-	expected := "BodyTube{Name=name, ID=id, Finish=finish, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Radius=auto 0.0}"
+	expected := "BodyTube{Name=name, ID=id, Finish=finish, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Radius=auto 0.0, Subcomponents=NestedSubcomponents{InnerTube=InnerTube{Name=name, ID=id, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, RadialPosition=0.00, RadialDirection=0.00, OuterRadius=0.00, Thickness=0.00, ClusterConfiguration=, ClusterScale=0.00, ClusterRotation=0.00, MotorMount=MotorMount{IgnitionEvent=, IgnitionDelay=0.00, Overhang=0.00, Motor=Motor{ConfigID=, Type=, Manufacturer=, Digest=, Designation=, Diameter=0.00, Length=0.00, Delay=}}}}}"
 	if bt.String() != expected {
 		t.Errorf("Expected %s, got %s", expected, bt.String())
 	}
