@@ -76,37 +76,39 @@ func (b *BodyTube) String() string {
 
 // BodyTubeSubcomponents represents the nested subcomponents element of the XML document
 type BodyTubeSubcomponents struct {
-	XMLName   xml.Name  `xml:"subcomponents"`
-	InnerTube InnerTube `xml:"innertube"`
+	XMLName         xml.Name        `xml:"subcomponents"`
+	InnerTube       InnerTube       `xml:"innertube"`
+	TrapezoidFinset TrapezoidFinset `xml:"trapezoidfinset"`
 }
 
 // String returns full string representation of the BodyTubeSubcomponents
 func (b *BodyTubeSubcomponents) String() string {
-	return fmt.Sprintf("NestedSubcomponents{InnerTube=%s}", b.InnerTube.String())
+	return fmt.Sprintf("NestedSubcomponents{InnerTube=%s, TrapezoidFinset=%s}", b.InnerTube.String(), b.TrapezoidFinset.String())
 }
 
 // InnerTube represents the inner tube element of the XML document
 type InnerTube struct {
-	XMLName              xml.Name    `xml:"innertube"`
-	Name                 string      `xml:"name"`
-	ID                   string      `xml:"id"`
-	AxialOffset          AxialOffset `xml:"axialoffset"`
-	Position             Position    `xml:"position"`
-	Material             Material    `xml:"material"`
-	Length               float64     `xml:"length"`
-	RadialPosition       float64     `xml:"radialposition"`
-	RadialDirection      float64     `xml:"radialdirection"`
-	OuterRadius          float64     `xml:"outerradius"`
-	Thickness            float64     `xml:"thickness"`
-	ClusterConfiguration string      `xml:"clusterconfiguration"`
-	ClusterScale         float64     `xml:"clusterscale"`
-	ClusterRotation      float64     `xml:"clusterrotation"`
-	MotorMount           MotorMount  `xml:"motormount"`
+	XMLName              xml.Name          `xml:"innertube"`
+	Name                 string            `xml:"name"`
+	ID                   string            `xml:"id"`
+	AxialOffset          AxialOffset       `xml:"axialoffset"`
+	Position             Position          `xml:"position"`
+	Material             Material          `xml:"material"`
+	Length               float64           `xml:"length"`
+	RadialPosition       float64           `xml:"radialposition"`
+	RadialDirection      float64           `xml:"radialdirection"`
+	OuterRadius          float64           `xml:"outerradius"`
+	Thickness            float64           `xml:"thickness"`
+	ClusterConfiguration string            `xml:"clusterconfiguration"`
+	ClusterScale         float64           `xml:"clusterscale"`
+	ClusterRotation      float64           `xml:"clusterrotation"`
+	MotorMount           MotorMount        `xml:"motormount"`
+	Subcomponents        NoseSubcomponents `xml:"subcomponents"` // TODO: Refactor naming here
 }
 
 // String returns full string representation of the innertube
 func (i *InnerTube) String() string {
-	return fmt.Sprintf("InnerTube{Name=%s, ID=%s, AxialOffset=%s, Position=%s, Material=%s, Length=%.2f, RadialPosition=%.2f, RadialDirection=%.2f, OuterRadius=%.2f, Thickness=%.2f, ClusterConfiguration=%s, ClusterScale=%.2f, ClusterRotation=%.2f, MotorMount=%s}", i.Name, i.ID, i.AxialOffset.String(), i.Position.String(), i.Material.String(), i.Length, i.RadialPosition, i.RadialDirection, i.OuterRadius, i.Thickness, i.ClusterConfiguration, i.ClusterScale, i.ClusterRotation, i.MotorMount.String())
+	return fmt.Sprintf("InnerTube{Name=%s, ID=%s, AxialOffset=%s, Position=%s, Material=%s, Length=%.2f, RadialPosition=%.2f, RadialDirection=%.2f, OuterRadius=%.2f, Thickness=%.2f, ClusterConfiguration=%s, ClusterScale=%.2f, ClusterRotation=%.2f, MotorMount=%s, Subcomponents=%s}", i.Name, i.ID, i.AxialOffset.String(), i.Position.String(), i.Material.String(), i.Length, i.RadialPosition, i.RadialDirection, i.OuterRadius, i.Thickness, i.ClusterConfiguration, i.ClusterScale, i.ClusterRotation, i.MotorMount.String(), i.Subcomponents.String())
 }
 
 // MotorMount represents the motor mount element of the XML document
@@ -153,4 +155,56 @@ type IgnitionConfig struct {
 // String returns full string representation of the ignition clusterconfiguration
 func (i *IgnitionConfig) String() string {
 	return fmt.Sprintf("IgnitionConfig{ConfigID=%s, IgnitionEvent=%s, IgnitionDelay=%.2f}", i.ConfigID, i.IgnitionEvent, i.IgnitionDelay)
+}
+
+// TrapezoidFinset represents the trapezoid finset element of the XML document
+type TrapezoidFinset struct {
+	XMLName        xml.Name       `xml:"trapezoidfinset"`
+	Name           string         `xml:"name"`
+	ID             string         `xml:"id"`
+	InstanceCount  int            `xml:"instancecount"`
+	FinCount       int            `xml:"fincount"`
+	RadiusOffset   RadiusOffset   `xml:"radiusoffset"`
+	AngleOffset    AngleOffset    `xml:"angleoffset"`
+	Rotation       float64        `xml:"rotation"`
+	AxialOffset    AxialOffset    `xml:"axialoffset"`
+	Position       Position       `xml:"position"`
+	Finish         string         `xml:"finish"`
+	Material       Material       `xml:"material"`
+	Thickness      float64        `xml:"thickness"`
+	CrossSection   string         `xml:"crosssection"`
+	Cant           float64        `xml:"cant"`
+	TabHeight      float64        `xml:"tabheight"`
+	TabLength      float64        `xml:"tablength"`
+	TabPositions   []TabPosition  `xml:"tabposition"`
+	FilletRadius   float64        `xml:"filletradius"`
+	FilletMaterial FilletMaterial `xml:"filletmaterial"`
+	RootChord      float64        `xml:"rootchord"`
+	TipChord       float64        `xml:"tipchord"`
+	SweepLength    float64        `xml:"sweeplength"`
+	Height         float64        `xml:"height"`
+}
+
+// String returns full string representation of the TrapezoidFinset
+func (t *TrapezoidFinset) String() string {
+	var tabPosition string
+	for i, tp := range t.TabPositions {
+		tabPosition += tp.String()
+		if i < len(t.TabPositions)-1 {
+			tabPosition += ", "
+		}
+	}
+
+	return fmt.Sprintf("TrapezoidFinset{Name=%s, ID=%s, InstanceCount=%d, FinCount=%d, RadiusOffset=%s, AngleOffset=%s, Rotation=%.2f, AxialOffset=%s, Position=%s, Finish=%s, Material=%s, Thickness=%.2f, CrossSection=%s, Cant=%.2f, TabHeight=%.2f, TabLength=%.2f, TabPositions=(%s), FilletRadius=%.2f, RootChord=%.2f, TipChord=%.2f, SweepLength=%.2f, Height=%.2f}", t.Name, t.ID, t.InstanceCount, t.FinCount, t.RadiusOffset.String(), t.AngleOffset.String(), t.Rotation, t.AxialOffset.String(), t.Position.String(), t.Finish, t.Material.String(), t.Thickness, t.CrossSection, t.Cant, t.TabHeight, t.TabLength, tabPosition, t.FilletRadius, t.RootChord, t.TipChord, t.SweepLength, t.Height)
+}
+
+// TabPosition represents the tabposition element of the XML document
+type TabPosition struct {
+	RelativeTo string  `xml:"relativeto,attr"`
+	Value      float64 `xml:",chardata"`
+}
+
+// String returns full string representation of the tabposition
+func (t *TabPosition) String() string {
+	return fmt.Sprintf("TabPosition{RelativeTo=%s, Value=%.2f}", t.RelativeTo, t.Value)
 }

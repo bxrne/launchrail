@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+// TODO: Omit empty fields
+
 // OpenrocketDocument represents the root of the XML document
 type OpenrocketDocument struct {
 	XMLName xml.Name       `xml:"openrocket"`
