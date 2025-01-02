@@ -48,7 +48,15 @@ type BodyTubeSubcomponents struct {
 
 // String returns full string representation of the BodyTubeSubcomponents
 func (b *BodyTubeSubcomponents) String() string {
-	return fmt.Sprintf("BodyTubeSubcomponents{InnerTube=%s, TrapezoidFinset=%s, Parachute=%s}", b.InnerTube.String(), b.TrapezoidFinset.String(), b.Parachute.String())
+	var centeringRings string
+	for _, cr := range b.CenteringRings {
+		centeringRings += cr.String()
+		if cr != b.CenteringRings[len(b.CenteringRings)-1] {
+			centeringRings += ", "
+		}
+	}
+
+	return fmt.Sprintf("BodyTubeSubcomponents{InnerTube=%s, TrapezoidFinset=%s, Parachute=%s, CenteringRings=(%s), Shockcord=%s}", b.InnerTube.String(), b.TrapezoidFinset.String(), b.Parachute.String(), centeringRings, b.Shockcord.String())
 }
 
 // InnerTube represents the inner tube element of the XML document
