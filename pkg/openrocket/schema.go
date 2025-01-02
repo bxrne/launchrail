@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+// TODO: Omit empty fields
+
 // OpenrocketDocument represents the root of the XML document
 type OpenrocketDocument struct {
 	XMLName xml.Name       `xml:"openrocket"`
@@ -34,35 +36,12 @@ type RocketDocument struct {
 	Revision           string             `xml:"revision"`
 	MotorConfiguration MotorConfiguration `xml:"motorconfiguration"`
 	ReferenceType      string             `xml:"referencetype"`
+	Subcomponents      Subcomponents      `xml:"subcomponents"`
 }
 
 // String returns full string representation of the RocketDocument
 func (r *RocketDocument) String() string {
-	return fmt.Sprintf("RocketDocument{Name=%s, ID=%s, AxialOffset=%s, Position=%s, Designer=%s, Revision=%s, MotorConfiguration=%s, ReferenceType=%s}", r.Name, r.ID, r.AxialOffset.String(), r.Position.String(), r.Designer, r.Revision, r.MotorConfiguration.String(), r.ReferenceType)
-}
-
-// AxialOffset represents the axial offset element of the XML document
-type AxialOffset struct {
-	XMLName xml.Name `xml:"axialoffset"`
-	Method  string   `xml:"method,attr"`
-	Value   float64  `xml:",chardata"`
-}
-
-// String returns full string representation of the AxialOffset
-func (a *AxialOffset) String() string {
-	return fmt.Sprintf("AxialOffset{Method=%s, Value=%.2f}", a.Method, a.Value)
-}
-
-// Position represents the position element of the XML document
-type Position struct {
-	XMLName xml.Name `xml:"position"`
-	Value   float64  `xml:",chardata"`
-	Type    string   `xml:"type,attr"`
-}
-
-// String returns full string representation of the Position
-func (p *Position) String() string {
-	return fmt.Sprintf("Position{Value=%.2f, Type=%s}", p.Value, p.Type)
+	return fmt.Sprintf("RocketDocument{Name=%s, ID=%s, AxialOffset=%s, Position=%s, Designer=%s, Revision=%s, MotorConfiguration=%s, ReferenceType=%s, Subcomponents={%s}}", r.Name, r.ID, r.AxialOffset.String(), r.Position.String(), r.Designer, r.Revision, r.MotorConfiguration.String(), r.ReferenceType, r.Subcomponents.String())
 }
 
 // Stage represents motor configuration stages
@@ -96,4 +75,36 @@ func (m *MotorConfiguration) String() string {
 	}
 
 	return fmt.Sprintf("MotorConfiguration{ConfigID=%s, Default=%t, Stages=(%s)}", m.ConfigID, m.Default, stages)
+}
+
+// Subcomponents represents the subcomponents element of the XML document
+type Subcomponents struct {
+	XMLName xml.Name      `xml:"subcomponents"`
+	Stages  []RocketStage `xml:"stage"`
+}
+
+// String returns full string representation of the Subcomponents
+func (s *Subcomponents) String() string {
+	var stages string
+	for i, stage := range s.Stages {
+		stages += stage.String()
+		if i < len(s.Stages)-1 {
+			stages += ", "
+		}
+	}
+
+	return fmt.Sprintf("Subcomponents{Stages=(%s)}", stages)
+}
+
+// RocketStage represents the stage subcomponent element of the XML document
+type RocketStage struct {
+	XMLName                xml.Name               `xml:"stage"`
+	Name                   string                 `xml:"name"`
+	ID                     string                 `xml:"id"`
+	SustainerSubcomponents SustainerSubcomponents `xml:"subcomponents"`
+}
+
+// String returns full string representation of the RocketStage
+func (r *RocketStage) String() string {
+	return fmt.Sprintf("RocketStage{Name=%s, ID=%s, SustainerSubcomponents=%s}", r.Name, r.ID, r.SustainerSubcomponents.String())
 }

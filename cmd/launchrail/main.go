@@ -18,7 +18,6 @@ func main() {
 	}
 	log.Info("Config loaded", "Name", cfg.App.Name, "Version", cfg.App.Version)
 
-	// NOTE: Get thrust curve from API
 	motor_data, err := thrustcurves.Load(cfg.Options.MotorDesignation, http_client.NewHTTPClient())
 	if err != nil {
 		log.Fatal("Failed to load motor data", "Error", err)
@@ -28,7 +27,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to describe motor", "Error", err)
 	}
-	log.Info("Motor loaded", "Description", motor_descripton)
+	log.Info("Motor data loaded", "Description", motor_descripton)
 
 	// NOTE: Get rocket configuration from OpenRocket
 	ork_data, err := openrocket.Load(cfg.Options.OpenRocketFile, cfg.External.OpenRocketVersion)
