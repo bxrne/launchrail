@@ -42,6 +42,8 @@ type BodyTubeSubcomponents struct {
 	InnerTube       InnerTube       `xml:"innertube"`
 	TrapezoidFinset TrapezoidFinset `xml:"trapezoidfinset"`
 	Parachute       Parachute       `xml:"parachute"`
+	CenteringRings  []CenteringRing `xml:"centeringring"`
+	Shockcord       Shockcord       `xml:"shockcord"`
 }
 
 // String returns full string representation of the BodyTubeSubcomponents

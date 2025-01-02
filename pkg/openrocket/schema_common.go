@@ -96,3 +96,23 @@ type MassComponent struct {
 func (m *MassComponent) String() string {
 	return fmt.Sprintf("MassComponent{Name=%s, ID=%s, AxialOffset=%s, Position=%s, PackedLength=%.2f, PackedRadius=%.2f, RadialPosition=%.2f, RadialDirection=%.2f, Mass=%.2f, Type=%s}", m.Name, m.ID, m.AxialOffset.String(), m.Position.String(), m.PackedLength, m.PackedRadius, m.RadialPosition, m.RadialDirection, m.Mass, m.Type)
 }
+
+// Shockcord represents the shockcord element of the XML document
+type Shockcord struct {
+	XMLName         xml.Name    `xml:"shockcord"`
+	Name            string      `xml:"name"`
+	ID              string      `xml:"id"`
+	AxialOffset     AxialOffset `xml:"axialoffset"`
+	Position        Position    `xml:"position"`
+	PackedLength    float64     `xml:"packedlength"`
+	PackedRadius    float64     `xml:"packedradius"`
+	RadialPosition  float64     `xml:"radialposition"`
+	RadialDirection float64     `xml:"radialdirection"`
+	CordLength      float64     `xml:"cordlength"`
+	Material        Material    `xml:"material"`
+}
+
+// String returns full string representation of the shockcord
+func (s *Shockcord) String() string {
+	return fmt.Sprintf("Shockcord{Name=%s, ID=%s, AxialOffset=%s, Position=%s, PackedLength=%.2f, PackedRadius=%.2f, RadialPosition=%.2f, RadialDirection=%.2f, CordLength=%.2f, Material=%s}", s.Name, s.ID, s.AxialOffset.String(), s.Position.String(), s.PackedLength, s.PackedRadius, s.RadialPosition, s.RadialDirection, s.CordLength, s.Material.String())
+}

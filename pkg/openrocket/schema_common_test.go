@@ -99,3 +99,24 @@ func TestSchemaMassComponentString(t *testing.T) {
 		t.Errorf("Expected %s, got %s", expected, m.String())
 	}
 }
+
+// TEST: GIVEN a Shockcord struct WHEN calling the String method THEN return a string representation of the Shockcord struct
+func TestSchemaShockcordString(t *testing.T) {
+	sc := &openrocket.Shockcord{
+		Name:            "name",
+		ID:              "id",
+		AxialOffset:     openrocket.AxialOffset{},
+		Position:        openrocket.Position{},
+		PackedLength:    1.0,
+		PackedRadius:    1.0,
+		RadialPosition:  1.0,
+		RadialDirection: 1.0,
+		CordLength:      1.0,
+		Material:        openrocket.Material{},
+	}
+
+	expected := "Shockcord{Name=name, ID=id, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, PackedLength=1.00, PackedRadius=1.00, RadialPosition=1.00, RadialDirection=1.00, CordLength=1.00, Material=Material{Type=, Density=0.00, Name=}}"
+	if sc.String() != expected {
+		t.Errorf("Expected %s, got %s", expected, sc.String())
+	}
+}
