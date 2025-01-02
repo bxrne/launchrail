@@ -47,15 +47,4 @@ func (d *DeploymentConfig) String() string {
 	return fmt.Sprintf("DeploymentConfig{ConfigID=%s, DeployEvent=%s, DeployAltitude=%.2f, DeployDelay=%.2f}", d.ConfigID, d.DeployEvent, d.DeployAltitude, d.DeployDelay)
 }
 
-// LineMaterial is the same as Material with a diff XMLName
-type LineMaterial struct {
-	XMLName xml.Name `xml:"linematerial"`
-	Type    string   `xml:"type,attr"`
-	Density float64  `xml:"density,attr"`
-	Name    string   `xml:",chardata"`
-}
 
-// String returns full string representation of the LineMaterial
-func (l *LineMaterial) String() string {
-	return fmt.Sprintf("Material{Type=%s, Density=%.2f, Name=%s}", l.Type, l.Density, l.Name)
-}

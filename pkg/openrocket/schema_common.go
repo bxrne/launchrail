@@ -5,9 +5,33 @@ import (
 	"fmt"
 )
 
-// Contains the 'utility' or repeated schema
+// INFO: Contains the 'utility' elements that are not component specific
 
-// AxialOffset represents the axial offset element of the XML document
+// RadiusOffset represents the radius offset element of the XML document
+type RadiusOffset struct {
+	XMLName xml.Name `xml:"radiusoffset"`
+	Method  string   `xml:"method,attr"`
+	Value   float64  `xml:",chardata"`
+}
+
+// String returns full string representation of the radiusoffset
+func (r *RadiusOffset) String() string {
+	return fmt.Sprintf("RadiusOffset{Method=%s, Value=%.2f}", r.Method, r.Value)
+}
+
+// AngleOffset represents the angle offset element of the XML document
+type AngleOffset struct {
+	XMLName xml.Name `xml:"angleoffset"`
+	Method  string   `xml:"method,attr"`
+	Value   float64  `xml:",chardata"`
+}
+
+// String returns full string representation of the angleoffset
+func (a *AngleOffset) String() string {
+	return fmt.Sprintf("AngleOffset{Method=%s, Value=%.2f}", a.Method, a.Value)
+}
+
+// AxialOffset is a calculated offset from the center of the component to the center of the rocket
 type AxialOffset struct {
 	XMLName xml.Name `xml:"axialoffset"`
 	Method  string   `xml:"method,attr"`
@@ -19,7 +43,7 @@ func (a *AxialOffset) String() string {
 	return fmt.Sprintf("AxialOffset{Method=%s, Value=%.2f}", a.Method, a.Value)
 }
 
-// Position represents the position element of the XML document
+// Position represents the position of the component in the rocket
 type Position struct {
 	XMLName xml.Name `xml:"position"`
 	Value   float64  `xml:",chardata"`
@@ -29,32 +53,6 @@ type Position struct {
 // String returns full string representation of the Position
 func (p *Position) String() string {
 	return fmt.Sprintf("Position{Value=%.2f, Type=%s}", p.Value, p.Type)
-}
-
-// Material represents the material element of the XML document
-type Material struct {
-	XMLName xml.Name `xml:"material"`
-	Type    string   `xml:"type,attr"`
-	Density float64  `xml:"density,attr"`
-	Name    string   `xml:",chardata"`
-}
-
-// String returns full string representation of the Material
-func (m *Material) String() string {
-	return fmt.Sprintf("Material{Type=%s, Density=%.2f, Name=%s}", m.Type, m.Density, m.Name)
-}
-
-// FilletMaterial represents the fillet material element of the XML document (XMLName is the only delta from Material)
-type FilletMaterial struct {
-	XMLName xml.Name `xml:"filletmaterial"`
-	Type    string   `xml:"type,attr"`
-	Density float64  `xml:"density,attr"`
-	Name    string   `xml:",chardata"`
-}
-
-// String returns full string representation of the filletmaterial
-func (f *FilletMaterial) String() string {
-	return fmt.Sprintf("FilletMaterial{Type=%s, Density=%.2f, Name=%s}", f.Type, f.Density, f.Name)
 }
 
 // CenteringRing represents the centering ring element of the XML document
@@ -97,28 +95,4 @@ type MassComponent struct {
 // String returns full string representation of the MassComponent
 func (m *MassComponent) String() string {
 	return fmt.Sprintf("MassComponent{Name=%s, ID=%s, AxialOffset=%s, Position=%s, PackedLength=%.2f, PackedRadius=%.2f, RadialPosition=%.2f, RadialDirection=%.2f, Mass=%.2f, Type=%s}", m.Name, m.ID, m.AxialOffset.String(), m.Position.String(), m.PackedLength, m.PackedRadius, m.RadialPosition, m.RadialDirection, m.Mass, m.Type)
-}
-
-// RadiusOffset represents the radius offset element of the XML document
-type RadiusOffset struct {
-	XMLName xml.Name `xml:"radiusoffset"`
-	Method  string   `xml:"method,attr"`
-	Value   float64  `xml:",chardata"`
-}
-
-// String returns full string representation of the radiusoffset
-func (r *RadiusOffset) String() string {
-	return fmt.Sprintf("RadiusOffset{Method=%s, Value=%.2f}", r.Method, r.Value)
-}
-
-// AngleOffset represents the angle offset element of the XML document
-type AngleOffset struct {
-	XMLName xml.Name `xml:"angleoffset"`
-	Method  string   `xml:"method,attr"`
-	Value   float64  `xml:",chardata"`
-}
-
-// String returns full string representation of the angleoffset
-func (a *AngleOffset) String() string {
-	return fmt.Sprintf("AngleOffset{Method=%s, Value=%.2f}", a.Method, a.Value)
 }
