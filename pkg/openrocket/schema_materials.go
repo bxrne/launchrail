@@ -41,5 +41,5 @@ type LineMaterial struct {
 
 // String returns full string representation of the LineMaterial
 func (l *LineMaterial) String() string {
-	return fmt.Sprintf("Material{Type=%s, Density=%.2f, Name=%s}", l.Type, l.Density, l.Name)
+	return fmt.Sprintf("LineMaterial{Type=%s, Density=%.2f, Name=%s}", l.Type, l.Density, l.Name)
 }
