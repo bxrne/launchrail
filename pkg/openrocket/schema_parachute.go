@@ -10,7 +10,7 @@ type Parachute struct {
 	XMLName          xml.Name         `xml:"parachute"`
 	Name             string           `xml:"name"`
 	ID               string           `xml:"id"`
-	AxialOffset      float64          `xml:"axialoffset"`
+	AxialOffset      AxialOffset      `xml:"axialoffset"`
 	Position         Position         `xml:"position"`
 	PackedLength     float64          `xml:"packedlength"`
 	PackedRadius     float64          `xml:"packedradius"`
@@ -30,7 +30,7 @@ type Parachute struct {
 
 // String returns full string representation of the parachute
 func (p *Parachute) String() string {
-	return fmt.Sprintf("Parachute{Name=%s, ID=%s, AxialOffset=%.2f, Position=%s, PackedLength=%.2f, PackedRadius=%.2f, RadialPosition=%.2f, RadialDirection=%.2f, CD=%s, Material=%s, DeployEvent=%s, DeployAltitude=%.2f, DeployDelay=%.2f, DeploymentConfig=%s, Diameter=%.2f, LineCount=%d, LineLength=%.2f, LineMaterial=%s}", p.Name, p.ID, p.AxialOffset, p.Position.String(), p.PackedLength, p.PackedRadius, p.RadialPosition, p.RadialDirection, p.CD, p.Material.String(), p.DeployEvent, p.DeployAltitude, p.DeployDelay, p.DeploymentConfig.String(), p.Diameter, p.LineCount, p.LineLength, p.LineMaterial.String())
+	return fmt.Sprintf("Parachute{Name=%s, ID=%s, AxialOffset=%s, Position=%s, PackedLength=%.2f, PackedRadius=%.2f, RadialPosition=%.2f, RadialDirection=%.2f, CD=%s, Material=%s, DeployEvent=%s, DeployAltitude=%.2f, DeployDelay=%.2f, DeploymentConfig=%s, Diameter=%.2f, LineCount=%d, LineLength=%.2f, LineMaterial=%s}", p.Name, p.ID, p.AxialOffset.String(), p.Position.String(), p.PackedLength, p.PackedRadius, p.RadialPosition, p.RadialDirection, p.CD, p.Material.String(), p.DeployEvent, p.DeployAltitude, p.DeployDelay, p.DeploymentConfig.String(), p.Diameter, p.LineCount, p.LineLength, p.LineMaterial.String())
 }
 
 // DeploymentConfig represents the deployment configuration element of the XML document
@@ -46,5 +46,3 @@ type DeploymentConfig struct {
 func (d *DeploymentConfig) String() string {
 	return fmt.Sprintf("DeploymentConfig{ConfigID=%s, DeployEvent=%s, DeployAltitude=%.2f, DeployDelay=%.2f}", d.ConfigID, d.DeployEvent, d.DeployAltitude, d.DeployDelay)
 }
-
-
