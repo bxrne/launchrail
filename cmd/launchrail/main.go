@@ -1,4 +1,4 @@
-package main
+package launchrail
 
 import (
 	"github.com/bxrne/launchrail/internal/config"
@@ -8,7 +8,7 @@ import (
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 )
 
-func main() {
+func Root() {
 	log := logger.GetLogger()
 	log.Debug("Starting...")
 
