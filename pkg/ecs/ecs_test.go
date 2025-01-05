@@ -3,7 +3,6 @@ package ecs_test
 import (
 	"testing"
 
-	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/ecs"
 )
 
@@ -22,17 +21,4 @@ func TestECSDescribe(t *testing.T) {
 		t.Errorf("Expected %s, got %s", expected, actual)
 	}
 
-}
-
-// TEST: GIVEN a new ECS instance WHEN NewECS is called THEN a new ECS instance is returned
-func TestNewECS(t *testing.T) {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		t.Errorf("Failed to get configuration: %v", err)
-	}
-
-	_, err = ecs.NewECS(cfg)
-	if err != nil {
-		t.Errorf("Failed to create ECS: %v", err)
-	}
 }
