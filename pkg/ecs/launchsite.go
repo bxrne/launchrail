@@ -1,5 +1,7 @@
 package ecs
 
+import "fmt"
+
 // Launchsite represents the launch site
 type Launchsite struct {
 	Latitude  float64
@@ -7,11 +9,16 @@ type Launchsite struct {
 	Altitude  float64
 }
 
-// NewLaunchsite creates a new Launchsite instance
-func NewLaunchsite() *Launchsite {
+// NewLaunchsite creates a new Launchsite from config
+func NewLaunchsite(lat float64, lon float64, alt float64) *Launchsite {
 	return &Launchsite{
-		Latitude:  0,
-		Longitude: 0,
-		Altitude:  0,
+		Latitude:  lat,
+		Longitude: lon,
+		Altitude:  alt,
 	}
+}
+
+// Describe returns a string representation of the Launchsite with units
+func (l *Launchsite) Describe() string {
+	return fmt.Sprintf("Lat: %.2f°, Lon: %.2f°, Alt: %.2fm", l.Latitude, l.Longitude, l.Altitude)
 }
