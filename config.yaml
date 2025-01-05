@@ -11,3 +11,12 @@ external:
 options:
   motor_designation: "269H110-14A"
   openrocket_file: "./testdata/openrocket/l1.ork"
+  launchrail:
+    length: 3.0 
+    angle: 0.0
+    orientation: 0.0
+  launchsite:
+    latitude: 37.7749
+    longitude: -122.4194
+    altitude: 0.0
+

@@ -34,12 +34,12 @@ func TestConfigString(t *testing.T) {
 				Length      float64 `mapstructure:"length"`
 				Angle       float64 `mapstructure:"angle"`
 				Orientation float64 `mapstructure:"orientation"`
-			}
+			} `mapstructure:"launchrail"`
 			Launchsite struct {
 				Latitude  float64 `mapstructure:"latitude"`
 				Longitude float64 `mapstructure:"longitude"`
 				Altitude  float64 `mapstructure:"altitude"`
-			}
+			} `mapstructure:"launchsite"`
 		}{
 			MotorDesignation: "G80-7T",
 			OpenRocketFile:   "test/fixtures/rocket.ork",

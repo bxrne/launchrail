@@ -21,12 +21,12 @@ type Config struct {
 			Length      float64 `mapstructure:"length"`
 			Angle       float64 `mapstructure:"angle"`
 			Orientation float64 `mapstructure:"orientation"`
-		}
+		} `mapstructure:"launchrail"`
 		Launchsite struct {
 			Latitude  float64 `mapstructure:"latitude"`
 			Longitude float64 `mapstructure:"longitude"`
 			Altitude  float64 `mapstructure:"altitude"`
-		}
+		} `mapstructure:"launchsite"`
 	} `mapstructure:"options"`
 }
 

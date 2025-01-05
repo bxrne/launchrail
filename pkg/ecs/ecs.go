@@ -15,7 +15,7 @@ func (e *ECS) Describe() string {
 }
 
 // New creates a new ECS instance
-func New(cfg *config.Config) (*ECS, error) {
+func NewECS(cfg *config.Config) (*ECS, error) {
 	return &ECS{
 		World:      NewWorld(),
 		Launchrail: NewLaunchrail(cfg.Options.Launchrail.Length, cfg.Options.Launchrail.Angle, cfg.Options.Launchrail.Orientation),
