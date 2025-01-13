@@ -1,5 +1,7 @@
 package config
 
+import "fmt"
+
 // Config represents the application configuration.
 type Config struct {
 	App struct {
@@ -15,6 +17,16 @@ type Config struct {
 	Options struct {
 		MotorDesignation string `mapstructure:"motor_designation"`
 		OpenRocketFile   string `mapstructure:"openrocket_file"`
+		Launchrail       struct {
+			Length      float64 `mapstructure:"length"`
+			Angle       float64 `mapstructure:"angle"`
+			Orientation float64 `mapstructure:"orientation"`
+		} `mapstructure:"launchrail"`
+		Launchsite struct {
+			Latitude  float64 `mapstructure:"latitude"`
+			Longitude float64 `mapstructure:"longitude"`
+			Altitude  float64 `mapstructure:"altitude"`
+		} `mapstructure:"launchsite"`
 	} `mapstructure:"options"`
 }
 
@@ -27,5 +39,11 @@ func (c *Config) String() map[string]string {
 	marshalled["external.openrocket_version"] = c.External.OpenRocketVersion
 	marshalled["options.motor_designation"] = c.Options.MotorDesignation
 	marshalled["options.openrocket_file"] = c.Options.OpenRocketFile
+	marshalled["options.launchrail.length"] = fmt.Sprintf("%.2f", c.Options.Launchrail.Length)
+	marshalled["options.launchrail.angle"] = fmt.Sprintf("%.2f", c.Options.Launchrail.Angle)
+	marshalled["options.launchrail.orientation"] = fmt.Sprintf("%.2f", c.Options.Launchrail.Orientation)
+	marshalled["options.launchsite.latitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Latitude)
+	marshalled["options.launchsite.longitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Longitude)
+	marshalled["options.launchsite.altitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Altitude)
 	return marshalled
 }

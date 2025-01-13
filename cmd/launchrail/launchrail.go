@@ -4,6 +4,7 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/pkg/ecs"
 	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 )
@@ -35,7 +36,13 @@ func Root() {
 		log.Fatal("Failed to load OpenRocket data", "Error", err)
 	}
 	log.Info("OpenRocket file loaded", "Description", ork_data.Describe())
-	log.Debug("Openrocket data", "Data", ork_data.String())
+
+	// NOTE: init ECS from config
+	ecs, err := ecs.NewECS(cfg, ork_data, motor_data)
+	if err != nil {
+		log.Fatal("Failed to create ECS", "Error", err)
+	}
+	log.Info("ECS initialised", "Description", ecs.Describe())
 
 	log.Debug("Finished")
 }
