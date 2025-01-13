@@ -38,7 +38,7 @@ func Root() {
 	log.Info("OpenRocket file loaded", "Description", ork_data.Describe())
 
 	// NOTE: init ECS from config
-	ecs, err := ecs.NewECS(cfg)
+	ecs, err := ecs.NewECS(cfg, ork_data, motor_data)
 	if err != nil {
 		log.Fatal("Failed to create ECS", "Error", err)
 	}

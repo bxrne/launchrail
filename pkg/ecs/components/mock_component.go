@@ -9,6 +9,8 @@ func (m *MockComponent) Type() string {
 	return m.mockType
 }
 
+func (m *MockComponent) Update(dt float64) {}
+
 func NewMockComponent(mockType string) *MockComponent {
 	return &MockComponent{
 		mockType: mockType,
