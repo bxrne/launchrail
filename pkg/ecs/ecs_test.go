@@ -28,7 +28,11 @@ func TestECSDescribe(t *testing.T) {
 
 // TEST: GIVEN a new ECS instance WHEN NewECS is called THEN a new ECS instance is returned
 func TestNewECS(t *testing.T) {
-	os.Chdir("../../")
+	err := os.Chdir("../../")
+	if err != nil {
+		t.Errorf("Expected nil, got %v", err)
+	}
+
 	cfg, err := config.GetConfig()
 	if err != nil {
 		t.Errorf("Expected nil, got %v", err)
