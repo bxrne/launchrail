@@ -2,14 +2,13 @@ package config_test
 
 import (
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/bxrne/launchrail/internal/config"
 )
 
 // Helper to change directory and reset after test
-func withWorkingDir(t *testing.T, dir string, testFunc func()) {
+func withWorkingDir(t *testing.T, dir string, testFunc func(cfg *config.Config, err error)) {
 	originalDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Failed to get current directory: %s", err)
@@ -27,17 +26,14 @@ func withWorkingDir(t *testing.T, dir string, testFunc func()) {
 		}
 	}()
 
-	// Reset the configuration
-	config.Reset()
-
-	// Run the test function
-	testFunc()
+	// WARN: Run the test function with the configuration and handle its error within
+	cfg, err := config.GetConfig()
+	testFunc(cfg, err)
 }
 
 // TEST: GIVEN a valid configuration file WHEN GetConfig is called THEN no error is returned
 func TestGetConfig(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -50,38 +46,36 @@ func TestGetConfig(t *testing.T) {
 
 // TEST: GIVEN an invalid config file WHEN GetConfig is called THEN the error 'failed to read config file' is returned
 func TestGetConfigInvalidConfigFile(t *testing.T) {
-	withWorkingDir(t, ".", func() {
-		_, err := config.GetConfig()
+	withWorkingDir(t, ".", func(cfg *config.Config, err error) {
 		if err == nil {
 			t.Error("Expected an error, got nil")
 		}
 
 		expected := "failed to read config file:"
-		if !strings.HasPrefix(err.Error(), expected) {
-			t.Errorf("Expected error to start with %s, got: %s", expected, err)
+		if err.Error()[:len(expected)] != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
 		}
 	})
 }
 
 // TEST: GIVEN a bad config file WHEN GetConfig is called THEN the error 'failed to unmarshal config' is returned
 func TestGetConfigBadConfigFile(t *testing.T) {
-	withWorkingDir(t, "../../testdata/config/bad", func() {
-		_, err := config.GetConfig()
+	withWorkingDir(t, "../../testdata/config/bad", func(cfg *config.Config, err error) {
 		if err == nil {
 			t.Error("Expected an error, got nil")
 		}
 
-		expected := "failed to unmarshal config:"
-		if !strings.HasPrefix(err.Error(), expected) {
-			t.Errorf("Expected error to start with %s, got: %s", expected, err)
+		expected := "failed to unmarshal config"
+		if err.Error()[:len(expected)] != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
 		}
+
 	})
 }
 
 // TEST: GIVEN a config WHEN another config is requested THEN the config is a singleton
 func TestGetConfigSingleton(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg1, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -91,7 +85,7 @@ func TestGetConfigSingleton(t *testing.T) {
 			t.Errorf("Expected no error, got: %s", err)
 		}
 
-		if cfg1 != cfg2 {
+		if cfg != cfg2 {
 			t.Error("Expected config to be a singleton")
 		}
 	})
@@ -99,8 +93,7 @@ func TestGetConfigSingleton(t *testing.T) {
 
 // TEST: GIVEN a config with missing app.name WHEN Validate is called THEN an error is returned
 func TestGetConfigMissingFields(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -120,8 +113,7 @@ func TestGetConfigMissingFields(t *testing.T) {
 
 // TEST: GIVEN a config with missing app.version WHEN Validate is called THEN an error is returned
 func TestGetConfigMissingVersion(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -141,8 +133,7 @@ func TestGetConfigMissingVersion(t *testing.T) {
 
 // TEST: GIVEN a config with missing logging.level WHEN Validate is called THEN an error is returned
 func TestGetConfigMissingLoggingLevel(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -162,8 +153,7 @@ func TestGetConfigMissingLoggingLevel(t *testing.T) {
 
 // TEST: GIVEN a config with external.openrocket_version WHEN Validate is called THEN no error is returned
 func TestGetConfigExternalOpenRocketVersion(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -183,8 +173,7 @@ func TestGetConfigExternalOpenRocketVersion(t *testing.T) {
 
 // TEST: GIVEN a config with missing options.motor_designation WHEN Validate is called THEN an error is returned
 func TestGetConfigMissingMotorDesignation(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -204,8 +193,7 @@ func TestGetConfigMissingMotorDesignation(t *testing.T) {
 
 // TEST: GIVEN a config with missing options.openrocket_file WHEN Validate is called THEN an error is returned
 func TestGetConfigMissingOpenRocketFile(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -225,8 +213,7 @@ func TestGetConfigMissingOpenRocketFile(t *testing.T) {
 
 // TEST: GIVEN a config with missing options.launchrail.length WHEN Validate is called THEN no error is returned
 func TestGetConfigMissingLaunchrailLength(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -246,8 +233,7 @@ func TestGetConfigMissingLaunchrailLength(t *testing.T) {
 
 // TEST: GIVEN a config with missing options.launchrail.angle WHEN Validate is called THEN no error is returned
 func TestGetConfigMissingLaunchrailAngle(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -267,8 +253,7 @@ func TestGetConfigMissingLaunchrailAngle(t *testing.T) {
 
 // TEST: GIVEN a config with missing options.launchrail.orientation WHEN Validate is called THEN no error is returned
 func TestGetConfigMissingLaunchrailOrientation(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -288,8 +273,7 @@ func TestGetConfigMissingLaunchrailOrientation(t *testing.T) {
 
 // TEST: GIVEN a config with missing options.launchsite.latitude WHEN Validate is called THEN no error is returned
 func TestGetConfigMissingLaunchsiteLatitude(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -309,8 +293,7 @@ func TestGetConfigMissingLaunchsiteLatitude(t *testing.T) {
 
 // TEST: GIVEN a config with missing options.launchsite.longitude WHEN Validate is called THEN no error is returned
 func TestGetConfigMissingLaunchsiteLongitude(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
@@ -330,8 +313,7 @@ func TestGetConfigMissingLaunchsiteLongitude(t *testing.T) {
 
 // TEST: GIVEN a config with missing options.launchsite.altitude WHEN Validate is called THEN no error is returned
 func TestGetConfigMissingLaunchsiteAltitude(t *testing.T) {
-	withWorkingDir(t, "../..", func() {
-		cfg, err := config.GetConfig()
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}

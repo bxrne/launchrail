@@ -1,51 +1,37 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"sync"
 
 	"github.com/spf13/viper"
 )
 
 var (
-	once sync.Once
-	cfg  *Config
+	cfg *Config
 )
 
 // GetConfig returns the application configuration as a singleton
 func GetConfig() (*Config, error) {
+
 	v := viper.New()
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
 	v.AddConfigPath(".")
 
 	if err := v.ReadInConfig(); err != nil {
-		cfg = nil
 		return nil, fmt.Errorf("failed to read config file: %s", err)
 	}
 
 	if err := v.Unmarshal(&cfg); err != nil {
-		cfg = nil
 		return nil, fmt.Errorf("failed to unmarshal config: %s", err)
 	}
 
 	if err := cfg.Validate(); err != nil {
-		cfg = nil
 		return nil, fmt.Errorf("failed to validate config: %s", err)
 	}
 
-	if cfg == nil {
-		return nil, errors.New("failed to load configuration")
-	}
-
 	return cfg, nil
-}
-
-// Reset resets the configuration singleton, useful for testing
-func Reset() {
-	cfg = nil
 }
 
 // Validate checks the config to error on empty field
