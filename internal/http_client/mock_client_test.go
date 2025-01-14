@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TEST: GIVEN a valid configuration file WHEN GetConfig is called THEN no error is returned
 func TestMockHTTPClient_Post(t *testing.T) {
 	tests := []struct {
 		name        string

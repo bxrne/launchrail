@@ -13,10 +13,9 @@ options:
   openrocket_file: "./testdata/openrocket/l1.ork"
   launchrail:
     length: 3.0 
-    angle: 0.0
-    orientation: 0.0
+    angle: 2.0
+    orientation: 1.0
   launchsite:
     latitude: 37.7749
     longitude: -122.4194
-    altitude: 0.0
-
+    altitude: 1.0
