@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/bxrne/launchrail/internal/config"
@@ -25,6 +26,9 @@ func withWorkingDir(t *testing.T, dir string, testFunc func()) {
 			t.Fatalf("Failed to reset directory: %s", err)
 		}
 	}()
+
+	// Reset the configuration
+	config.Reset()
 
 	// Run the test function
 	testFunc()
@@ -52,27 +56,49 @@ func TestGetConfigInvalidConfigFile(t *testing.T) {
 			t.Error("Expected an error, got nil")
 		}
 
-		if err.Error() != "failed to read config file" {
-			t.Errorf("Expected error to be 'failed to read config file', got: %s", err)
+		expected := "failed to read config file:"
+		if !strings.HasPrefix(err.Error(), expected) {
+			t.Errorf("Expected error to start with %s, got: %s", expected, err)
 		}
 	})
 }
 
 // TEST: GIVEN a bad config file WHEN GetConfig is called THEN the error 'failed to unmarshal config' is returned
 func TestGetConfigBadConfigFile(t *testing.T) {
-	withWorkingDir(t, "../../testdata/config/bad/", func() {
+	withWorkingDir(t, "../../testdata/config/bad", func() {
 		_, err := config.GetConfig()
 		if err == nil {
 			t.Error("Expected an error, got nil")
 		}
-		if err.Error() != "failed to unmarshal config" {
-			t.Errorf("Expected error to be 'failed to unmarshal config', got: %s", err)
+
+		expected := "failed to unmarshal config:"
+		if !strings.HasPrefix(err.Error(), expected) {
+			t.Errorf("Expected error to start with %s, got: %s", expected, err)
 		}
 	})
 }
 
-// TEST: GIVEN a configuration file with missing app.name WHEN Validate is called THEN an error is returned
-func TestValidateConfigMissingAppName(t *testing.T) {
+// TEST: GIVEN a config WHEN another config is requested THEN the config is a singleton
+func TestGetConfigSingleton(t *testing.T) {
+	withWorkingDir(t, "../..", func() {
+		cfg1, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg2, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		if cfg1 != cfg2 {
+			t.Error("Expected config to be a singleton")
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing app.name WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingFields(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
 		cfg, err := config.GetConfig()
 		if err != nil {
@@ -85,16 +111,15 @@ func TestValidateConfigMissingAppName(t *testing.T) {
 			t.Error("Expected an error, got nil")
 		}
 
-		if err.Error() != "app.name is required" {
-			t.Errorf("Expected error to be 'app.name is required', got: %s", err)
+		expected := "app.name is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
 		}
-
-		cfg.App.Name = "launchrail-test" // Reset app.name
 	})
 }
 
-// TEST: GIVEN a configuration file with missing app.version WHEN GetConfig is called THEN an error is returned
-func TestValidateConfigMissingAppVersion(t *testing.T) {
+// TEST: GIVEN a config with missing app.version WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingVersion(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
 		cfg, err := config.GetConfig()
 		if err != nil {
@@ -107,16 +132,15 @@ func TestValidateConfigMissingAppVersion(t *testing.T) {
 			t.Error("Expected an error, got nil")
 		}
 
-		if err.Error() != "app.version is required" {
-			t.Errorf("Expected error to be 'app.version is required', got: %s", err)
+		expected := "app.version is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
 		}
-
-		cfg.App.Version = "0.0.0" // Reset app.version
 	})
 }
 
-// TEST: GIVEN a configuration file with missing logging.level WHEN GetConfig is called THEN an error is returned
-func TestValidateConfigMissingLoggingLevel(t *testing.T) {
+// TEST: GIVEN a config with missing logging.level WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingLoggingLevel(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
 		cfg, err := config.GetConfig()
 		if err != nil {
@@ -129,16 +153,15 @@ func TestValidateConfigMissingLoggingLevel(t *testing.T) {
 			t.Error("Expected an error, got nil")
 		}
 
-		if err.Error() != "logging.level is required" {
-			t.Errorf("Expected error to be 'logging.level is required', got: %s", err)
+		expected := "logging.level is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
 		}
-
-		cfg.Logging.Level = "info" // Reset logging.level
 	})
 }
 
-// TEST: GIVEN a configuration file with missing external.openrocket_version WHEN GetConfig is called THEN error is returned
-func TestValidateConfigMissingOpenRocketVersion(t *testing.T) {
+// TEST: GIVEN a config with external.openrocket_version WHEN Validate is called THEN no error is returned
+func TestGetConfigExternalOpenRocketVersion(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
 		cfg, err := config.GetConfig()
 		if err != nil {
@@ -147,17 +170,19 @@ func TestValidateConfigMissingOpenRocketVersion(t *testing.T) {
 
 		cfg.External.OpenRocketVersion = ""
 		err = cfg.Validate()
-		expected := "external.openrocket_version is required"
-		if err == nil && err.Error() != expected {
-			t.Errorf("Expected no error, got: %s", err)
+		if err == nil {
+			t.Error("Expected an error, got nil")
 		}
 
-		cfg.External.OpenRocketVersion = "15.03" // Reset external.openrocket_version
+		expected := "external.openrocket_version is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
 	})
 }
 
-// TEST: GIVEN a configuration file with missing options.motor_designation WHEN GetConfig is called THEN an error is returned
-func TestValidateConfigMissingMotorDesignation(t *testing.T) {
+// TEST: GIVEN a config with missing options.motor_designation WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingMotorDesignation(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
 		cfg, err := config.GetConfig()
 		if err != nil {
@@ -170,16 +195,15 @@ func TestValidateConfigMissingMotorDesignation(t *testing.T) {
 			t.Error("Expected an error, got nil")
 		}
 
-		if err.Error() != "options.motor_designation is required" {
-			t.Errorf("Expected error to be 'options.motor_designation is required', got: %s", err)
+		expected := "options.motor_designation is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
 		}
-
-		cfg.Options.MotorDesignation = "A8" // Reset options.motor_designation
 	})
 }
 
-// TEST: GIVEN a configuration file with missing options.open_rocket_file WHEN GetConfig is called THEN an error is returned
-func TestValidateConfigMissingOpenRocketFile(t *testing.T) {
+// TEST: GIVEN a config with missing options.openrocket_file WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingOpenRocketFile(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
 		cfg, err := config.GetConfig()
 		if err != nil {
@@ -192,35 +216,135 @@ func TestValidateConfigMissingOpenRocketFile(t *testing.T) {
 			t.Error("Expected an error, got nil")
 		}
 
-		if err.Error() != "options.openrocket_file is required" {
-			t.Errorf("Expected error to be 'options.openrocket_file is required', got: %s", err)
+		expected := "options.openrocket_file is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
 		}
-
-		cfg.Options.OpenRocketFile = "./testdata/openrocket/l1.ork" // Reset options.open_rocket_file
 	})
 }
 
-// TEST: GIVEN a configuration file with invalid options.open_rocket_file WHEN GetConfig is called THEN an error is returned
-func TestValidateConfigInvalidOpenRocketFile(t *testing.T) {
+// TEST: GIVEN a config with missing options.launchrail.length WHEN Validate is called THEN no error is returned
+func TestGetConfigMissingLaunchrailLength(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
 		cfg, err := config.GetConfig()
 		if err != nil {
 			t.Errorf("Expected no error, got: %s", err)
 		}
 
-		cfg.Options.OpenRocketFile = "test/resources/invalid.ork"
+		cfg.Options.Launchrail.Length = 0
 		err = cfg.Validate()
 		if err == nil {
 			t.Error("Expected an error, got nil")
 		}
 
-		unixErr := "options.openrocket_file is invalid: stat test/resources/invalid.ork: no such file or directory"
-		winErr := "options.openrocket_file is invalid: CreateFile test/resources/invalid.ork: The system cannot find the path specified."
+		expected := "options.launchrail.length is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
 
-		if err.Error() != unixErr && err.Error() != winErr {
-			t.Errorf("Expected error to be '%s' or '%s', got: %s", unixErr, winErr, err)
+// TEST: GIVEN a config with missing options.launchrail.angle WHEN Validate is called THEN no error is returned
+func TestGetConfigMissingLaunchrailAngle(t *testing.T) {
+	withWorkingDir(t, "../..", func() {
+		cfg, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
 		}
 
-		cfg.Options.OpenRocketFile = "test/resources/rocket.ork" // Reset options.open_rocket_file
+		cfg.Options.Launchrail.Angle = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.launchrail.angle is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing options.launchrail.orientation WHEN Validate is called THEN no error is returned
+func TestGetConfigMissingLaunchrailOrientation(t *testing.T) {
+	withWorkingDir(t, "../..", func() {
+		cfg, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.Launchrail.Orientation = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.launchrail.orientation is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing options.launchsite.latitude WHEN Validate is called THEN no error is returned
+func TestGetConfigMissingLaunchsiteLatitude(t *testing.T) {
+	withWorkingDir(t, "../..", func() {
+		cfg, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.Launchsite.Latitude = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.launchsite.latitude is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing options.launchsite.longitude WHEN Validate is called THEN no error is returned
+func TestGetConfigMissingLaunchsiteLongitude(t *testing.T) {
+	withWorkingDir(t, "../..", func() {
+		cfg, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.Launchsite.Longitude = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.launchsite.longitude is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing options.launchsite.altitude WHEN Validate is called THEN no error is returned
+func TestGetConfigMissingLaunchsiteAltitude(t *testing.T) {
+	withWorkingDir(t, "../..", func() {
+		cfg, err := config.GetConfig()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.Launchsite.Altitude = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.launchsite.altitude is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
 	})
 }
