@@ -137,7 +137,7 @@ func TestValidateConfigMissingLoggingLevel(t *testing.T) {
 	})
 }
 
-// TEST: GIVEN a configuration file with missing external.openrocket_version WHEN GetConfig is called THEN no error is returned
+// TEST: GIVEN a configuration file with missing external.openrocket_version WHEN GetConfig is called THEN error is returned
 func TestValidateConfigMissingOpenRocketVersion(t *testing.T) {
 	withWorkingDir(t, "../..", func() {
 		cfg, err := config.GetConfig()
@@ -147,7 +147,8 @@ func TestValidateConfigMissingOpenRocketVersion(t *testing.T) {
 
 		cfg.External.OpenRocketVersion = ""
 		err = cfg.Validate()
-		if err != nil {
+		expected := "external.openrocket_version is required"
+		if err == nil && err.Error() != expected {
 			t.Errorf("Expected no error, got: %s", err)
 		}
 

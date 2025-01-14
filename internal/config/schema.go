@@ -30,7 +30,7 @@ type Config struct {
 	} `mapstructure:"options"`
 }
 
-// Marshal to map structure for logging.
+// String returns the configuration as a map of strings, useful for testing.
 func (c *Config) String() map[string]string {
 	marshalled := make(map[string]string)
 	marshalled["app.name"] = c.App.Name
