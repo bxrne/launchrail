@@ -7,6 +7,8 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/ecs"
 	"github.com/bxrne/launchrail/pkg/ecs/entities"
+	"github.com/bxrne/launchrail/pkg/openrocket"
+	"github.com/bxrne/launchrail/pkg/thrustcurves"
 )
 
 // TEST: GIVEN a new ECS instance WHEN Describe is called THEN a string representation of the ECS is returned
@@ -38,7 +40,7 @@ func TestNewECS(t *testing.T) {
 		t.Errorf("Expected nil, got %v", err)
 	}
 
-	e, err := ecs.NewECS(cfg, nil, nil)
+	e, err := ecs.NewECS(cfg, &openrocket.RocketDocument{}, &thrustcurves.MotorData{})
 
 	if err != nil {
 		t.Errorf("Expected nil, got %v", err)

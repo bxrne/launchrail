@@ -20,8 +20,11 @@ func (e *ECS) Describe() string {
 }
 
 // New creates a new ECS instance
-func NewECS(cfg *config.Config, orkData *openrocket.OpenrocketDocument, motorData *thrustcurves.MotorData) (*ECS, error) {
-	rocket := entities.NewRocket(1.0)
+func NewECS(cfg *config.Config, orkData *openrocket.RocketDocument, motorData *thrustcurves.MotorData) (*ECS, error) {
+	rocket, err := entities.NewRocketFromORK(orkData)
+	if err != nil {
+		return nil, err
+	}
 
 	return &ECS{
 		World:      NewWorld(rocket),

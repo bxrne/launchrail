@@ -35,10 +35,16 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to load OpenRocket data", "Error", err)
 	}
+
+	// NOTE: Validate OpenRocket data
+	err = ork_data.Validate(cfg)
+	if err != nil {
+		log.Fatal("Failed to validate OpenRocket data", "Error", err)
+	}
 	log.Info("OpenRocket file loaded", "Description", ork_data.Describe())
 
 	// NOTE: init ECS from config
-	ecs, err := ecs.NewECS(cfg, ork_data, motor_data)
+	ecs, err := ecs.NewECS(cfg, &ork_data.Rocket, motor_data)
 	if err != nil {
 		log.Fatal("Failed to create ECS", "Error", err)
 	}

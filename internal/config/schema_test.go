@@ -9,40 +9,30 @@ import (
 
 // TEST: GIVEN a populated configuration WHEN String is called THEN a map of configuration values is returned
 func TestConfigString(t *testing.T) {
-	cfg := &config.Config{
-		App: struct {
-			Name    string `mapstructure:"name"`
-			Version string `mapstructure:"version"`
-		}{
+	cfg := config.Config{
+		App: config.App{
 			Name:    "launchrail-test",
 			Version: "0.0.0",
 		},
-		External: struct {
-			OpenRocketVersion string `mapstructure:"openrocket_version"`
-		}{
-			OpenRocketVersion: "15.03",
-		},
-		Logging: struct {
-			Level string `mapstructure:"level"`
-		}{
+		Logging: config.Logging{
 			Level: "info",
 		},
-		Options: struct {
-			MotorDesignation string `mapstructure:"motor_designation"`
-			OpenRocketFile   string `mapstructure:"openrocket_file"`
-			Launchrail       struct {
-				Length      float64 `mapstructure:"length"`
-				Angle       float64 `mapstructure:"angle"`
-				Orientation float64 `mapstructure:"orientation"`
-			} `mapstructure:"launchrail"`
-			Launchsite struct {
-				Latitude  float64 `mapstructure:"latitude"`
-				Longitude float64 `mapstructure:"longitude"`
-				Altitude  float64 `mapstructure:"altitude"`
-			} `mapstructure:"launchsite"`
-		}{
+		External: config.External{
+			OpenRocketVersion: "15.03",
+		},
+		Options: config.Options{
 			MotorDesignation: "G80-7T",
 			OpenRocketFile:   "test/fixtures/rocket.ork",
+			Launchrail: config.Launchrail{
+				Length:      0.00,
+				Angle:       0.00,
+				Orientation: 0.00,
+			},
+			Launchsite: config.Launchsite{
+				Latitude:  0.00,
+				Longitude: 0.00,
+				Altitude:  0.00,
+			},
 		},
 	}
 

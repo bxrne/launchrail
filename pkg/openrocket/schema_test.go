@@ -1,8 +1,10 @@
 package openrocket_test
 
 import (
-	"github.com/bxrne/launchrail/pkg/openrocket"
 	"testing"
+
+	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/pkg/openrocket"
 )
 
 // TEST: GIVEN a OpenrocketDocument struct WHEN calling the String method THEN return a string representation of the OpenrocketDocument struct
@@ -104,5 +106,62 @@ func TestSchemaRocketStageString(t *testing.T) {
 
 	if rs.String() != expected {
 		t.Errorf("Expected %s, got %s", expected, rs.String())
+	}
+}
+
+// TEST: GIVEN a Subcomponents struct WHEN calling the List method THEN return a list of all Subcomponents
+func TestSchemaSubcomponentsList(t *testing.T) {
+	sc := &openrocket.Subcomponents{
+		Stages: []openrocket.RocketStage{},
+	}
+
+	if len(sc.List()) != 0 {
+		t.Errorf("Expected 0, got %d", len(sc.List()))
+	}
+}
+
+// TEST: Given a valid OpenrocketDocument struct WHEN calling Validate THEN return nil
+func TestSchemaOpenrocketDocumentValidate(t *testing.T) {
+	ord := &openrocket.OpenrocketDocument{
+		Version: "OpenRocket 15.03",
+		Creator: "OpenRocket 15.03",
+		Rocket: openrocket.RocketDocument{
+			Subcomponents: openrocket.Subcomponents{
+				Stages: []openrocket.RocketStage{
+					{
+						Name: "Sustainer",
+					},
+				},
+			},
+		},
+	}
+
+	cfg := &config.Config{
+		External: config.External{
+			OpenRocketVersion: "15.03",
+		},
+	}
+
+	if err := ord.Validate(cfg); err != nil {
+		t.Errorf("Expected nil, got %v", err)
+	}
+}
+
+// TEST: Given an invalid OpenrocketDocument struct WHEN calling Validate THEN return an Error
+func TestSchemaOpenrocketDocumentValidateError(t *testing.T) {
+	ord := &openrocket.OpenrocketDocument{
+		Version: "OpenRocket 15.03",
+		Creator: "OpenRocket 15.04",
+		Rocket:  openrocket.RocketDocument{},
+	}
+
+	cfg := &config.Config{
+		External: config.External{
+			OpenRocketVersion: "15.03",
+		},
+	}
+
+	if err := ord.Validate(cfg); err == nil {
+		t.Errorf("Expected error, got nil")
 	}
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/bxrne/launchrail/pkg/ecs/components"
 	"github.com/bxrne/launchrail/pkg/ecs/types"
+	"github.com/bxrne/launchrail/pkg/openrocket"
 )
 
 type Rocket struct {
@@ -28,6 +29,25 @@ func NewRocket(mass float64, components ...components.Component) *Rocket {
 		Mass:         mass,
 		Components:   components,
 	}
+}
+
+// NewRocketFromORK creates a new rocket instance from an ORK Document
+func NewRocketFromORK(orkData *openrocket.RocketDocument) (*Rocket, error) {
+	// TODO: Decompose ork
+	// subs := orkData.Subcomponents.List()
+	// nosecone := subs[0].SustainerSubcomponents.Nosecone
+	// bodytube := subs[0].SustainerSubcomponents.BodyTube
+
+	return &Rocket{
+		ID:           0,
+		Position:     types.Vector3{X: 0, Y: 0, Z: 0},
+		Velocity:     types.Vector3{X: 0, Y: 0, Z: 0},
+		Acceleration: types.Vector3{X: 0, Y: 0, Z: 0},
+		Forces:       []types.Vector3{},
+		Mass:         1.0,
+		Components:   []components.Component{},
+	}, nil
+
 }
 
 // NewRocketWithID creates a new rocket instance with an ID
