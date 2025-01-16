@@ -31,8 +31,8 @@ func NewNosecone(radius, length, mass, shapeParameter float64) *Nosecone {
 
 // NewNoseconeFromORK creates a new nosecone instance from an ORK Document
 func NewNoseconeFromORK(orkData *openrocket.RocketDocument) *Nosecone {
-	ork_nosecone := orkData.Subcomponents.Stages[0].SustainerSubcomponents.Nosecone
-	return NewNosecone(ork_nosecone.AftRadius, ork_nosecone.Length, ork_nosecone.GetMass(), ork_nosecone.ShapeParameter)
+	orkNosecone := orkData.Subcomponents.Stages[0].SustainerSubcomponents.Nosecone
+	return NewNosecone(orkNosecone.AftRadius, orkNosecone.Length, orkNosecone.GetMass(), orkNosecone.ShapeParameter)
 }
 
 // String returns a string representation of the Nosecone

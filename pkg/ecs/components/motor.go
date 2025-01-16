@@ -51,8 +51,8 @@ func (m *Motor) Update(dt float64) error {
 		}
 
 		// Update the position of the MotorData
-		thrust_vector := types.Vector3{X: 0, Y: 0, Z: m.thrust * dt} // Thrust over time gives displacement
-		m.Position = m.Position.Add(thrust_vector)
+		thrustVec := types.Vector3{X: 0, Y: 0, Z: m.thrust * dt} // Thrust over time gives displacement
+		m.Position = m.Position.Add(thrustVec)
 	} else {
 		m.thrust = 0 // No thrust if idle
 	}
