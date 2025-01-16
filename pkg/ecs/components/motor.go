@@ -79,7 +79,7 @@ func NewMotor(md *thrustcurves.MotorData) *Motor {
 }
 
 // GetThrustAfter returns the thrust of the Motor at a given time using linear interpolation
-func (m *Motor) GetThrustAfter(total_dt float64) float64 {
+func (m *Motor) GetThrustAfter(totalDt float64) float64 {
 	// If the thrust curve is empty, return 0
 	if len(m.Thrustcurve) == 0 {
 		return 0
@@ -87,21 +87,21 @@ func (m *Motor) GetThrustAfter(total_dt float64) float64 {
 
 	// Find the appropriate segment for interpolation
 	for i := 0; i < len(m.Thrustcurve)-1; i++ {
-		if m.Thrustcurve[i][0] <= total_dt && total_dt < m.Thrustcurve[i+1][0] {
+		if m.Thrustcurve[i][0] <= totalDt && totalDt < m.Thrustcurve[i+1][0] {
 			// Perform linear interpolation
 			t1, thrust1 := m.Thrustcurve[i][0], m.Thrustcurve[i][1]
 			t2, thrust2 := m.Thrustcurve[i+1][0], m.Thrustcurve[i+1][1]
 
 			// Linear interpolation formula
-			return thrust1 + (thrust2-thrust1)*(total_dt-t1)/(t2-t1)
+			return thrust1 + (thrust2-thrust1)*(totalDt-t1)/(t2-t1)
 		}
 	}
 
-	// If total_dt is beyond the last sample, return the last thrust value
-	if total_dt >= m.Thrustcurve[len(m.Thrustcurve)-1][0] {
+	// If totalDt is beyond the last sample, return the last thrust value
+	if totalDt >= m.Thrustcurve[len(m.Thrustcurve)-1][0] {
 		return m.Thrustcurve[len(m.Thrustcurve)-1][1]
 	}
 
-	// If total_dt is before the first sample, return 0
+	// If totalDt is before the first sample, return 0
 	return 0
 }
