@@ -34,6 +34,10 @@ func TestConfigString(t *testing.T) {
 				Altitude:  0.00,
 			},
 		},
+		Simulation: config.Simulation{
+			Step:    0.00,
+			MaxTime: 0.00,
+		},
 	}
 
 	expected := map[string]string{
@@ -49,6 +53,8 @@ func TestConfigString(t *testing.T) {
 		"options.launchsite.latitude":    "0.00",
 		"options.launchsite.longitude":   "0.00",
 		"options.launchsite.altitude":    "0.00",
+		"simulation.step":                "0.00",
+		"simulation.max_time":            "0.00",
 	}
 
 	actual := cfg.String()

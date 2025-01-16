@@ -23,7 +23,8 @@ func TestWorld_String(t *testing.T) {
 	r := entities.NewRocket(1.0)
 	w := ecs.NewWorld(r)
 
-	expected := "1 entities and 0 systems"
+	expected := "World{Entities: Entity 0: Rocket{ID: 0, Position: {0 0 0}, Velocity: {0 0 0}, Acceleration: {0 0 0}, Mass: 1.00, Forces: [], Components: []}\n, Systems: }"
+
 	if w.String() != expected {
 		t.Errorf("Expected %s, got %s", expected, w.String())
 	}
