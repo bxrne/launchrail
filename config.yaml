@@ -5,12 +5,12 @@ app:
 logging:
   level: "debug"
 
+simulation:
+  step: 0.1
+  max_time: 10.0
+
 external:
   openrocket_version: "23.09"
-
-simulation:
-  step: 1
-  max_time: 10.0
 
 options:
   motor_designation: "269H110-14A"

@@ -2,7 +2,6 @@ package simulator
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/ecs"
@@ -10,42 +9,35 @@ import (
 
 // Simulator represents the simulation environment
 type Simulator struct {
-	ecs       *ecs.ECS
-	tick      time.Duration // Duration of each tick
-	totalTime float64       // Cumulative time in seconds
-	maxTime   float64       // Maximum time in seconds
+	ecs         *ecs.ECS
+	maxTime     float64 // Maximum time in seconds
+	elapsedTime float64 // Elapsed time in Seconds
+	timeStep    float64 // Time step in seconds
 }
 
 // NewSimulator creates a new Simulator instance
 func NewSimulator(cfg *config.Config, ecs *ecs.ECS) *Simulator {
 	return &Simulator{
-		ecs:     ecs,
-		tick:    time.Duration(cfg.Simulation.Step) * time.Millisecond,
-		maxTime: cfg.Simulation.MaxTime,
+		ecs:         ecs,
+		maxTime:     cfg.Simulation.MaxTime,
+		timeStep:    cfg.Simulation.Step,
+		elapsedTime: 0.0,
 	}
 }
 
 // Run starts the simulation loop
 func (s *Simulator) Run() {
-	fmt.Println("Starting simulation...")
-
-	// Reset total time
-	s.totalTime = 0.0
-
-	for {
-		// Update the ECS with the current tick duration
-		s.ecs.Update(float64(s.tick.Milliseconds()) / 1000.0) // Convert milliseconds to seconds
-		s.totalTime += float64(s.tick.Milliseconds()) / 1000.0
-
-		// Print the current state of the simulation
-		fmt.Printf("Total Time: %.3f seconds\n", s.totalTime)
-
-		// Optional: Sleep to maintain the desired tick rate
-		time.Sleep(s.tick)
+	// Run for all available steps until remainder/none
+	for (s.elapsedTime + s.timeStep) < s.maxTime {
+		s.elapsedTime += s.timeStep
+		s.ecs.Update(s.timeStep)
 	}
+
+	// Update the ECS with the remaining timeStep
+	s.ecs.Update(s.maxTime - s.elapsedTime)
 }
 
 // String returns a string representation of the Simulator
 func (s *Simulator) String() string {
-	return "Simulator with ECS: " + s.ecs.Describe()
+	return fmt.Sprintf("Simulator{MaxTime: %.2f, ElapsedTime: %.2f, TimeStep: %.2f, ECS: %s}", s.maxTime, s.elapsedTime, s.timeStep, s.ecs.Describe())
 }

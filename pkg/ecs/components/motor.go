@@ -53,9 +53,6 @@ func (m *Motor) Update(dt float64) {
 	} else {
 		m.thrust = 0 // No thrust if idle
 	}
-
-	// Print the current state of the motor
-	fmt.Printf("Dt=%.3f, Mass=%.3f, Thrust=%.3f, Position=[%.3f, %.3f, %.3f], State=%s\n", dt, m.Mass, m.thrust, m.Position.X, m.Position.Y, m.Position.Z, m.fsm.GetState())
 }
 
 // NewMotor creates a new motor instance

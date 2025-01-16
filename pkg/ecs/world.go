@@ -35,6 +35,10 @@ func (w *World) AddSystem(s systems.System) {
 
 // Update calls the Update method on all systems
 func (w *World) Update(dt float64) {
+	for _, s := range w.systems {
+		s.Update(dt)
+	}
+
 	for _, e := range w.entities {
 		e.Update(dt)
 	}
