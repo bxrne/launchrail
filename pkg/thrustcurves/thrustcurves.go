@@ -11,7 +11,6 @@ import (
 
 // NOTE: Assemble motor data from the ThrustCurve API.
 func Load(designationString string, client http_client.HTTPClient) (*MotorData, error) {
-	// designation, err := validator.New(designationString)
 	des, err := designation.New(designationString)
 
 	if err != nil {
@@ -28,11 +27,15 @@ func Load(designationString string, client http_client.HTTPClient) (*MotorData, 
 		return nil, fmt.Errorf("failed to get motor curve: %s", err)
 	}
 
-	return &MotorData{
+	md := &MotorData{
 		Designation: des,
 		ID:          id,
 		Thrust:      curve,
-	}, nil
+	}
+
+	fmt.Println(md)
+
+	return md, nil
 }
 
 // NOTE: Search for the motor ID using the designation via the ThrustCurve API.

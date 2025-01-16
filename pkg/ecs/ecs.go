@@ -29,6 +29,8 @@ func NewECS(cfg *config.Config, orkData *openrocket.RocketDocument, motorData *t
 
 	nosecone := components.NewNoseconeFromORK(orkData)
 	rocket.AddComponent(nosecone)
+	motor := components.NewMotor(motorData, motorData.GetMass())
+	rocket.AddComponent(motor)
 
 	return &ECS{
 		World:      NewWorld(rocket),

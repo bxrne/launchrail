@@ -9,7 +9,6 @@ import (
 
 // Nosecone represents the nosecone component of a rocket
 type Nosecone struct {
-	ID             int
 	Position       types.Vector3
 	Radius         float64
 	Length         float64
@@ -20,7 +19,6 @@ type Nosecone struct {
 // NewNosecone creates a new nosecone instance
 func NewNosecone(radius, length, mass, shapeParameter float64) *Nosecone {
 	return &Nosecone{
-		ID:             0,
 		Position:       types.Vector3{X: 0, Y: 0, Z: 0},
 		Radius:         radius,
 		Length:         length,
@@ -37,7 +35,7 @@ func NewNoseconeFromORK(orkData *openrocket.RocketDocument) *Nosecone {
 
 // String returns a string representation of the Nosecone
 func (n *Nosecone) String() string {
-	return fmt.Sprintf("Nosecone{ID: %d, Position: %v, Radius: %.2f, Length: %.2f, Mass: %.2f, ShapeParameter: %.2f}", n.ID, n.Position, n.Radius, n.Length, n.Mass, n.ShapeParameter)
+	return fmt.Sprintf("Nosecone{Position: %v, Radius: %.2f, Length: %.2f, Mass: %.2f, ShapeParameter: %.2f}", n.Position, n.Radius, n.Length, n.Mass, n.ShapeParameter)
 }
 
 // Update updates the nosecone

@@ -10,7 +10,7 @@ import (
 func TestNosecone_String(t *testing.T) {
 	nosecone := components.Nosecone{}
 
-	expected := "Nosecone{ID: 0, Position: {0 0 0}, Radius: 0.00, Length: 0.00, Mass: 0.00, ShapeParameter: 0.00}"
+	expected := "Nosecone{Position: {0 0 0}, Radius: 0.00, Length: 0.00, Mass: 0.00, ShapeParameter: 0.00}"
 	actual := nosecone.String()
 
 	if actual != expected {
