@@ -34,10 +34,6 @@ func NewRocket(mass float64, components ...components.Component) *Rocket {
 // NewRocketFromORK creates a new rocket instance from an ORK Document
 func NewRocketFromORK(orkData *openrocket.RocketDocument) (*Rocket, error) {
 	// TODO: Decompose ork
-	// subs := orkData.Subcomponents.List()
-	// nosecone := subs[0].SustainerSubcomponents.Nosecone
-	// bodytube := subs[0].SustainerSubcomponents.BodyTube
-
 	return &Rocket{
 		ID:           0,
 		Position:     types.Vector3{X: 0, Y: 0, Z: 0},

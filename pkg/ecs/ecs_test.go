@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/pkg/ecs"
 	"github.com/bxrne/launchrail/pkg/ecs/entities"
 	"github.com/bxrne/launchrail/pkg/openrocket"
@@ -19,7 +20,7 @@ func TestECSDescribe(t *testing.T) {
 		Launchsite: ecs.NewLaunchsite(0.0, 0.0, 0.0),
 	}
 
-	expected := "Rail: Len: 0.00m, Angle: 0.00°, Orient: 0.00°, Site: Lat: 0.00°, Lon: 0.00°, Alt: 0.00m, World: 1 entities, 0 components, and 0 systems"
+	expected := "Rail: Len: 0.00m, Angle: 0.00°, Orient: 0.00°, Site: Lat: 0.00°, Lon: 0.00°, Alt: 0.00m, World: 1 entities and 0 systems"
 	actual := e.Describe()
 
 	if actual != expected {
@@ -40,13 +41,23 @@ func TestNewECS(t *testing.T) {
 		t.Errorf("Expected nil, got %v", err)
 	}
 
-	e, err := ecs.NewECS(cfg, &openrocket.RocketDocument{}, &thrustcurves.MotorData{})
-
+	motor_data, err := thrustcurves.Load(cfg.Options.MotorDesignation, http_client.NewHTTPClient())
 	if err != nil {
 		t.Errorf("Expected nil, got %v", err)
 	}
 
-	if e == nil {
+	ork_data, err := openrocket.Load(cfg.Options.OpenRocketFile, cfg.External.OpenRocketVersion)
+	if err != nil {
+		t.Errorf("Expected nil, got %v", err)
+	}
+
+	ecs, err := ecs.NewECS(cfg, &ork_data.Rocket, motor_data)
+	if err != nil {
+		t.Errorf("Expected nil, got %v", err)
+	}
+
+	if ecs == nil {
 		t.Errorf("Expected ECS instance, got nil")
 	}
+
 }

@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-// TEST: GIVEN a mock component WHEN Type is called THEN the type is returned.
-func TestMockComponent_Type(t *testing.T) {
+// TEST: GIVEN a mock component WHEN String is called THEN the type is returned.
+func TestMockComponent_String(t *testing.T) {
 	mock := components.NewMockComponent("Mock")
-	if got := mock.Type(); got != "Mock" {
+	if got := mock.String(); got != "Mock" {
 		t.Errorf("MockComponent.Type() = %v, want %v", got, "Mock")
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/bxrne/launchrail/pkg/ecs"
-	"github.com/bxrne/launchrail/pkg/ecs/components"
 	"github.com/bxrne/launchrail/pkg/ecs/entities"
 	"github.com/bxrne/launchrail/pkg/ecs/systems"
 )
@@ -24,7 +23,7 @@ func TestWorld_String(t *testing.T) {
 	r := entities.NewRocket(1.0)
 	w := ecs.NewWorld(r)
 
-	expected := "1 entities, 0 components, and 0 systems"
+	expected := "1 entities and 0 systems"
 	if w.String() != expected {
 		t.Errorf("Expected %s, got %s", expected, w.String())
 	}
@@ -35,7 +34,7 @@ func TestWorld_Describe(t *testing.T) {
 	r := entities.NewRocket(1.0)
 	w := ecs.NewWorld(r)
 
-	expected := "1 entities, 0 components, and 0 systems"
+	expected := "1 entities and 0 systems"
 	if w.Describe() != expected {
 		t.Errorf("Expected %s, got %s", expected, w.Describe())
 	}
@@ -47,20 +46,7 @@ func TestWorld_AddEntity(t *testing.T) {
 	w := ecs.NewWorld(r)
 
 	w.AddEntity(r)
-	expected := "2 entities, 0 components, and 0 systems"
-	if w.Describe() != expected {
-		t.Errorf("Expected %s, got %s", expected, w.Describe())
-	}
-}
-
-// TEST: GIVEN a World instance and a Component WHEN AddComponent is called THEN the component is added to the TestNewWorld
-func TestWorld_AddComponent(t *testing.T) {
-	r := entities.NewRocket(1.0)
-	w := ecs.NewWorld(r)
-
-	c := components.NewMockComponent("mock")
-	w.AddComponent(c)
-	expected := "1 entities, 1 components, and 0 systems"
+	expected := "2 entities and 0 systems"
 	if w.Describe() != expected {
 		t.Errorf("Expected %s, got %s", expected, w.Describe())
 	}
@@ -73,7 +59,7 @@ func TestWorld_AddSystem(t *testing.T) {
 
 	s := systems.NewMockSystem(1)
 	w.AddSystem(s)
-	expected := "1 entities, 0 components, and 1 systems"
+	expected := "1 entities and 1 systems"
 	if w.Describe() != expected {
 		t.Errorf("Expected %s, got %s", expected, w.Describe())
 	}

@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/pkg/ecs/components"
 	"github.com/bxrne/launchrail/pkg/ecs/entities"
 	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
@@ -25,6 +26,9 @@ func NewECS(cfg *config.Config, orkData *openrocket.RocketDocument, motorData *t
 	if err != nil {
 		return nil, err
 	}
+
+	nosecone := components.NewNoseconeFromORK(orkData)
+	rocket.AddComponent(nosecone)
 
 	return &ECS{
 		World:      NewWorld(rocket),
