@@ -8,18 +8,13 @@ import (
 type MotorData struct {
 	Designation  designation.Designation
 	ID           string
-	Thrust       [][]float64
-	TotalImpulse float64
-	BurnTime     float64
-	AvgThrust    float64
-	TotalMass    float64
-	WetMass      float64
-	MaxThrust    float64
-}
-
-// GetMass returns the mass of the motor
-func (m *MotorData) GetMass() float64 {
-	return 0.0 // TODO: Fix
+	Thrust       [][]float64 // [[time, thrust], ...]
+	TotalImpulse float64     // Newton-seconds
+	BurnTime     float64     // Seconds
+	AvgThrust    float64     // Newtons
+	TotalMass    float64     // Kg
+	WetMass      float64     // Kg
+	MaxThrust    float64     // Newtons
 }
 
 // SearchResponse represents the response from the ThrustCurve search API

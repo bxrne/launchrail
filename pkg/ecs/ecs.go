@@ -1,6 +1,8 @@
 package ecs
 
 import (
+	"fmt"
+
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/ecs/components"
 	"github.com/bxrne/launchrail/pkg/ecs/entities"
@@ -29,9 +31,12 @@ func NewECS(cfg *config.Config, orkData *openrocket.RocketDocument, motorData *t
 
 	nosecone := components.NewNoseconeFromORK(orkData)
 	rocket.AddComponent(nosecone)
-	motor := components.NewMotor(motorData, motorData.GetMass())
+	motor := components.NewMotor(motorData)
 	rocket.AddComponent(motor)
 
+	for i, sub := range rocket.Components {
+		fmt.Printf("Component %d: %s\n", i, sub)
+	}
 	return &ECS{
 		World:      NewWorld(rocket),
 		Launchrail: NewLaunchrail(cfg.Options.Launchrail.Length, cfg.Options.Launchrail.Angle, cfg.Options.Launchrail.Orientation),

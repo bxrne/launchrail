@@ -34,8 +34,8 @@ func Load(designationString string, client http_client.HTTPClient) (*MotorData, 
 		TotalImpulse: props.Results[0].TotalImpulse,
 		BurnTime:     props.Results[0].BurnTime,
 		AvgThrust:    props.Results[0].AvgThrust,
-		TotalMass:    props.Results[0].TotalMass,
-		WetMass:      props.Results[0].WetMass,
+		TotalMass:    props.Results[0].TotalMass / 1000, // Convert grams to kg
+		WetMass:      props.Results[0].WetMass / 1000,   // Convert grams to kg
 		MaxThrust:    props.Results[0].MaxThrust,
 	}, nil
 
