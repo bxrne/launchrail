@@ -11,8 +11,9 @@ func (m *MockComponent) String() string {
 }
 
 // Update updates the component
-func (m *MockComponent) Update(dt float64) {
+func (m *MockComponent) Update(dt float64) error {
 	// INFO: Empty, just meeting interface requirements
+	return nil
 }
 
 // NewMockComponent creates a new MockComponent instance

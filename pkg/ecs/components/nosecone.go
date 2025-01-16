@@ -44,7 +44,7 @@ func (n *Nosecone) String() string {
 }
 
 // Update updates the nosecone
-func (n *Nosecone) Update(dt float64) {
-
+func (n *Nosecone) Update(dt float64) error {
 	// INFO: Empty, just meeting interface requirements
+	return nil
 }

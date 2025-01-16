@@ -24,12 +24,15 @@ func (m *Motor) String() string {
 }
 
 // Update updates the motor (uses thrust curves and reduces mass)
-func (m *Motor) Update(dt float64) {
+func (m *Motor) Update(dt float64) error {
 	// Update elapsed time
 	m.elapsedTime += dt
 
 	// Update the FSM state
-	m.fsm.UpdateState(m.Mass, m.elapsedTime, m.Props.BurnTime)
+	err := m.fsm.UpdateState(m.Mass, m.elapsedTime, m.Props.BurnTime)
+	if err != nil {
+		return err
+	}
 
 	// If in burning state, calculate thrust and update mass
 	if m.fsm.GetState() == StateBurning {
@@ -53,6 +56,8 @@ func (m *Motor) Update(dt float64) {
 	} else {
 		m.thrust = 0 // No thrust if idle
 	}
+
+	return nil
 }
 
 // NewMotor creates a new motor instance

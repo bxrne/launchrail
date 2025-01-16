@@ -52,10 +52,9 @@ func main() {
 	log.Info("ECS initialised", "Description", ecs.Describe())
 
 	// NOTE: Start sim
-	log.Debug("Starting simulation")
 	sim := simulator.NewSimulator(cfg, ecs)
-	log.Info("Running simulation")
+	log.Debug("Running simulation", "Simulator", sim.Describe())
 	sim.Run()
 
-	log.Debug("Finished", "Results", sim.String())
+	log.Info("Finished", "Results", sim.String())
 }

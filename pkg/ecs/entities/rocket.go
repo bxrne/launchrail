@@ -71,8 +71,13 @@ func (r *Rocket) RemoveComponent(c components.Component) {
 }
 
 // Update updates the rocket
-func (r *Rocket) Update(dt float64) {
+func (r *Rocket) Update(dt float64) error {
 	for _, component := range r.Components {
-		component.Update(dt)
+		err := component.Update(dt)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }

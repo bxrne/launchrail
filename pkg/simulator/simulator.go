@@ -41,3 +41,8 @@ func (s *Simulator) Run() {
 func (s *Simulator) String() string {
 	return fmt.Sprintf("Simulator{MaxTime: %.2f, ElapsedTime: %.2f, TimeStep: %.2f, ECS: %s}", s.maxTime, s.elapsedTime, s.timeStep, s.ecs.Describe())
 }
+
+// Describe returns a string representation of the simulator
+func (s *Simulator) Describe() string {
+	return fmt.Sprintf("MaxTime=%.2f, TimeStep=%.2f", s.maxTime, s.timeStep)
+}

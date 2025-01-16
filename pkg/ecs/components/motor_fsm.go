@@ -32,14 +32,22 @@ func NewMotorFSM() *MotorFSM {
 }
 
 // UpdateState updates the state based on mass and elapsed time
-func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime float64) {
+func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime float64) error {
 	ctx := context.Background() // Create a background context
 
 	if mass > 0 && elapsedTime <= burnTime {
-		fsm.fsm.Event(ctx, "ignite")
+		err := fsm.fsm.Event(ctx, "ignite")
+		if err != nil {
+			return err
+		}
 	} else {
-		fsm.fsm.Event(ctx, "extinguish")
+		err := fsm.fsm.Event(ctx, "extinguish")
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // GetState returns the current state of the FSM

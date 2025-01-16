@@ -8,5 +8,5 @@ type Entity interface {
 	Describe() string // short description
 	AddComponent(c components.Component)
 	RemoveComponent(c components.Component)
-	Update(dt float64)
+	Update(dt float64) error
 }
