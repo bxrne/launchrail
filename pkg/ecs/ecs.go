@@ -40,6 +40,11 @@ func NewECS(cfg *config.Config, orkData *openrocket.RocketDocument, motorData *t
 }
 
 // Update updates the ecs
-func (e *ECS) Update(dt float64) {
-	e.World.Update(dt)
+func (e *ECS) Update(dt float64) error {
+	err := e.World.Update(dt)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -34,14 +34,19 @@ func (w *World) AddSystem(s systems.System) {
 }
 
 // Update calls the Update method on all systems
-func (w *World) Update(dt float64) {
+func (w *World) Update(dt float64) error {
 	for _, s := range w.systems {
 		s.Update(dt)
 	}
 
 	for _, e := range w.entities {
-		e.Update(dt)
+		err := e.Update(dt)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // String returns a string representation of the NewWorld

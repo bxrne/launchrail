@@ -26,15 +26,24 @@ func NewSimulator(cfg *config.Config, ecs *ecs.ECS) *Simulator {
 }
 
 // Run starts the simulation loop
-func (s *Simulator) Run() {
+func (s *Simulator) Run() error {
 	// Run for all available steps until remainder/none
 	for (s.elapsedTime + s.timeStep) < s.maxTime {
 		s.elapsedTime += s.timeStep
-		s.ecs.Update(s.timeStep)
+		err := s.ecs.Update(s.timeStep)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	// Update the ECS with the remaining timeStep
-	s.ecs.Update(s.maxTime - s.elapsedTime)
+	err := s.ecs.Update(s.maxTime - s.elapsedTime)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // String returns a string representation of the Simulator

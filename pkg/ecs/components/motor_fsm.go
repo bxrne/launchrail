@@ -2,6 +2,8 @@ package components
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/looplab/fsm"
 )
 
@@ -18,7 +20,7 @@ type MotorFSM struct {
 
 // NewMotorFSM creates a new MotorFSM instance
 func NewMotorFSM() *MotorFSM {
-	f := &MotorFSM{
+	return &MotorFSM{
 		fsm: fsm.NewFSM(
 			StateIdle,
 			fsm.Events{
@@ -28,26 +30,43 @@ func NewMotorFSM() *MotorFSM {
 			fsm.Callbacks{},
 		),
 	}
-	return f
 }
 
 // UpdateState updates the state based on mass and elapsed time
 func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime float64) error {
 	ctx := context.Background() // Create a background context
+	currentState := fsm.fsm.Current()
 
 	if mass > 0 && elapsedTime <= burnTime {
-		err := fsm.fsm.Event(ctx, "ignite")
-		if err != nil {
-			return err
-		}
-	} else {
-		err := fsm.fsm.Event(ctx, "extinguish")
-		if err != nil {
-			return err
-		}
+		return fsm.handlePotentiallyActiveState(ctx, currentState)
 	}
+	return fsm.handlePotentiallyInactiveState(ctx, currentState)
+}
 
-	return nil
+// handlePotentiallyActiveState handles state transitions when the motor is active
+func (fsm *MotorFSM) handlePotentiallyActiveState(ctx context.Context, currentState string) error {
+	switch currentState {
+	case StateIdle:
+		return fsm.fsm.Event(ctx, "ignite")
+	case StateBurning:
+		// Already in burning state, no action needed
+		return nil
+	default:
+		return fmt.Errorf("invalid state: %s", currentState)
+	}
+}
+
+// handlePotentiallyInactiveState handles state transitions when the motor is inactive
+func (fsm *MotorFSM) handlePotentiallyInactiveState(ctx context.Context, currentState string) error {
+	switch currentState {
+	case StateBurning:
+		return fsm.fsm.Event(ctx, "extinguish")
+	case StateIdle:
+		// Already in idle state, no action needed
+		return nil
+	default:
+		return fmt.Errorf("invalid state: %s", currentState)
+	}
 }
 
 // GetState returns the current state of the FSM

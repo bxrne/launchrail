@@ -73,5 +73,8 @@ func TestWorld_Update(t *testing.T) {
 
 	s := systems.NewMockSystem(1)
 	w.AddSystem(s)
-	w.Update(1.0)
+	err := w.Update(1.0)
+	if err != nil {
+		t.Errorf("Expected nil, got %v", err)
+	}
 }

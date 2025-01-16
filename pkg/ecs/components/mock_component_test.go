@@ -16,7 +16,11 @@ func TestMockComponent_String(t *testing.T) {
 // TEST: GIVEN a mock component and a delta time WHEN Update is called THEN the component is updated.
 func TestMockComponent_Update(t *testing.T) {
 	mock := components.NewMockComponent("Mock")
-	mock.Update(1.0)
+	err := mock.Update(1.0)
+
+	if err != nil {
+		t.Errorf("Expected nil, got %v", err)
+	}
 }
 
 // TEST: GIVEN nothing WHEN NewMockComponent is called THEN a new MockComponent instance is returned.

@@ -54,6 +54,7 @@ func TestRocket_Update(t *testing.T) {
 	rocket := entities.NewRocket(1.0)
 	component := components.NewMockComponent("mock")
 	rocket.AddComponent(component)
-	rocket.Update(1.0)
+	err := rocket.Update(1.0)
+	assert.Nil(t, err)
 
 }

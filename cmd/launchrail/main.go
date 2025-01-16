@@ -54,7 +54,11 @@ func main() {
 	// NOTE: Start sim
 	sim := simulator.NewSimulator(cfg, ecs)
 	log.Debug("Running simulation", "Simulator", sim.Describe())
-	sim.Run()
+
+	err = sim.Run()
+	if err != nil {
+		log.Fatal("Failed to run simulation", "Error", err)
+	}
 
 	log.Info("Finished", "Results", sim.String())
 }
