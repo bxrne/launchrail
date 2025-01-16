@@ -17,54 +17,56 @@ func Load(designationString string, client http_client.HTTPClient) (*MotorData, 
 		return nil, fmt.Errorf("failed to create motor designation: %s", err)
 	}
 
-	id, err := getMotorID(des, client)
+	props, err := getMotorProps(des, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get motor ID: %s", err)
 	}
 
-	curve, err := getMotorCurve(id, client)
+	curve, err := getMotorCurve(props.Results[0].MotorID, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get motor curve: %s", err)
 	}
 
-	md := &MotorData{
-		Designation: des,
-		ID:          id,
-		Thrust:      curve,
-	}
+	return &MotorData{
+		Designation:  des,
+		ID:           props.Results[0].MotorID,
+		Thrust:       curve,
+		TotalImpulse: props.Results[0].TotalImpulse,
+		BurnTime:     props.Results[0].BurnTime,
+		AvgThrust:    props.Results[0].AvgThrust,
+		TotalMass:    props.Results[0].TotalMass,
+		WetMass:      props.Results[0].WetMass,
+		MaxThrust:    props.Results[0].MaxThrust,
+	}, nil
 
-	fmt.Println(md)
-
-	return md, nil
 }
 
 // NOTE: Search for the motor ID using the designation via the ThrustCurve API.
-func getMotorID(designation designation.Designation, client http_client.HTTPClient) (string, error) {
+func getMotorProps(designation designation.Designation, client http_client.HTTPClient) (SearchResponse, error) {
 	url := "https://www.thrustcurve.org/api/v1/search.json"
 	requestBody := map[string]interface{}{
 		"designation": designation,
 	}
 	requestBodyJSON, err := json.Marshal(requestBody)
 	if err != nil {
-		return "", err
+		return SearchResponse{}, err
 	}
 
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(requestBodyJSON))
 	if err != nil {
-		return "", err
+		return SearchResponse{}, err
 	}
-	defer resp.Body.Close()
 
 	var searchResponse SearchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&searchResponse); err != nil {
-		return "", err
+		return SearchResponse{}, err
 	}
 
 	if len(searchResponse.Results) == 0 {
-		return "", fmt.Errorf("no motor found for designation %s", designation)
+		return SearchResponse{}, fmt.Errorf("no results found for motor designation %s", designation)
 	}
 
-	return searchResponse.Results[0].MotorID, nil
+	return searchResponse, nil
 }
 
 // NOTE: Download the motor curve using the motor ID via the ThrustCurve API.
