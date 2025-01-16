@@ -40,12 +40,19 @@ type Options struct {
 	Launchsite       Launchsite `mapstructure:"launchsite"`
 }
 
+// Simulation represents the simulation configuration.
+type Simulation struct {
+	Step    float64 `mapstructure:"step"`
+	MaxTime float64 `mapstructure:"max_time"`
+}
+
 // Config represents the overall application configuration.
 type Config struct {
-	App      App      `mapstructure:"app"`
-	Logging  Logging  `mapstructure:"logging"`
-	External External `mapstructure:"external"`
-	Options  Options  `mapstructure:"options"`
+	App        App        `mapstructure:"app"`
+	Logging    Logging    `mapstructure:"logging"`
+	External   External   `mapstructure:"external"`
+	Options    Options    `mapstructure:"options"`
+	Simulation Simulation `mapstructure:"simulation"`
 }
 
 // String returns the configuration as a map of strings, useful for testing.
@@ -63,5 +70,7 @@ func (c *Config) String() map[string]string {
 	marshalled["options.launchsite.latitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Latitude)
 	marshalled["options.launchsite.longitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Longitude)
 	marshalled["options.launchsite.altitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Altitude)
+	marshalled["simulation.step"] = fmt.Sprintf("%.2f", c.Simulation.Step)
+	marshalled["simulation.max_time"] = fmt.Sprintf("%.2f", c.Simulation.MaxTime)
 	return marshalled
 }

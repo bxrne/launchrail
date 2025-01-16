@@ -2,7 +2,6 @@ package components
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/bxrne/launchrail/pkg/ecs/types"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
@@ -11,65 +10,52 @@ import (
 // Motor represents the motor component of a rocket
 type Motor struct {
 	Position    types.Vector3
-	Thrustcurve [][]float64
+	Thrustcurve [][]float64 // [[time, thrust], ...]
 	Mass        float64
 	thrust      float64
 	Props       *thrustcurves.MotorData
-	mu          sync.RWMutex
+	fsm         *MotorFSM // FSM instance
+	elapsedTime float64   // Time elapsed since ignition
 }
-
-// defined elsewhere but within scope
-// type MotorData struct {
-// 	Designation  designation.Designation
-// 	ID           string
-// 	Thrust       [][]float64 // [[time, thrust], ...]
-// 	TotalImpulse float64     // Newton-seconds
-// 	BurnTime     float64     // Seconds
-// 	AvgThrust    float64     // Newtons
-// 	TotalMass    float64     // Kg
-// 	WetMass      float64     // Kg
-// 	MaxThrust    float64     // Newtons
-// }
 
 // String returns a string representation of the MotorData
 func (m *Motor) String() string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	return fmt.Sprintf("Motor{Position: %v, Mass: %.2f, Thrust: %.2f}", m.Position, m.Mass, m.thrust)
-}
-
-// GetThrustAfter returns the thrust of the Motor at given time
-func (m *Motor) GetThrustAfter(total_dt float64) float64 {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	// Find the thrust value based on the current time
-	for _, sample := range m.Thrustcurve {
-		if sample[0] <= total_dt {
-			return sample[1]
-		}
-
-	}
-	return 0
-}
-
-// GetThrust returns the thrust of the Motor
-func (m *Motor) GetThrust() float64 {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	return m.thrust
+	return fmt.Sprintf("Motor{Position: %v, Mass: %.3f, Thrust: %.3f, State: %s}", m.Position, m.Mass, m.thrust, m.fsm.GetState())
 }
 
 // Update updates the motor (uses thrust curves and reduces mass)
 func (m *Motor) Update(dt float64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	// Update elapsed time
+	m.elapsedTime += dt
 
-	m.thrust = m.GetThrustAfter(dt)
-	m.Mass -= m.Props.WetMass / m.Props.BurnTime * dt
+	// Update the FSM state
+	m.fsm.UpdateState(m.Mass, m.elapsedTime, m.Props.BurnTime)
 
+	// If in burning state, calculate thrust and update mass
+	if m.fsm.GetState() == StateBurning {
+		m.thrust = m.GetThrustAfter(m.elapsedTime)
+
+		// Calculate mass loss based on thrust and time
+		if m.Mass > 0 {
+			massLoss := (m.thrust * dt) / m.Props.AvgThrust // Average thrust is used for mass loss calculation
+			newMass := m.Mass - massLoss
+
+			// Ensure mass does not go negative
+			if newMass < 0 {
+				newMass = 0
+			}
+			m.Mass = newMass
+		}
+
+		// Update the position of the MotorData
+		thrust_vector := types.Vector3{X: 0, Y: 0, Z: m.thrust * dt} // Thrust over time gives displacement
+		m.Position = m.Position.Add(thrust_vector)
+	} else {
+		m.thrust = 0 // No thrust if idle
+	}
+
+	// Print the current state of the motor
+	fmt.Printf("Dt=%.3f, Mass=%.3f, Thrust=%.3f, Position=[%.3f, %.3f, %.3f], State=%s\n", dt, m.Mass, m.thrust, m.Position.X, m.Position.Y, m.Position.Z, m.fsm.GetState())
 }
 
 // NewMotor creates a new motor instance
@@ -80,6 +66,7 @@ func NewMotor(md *thrustcurves.MotorData) *Motor {
 		Mass:        md.TotalMass,
 		Props:       md,
 		thrust:      0,
+		fsm:         NewMotorFSM(), // Initialize the FSM
 	}
 
 	// Initialize thrust to the first thrust value in the curve
@@ -87,4 +74,32 @@ func NewMotor(md *thrustcurves.MotorData) *Motor {
 		m.thrust = m.Thrustcurve[0][1]
 	}
 	return m
+}
+
+// GetThrustAfter returns the thrust of the Motor at a given time using linear interpolation
+func (m *Motor) GetThrustAfter(total_dt float64) float64 {
+	// If the thrust curve is empty, return 0
+	if len(m.Thrustcurve) == 0 {
+		return 0
+	}
+
+	// Find the appropriate segment for interpolation
+	for i := 0; i < len(m.Thrustcurve)-1; i++ {
+		if m.Thrustcurve[i][0] <= total_dt && total_dt < m.Thrustcurve[i+1][0] {
+			// Perform linear interpolation
+			t1, thrust1 := m.Thrustcurve[i][0], m.Thrustcurve[i][1]
+			t2, thrust2 := m.Thrustcurve[i+1][0], m.Thrustcurve[i+1][1]
+
+			// Linear interpolation formula
+			return thrust1 + (thrust2-thrust1)*(total_dt-t1)/(t2-t1)
+		}
+	}
+
+	// If total_dt is beyond the last sample, return the last thrust value
+	if total_dt >= m.Thrustcurve[len(m.Thrustcurve)-1][0] {
+		return m.Thrustcurve[len(m.Thrustcurve)-1][1]
+	}
+
+	// If total_dt is before the first sample, return 0
+	return 0
 }

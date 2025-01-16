@@ -43,3 +43,8 @@ func NewECS(cfg *config.Config, orkData *openrocket.RocketDocument, motorData *t
 		Launchsite: NewLaunchsite(cfg.Options.Launchsite.Latitude, cfg.Options.Launchsite.Longitude, cfg.Options.Launchsite.Altitude),
 	}, nil
 }
+
+// Update updates the ecs
+func (e *ECS) Update(dt float64) {
+	e.World.Update(dt)
+}

@@ -8,6 +8,10 @@ logging:
 external:
   openrocket_version: "23.09"
 
+simulation:
+  step: 1
+  max_time: 10.0
+
 options:
   motor_designation: "269H110-14A"
   openrocket_file: "./testdata/openrocket/l1.ork"

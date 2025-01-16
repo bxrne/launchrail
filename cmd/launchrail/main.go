@@ -6,6 +6,7 @@ import (
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/pkg/ecs"
 	"github.com/bxrne/launchrail/pkg/openrocket"
+	"github.com/bxrne/launchrail/pkg/simulator"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 )
 
@@ -50,5 +51,11 @@ func main() {
 	}
 	log.Info("ECS initialised", "Description", ecs.Describe())
 
-	log.Debug("Finished")
+	// NOTE: Start sim
+	log.Debug("Starting simulation")
+	sim := simulator.NewSimulator(cfg, ecs)
+	log.Info("Running simulation")
+	sim.Run()
+
+	log.Debug("Finished", "Results", sim.String())
 }
