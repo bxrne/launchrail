@@ -5,8 +5,8 @@ import (
 	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/pkg/ecs"
+	"github.com/bxrne/launchrail/pkg/ecs/entities"
 	"github.com/bxrne/launchrail/pkg/openrocket"
-	"github.com/bxrne/launchrail/pkg/simulator"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 )
 
@@ -44,21 +44,20 @@ func main() {
 	}
 	log.Info("OpenRocket file loaded", "Description", ork_data.Describe())
 
-	// NOTE: init ECS from config
-	ecs, err := ecs.NewECS(cfg, &ork_data.Rocket, motor_data)
-	if err != nil {
-		log.Fatal("Failed to create ECS", "Error", err)
+	// NOTE: Create the ecs
+	ecs := ecs.NewECS()
+	motor := entities.NewMotor(1, motor_data)
+	nosecone := entities.NewNoseconeFromORK(1, &ork_data.Rocket)
+	rocket := entities.NewRocket(1, 10.0, motor, nosecone)
+	ecs.AddEntity(1, rocket)
+
+	log.Info("ECS created", "Description", ecs.String())
+
+	log.Info("Running simulation", "Step", cfg.Simulation.Step, "MaxTime", cfg.Simulation.MaxTime)
+	for i := 0.0; i < cfg.Simulation.MaxTime; i++ {
+		log.Debug("Running simulation step", "Step", i)
+		ecs.Update(i)
+		log.Debug("States updated", "Motor", motor.String())
 	}
-	log.Info("ECS initialised", "Description", ecs.Describe())
-
-	// NOTE: Start sim
-	sim := simulator.NewSimulator(cfg, ecs)
-	log.Debug("Running simulation", "Simulator", sim.Describe())
-
-	err = sim.Run()
-	if err != nil {
-		log.Fatal("Failed to run simulation", "Error", err)
-	}
-
-	log.Info("Finished", "Results", sim.String())
+	log.Info("Simulation complete")
 }

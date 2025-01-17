@@ -1,50 +1,61 @@
 package ecs
 
 import (
-	"github.com/bxrne/launchrail/internal/config"
-	"github.com/bxrne/launchrail/pkg/ecs/components"
-	"github.com/bxrne/launchrail/pkg/ecs/entities"
-	"github.com/bxrne/launchrail/pkg/openrocket"
-	"github.com/bxrne/launchrail/pkg/thrustcurves"
+	"sync"
 )
 
-// ECS represents all non fixed objects
+// Entity represents a unique identifier for an entity.
+type Entity int
+
+// Component is an interface that all components must implement.
+type Component interface {
+	Update(dt float64) error
+}
+
+// ECS structure
 type ECS struct {
-	World      *World
-	Launchrail *Launchrail
-	Launchsite *Launchsite
+	mu         sync.RWMutex
+	entities   []Entity
+	components map[Entity][]Component
 }
 
-// Describe returns a string representation of the ecs
-func (e *ECS) Describe() string {
-	return "Rail: " + e.Launchrail.Describe() + ", Site: " + e.Launchsite.Describe() + ", World: " + e.World.Describe()
-}
-
-// New creates a new ECS instance
-func NewECS(cfg *config.Config, orkData *openrocket.RocketDocument, motorData *thrustcurves.MotorData) (*ECS, error) {
-	rocket, err := entities.NewRocketFromORK(orkData)
-	if err != nil {
-		return nil, err
-	}
-
-	nosecone := components.NewNoseconeFromORK(orkData)
-	rocket.AddComponent(nosecone)
-	motor := components.NewMotor(motorData)
-	rocket.AddComponent(motor)
-
+// NewECS initializes a new ECS.
+func NewECS() *ECS {
 	return &ECS{
-		World:      NewWorld(rocket),
-		Launchrail: NewLaunchrail(cfg.Options.Launchrail.Length, cfg.Options.Launchrail.Angle, cfg.Options.Launchrail.Orientation),
-		Launchsite: NewLaunchsite(cfg.Options.Launchsite.Latitude, cfg.Options.Launchsite.Longitude, cfg.Options.Launchsite.Altitude),
-	}, nil
+		entities:   []Entity{},
+		components: make(map[Entity][]Component),
+	}
 }
 
-// Update updates the ecs
-func (e *ECS) Update(dt float64) error {
-	err := e.World.Update(dt)
-	if err != nil {
-		return err
-	}
+// AddEntity adds a new entity with components.
+func (ecs *ECS) AddEntity(entity Entity, components ...Component) {
+	ecs.mu.Lock()
+	defer ecs.mu.Unlock()
+	ecs.entities = append(ecs.entities, entity)
+	ecs.components[entity] = components
+}
 
-	return nil
+// Update updates all entities in the ECS.
+func (ecs *ECS) Update(dt float64) {
+	ecs.mu.RLock()
+	defer ecs.mu.RUnlock()
+	for _, entity := range ecs.entities {
+		for _, component := range ecs.components[entity] {
+			if err := component.Update(dt); err != nil {
+				// Handle error (e.g., log it)
+			}
+		}
+	}
+}
+
+// String returns a string representation of the ECS.
+func (ecs *ECS) String() string {
+	ecs.mu.RLock()
+	defer ecs.mu.RUnlock()
+	var str string
+	for _, entity := range ecs.entities {
+		str += "Entity: " + string(entity) + "\n"
+
+	}
+	return str
 }
