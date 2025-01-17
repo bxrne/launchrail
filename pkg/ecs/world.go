@@ -35,16 +35,18 @@ func (w *World) AddSystem(s systems.System) {
 
 // Update calls the Update method on all systems
 func (w *World) Update(dt float64) error {
-	for _, s := range w.systems {
-		s.Update(dt)
-	}
-
 	for _, e := range w.entities {
 		err := e.Update(dt)
 		if err != nil {
 			return err
 		}
 	}
+
+	// for _, s := range w.systems {
+	// 	for _, e := range w.entities {
+	// 		go s.Apply(e)
+	// 	}
+	// }
 
 	return nil
 }

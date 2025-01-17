@@ -58,7 +58,7 @@ func TestWorld_AddSystem(t *testing.T) {
 	r := entities.NewRocket(1.0)
 	w := ecs.NewWorld(r)
 
-	s := systems.NewMockSystem(1)
+	s := systems.NewMockSystem(entities.NewRocket(1.0))
 	w.AddSystem(s)
 	expected := "1 entities and 1 systems"
 	if w.Describe() != expected {
@@ -71,7 +71,7 @@ func TestWorld_Update(t *testing.T) {
 	r := entities.NewRocket(1.0)
 	w := ecs.NewWorld(r)
 
-	s := systems.NewMockSystem(1)
+	s := systems.NewMockSystem(entities.NewRocket(1.0))
 	w.AddSystem(s)
 	err := w.Update(1.0)
 	if err != nil {

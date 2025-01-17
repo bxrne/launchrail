@@ -2,7 +2,6 @@ package components
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/bxrne/launchrail/pkg/ecs/types"
 	"github.com/bxrne/launchrail/pkg/openrocket"
@@ -15,7 +14,6 @@ type Nosecone struct {
 	Length         float64
 	Mass           float64
 	ShapeParameter float64
-	mu             sync.RWMutex
 }
 
 // NewNosecone creates a new nosecone instance
@@ -37,9 +35,6 @@ func NewNoseconeFromORK(orkData *openrocket.RocketDocument) *Nosecone {
 
 // String returns a string representation of the Nosecone
 func (n *Nosecone) String() string {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
 	return fmt.Sprintf("Nosecone{Position: %v, Radius: %.2f, Length: %.2f, Mass: %.2f, ShapeParameter: %.2f}", n.Position, n.Radius, n.Length, n.Mass, n.ShapeParameter)
 }
 

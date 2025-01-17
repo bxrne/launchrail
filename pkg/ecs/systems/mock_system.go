@@ -1,31 +1,17 @@
 package systems
 
-// MockSystem implements systems.System interface for testing
+import "github.com/bxrne/launchrail/pkg/ecs/entities"
+
+// MockSystem is a mock system for testing
 type MockSystem struct {
-	updateCalled bool
-	updateDt     float64
-	priority     int
+	target entities.Entity
 }
 
-func (s *MockSystem) Update(dt float64) {
-	s.updateCalled = true
-	s.updateDt = dt
+// Apply applies the system to an entity
+func (s *MockSystem) Apply() {
 }
 
-func (s *MockSystem) Priority() int {
-	return s.priority
-}
-
-func (s *MockSystem) GetUpdateCalled() bool {
-	return s.updateCalled
-}
-
-func (s *MockSystem) GetUpdateDt() float64 {
-	return s.updateDt
-}
-
-func NewMockSystem(priority int) *MockSystem {
-	return &MockSystem{
-		priority: priority,
-	}
+// NewMockSystem creates a new MockSystem instance
+func NewMockSystem(target entities.Entity) *MockSystem {
+	return &MockSystem{target: target}
 }
