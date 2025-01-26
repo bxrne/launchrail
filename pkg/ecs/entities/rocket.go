@@ -2,6 +2,7 @@ package entities
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/bxrne/launchrail/pkg/ecs/components"
 	"github.com/bxrne/launchrail/pkg/ecs/types"
@@ -18,7 +19,7 @@ type Rocket struct {
 
 // NewRocket creates a new rocket instance
 func NewRocket(id int, mass float64, motor *components.Motor, nosecone *Nosecone, dragCoefficient float64) *Rocket {
-	area := 3.14159 * (nosecone.Radius * nosecone.Radius)
+	area := math.Pi * (nosecone.Radius * nosecone.Radius)
 
 	return &Rocket{
 		ID:           id,
