@@ -52,6 +52,7 @@ func main() {
 	world := ecs.NewWorld()
 
 	// Add systems
+	world.AddSystem(systems.NewParasiteSystem())
 	world.AddSystem(systems.NewRocketSystem())
 	world.AddSystem(systems.NewPhysicsSystem(4)) // 4 worker threads
 
