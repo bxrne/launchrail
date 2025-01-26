@@ -50,18 +50,21 @@ func main() {
 	}
 	log.Info("OpenRocket file loaded", "Description", ork_data.Describe())
 
-	// Create ECS world
-	world := ecs.NewWorld()
-
-	// Storage via Parasite system
+	// NOTE: Init motion data storage
 	motion_store, err := storage.NewStorage(cfg.App.BaseDir, "motion")
 	if err != nil {
 		log.Fatal("Failed to create motion storage", "Error", err)
 	}
-	motion_store.Init([]string{"time", "Sx", "Sy", "Sz", "Vx", "Vy", "Vz", "Ax", "Ay", "Az"})
+
+	err = motion_store.Init([]string{"time", "sx", "sy", "sz", "vx", "vy", "vz", "ax", "ay", "az"})
+	if err != nil {
+		log.Fatal("Failed to initialize motion storage", "Error", err)
+	}
+
+	// Create ECS world
+	world := ecs.NewWorld()
 
 	// Add systems
-	world.AddSystem(systems.NewParasiteSystem())
 	world.AddSystem(systems.NewRocketSystem())
 	world.AddSystem(systems.NewPhysicsSystem(4)) // 4 worker threads
 
@@ -97,15 +100,24 @@ func main() {
 		if err := world.Update(cfg.Simulation.Step); err != nil {
 			log.Fatal(err.Error())
 		}
-		log.Debug(
-			"Rocket",
-			"Time", t,
-			"Position", physicsComp.Position,
-			"Velocity", physicsComp.Velocity,
-			"Thrust", motorComp.GetThrust(),
-		)
-		motion_store.Write([]string{fmt.Sprintf("%f", t), fmt.Sprintf("%f", physicsComp.Position.X), fmt.Sprintf("%f", physicsComp.Position.Y), fmt.Sprintf("%f", physicsComp.Position.Z), fmt.Sprintf("%f", physicsComp.Velocity.X), fmt.Sprintf("%f", physicsComp.Velocity.Y), fmt.Sprintf("%f", physicsComp.Velocity.Z), fmt.Sprintf("%f", physicsComp.Acceleration.X), fmt.Sprintf("%f", physicsComp.Acceleration.Y), fmt.Sprintf("%f", physicsComp.Acceleration.Z)})
 
+		log.Debug("Simulation progress", "Time", t, "Position", physicsComp.Position)
+
+		err = motion_store.Write([]string{
+			fmt.Sprintf("%f", t),
+			fmt.Sprintf("%f", physicsComp.Position.X),
+			fmt.Sprintf("%f", physicsComp.Position.Y),
+			fmt.Sprintf("%f", physicsComp.Position.Z),
+			fmt.Sprintf("%f", physicsComp.Velocity.X),
+			fmt.Sprintf("%f", physicsComp.Velocity.Y),
+			fmt.Sprintf("%f", physicsComp.Velocity.Z),
+			fmt.Sprintf("%f", physicsComp.Acceleration.X),
+			fmt.Sprintf("%f", physicsComp.Acceleration.Y),
+			fmt.Sprintf("%f", physicsComp.Acceleration.Z),
+		})
+		if err != nil {
+			log.Fatal("Failed to write motion data", "Error", err)
+		}
 	}
 
 	log.Info("Simulation complete")
