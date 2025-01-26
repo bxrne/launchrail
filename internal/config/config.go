@@ -44,6 +44,10 @@ func (cfg *Config) Validate() error {
 		return fmt.Errorf("app.version is required")
 	}
 
+	if cfg.App.BaseDir == "" {
+		return fmt.Errorf("app.base_dir is required")
+	}
+
 	if cfg.Logging.Level == "" {
 		return fmt.Errorf("logging.level is required")
 	}

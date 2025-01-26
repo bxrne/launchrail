@@ -6,6 +6,7 @@ import "fmt"
 type App struct {
 	Name    string `mapstructure:"name"`
 	Version string `mapstructure:"version"`
+	BaseDir string `mapstructure:"base_dir"`
 }
 
 // Logging represents the logging configuration.
@@ -61,6 +62,7 @@ func (c *Config) String() map[string]string {
 	marshalled["app.name"] = c.App.Name
 	marshalled["app.version"] = c.App.Version
 	marshalled["logging.level"] = c.Logging.Level
+	marshalled["app.base_dir"] = c.App.BaseDir
 	marshalled["external.openrocket_version"] = c.External.OpenRocketVersion
 	marshalled["options.motor_designation"] = c.Options.MotorDesignation
 	marshalled["options.openrocket_file"] = c.Options.OpenRocketFile
