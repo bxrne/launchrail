@@ -53,7 +53,8 @@ func TestMotor_UpdateIdleState(t *testing.T) {
 	motor := components.NewMotor(1, md)
 
 	// Simulate motor burn to completion
-	motor.Update(2.5)
+	err := motor.Update(2.5)
+	assert.NoError(t, err, "Motor update should not produce an error")
 
 	assert.Equal(t, "idle", motor.FSM.GetState(), "Motor FSM should transition to 'idle' state after burn completion")
 	assert.Equal(t, float64(0), motor.GetThrust(), "Motor thrust should be zero in the 'idle' state")
@@ -87,7 +88,8 @@ func TestMotor_ThrustInterpolation(t *testing.T) {
 	motor := components.NewMotor(1, md)
 
 	// Simulate motor update to test thrust interpolation
-	motor.Update(0.5)
+	err := motor.Update(0.5)
+	assert.NoError(t, err, "Motor update should not produce an error")
 	assert.Equal(t, 15.0, motor.GetThrust(), "Thrust should be interpolated correctly at t=0.5")
 
 	motor.Update(0.5)

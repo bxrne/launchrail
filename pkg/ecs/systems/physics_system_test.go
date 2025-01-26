@@ -59,7 +59,8 @@ func TestPhysicsSystem_Update(t *testing.T) {
 	err := physicsSystem.Update(world, 0.016)
 	assert.NoError(t, err, "PhysicsSystem update should not return an error")
 	for _, component := range []*MockPhysicsComponent{component1, component2} {
-		component.Update(0.016) // INFO: Why did i have to do this to make it pass?
+		err := component.Update(0.016)
+		assert.NoError(t, err, "Physics component update should not return an error")
 	}
 	assert.True(t, component1.updated, "Physics component on entity1 should be updated")
 	assert.True(t, component2.updated, "Physics component on entity2 should be updated")
@@ -83,7 +84,8 @@ func TestPhysicsSystem_ParallelUpdate(t *testing.T) {
 	assert.NoError(t, err, "PhysicsSystem update should not return an error in parallel processing")
 
 	for _, component := range components {
-		component.Update(0.016)
+		err := component.Update(0.016)
+		assert.NoError(t, err, "Physics component update should not return an error")
 	}
 
 	for _, component := range components {

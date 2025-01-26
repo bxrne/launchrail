@@ -49,7 +49,10 @@ func (r *Rocket) Update(dt float64) error {
 	r.Physics.AddForce(dragForce)
 
 	// Update physics for movement
-	r.Physics.Update(dt)
+	err := r.Physics.Update(dt)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

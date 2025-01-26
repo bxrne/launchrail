@@ -58,20 +58,31 @@ func main() {
 	// Create rocket entity
 	rocketID := world.CreateEntity()
 	nosecone := entities.NewNoseconeFromORK(rocketID, &ork_data.Rocket)
-	world.AddComponent(rocketID, nosecone)
+	err = world.AddComponent(rocketID, nosecone)
+	if err != nil {
+		log.Fatal("Failed to add Nosecone component", "Error", err)
+	}
 
 	// Add components
 	motorComp := components.NewMotor(rocketID, motor_data)
 	physicsComp := components.NewPhysics(9.81, 1.0)
 	aeroComp := components.NewAerodynamics(0.5, math.Pi*math.Pow(nosecone.Radius, 2))
 
-	world.AddComponent(rocketID, motorComp)
-	world.AddComponent(rocketID, physicsComp)
-	world.AddComponent(rocketID, aeroComp)
+	err = world.AddComponent(rocketID, motorComp)
+	if err != nil {
+		log.Fatal("Failed to add Motor component", "Error", err)
+	}
 
-	// Run simulation
-	// timeStep := 0.016 // 60Hz
-	// maxTime := 10.0   // Example max time
+	err = world.AddComponent(rocketID, physicsComp)
+	if err != nil {
+		log.Fatal("Failed to add Physics component", "Error", err)
+	}
+
+	err = world.AddComponent(rocketID, aeroComp)
+	if err != nil {
+		log.Fatal("Failed to add Aerodynamics component", "Error", err)
+	}
+
 	for t := 0.0; t < cfg.Simulation.MaxTime; t += cfg.Simulation.Step {
 		if err := world.Update(cfg.Simulation.Step); err != nil {
 			log.Fatal(err.Error())

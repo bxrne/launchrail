@@ -23,6 +23,7 @@ func (s *PhysicsSystem) Priority() int {
 }
 
 func (s *PhysicsSystem) Update(world *ecs.World, dt float64) error {
+	var err error
 	entities := world.Query(ecs.ComponentPhysics)
 
 	// Process physics in parallel
@@ -42,13 +43,16 @@ func (s *PhysicsSystem) Update(world *ecs.World, dt float64) error {
 				entity := entities[i]
 				if comp, ok := world.GetComponent(entity, ecs.ComponentPhysics); ok {
 					if physics, ok := comp.(ecs.PhysicsComponent); ok {
-						physics.Update(dt)
-				}
+						err = physics.Update(dt)
+						if err != nil {
+							return
+						}
+					}
 				}
 			}
 		}(start, end)
 	}
 
 	s.wg.Wait()
-	return nil
+	return err
 }
