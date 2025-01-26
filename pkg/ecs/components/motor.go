@@ -7,7 +7,6 @@ import (
 	"github.com/bxrne/launchrail/pkg/ecs"
 	"github.com/bxrne/launchrail/pkg/ecs/types"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
-	"github.com/looplab/fsm"
 )
 
 type Motor struct {
@@ -17,7 +16,7 @@ type Motor struct {
 	Mass        float64
 	thrust      float64
 	Props       *thrustcurves.MotorData
-	fsm         *fsm.FSM
+	FSM         *MotorFSM
 	elapsedTime float64
 	mu          sync.RWMutex
 }
@@ -30,14 +29,7 @@ func NewMotor(id ecs.EntityID, md *thrustcurves.MotorData) *Motor {
 		Mass:        md.TotalMass,
 		Props:       md,
 		thrust:      0,
-		fsm: fsm.NewFSM(
-			"idle",
-			fsm.Events{
-				{Name: "ignite", Src: []string{"idle"}, Dst: "burning"},
-				{Name: "extinguish", Src: []string{"burning"}, Dst: "idle"},
-			},
-			fsm.Callbacks{},
-		),
+		FSM:         NewMotorFSM(),
 	}
 
 	if len(m.Thrustcurve) > 0 {
@@ -56,17 +48,14 @@ func (m *Motor) Update(dt float64) error {
 
 	m.elapsedTime += dt
 
-	// Update state
-	if m.Mass > 0 && m.elapsedTime <= m.Props.BurnTime {
-		if m.fsm.Current() == "idle" {
-			m.fsm.Event(nil, "ignite")
-		}
-	} else if m.fsm.Current() == "burning" {
-		m.fsm.Event(nil, "extinguish")
+	// Update FSM state
+	err := m.FSM.UpdateState(m.Mass, m.elapsedTime, m.Props.BurnTime)
+	if err != nil {
+		return err
 	}
 
-	// Update thrust and mass
-	if m.fsm.Current() == "burning" {
+	// Update thrust and mass based on state
+	if m.FSM.GetState() == StateBurning {
 		m.thrust = m.interpolateThrust(m.elapsedTime)
 		if m.Mass > 0 && m.thrust > 0 {
 			massLoss := (m.thrust * dt) / m.Props.AvgThrust
@@ -85,42 +74,36 @@ func (m *Motor) GetThrust() float64 {
 	return m.thrust
 }
 
+func (m *Motor) GetMass() float64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.Mass
+}
+
 func (m *Motor) Type() string {
 	return ecs.ComponentMotor
 }
 
-// interpolateThrust returns the thrust of the Motor at a given time using linear interpolation
 func (m *Motor) interpolateThrust(totalDt float64) float64 {
-	// If the thrust curve is empty, return 0
 	if len(m.Thrustcurve) == 0 {
 		return 0
 	}
 
-	// Find the appropriate segment for interpolation
 	for i := 0; i < len(m.Thrustcurve)-1; i++ {
 		if m.Thrustcurve[i][0] <= totalDt && totalDt < m.Thrustcurve[i+1][0] {
-			// Perform linear interpolation
 			t1, thrust1 := m.Thrustcurve[i][0], m.Thrustcurve[i][1]
 			t2, thrust2 := m.Thrustcurve[i+1][0], m.Thrustcurve[i+1][1]
-
-			// Linear interpolation formula
 			return thrust1 + (thrust2-thrust1)*(totalDt-t1)/(t2-t1)
 		}
 	}
 
-	// If totalDt is beyond the last sample, return the last thrust value
 	if totalDt >= m.Thrustcurve[len(m.Thrustcurve)-1][0] {
 		return m.Thrustcurve[len(m.Thrustcurve)-1][1]
 	}
 
-	// If totalDt is before the first sample, return 0
 	return 0
 }
 
 func (m *Motor) String() string {
 	return fmt.Sprintf("Motor{ID: %d, Position: %s, Mass: %f, Thrust: %f}", m.ID, m.Position.String(), m.Mass, m.thrust)
-}
-
-func (m *Motor) GetMass() float64 {
-	return m.Mass
 }

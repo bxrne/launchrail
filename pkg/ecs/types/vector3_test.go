@@ -54,6 +54,13 @@ func TestVector3Operations(t *testing.T) {
 	if result != expected {
 		t.Errorf("Expected %v but got %v", expected, result)
 	}
+
+	// Round to 2 decimal places
+	result = v1.Round(2)
+	expected = types.Vector3{X: 3, Y: 4, Z: 5}
+	if result != expected {
+		t.Errorf("Expected %v but got %v", expected, result)
+	}
 	// Division by zero should panic
 	v1.DivideScalar(0)
 }

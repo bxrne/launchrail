@@ -48,10 +48,8 @@ func (p *Physics) Update(dt float64) error {
 		netForce = netForce.Add(force)
 	}
 
-	// Ensure mass is not zero before calculating acceleration
-	if p.Mass > 0 {
-		p.Acceleration = netForce.DivideScalar(p.Mass)
-	}
+	// Calculate acceleration (mass assumed to be non-zero)
+	p.Acceleration = netForce.DivideScalar(p.Mass)
 
 	// Update velocity and position
 	p.Velocity = p.Velocity.Add(p.Acceleration.MultiplyScalar(dt))

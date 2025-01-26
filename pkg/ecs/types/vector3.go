@@ -65,3 +65,14 @@ func (v Vector3) DivideScalar(scalar float64) Vector3 {
 		Z: v.Z / scalar,
 	}
 }
+
+// Round returns the vector with each component rounded to the given precision
+// INFO: Rounding the vector components to the supplied precision.
+func (v Vector3) Round(precision int) Vector3 {
+	prec := math.Pow10(precision)
+	return Vector3{
+		X: math.Round(v.X*prec) / prec,
+		Y: math.Round(v.Y*prec) / prec,
+		Z: math.Round(v.Z*prec) / prec,
+	}
+}
