@@ -92,10 +92,12 @@ func TestMotor_ThrustInterpolation(t *testing.T) {
 	assert.NoError(t, err, "Motor update should not produce an error")
 	assert.Equal(t, 15.0, motor.GetThrust(), "Thrust should be interpolated correctly at t=0.5")
 
-	motor.Update(0.5)
+	err = motor.Update(0.5)
+	assert.NoError(t, err, "Motor update should not produce an error")
 	assert.Equal(t, 20.0, motor.GetThrust(), "Thrust should be interpolated correctly at t=1.0")
 
-	motor.Update(0.5)
+	err = motor.Update(0.5)
+	assert.NoError(t, err, "Motor update should not produce an error")
 	assert.Equal(t, 17.5, motor.GetThrust(), "Thrust should be interpolated correctly at t=1.5")
 }
 
