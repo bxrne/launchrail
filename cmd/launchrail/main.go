@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/pkg/ecs"
 	"github.com/bxrne/launchrail/pkg/ecs/components"
 	"github.com/bxrne/launchrail/pkg/ecs/entities"
@@ -51,6 +53,13 @@ func main() {
 	// Create ECS world
 	world := ecs.NewWorld()
 
+	// Storage via Parasite system
+	motion_store, err := storage.NewStorage(cfg.App.BaseDir, "motion")
+	if err != nil {
+		log.Fatal("Failed to create motion storage", "Error", err)
+	}
+	motion_store.Init([]string{"time", "Sx", "Sy", "Sz", "Vx", "Vy", "Vz", "Ax", "Ay", "Az"})
+
 	// Add systems
 	world.AddSystem(systems.NewParasiteSystem())
 	world.AddSystem(systems.NewRocketSystem())
@@ -67,7 +76,7 @@ func main() {
 	// Add components
 	motorComp := components.NewMotor(rocketID, motor_data)
 	physicsComp := components.NewPhysics(9.81, 1.0)
-	aeroComp := components.NewAerodynamics(0.5, math.Pi*math.Pow(nosecone.Radius, 2))
+	aeroComp := components.NewAerodynamics(0.5, math.Pi*nosecone.Radius*nosecone.Radius)
 
 	err = world.AddComponent(rocketID, motorComp)
 	if err != nil {
@@ -95,6 +104,8 @@ func main() {
 			"Velocity", physicsComp.Velocity,
 			"Thrust", motorComp.GetThrust(),
 		)
+		motion_store.Write([]string{fmt.Sprintf("%f", t), fmt.Sprintf("%f", physicsComp.Position.X), fmt.Sprintf("%f", physicsComp.Position.Y), fmt.Sprintf("%f", physicsComp.Position.Z), fmt.Sprintf("%f", physicsComp.Velocity.X), fmt.Sprintf("%f", physicsComp.Velocity.Y), fmt.Sprintf("%f", physicsComp.Velocity.Z), fmt.Sprintf("%f", physicsComp.Acceleration.X), fmt.Sprintf("%f", physicsComp.Acceleration.Y), fmt.Sprintf("%f", physicsComp.Acceleration.Z)})
+
 	}
 
 	log.Info("Simulation complete")

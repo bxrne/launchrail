@@ -18,17 +18,23 @@ type Storage struct {
 
 // NewStorage creates a new storage service
 func NewStorage(baseDir, dir string) (*Storage, error) {
-	// Create the base directory if it doesn't exist
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	baseDir = fmt.Sprintf("%s/%s", homeDir, baseDir)
 	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
-		err := os.Mkdir(baseDir, os.ModePerm)
+		err := os.Mkdir(baseDir, 0755)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	// Create the directory if it doesn't exist
+	dir = fmt.Sprintf("%s/%s", baseDir, dir)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err := os.Mkdir(dir, os.ModePerm)
+		err := os.Mkdir(dir, 0755)
 		if err != nil {
 			return nil, err
 		}
