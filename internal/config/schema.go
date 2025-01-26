@@ -2,32 +2,57 @@ package config
 
 import "fmt"
 
-// Config represents the application configuration.
+// App represents the application configuration.
+type App struct {
+	Name    string `mapstructure:"name"`
+	Version string `mapstructure:"version"`
+}
+
+// Logging represents the logging configuration.
+type Logging struct {
+	Level string `mapstructure:"level"`
+}
+
+// External represents the external configuration.
+type External struct {
+	OpenRocketVersion string `mapstructure:"openrocket_version"`
+}
+
+// Launchrail represents the launchrail configuration.
+type Launchrail struct {
+	Length      float64 `mapstructure:"length"`
+	Angle       float64 `mapstructure:"angle"`
+	Orientation float64 `mapstructure:"orientation"`
+}
+
+// Launchsite represents the launchsite configuration.
+type Launchsite struct {
+	Latitude  float64 `mapstructure:"latitude"`
+	Longitude float64 `mapstructure:"longitude"`
+	Altitude  float64 `mapstructure:"altitude"`
+}
+
+// Options represents the application options.
+type Options struct {
+	MotorDesignation string     `mapstructure:"motor_designation"`
+	OpenRocketFile   string     `mapstructure:"openrocket_file"`
+	Launchrail       Launchrail `mapstructure:"launchrail"`
+	Launchsite       Launchsite `mapstructure:"launchsite"`
+}
+
+// Simulation represents the simulation configuration.
+type Simulation struct {
+	Step    float64 `mapstructure:"step"`
+	MaxTime float64 `mapstructure:"max_time"`
+}
+
+// Config represents the overall application configuration.
 type Config struct {
-	App struct {
-		Name    string `mapstructure:"name"`
-		Version string `mapstructure:"version"`
-	} `mapstructure:"app"`
-	Logging struct {
-		Level string `mapstructure:"level"`
-	} `mapstructure:"logging"`
-	External struct {
-		OpenRocketVersion string `mapstructure:"openrocket_version"`
-	} `mapstructure:"external"`
-	Options struct {
-		MotorDesignation string `mapstructure:"motor_designation"`
-		OpenRocketFile   string `mapstructure:"openrocket_file"`
-		Launchrail       struct {
-			Length      float64 `mapstructure:"length"`
-			Angle       float64 `mapstructure:"angle"`
-			Orientation float64 `mapstructure:"orientation"`
-		} `mapstructure:"launchrail"`
-		Launchsite struct {
-			Latitude  float64 `mapstructure:"latitude"`
-			Longitude float64 `mapstructure:"longitude"`
-			Altitude  float64 `mapstructure:"altitude"`
-		} `mapstructure:"launchsite"`
-	} `mapstructure:"options"`
+	App        App        `mapstructure:"app"`
+	Logging    Logging    `mapstructure:"logging"`
+	External   External   `mapstructure:"external"`
+	Options    Options    `mapstructure:"options"`
+	Simulation Simulation `mapstructure:"simulation"`
 }
 
 // String returns the configuration as a map of strings, useful for testing.
@@ -45,5 +70,7 @@ func (c *Config) String() map[string]string {
 	marshalled["options.launchsite.latitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Latitude)
 	marshalled["options.launchsite.longitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Longitude)
 	marshalled["options.launchsite.altitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Altitude)
+	marshalled["simulation.step"] = fmt.Sprintf("%.2f", c.Simulation.Step)
+	marshalled["simulation.max_time"] = fmt.Sprintf("%.2f", c.Simulation.MaxTime)
 	return marshalled
 }

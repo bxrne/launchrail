@@ -330,3 +330,63 @@ func TestGetConfigMissingLaunchsiteAltitude(t *testing.T) {
 		}
 	})
 }
+
+// TEST: GIVEN a config with invalid options.openrocket_file WHEN Validate is called THEN an error is returned
+func TestGetConfigInvalidOpenRocketFile(t *testing.T) {
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.OpenRocketFile = "invalid"
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.openrocket_file is invalid:"
+		if err.Error()[:len(expected)] != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing simulation.step WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingSimulationStep(t *testing.T) {
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Simulation.Step = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "simulation.step is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing simulation.max_time WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingSimulationMaxTime(t *testing.T) {
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Simulation.MaxTime = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "simulation.max_time is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}

@@ -4,87 +4,95 @@ import (
 	"testing"
 
 	"github.com/bxrne/launchrail/pkg/ecs"
-	"github.com/bxrne/launchrail/pkg/ecs/components"
-	"github.com/bxrne/launchrail/pkg/ecs/entities"
-	"github.com/bxrne/launchrail/pkg/ecs/systems"
+	"github.com/stretchr/testify/assert"
 )
 
-// TEST: GIVEN nothing WHEN a NewWorld is called THEN a new World instance is returned
-func TestNewWorld(t *testing.T) {
-	r := entities.NewRocket(1.0)
-	w := ecs.NewWorld(r)
-
-	if w == nil {
-		t.Errorf("Expected World instance, got nil")
-	}
+type MockComponent struct {
+	name string
 }
 
-// TEST: GIVEN a World instance and a Rocket Entity WHEN String is called THEN a string representation of the World is returned
-func TestWorld_String(t *testing.T) {
-	r := entities.NewRocket(1.0)
-	w := ecs.NewWorld(r)
-
-	expected := "1 entities, 0 components, and 0 systems"
-	if w.String() != expected {
-		t.Errorf("Expected %s, got %s", expected, w.String())
-	}
+func (m MockComponent) Type() string {
+	return m.name
 }
 
-// TEST: GIVEN a World instance and a Rocket Entity WHEN Describe is called THEN a string representation of the World is returned
-func TestWorld_Describe(t *testing.T) {
-	r := entities.NewRocket(1.0)
-	w := ecs.NewWorld(r)
-
-	expected := "1 entities, 0 components, and 0 systems"
-	if w.Describe() != expected {
-		t.Errorf("Expected %s, got %s", expected, w.Describe())
-	}
+func (m MockComponent) Update(dt float64) error {
+	return nil
 }
 
-// TEST: GIVEN a World instance and a Rocket Entity WHEN AddEntity is called THEN the entity is added to the NewWorld
-func TestWorld_AddEntity(t *testing.T) {
-	r := entities.NewRocket(1.0)
-	w := ecs.NewWorld(r)
+type MockSystem struct{}
 
-	w.AddEntity(r)
-	expected := "2 entities, 0 components, and 0 systems"
-	if w.Describe() != expected {
-		t.Errorf("Expected %s, got %s", expected, w.Describe())
-	}
+func (ms MockSystem) Update(w *ecs.World, dt float64) error {
+	return nil
 }
 
-// TEST: GIVEN a World instance and a Component WHEN AddComponent is called THEN the component is added to the TestNewWorld
+func (ms MockSystem) Priority() int {
+	return 0
+}
+
+func TestWorld_CreateEntity(t *testing.T) {
+	world := ecs.NewWorld()
+
+	entity := world.CreateEntity()
+	assert.NotZero(t, entity, "Entity ID should not be zero")
+
+	entity2 := world.CreateEntity()
+	assert.NotEqual(t, entity, entity2, "Each entity should have a unique ID")
+}
+
 func TestWorld_AddComponent(t *testing.T) {
-	r := entities.NewRocket(1.0)
-	w := ecs.NewWorld(r)
+	world := ecs.NewWorld()
+	entity := world.CreateEntity()
 
-	c := components.NewMockComponent("mock")
-	w.AddComponent(c)
-	expected := "1 entities, 1 components, and 0 systems"
-	if w.Describe() != expected {
-		t.Errorf("Expected %s, got %s", expected, w.Describe())
-	}
+	component := MockComponent{name: "testComponent"}
+	err := world.AddComponent(entity, component)
+	assert.NoError(t, err, "Adding a component to an existing entity should not produce an error")
+
+	retrieved, exists := world.GetComponent(entity, "testComponent")
+	assert.True(t, exists, "Component should exist")
+	assert.Equal(t, component, retrieved, "Retrieved component should match the added component")
 }
 
-// TEST: GIVEN a World instance and a System WHEN AddSystem is called THEN the system is added to the TestNewWorld
-func TestWorld_AddSystem(t *testing.T) {
-	r := entities.NewRocket(1.0)
-	w := ecs.NewWorld(r)
+func TestWorld_AddComponent_InvalidEntity(t *testing.T) {
+	world := ecs.NewWorld()
+	component := MockComponent{name: "testComponent"}
 
-	s := systems.NewMockSystem(1)
-	w.AddSystem(s)
-	expected := "1 entities, 0 components, and 1 systems"
-	if w.Describe() != expected {
-		t.Errorf("Expected %s, got %s", expected, w.Describe())
-	}
+	err := world.AddComponent(999, component) // Non-existent entity
+	assert.Error(t, err, "Adding a component to a non-existent entity should produce an error")
 }
 
-// TEST: GIVEN a World instance and a System WHEN Update is called THEN the system is updated
+func TestWorld_Query(t *testing.T) {
+	world := ecs.NewWorld()
+	entity1 := world.CreateEntity()
+	entity2 := world.CreateEntity()
+
+	componentA := MockComponent{name: "ComponentA"}
+	componentB := MockComponent{name: "ComponentB"}
+
+	_ = world.AddComponent(entity1, componentA)
+	_ = world.AddComponent(entity2, componentA)
+	_ = world.AddComponent(entity2, componentB)
+
+	matchedEntities := world.Query("ComponentA")
+	assert.Len(t, matchedEntities, 2, "Querying by ComponentA should return two entities")
+
+	matchedEntities = world.Query("ComponentA", "ComponentB")
+	assert.Len(t, matchedEntities, 1, "Querying by ComponentA and ComponentB should return one entity")
+	assert.Equal(t, entity2, matchedEntities[0], "Entity2 should match the query")
+}
+
 func TestWorld_Update(t *testing.T) {
-	r := entities.NewRocket(1.0)
-	w := ecs.NewWorld(r)
+	world := ecs.NewWorld()
+	system := MockSystem{}
 
-	s := systems.NewMockSystem(1)
-	w.AddSystem(s)
-	w.Update(1.0)
+	world.AddSystem(system)
+
+	err := world.Update(0.016) // Assume a frame time of 16ms
+	assert.NoError(t, err, "Updating the world should not produce an error")
+}
+
+func TestWorld_AddSystem(t *testing.T) {
+	world := ecs.NewWorld()
+	system := MockSystem{}
+
+	world.AddSystem(system)
 }

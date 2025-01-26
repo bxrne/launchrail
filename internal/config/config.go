@@ -88,5 +88,13 @@ func (cfg *Config) Validate() error {
 		return fmt.Errorf("options.launchsite.altitude is required")
 	}
 
+	if cfg.Simulation.Step == 0 {
+		return fmt.Errorf("simulation.step is required")
+	}
+
+	if cfg.Simulation.MaxTime == 0 {
+		return fmt.Errorf("simulation.max_time is required")
+	}
+
 	return nil
 }

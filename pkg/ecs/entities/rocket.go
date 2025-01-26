@@ -2,61 +2,63 @@ package entities
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/bxrne/launchrail/pkg/ecs/components"
 	"github.com/bxrne/launchrail/pkg/ecs/types"
 )
 
+// Rocket represents a rocket entity
 type Rocket struct {
 	ID           int
-	Position     types.Vector3
-	Velocity     types.Vector3
-	Acceleration types.Vector3
-	Mass         float64
-	Forces       []types.Vector3
-	Components   []components.Component
+	Motor        *components.Motor
+	Nosecone     *Nosecone
+	Physics      *components.Physics
+	Aerodynamics *components.Aerodynamics
 }
 
 // NewRocket creates a new rocket instance
-func NewRocket(mass float64, components ...components.Component) *Rocket {
+func NewRocket(id int, mass float64, motor *components.Motor, nosecone *Nosecone, dragCoefficient float64) *Rocket {
+	area := math.Pi * (nosecone.Radius * nosecone.Radius)
+
 	return &Rocket{
-		ID:           0,
-		Position:     types.Vector3{X: 0, Y: 0, Z: 0},
-		Velocity:     types.Vector3{X: 0, Y: 0, Z: 0},
-		Acceleration: types.Vector3{X: 0, Y: 0, Z: 0},
-		Forces:       []types.Vector3{},
-		Mass:         mass,
-		Components:   components,
+		ID:           id,
+		Motor:        motor,
+		Nosecone:     nosecone,
+		Physics:      components.NewPhysics(9.81, mass),
+		Aerodynamics: components.NewAerodynamics(dragCoefficient, area),
 	}
 }
 
-// NewRocketWithID creates a new rocket instance with an ID
+// Update updates the rocket state based on the timestep
+func (r *Rocket) Update(dt float64) error {
+	if dt <= 0 {
+		return fmt.Errorf("invalid timestep: dt must be > 0")
+	}
+
+	// Update motor first to get thrust
+	if err := r.Motor.Update(dt); err != nil {
+		return err
+	}
+
+	// Apply motor thrust as a force
+	thrustVec := types.Vector3{X: 0, Y: r.Motor.GetThrust(), Z: 0}
+	r.Physics.AddForce(thrustVec)
+
+	// Apply aerodynamic drag
+	dragForce := r.Aerodynamics.CalculateDrag(r.Physics.Velocity)
+	r.Physics.AddForce(dragForce)
+
+	// Update physics for movement
+	err := r.Physics.Update(dt)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// String returns a string representation of the Rocket
 func (r *Rocket) String() string {
-	return fmt.Sprintf("Rocket{ID: %d, Position: %v, Velocity: %v, Acceleration: %v, Mass: %.2f, Forces: %v, Components: %v}", r.ID, r.Position, r.Velocity, r.Acceleration, r.Mass, r.Forces, r.Components)
-}
-
-// Describe returns a string representation of the rocket
-func (r *Rocket) Describe() string {
-	return fmt.Sprintf("Rocket{ID: %d, Position: %v, Velocity: %v, Acceleration: %v, Mass: %.2f}", r.ID, r.Position, r.Velocity, r.Acceleration, r.Mass)
-}
-
-// AddComponent adds a component to the rocket
-func (r *Rocket) AddComponent(c components.Component) {
-	r.Components = append(r.Components, c)
-}
-
-// RemoveComponent removes a component from the rocket
-func (r *Rocket) RemoveComponent(c components.Component) {
-	for i, component := range r.Components {
-		if component == c {
-			r.Components = append(r.Components[:i], r.Components[i+1:]...)
-		}
-	}
-}
-
-// Update updates the rocket
-func (r *Rocket) Update(dt float64) {
-	for _, component := range r.Components {
-		component.Update(dt)
-	}
+	return fmt.Sprintf("Rocket{ID: %d, Motor: %s, Nosecone: %s, Physics: %s, Aerodynamics: %s}", r.ID, r.Motor.String(), r.Nosecone.String(), r.Physics.String(), r.Aerodynamics.String())
 }

@@ -3,6 +3,8 @@ package openrocket
 import (
 	"encoding/xml"
 	"fmt"
+
+	"github.com/bxrne/launchrail/internal/config"
 )
 
 // TODO: Omit empty fields
@@ -13,6 +15,25 @@ type OpenrocketDocument struct {
 	Version string         `xml:"version,attr"`
 	Creator string         `xml:"creator,attr"`
 	Rocket  RocketDocument `xml:"rocket"`
+}
+
+// Validate checks if the OpenrocketDocument is valid for this program
+func (o *OpenrocketDocument) Validate(cfg *config.Config) error {
+	// Check if the OpenRocket version matches the expected version
+	if fmt.Sprintf("OpenRocket %s", cfg.External.OpenRocketVersion) != o.Creator {
+		return fmt.Errorf("OpenRocket version mismatch: expected %s, got %s", cfg.External.OpenRocketVersion, o.Creator)
+	}
+
+	// Check subcomponents structure (must be single sustainer only)
+	if len(o.Rocket.Subcomponents.Stages) != 1 {
+		return fmt.Errorf("expected 1 subcomponent, got %d", len(o.Rocket.Subcomponents.Stages))
+	}
+
+	if o.Rocket.Subcomponents.Stages[0].Name != "Sustainer" {
+		return fmt.Errorf("expected Sustainer, got %s", o.Rocket.Subcomponents.Stages[0].Name)
+	}
+
+	return nil
 }
 
 // Describe returns a string representation of the OpenrocketDocument
@@ -94,6 +115,11 @@ func (s *Subcomponents) String() string {
 	}
 
 	return fmt.Sprintf("Subcomponents{Stages=(%s)}", stages)
+}
+
+// List returns a list of all subcomponents so we can iterate over them
+func (s *Subcomponents) List() []RocketStage {
+	return s.Stages
 }
 
 // RocketStage represents the stage subcomponent element of the XML document

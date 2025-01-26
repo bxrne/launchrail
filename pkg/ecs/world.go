@@ -3,71 +3,93 @@ package ecs
 import (
 	"fmt"
 	"sync"
-
-	"github.com/bxrne/launchrail/pkg/ecs/components"
-	"github.com/bxrne/launchrail/pkg/ecs/entities"
-	"github.com/bxrne/launchrail/pkg/ecs/systems"
 )
 
-// World manages all entities, components, and systems
+type EntityID uint64
+
 type World struct {
-	entities   []entities.Entity
-	components []components.Component
-	systems    []systems.System
-	mu         sync.RWMutex
+    mu sync.RWMutex
+
+    entities    map[EntityID]struct{}
+    components  map[EntityID]map[string]Component
+    systems     []System
+    nextEntity  EntityID
 }
 
-func NewWorld(Rocket *entities.Rocket) *World {
-	w := &World{
-		entities:   make([]entities.Entity, 0),
-		components: make([]components.Component, 0),
-		systems:    make([]systems.System, 0),
-	}
-
-	w.AddEntity(Rocket)
-	return w
+func NewWorld() *World {
+    return &World{
+        entities:    make(map[EntityID]struct{}),
+        components:  make(map[EntityID]map[string]Component),
+        systems:     make([]System, 0),
+        nextEntity:  1,
+    }
 }
 
-// AddEntity adds an entity to the World
-func (w *World) AddEntity(e entities.Entity) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+func (w *World) CreateEntity() EntityID {
+    w.mu.Lock()
+    defer w.mu.Unlock()
 
-	w.entities = append(w.entities, e)
+    id := w.nextEntity
+    w.nextEntity++
+
+    w.entities[id] = struct{}{}
+    w.components[id] = make(map[string]Component)
+    return id
 }
 
-// AddComponent adds a component to the NewWorld
-func (w *World) AddComponent(c components.Component) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+func (w *World) AddComponent(entity EntityID, component Component) error {
+    w.mu.Lock()
+    defer w.mu.Unlock()
 
-	w.components = append(w.components, c)
+    if _, exists := w.entities[entity]; !exists {
+        return fmt.Errorf("entity %d does not exist", entity)
+    }
+
+    w.components[entity][component.Type()] = component
+    return nil
 }
 
-// AddSystem adds a system to the NewWorld
-func (w *World) AddSystem(s systems.System) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+func (w *World) GetComponent(entity EntityID, componentType string) (Component, bool) {
+    w.mu.RLock()
+    defer w.mu.RUnlock()
 
-	w.systems = append(w.systems, s)
+    if components, exists := w.components[entity]; exists {
+        if component, exists := components[componentType]; exists {
+            return component, true
+        }
+    }
+    return nil, false
 }
 
-// Update calls the Update method on all systems
-func (w *World) Update(dt float64) {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
+func (w *World) Query(componentTypes ...string) []EntityID {
+    w.mu.RLock()
+    defer w.mu.RUnlock()
 
-	for _, s := range w.systems {
-		s.Update(dt)
-	}
+    var matches []EntityID
+entityLoop:
+    for entity := range w.entities {
+        for _, compType := range componentTypes {
+            if _, exists := w.components[entity][compType]; !exists {
+                continue entityLoop
+            }
+        }
+        matches = append(matches, entity)
+    }
+    return matches
 }
 
-// String returns a string representation of the NewWorld
-func (w *World) String() string {
-	return fmt.Sprintf("%d entities, %d components, and %d systems", len(w.entities), len(w.components), len(w.systems))
+func (w *World) Update(dt float64) error {
+    // Sort systems by priority if needed
+    for _, system := range w.systems {
+        if err := system.Update(w, dt); err != nil {
+            return fmt.Errorf("system update failed: %w", err)
+        }
+    }
+    return nil
 }
 
-// Describe returns a string representation of the NewWorld
-func (w *World) Describe() string {
-	return fmt.Sprintf("%d entities, %d components, and %d systems", len(w.entities), len(w.components), len(w.systems))
+func (w *World) AddSystem(system System) {
+    w.mu.Lock()
+    defer w.mu.Unlock()
+    w.systems = append(w.systems, system)
 }

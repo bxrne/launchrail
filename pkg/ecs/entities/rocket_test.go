@@ -1,59 +1,71 @@
 package entities_test
 
 import (
-	"fmt"
+	"math"
 	"testing"
 
 	"github.com/bxrne/launchrail/pkg/ecs/components"
-	"github.com/bxrne/launchrail/pkg/ecs/entities"
+	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/bxrne/launchrail/pkg/ecs/entities"
 )
 
-// TEST: GIVEN a mass and a component set WHEN NewRocket is called THEN a new Rocket instance is returned with the given mass and components
+var md = &thrustcurves.MotorData{
+	Thrust:    [][]float64{{0, 10}, {1, 20}, {2, 15}},
+	TotalMass: 50,
+	BurnTime:  2.0,
+	AvgThrust: 15,
+}
+
 func TestNewRocket(t *testing.T) {
-	mass := 1.0
-	component := components.NewMockComponent("mock")
-	rocket := entities.NewRocket(mass, component)
-	assert.Equal(t, rocket.Mass, mass)
-	assert.Equal(t, rocket.Components[0], component)
+	motor := components.NewMotor(100.0, md)
+	nosecone := &entities.Nosecone{Radius: 0.1}
+
+	rocket := entities.NewRocket(1, 10.0, motor, nosecone, 0.5)
+
+	assert.Equal(t, 1, rocket.ID)
+	assert.Equal(t, 10.0, rocket.Physics.Mass)
+	assert.Equal(t, 0.5, rocket.Aerodynamics.DragCoefficient)
+	assert.Equal(t, math.Pi*(0.1*0.1), rocket.Aerodynamics.Area)
 }
 
-// TEST: GIVEN a rocket instance WHEN String is called THEN a string representation of the rocket is returned
-func TestRocket_String(t *testing.T) {
-	rocket := entities.NewRocket(1.0)
-	expected := fmt.Sprintf("Rocket{ID: %d, Position: %v, Velocity: %v, Acceleration: %v, Mass: %.2f, Forces: %v, Components: %v}", rocket.ID, rocket.Position, rocket.Velocity, rocket.Acceleration, rocket.Mass, rocket.Forces, rocket.Components)
-	assert.Equal(t, rocket.String(), expected)
+func TestRocketUpdate(t *testing.T) {
+	t.Run("Invalid Timestep", func(t *testing.T) {
+		motor := components.NewMotor(100.0, md)
+		nosecone := &entities.Nosecone{Radius: 0.1}
+		rocket := entities.NewRocket(1, 10.0, motor, nosecone, 0.5)
+
+		err := rocket.Update(-0.1)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid timestep")
+	})
+
+	t.Run("Successful Update", func(t *testing.T) {
+		motor := components.NewMotor(100.0, md)
+		nosecone := &entities.Nosecone{Radius: 0.1}
+		rocket := entities.NewRocket(1, 10.0, motor, nosecone, 0.5)
+
+		initialVelocity := rocket.Physics.Velocity
+
+		err := rocket.Update(0.1)
+		require.NoError(t, err)
+
+		// Check that velocity has changed
+		assert.NotEqual(t, initialVelocity, rocket.Physics.Velocity)
+	})
 }
 
-// TEST: GIVEN a rocket instance WHEN Describe is called THEN a string representation of the rocket is returned
-func TestRocket_Describe(t *testing.T) {
-	rocket := entities.NewRocket(1.0)
-	expected := fmt.Sprintf("Rocket{ID: %d, Position: %v, Velocity: %v, Acceleration: %v, Mass: %.2f}", rocket.ID, rocket.Position, rocket.Velocity, rocket.Acceleration, rocket.Mass)
-	assert.Equal(t, rocket.Describe(), expected)
-}
+func TestRocketString(t *testing.T) {
+	motor := components.NewMotor(100.0, md)
+	nosecone := &entities.Nosecone{Radius: 0.1}
+	rocket := entities.NewRocket(1, 10.0, motor, nosecone, 0.5)
 
-// TEST: GIVEN a rocket instance and a component WHEN AddComponent is called THEN the component is added to the Rocket
-func TestRocket_AddComponent(t *testing.T) {
-	rocket := entities.NewRocket(1.0)
-	component := components.NewMockComponent("mock")
-	rocket.AddComponent(component)
-	assert.Equal(t, rocket.Components[0], component)
-}
-
-// TEST: GIVEN a rocket instance and a component WHEN RemoveComponent is called THEN the component is removed from the rocket
-func TestRocket_RemoveComponent(t *testing.T) {
-	rocket := entities.NewRocket(1.0)
-	component := components.NewMockComponent("mock")
-	rocket.AddComponent(component)
-	rocket.RemoveComponent(component)
-	assert.Equal(t, len(rocket.Components), 0)
-}
-
-// TEST: GIVEN a rocket instance and a delta time WHEN Update is called THEN the rocket is updated
-func TestRocket_Update(t *testing.T) {
-	rocket := entities.NewRocket(1.0)
-	component := components.NewMockComponent("mock")
-	rocket.AddComponent(component)
-	rocket.Update(1.0)
-
+	stringRep := rocket.String()
+	assert.Contains(t, stringRep, "Rocket{ID: 1")
+	assert.Contains(t, stringRep, "Motor:")
+	assert.Contains(t, stringRep, "Nosecone:")
+	assert.Contains(t, stringRep, "Physics:")
+	assert.Contains(t, stringRep, "Aerodynamics:")
 }

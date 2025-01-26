@@ -5,6 +5,10 @@ app:
 logging:
   level: "debug"
 
+simulation:
+  step: 1 # 60hz
+  max_time: 300.0
+
 external:
   openrocket_version: "23.09"
 

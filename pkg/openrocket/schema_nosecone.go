@@ -3,6 +3,7 @@ package openrocket
 import (
 	"encoding/xml"
 	"fmt"
+	"math"
 )
 
 // Nosecone represents the nosecone element of the XML document
@@ -29,6 +30,18 @@ type Nosecone struct {
 // String returns full string representation of the Nosecone
 func (n *Nosecone) String() string {
 	return fmt.Sprintf("Nosecone{Name=%s, ID=%s, Finish=%s, Material=%s, Length=%.2f, Thickness=%.2f, Shape=%s, ShapeClipped=%t, ShapeParameter=%.2f, AftRadius=%.2f, AftShoulderRadius=%.2f, AftShoulderLength=%.2f, AftShoulderThickness=%.2f, AftShoulderCapped=%t, IsFlipped=%t, Subcomponents=%s}", n.Name, n.ID, n.Finish, n.Material.String(), n.Length, n.Thickness, n.Shape, n.ShapeClipped, n.ShapeParameter, n.AftRadius, n.AftShoulderRadius, n.AftShoulderLength, n.AftShoulderThickness, n.AftShoulderCapped, n.IsFlipped, n.Subcomponents.String())
+}
+
+// GetMass returns the mass of the nose cone
+func (n *Nosecone) GetMass() float64 {
+	// Calculate nosecone body mass (assuming cylindrical approximation for simplicity)
+	volume := math.Pi * n.AftRadius * n.AftRadius * n.Length
+	bodyMass := volume * n.Material.Density
+
+	// Add mass of any mass components
+	additionalMass := n.Subcomponents.MassComponent.Mass
+
+	return (bodyMass + additionalMass) / 10
 }
 
 // NoseSubcomponents represents the nested subcomponents element of the XML document
