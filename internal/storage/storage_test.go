@@ -11,46 +11,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewStorage(t *testing.T) {
-	baseDir := "./test_base"
-	dir := "./test_dir"
-	defer os.RemoveAll(baseDir)
-	defer os.RemoveAll(dir)
-
-	_, err := storage.NewStorage(baseDir, dir)
-
+func setupTest(t *testing.T) (string, string, func()) {
+	homeDir, err := os.UserHomeDir()
 	require.NoError(t, err)
 
-	// Check directories were created
-	_, err1 := os.Stat(baseDir)
-	_, err2 := os.Stat(dir)
-	assert.NoError(t, err1)
-	assert.NoError(t, err2)
+	baseDir := "test_base"
+	dir := "test_dir"
+	fullBaseDir := filepath.Join(homeDir, baseDir)
+
+	cleanup := func() {
+		os.RemoveAll(fullBaseDir)
+	}
+
+	return baseDir, dir, cleanup
 }
 
-func TestNewStorageExistingDirectories(t *testing.T) {
-	baseDir := "./test_base_existing"
-	dir := "./test_dir_existing"
-
-	// Create directories first
-	err1 := os.MkdirAll(baseDir, os.ModePerm)
-	err2 := os.MkdirAll(dir, os.ModePerm)
-	require.NoError(t, err1)
-	require.NoError(t, err2)
-
-	defer os.RemoveAll(baseDir)
-	defer os.RemoveAll(dir)
+func TestNewStorage(t *testing.T) {
+	baseDir, dir, cleanup := setupTest(t)
+	defer cleanup()
 
 	_, err := storage.NewStorage(baseDir, dir)
-
 	require.NoError(t, err)
+
+	homeDir, _ := os.UserHomeDir()
+	expectedBaseDir := filepath.Join(homeDir, baseDir)
+	expectedDir := filepath.Join(expectedBaseDir, dir)
+
+	_, err = os.Stat(expectedBaseDir)
+	assert.NoError(t, err)
+	_, err = os.Stat(expectedDir)
+	assert.NoError(t, err)
 }
 
 func TestInit(t *testing.T) {
-	baseDir := "./test_base_init"
-	dir := "./test_dir_init"
-	defer os.RemoveAll(baseDir)
-	defer os.RemoveAll(dir)
+	baseDir, dir, cleanup := setupTest(t)
+	defer cleanup()
 
 	s, err := storage.NewStorage(baseDir, dir)
 	require.NoError(t, err)
@@ -59,13 +54,14 @@ func TestInit(t *testing.T) {
 	err = s.Init(headers)
 	require.NoError(t, err)
 
-	// Find the CSV file
-	files, err := os.ReadDir(dir)
+	homeDir, _ := os.UserHomeDir()
+	fullDir := filepath.Join(homeDir, baseDir, dir)
+
+	files, err := os.ReadDir(fullDir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
 
-	// Open and check the file
-	filePath := filepath.Join(dir, files[0].Name())
+	filePath := filepath.Join(fullDir, files[0].Name())
 	file, err := os.Open(filePath)
 	require.NoError(t, err)
 	defer file.Close()
@@ -77,10 +73,8 @@ func TestInit(t *testing.T) {
 }
 
 func TestWrite(t *testing.T) {
-	baseDir := "./test_base_write"
-	dir := "./test_dir_write"
-	defer os.RemoveAll(baseDir)
-	defer os.RemoveAll(dir)
+	baseDir, dir, cleanup := setupTest(t)
+	defer cleanup()
 
 	s, err := storage.NewStorage(baseDir, dir)
 	require.NoError(t, err)
@@ -89,38 +83,34 @@ func TestWrite(t *testing.T) {
 	err = s.Init(headers)
 	require.NoError(t, err)
 
-	// Write valid data
 	data := []string{"Value1", "Value2", "Value3"}
 	err = s.Write(data)
 	require.NoError(t, err)
 
-	// Find the CSV file
-	files, err := os.ReadDir(dir)
+	homeDir, _ := os.UserHomeDir()
+	fullDir := filepath.Join(homeDir, baseDir, dir)
+
+	files, err := os.ReadDir(fullDir)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
 
-	// Open and check the file
-	filePath := filepath.Join(dir, files[0].Name())
+	filePath := filepath.Join(fullDir, files[0].Name())
 	file, err := os.Open(filePath)
 	require.NoError(t, err)
 	defer file.Close()
 
 	reader := csv.NewReader(file)
-	// Skip headers
 	_, err = reader.Read()
 	require.NoError(t, err)
 
-	// Read data row
 	readData, err := reader.Read()
 	require.NoError(t, err)
 	assert.Equal(t, data, readData)
 }
 
 func TestWriteInvalidData(t *testing.T) {
-	baseDir := "./test_base_invalid"
-	dir := "./test_dir_invalid"
-	defer os.RemoveAll(baseDir)
-	defer os.RemoveAll(dir)
+	baseDir, dir, cleanup := setupTest(t)
+	defer cleanup()
 
 	s, err := storage.NewStorage(baseDir, dir)
 	require.NoError(t, err)
@@ -129,7 +119,6 @@ func TestWriteInvalidData(t *testing.T) {
 	err = s.Init(headers)
 	require.NoError(t, err)
 
-	// Write invalid data (wrong length)
 	data := []string{"Value1", "Value2", "Value3"}
 	err = s.Write(data)
 	require.Error(t, err)
