@@ -131,6 +131,26 @@ func TestGetConfigMissingVersion(t *testing.T) {
 	})
 }
 
+// TEST: GIVEN a config with missing app.base_dir WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingBaseDir(t *testing.T) {
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.App.BaseDir = ""
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "app.base_dir is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
 // TEST: GIVEN a config with missing logging.level WHEN Validate is called THEN an error is returned
 func TestGetConfigMissingLoggingLevel(t *testing.T) {
 	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {

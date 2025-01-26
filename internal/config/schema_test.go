@@ -13,6 +13,7 @@ func TestConfigString(t *testing.T) {
 		App: config.App{
 			Name:    "launchrail-test",
 			Version: "0.0.0",
+			BaseDir: "/tmp",
 		},
 		Logging: config.Logging{
 			Level: "info",
@@ -43,6 +44,7 @@ func TestConfigString(t *testing.T) {
 	expected := map[string]string{
 		"app.name":                       "launchrail-test",
 		"app.version":                    "0.0.0",
+		"app.base_dir":                   "/tmp",
 		"logging.level":                  "info",
 		"external.openrocket_version":    "15.03",
 		"options.motor_designation":      "G80-7T",
