@@ -3,13 +3,14 @@ package entities
 import (
 	"fmt"
 
+	"github.com/bxrne/launchrail/pkg/ecs"
 	"github.com/bxrne/launchrail/pkg/ecs/types"
 	"github.com/bxrne/launchrail/pkg/openrocket"
 )
 
 // Nosecone represents the nosecone entity of a rocket
 type Nosecone struct {
-	ID             int
+	ID             ecs.EntityID
 	Position       types.Vector3
 	Radius         float64
 	Length         float64
@@ -18,7 +19,7 @@ type Nosecone struct {
 }
 
 // NewNosecone creates a new nosecone instance
-func NewNosecone(id int, radius, length, mass, shapeParameter float64) *Nosecone {
+func NewNosecone(id ecs.EntityID, radius, length, mass, shapeParameter float64) *Nosecone {
 	return &Nosecone{
 		ID:             id,
 		Position:       types.Vector3{X: 0, Y: 0, Z: 0},
@@ -30,7 +31,7 @@ func NewNosecone(id int, radius, length, mass, shapeParameter float64) *Nosecone
 }
 
 // NewNoseconeFromORK creates a new nosecone instance from an ORK Document
-func NewNoseconeFromORK(id int, orkData *openrocket.RocketDocument) *Nosecone {
+func NewNoseconeFromORK(id ecs.EntityID, orkData *openrocket.RocketDocument) *Nosecone {
 	orkNosecone := orkData.Subcomponents.Stages[0].SustainerSubcomponents.Nosecone
 	return NewNosecone(id, orkNosecone.AftRadius, orkNosecone.Length, orkNosecone.GetMass(), orkNosecone.ShapeParameter)
 }
@@ -44,4 +45,9 @@ func (n *Nosecone) String() string {
 func (n *Nosecone) Update(dt float64) error {
 	// INFO: Empty, just meeting interface requirements
 	return nil
+}
+
+// Type returns the type of the component
+func (n *Nosecone) Type() string {
+	return "nosecone"
 }

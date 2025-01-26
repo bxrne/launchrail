@@ -1,11 +1,14 @@
 package main
 
 import (
+	"math"
+
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/pkg/ecs"
 	"github.com/bxrne/launchrail/pkg/ecs/components"
+	"github.com/bxrne/launchrail/pkg/ecs/entities"
 	"github.com/bxrne/launchrail/pkg/ecs/systems"
 	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
@@ -54,21 +57,23 @@ func main() {
 
 	// Create rocket entity
 	rocketID := world.CreateEntity()
+	nosecone := entities.NewNoseconeFromORK(rocketID, &ork_data.Rocket)
+	world.AddComponent(rocketID, nosecone)
 
 	// Add components
 	motorComp := components.NewMotor(rocketID, motor_data)
 	physicsComp := components.NewPhysics(9.81, 1.0)
-	aeroComp := components.NewAerodynamics(0.5, 3.14159*(0.1*0.1)) // Example area
+	aeroComp := components.NewAerodynamics(0.5, math.Pi*math.Pow(nosecone.Radius, 2))
 
 	world.AddComponent(rocketID, motorComp)
 	world.AddComponent(rocketID, physicsComp)
 	world.AddComponent(rocketID, aeroComp)
 
 	// Run simulation
-	timeStep := 0.016 // 60Hz
-	maxTime := 10.0   // Example max time
-	for t := 0.0; t < maxTime; t += timeStep {
-		if err := world.Update(timeStep); err != nil {
+	// timeStep := 0.016 // 60Hz
+	// maxTime := 10.0   // Example max time
+	for t := 0.0; t < cfg.Simulation.MaxTime; t += cfg.Simulation.Step {
+		if err := world.Update(cfg.Simulation.Step); err != nil {
 			log.Fatal(err.Error())
 		}
 		log.Debug(
@@ -81,4 +86,6 @@ func main() {
 	}
 
 	log.Info("Simulation complete")
+
+	log.Debug("Exiting...")
 }
