@@ -2,80 +2,95 @@ package components
 
 import (
 	"fmt"
+	"sync"
 
+	"github.com/bxrne/launchrail/pkg/ecs"
 	"github.com/bxrne/launchrail/pkg/ecs/types"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
+	"github.com/looplab/fsm"
 )
 
-// Motor represents the motor component of a rocket
 type Motor struct {
+	ID          ecs.EntityID
 	Position    types.Vector3
-	Thrustcurve [][]float64 // [[time, thrust], ...]
+	Thrustcurve [][]float64
 	Mass        float64
 	thrust      float64
 	Props       *thrustcurves.MotorData
-	fsm         *MotorFSM // FSM instance
-	elapsedTime float64   // Time elapsed since ignition
+	fsm         *fsm.FSM
+	elapsedTime float64
+	mu          sync.RWMutex
 }
 
-// String returns a string representation of the MotorData
-func (m *Motor) String() string {
-	return fmt.Sprintf("Motor{Position: %v, Mass: %.3f, Thrust: %.3f, State: %s}", m.Position, m.Mass, m.thrust, m.fsm.GetState())
-}
-
-// Update updates the motor (uses thrust curves and reduces mass)
-func (m *Motor) Update(dt float64) error {
-	// Update elapsed time
-	m.elapsedTime += dt
-
-	// Update the FSM state
-	err := m.fsm.UpdateState(m.Mass, m.elapsedTime, m.Props.BurnTime)
-	if err != nil {
-		return err
-	}
-
-	// If in burning state, calculate thrust and update mass
-	if m.fsm.GetState() == StateBurning {
-		m.thrust = m.GetThrustAfter(m.elapsedTime)
-
-		// Calculate mass loss based on thrust and time
-		if m.Mass > 0 {
-			massLoss := (m.thrust * dt) / m.Props.AvgThrust // Average thrust is used for mass loss calculation
-			newMass := m.Mass - massLoss
-
-			// Ensure mass does not go negative
-			if newMass < 0 {
-				newMass = 0
-			}
-			m.Mass = newMass
-		}
-	} else {
-		m.thrust = 0 // No thrust if idle
-	}
-
-	return nil
-}
-
-// NewMotor creates a new motor instance
-func NewMotor(md *thrustcurves.MotorData) *Motor {
+func NewMotor(id ecs.EntityID, md *thrustcurves.MotorData) *Motor {
 	m := &Motor{
-		Position:    types.Vector3{X: 0, Y: 0, Z: 0},
+		ID:          id,
+		Position:    types.Vector3{},
 		Thrustcurve: md.Thrust,
 		Mass:        md.TotalMass,
 		Props:       md,
 		thrust:      0,
-		fsm:         NewMotorFSM(), // Initialize the FSM
+		fsm: fsm.NewFSM(
+			"idle",
+			fsm.Events{
+				{Name: "ignite", Src: []string{"idle"}, Dst: "burning"},
+				{Name: "extinguish", Src: []string{"burning"}, Dst: "idle"},
+			},
+			fsm.Callbacks{},
+		),
 	}
 
-	// Initialize thrust to the first thrust value in the curve
 	if len(m.Thrustcurve) > 0 {
 		m.thrust = m.Thrustcurve[0][1]
 	}
 	return m
 }
 
-// GetThrustAfter returns the thrust of the Motor at a given time using linear interpolation
-func (m *Motor) GetThrustAfter(totalDt float64) float64 {
+func (m *Motor) Update(dt float64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if dt <= 0 {
+		return fmt.Errorf("invalid timestep: dt must be > 0")
+	}
+
+	m.elapsedTime += dt
+
+	// Update state
+	if m.Mass > 0 && m.elapsedTime <= m.Props.BurnTime {
+		if m.fsm.Current() == "idle" {
+			m.fsm.Event(nil, "ignite")
+		}
+	} else if m.fsm.Current() == "burning" {
+		m.fsm.Event(nil, "extinguish")
+	}
+
+	// Update thrust and mass
+	if m.fsm.Current() == "burning" {
+		m.thrust = m.interpolateThrust(m.elapsedTime)
+		if m.Mass > 0 && m.thrust > 0 {
+			massLoss := (m.thrust * dt) / m.Props.AvgThrust
+			m.Mass = max(0, m.Mass-massLoss)
+		}
+	} else {
+		m.thrust = 0
+	}
+
+	return nil
+}
+
+func (m *Motor) GetThrust() float64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.thrust
+}
+
+func (m *Motor) Type() string {
+	return ecs.ComponentMotor
+}
+
+// interpolateThrust returns the thrust of the Motor at a given time using linear interpolation
+func (m *Motor) interpolateThrust(totalDt float64) float64 {
 	// If the thrust curve is empty, return 0
 	if len(m.Thrustcurve) == 0 {
 		return 0
@@ -100,4 +115,12 @@ func (m *Motor) GetThrustAfter(totalDt float64) float64 {
 
 	// If totalDt is before the first sample, return 0
 	return 0
+}
+
+func (m *Motor) String() string {
+	return fmt.Sprintf("Motor{ID: %d, Position: %s, Mass: %f, Thrust: %f}", m.ID, m.Position.String(), m.Mass, m.thrust)
+}
+
+func (m *Motor) GetMass() float64 {
+	return m.Mass
 }

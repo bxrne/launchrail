@@ -5,7 +5,8 @@ import (
 	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/pkg/ecs"
-	"github.com/bxrne/launchrail/pkg/ecs/entities"
+	"github.com/bxrne/launchrail/pkg/ecs/components"
+	"github.com/bxrne/launchrail/pkg/ecs/systems"
 	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 )
@@ -44,20 +45,40 @@ func main() {
 	}
 	log.Info("OpenRocket file loaded", "Description", ork_data.Describe())
 
-	// NOTE: Create the ecs
-	ecs := ecs.NewECS()
-	motor := entities.NewMotor(1, motor_data)
-	nosecone := entities.NewNoseconeFromORK(1, &ork_data.Rocket)
-	rocket := entities.NewRocket(1, 10.0, motor, nosecone)
-	ecs.AddEntity(1, rocket)
+	// Create ECS world
+	world := ecs.NewWorld()
 
-	log.Info("ECS created", "Description", ecs.String())
+	// Add systems
+	world.AddSystem(systems.NewRocketSystem())
+	world.AddSystem(systems.NewPhysicsSystem(4)) // 4 worker threads
 
-	log.Info("Running simulation", "Step", cfg.Simulation.Step, "MaxTime", cfg.Simulation.MaxTime)
-	for i := 0.0; i < cfg.Simulation.MaxTime; i++ {
-		log.Debug("Running simulation step", "Step", i)
-		ecs.Update(i)
-		log.Debug("States updated", "Motor", motor.String())
+	// Create rocket entity
+	rocketID := world.CreateEntity()
+
+	// Add components
+	motorComp := components.NewMotor(rocketID, motor_data)
+	physicsComp := components.NewPhysics(9.81, 1.0)
+	aeroComp := components.NewAerodynamics(0.5, 3.14159*(0.1*0.1)) // Example area
+
+	world.AddComponent(rocketID, motorComp)
+	world.AddComponent(rocketID, physicsComp)
+	world.AddComponent(rocketID, aeroComp)
+
+	// Run simulation
+	timeStep := 0.016 // 60Hz
+	maxTime := 10.0   // Example max time
+	for t := 0.0; t < maxTime; t += timeStep {
+		if err := world.Update(timeStep); err != nil {
+			log.Fatal(err.Error())
+		}
+		log.Debug(
+			"Rocket",
+			"Time", t,
+			"Position", physicsComp.Position,
+			"Velocity", physicsComp.Velocity,
+			"Thrust", motorComp.GetThrust(),
+		)
 	}
+
 	log.Info("Simulation complete")
 }

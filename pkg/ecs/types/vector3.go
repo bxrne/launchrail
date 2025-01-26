@@ -1,6 +1,9 @@
 package types
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 // Vector3 represents a 3D vector
 type Vector3 struct {
@@ -8,6 +11,7 @@ type Vector3 struct {
 }
 
 // Add returns the sum of two vectors
+// INFO: Adding two vectors component-wise.
 func (v Vector3) Add(other Vector3) Vector3 {
 	return Vector3{
 		X: v.X + other.X,
@@ -17,7 +21,30 @@ func (v Vector3) Add(other Vector3) Vector3 {
 }
 
 // Subtract returns the difference of two vectors
-func (v Vector3) Scale(scalar float64) Vector3 {
+// INFO: Subtracting other vector from this vector component-wise.
+func (v Vector3) Subtract(other Vector3) Vector3 {
+	return Vector3{
+		X: v.X - other.X,
+		Y: v.Y - other.Y,
+		Z: v.Z - other.Z,
+	}
+}
+
+// Magnitude returns the length of the vector
+// INFO: Calculating the magnitude as the Euclidean norm.
+func (v Vector3) Magnitude() float64 {
+	return math.Sqrt(v.X*v.X + v.Y*v.Y + v.Z*v.Z)
+}
+
+// String returns a string representation of the vector
+// INFO: Format the vector components to two decimal places for readability.
+func (v Vector3) String() string {
+	return fmt.Sprintf("Vector3{X: %.2f, Y: %.2f, Z: %.2f}", v.X, v.Y, v.Z)
+}
+
+// MultiplyScalar returns the vector multiplied by a scalar
+// INFO: Scaling the vector components by the given scalar.
+func (v Vector3) MultiplyScalar(scalar float64) Vector3 {
 	return Vector3{
 		X: v.X * scalar,
 		Y: v.Y * scalar,
@@ -25,7 +52,16 @@ func (v Vector3) Scale(scalar float64) Vector3 {
 	}
 }
 
-// Magnitude returns the length of the vector
-func (v Vector3) Magnitude() float64 {
-	return math.Sqrt(v.X*v.X + v.Y*v.Y + v.Z*v.Z)
+// DivideScalar returns the vector divided by a scalar
+// INFO: Ensure the scalar is not zero to avoid division by zero.
+func (v Vector3) DivideScalar(scalar float64) Vector3 {
+	if scalar == 0 {
+		// WARN: Avoiding division by zero which would lead to NaN values.
+		panic("division by zero")
+	}
+	return Vector3{
+		X: v.X / scalar,
+		Y: v.Y / scalar,
+		Z: v.Z / scalar,
+	}
 }

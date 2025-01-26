@@ -3,54 +3,58 @@ package entities
 import (
 	"fmt"
 
+	"github.com/bxrne/launchrail/pkg/ecs/components"
 	"github.com/bxrne/launchrail/pkg/ecs/types"
 )
 
 // Rocket represents a rocket entity
 type Rocket struct {
 	ID           int
-	Position     types.Vector3
-	Velocity     types.Vector3
-	Acceleration types.Vector3
-	Mass         float64
-	Motor        *Motor    // Reference to the Motor entity
-	Nosecone     *Nosecone // Reference to the Nosecone entity
+	Motor        *components.Motor
+	Nosecone     *Nosecone
+	Physics      *components.Physics
+	Aerodynamics *components.Aerodynamics
 }
 
 // NewRocket creates a new rocket instance
-func NewRocket(id int, mass float64, motor *Motor, nosecone *Nosecone) *Rocket {
+func NewRocket(id int, mass float64, motor *components.Motor, nosecone *Nosecone, dragCoefficient float64) *Rocket {
+	area := 3.14159 * (nosecone.Radius * nosecone.Radius)
+
 	return &Rocket{
 		ID:           id,
-		Position:     types.Vector3{X: 0, Y: 0, Z: 0},
-		Velocity:     types.Vector3{X: 0, Y: 0, Z: 0},
-		Acceleration: types.Vector3{X: 0, Y: 0, Z: 0},
-		Mass:         mass,
 		Motor:        motor,
 		Nosecone:     nosecone,
+		Physics:      components.NewPhysics(9.81, mass),
+		Aerodynamics: components.NewAerodynamics(dragCoefficient, area),
 	}
 }
 
-// Update updates the rocket
+// Update updates the rocket state based on the timestep
 func (r *Rocket) Update(dt float64) error {
-	// Update the motor
-	if r.Motor != nil {
-		err := r.Motor.Update(dt)
-		if err != nil {
-			return err
-		}
+	if dt <= 0 {
+		return fmt.Errorf("invalid timestep: dt must be > 0")
 	}
 
-	// Update the nosecone if needed (e.g., for drag calculations)
-	if r.Nosecone != nil {
-		// Perform any necessary updates for the nosecone
+	// Update motor first to get thrust
+	if err := r.Motor.Update(dt); err != nil {
+		return err
 	}
 
-	// Update other rocket properties (e.g., position, velocity) here
+	// Apply motor thrust as a force
+	thrustVec := types.Vector3{X: 0, Y: r.Motor.GetThrust(), Z: 0}
+	r.Physics.AddForce(thrustVec)
+
+	// Apply aerodynamic drag
+	dragForce := r.Aerodynamics.CalculateDrag(r.Physics.Velocity)
+	r.Physics.AddForce(dragForce)
+
+	// Update physics for movement
+	r.Physics.Update(dt)
 
 	return nil
 }
 
 // String returns a string representation of the Rocket
 func (r *Rocket) String() string {
-	return fmt.Sprintf("Rocket{ID: %d, Position: %v, Velocity: %v, Acceleration: %v, Mass: %.2f, Motor: %s, Nosecone: %s}", r.ID, r.Position, r.Velocity, r.Acceleration, r.Mass, r.Motor, r.Nosecone)
+	return fmt.Sprintf("Rocket{ID: %d, Motor: %s, Nosecone: %s, Physics: %s, Aerodynamics: %s}", r.ID, r.Motor.String(), r.Nosecone.String(), r.Physics.String(), r.Aerodynamics.String())
 }
