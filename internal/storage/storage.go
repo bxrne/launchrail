@@ -52,7 +52,7 @@ func (s *Storage) Init(headers []string) error {
 	s.headers = headers
 
 	// Create the file in dir with timestamp as name
-	timestamp := time.Now().Format("2006-01-02T15:04:05")
+	timestamp := time.Now().Format("2006-01-02T150405")
 	filename := fmt.Sprintf("%s/%s.csv", s.dir, timestamp)
 	file, err := os.Create(filename)
 	if err != nil {
@@ -61,7 +61,11 @@ func (s *Storage) Init(headers []string) error {
 
 	// Write the headers to the filename
 	writer := csv.NewWriter(file)
-	writer.Write(headers)
+	err = writer.Write(headers)
+	if err != nil {
+		return err
+	}
+
 	writer.Flush()
 	file.Close()
 
@@ -78,7 +82,7 @@ func (s *Storage) Write(data []string) error {
 	}
 
 	// Open the file in dir with timestamp as name
-	timestamp := time.Now().Format("2006-01-02T15:04:05")
+	timestamp := time.Now().Format("2006-01-02T150405")
 	filename := fmt.Sprintf("%s/%s.csv", s.dir, timestamp)
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 	if err != nil {
@@ -88,7 +92,11 @@ func (s *Storage) Write(data []string) error {
 	// Write the data to the filename
 	writer := csv.NewWriter(file)
 
-	writer.Write(data)
+	err = writer.Write(data)
+	if err != nil {
+		return err
+	}
+
 	writer.Flush()
 
 	file.Close()
