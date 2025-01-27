@@ -61,7 +61,11 @@ func (s *Storage) Init(headers []string) error {
 
 	// Write the headers to the filename
 	writer := csv.NewWriter(file)
-	writer.Write(headers)
+	err = writer.Write(headers)
+	if err != nil {
+		return err
+	}
+
 	writer.Flush()
 	file.Close()
 
@@ -88,7 +92,11 @@ func (s *Storage) Write(data []string) error {
 	// Write the data to the filename
 	writer := csv.NewWriter(file)
 
-	writer.Write(data)
+	err = writer.Write(data)
+	if err != nil {
+		return err
+	}
+
 	writer.Flush()
 
 	file.Close()
