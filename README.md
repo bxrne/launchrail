@@ -10,7 +10,8 @@ Launchrail is an open-source GNU General Public License v3.0 (GPL-3.0) project t
 git clone https://github.com/bxrne/launchrail.git
 cd launchrail
 
-go run .
+go run ./cmd/launchrail
+air # for hot reload (dev)
 ```
 
 ### Testing
@@ -18,7 +19,7 @@ go run .
 Run locally with the command below, runs on change for PRs and on main push (see [build and test CI](.github/workflows/build_test.yaml)).
 
 ```bash
-go test ./...
+go test ./... -v 
 ```
 
 
