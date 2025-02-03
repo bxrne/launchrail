@@ -108,64 +108,73 @@ func (s *PhysicsSystem) Update(dt float32) error {
 
 // applyForce applies forces to an entity
 func (s *PhysicsSystem) applyForce(entity PhysicsEntity, force types.Vector3, dt float32) {
-	// Validate timestep
-	dt64 := float64(dt)
-	if dt64 <= 0 || math.IsNaN(dt64) || dt64 > 0.1 {
+	// Add nil checks for required components
+	if entity.Bodytube == nil || entity.Nosecone == nil || entity.Mass == nil {
 		return
 	}
 
-	// Reset acceleration each frame
+	// Validate timestep and mass
+	dt64 := float64(dt)
+	if dt64 <= 0 || math.IsNaN(dt64) || dt64 > 0.1 || entity.Mass.Value <= 0 {
+		return
+	}
+
+	// Check current state for landing condition
+	if entity.Position.Y <= 0 {
+		entity.Position.Y = 0
+		entity.Velocity.Y = 0
+		entity.Acceleration.Y = 0
+		return
+	}
+
+	// Reset acceleration and apply gravity
 	entity.Acceleration.X = 0
 	entity.Acceleration.Y = -s.gravity // Use configured gravity
 
 	// Calculate forces
 	var netForce float64
-	// Add thrust in POSITIVE Y direction (upward)
-	if !entity.Motor.IsCoasting() {
+
+	// Add thrust if motor is active
+	if entity.Motor != nil && !entity.Motor.IsCoasting() {
 		thrust := entity.Motor.GetThrust()
-		netForce += thrust // Add thrust as positive force
+		if !math.IsNaN(thrust) {
+			netForce += thrust
+		}
 	}
 
-	// Calculate drag
+	// Calculate velocity magnitude for drag
 	velocity := math.Sqrt(entity.Velocity.X*entity.Velocity.X +
 		entity.Velocity.Y*entity.Velocity.Y)
+
 	if velocity > 0 {
-		// Air density decreases with altitude
+		// Get atmospheric density
 		rho := getAtmosphericDensity(entity.Position.Y)
-
-		// Reference area
-		area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
-
-		// Drag coefficient increases with velocity
-		cd := 0.3
-		if velocity > 100 {
-			cd = 0.5
+		if math.IsNaN(rho) {
+			rho = 1.225 // Use sea level density as fallback
 		}
 
-		// Calculate drag force
+		// Calculate drag
+		area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
+		cd := 0.3 // Base drag coefficient
+		if velocity > 100 {
+			cd = 0.5 // Increased drag at higher velocities
+		}
+
 		dragForce := 0.5 * rho * cd * area * velocity * velocity
 
-		// Apply drag opposite to velocity
+		// Apply drag in opposite direction of velocity
 		if entity.Velocity.Y > 0 {
 			netForce -= dragForce
 		} else {
 			netForce += dragForce
 		}
 
-		// apply passed in force
+		// Add external force
 		netForce += force.Y
-
 	}
 
-	// Calculate lift
-	liftCoefficient := 0.5 // Simplified lift coefficient
-	area := math.Pi * entity.Bodytube.Radius * entity.Bodytube.Radius
-	rho := 1.225 * math.Exp(-entity.Position.Y/7400.0)
-	liftForce := 0.5 * rho * liftCoefficient * area * velocity * velocity
-	netForce += liftForce
-
-	// Calculate final acceleration (adding to gravity)
-	entity.Acceleration.Y += netForce / entity.Mass.Value // ADD to existing acceleration
+	// Calculate acceleration from net force
+	entity.Acceleration.Y += netForce / entity.Mass.Value
 
 	// Semi-implicit Euler integration
 	newVelocity := entity.Velocity.Y + entity.Acceleration.Y*dt64
@@ -173,16 +182,13 @@ func (s *PhysicsSystem) applyForce(entity PhysicsEntity, force types.Vector3, dt
 
 	// Ground collision check with proper landing detection
 	if newPosition <= 0 {
-		if newVelocity < 0 {
-			// Landing - stop movement
-			entity.Position.Y = 0
-			entity.Velocity.Y = 0
-			entity.Acceleration.Y = 0
-		}
-		return // Stop updating after landing
+		entity.Position.Y = 0
+		entity.Velocity.Y = 0
+		entity.Acceleration.Y = 0
+		return
 	}
 
-	// Update state if not landed
+	// Update state if no collision
 	entity.Velocity.Y = newVelocity
 	entity.Position.Y = newPosition
 }

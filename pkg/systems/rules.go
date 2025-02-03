@@ -82,10 +82,18 @@ func (s *RulesSystem) checkApogee(entity PhysicsEntity) Event {
 }
 
 func (s *RulesSystem) checkLanding(entity PhysicsEntity) Event {
-	if s.hadApogee && entity.Position.Y <= 0 && entity.Velocity.Y < 0 {
+	// Only check for landing if we've passed apogee
+	if !s.hadApogee {
+		return None
+	}
+
+	// Check if we've hit the ground with downward velocity
+	if entity.Position.Y <= 0 && entity.Velocity.Y < 0 {
+		// Reset state on landing
 		entity.Position.Y = 0
 		entity.Velocity.Y = 0
 		entity.Acceleration.Y = 0
+		entity.Motor.SetState("LANDED")
 		return Land
 	}
 	return None

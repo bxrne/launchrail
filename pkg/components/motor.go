@@ -37,8 +37,8 @@ type Motor struct {
 	mu          sync.RWMutex
 	burnTime    float64
 	isCoasting  bool
-	logger      logf.Logger // Add logger
-	state       MotorState  // Add motor state
+	logger      logf.Logger
+	state       MotorState
 }
 
 // NewMotor creates a new motor component from thrust curve data
@@ -170,6 +170,13 @@ func (m *Motor) Reset() {
 	m.Mass = m.Props.TotalMass
 	m.FSM = NewMotorFSM()
 	m.state = MotorIgnited // Reset state
+}
+
+// SetState (testing only) sets the motor state to a specific value
+func (m *Motor) SetState(state string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.state = MotorState(state)
 }
 
 // GetMass returns the current mass of the motor

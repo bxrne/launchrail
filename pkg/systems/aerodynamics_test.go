@@ -102,6 +102,3 @@ func TestAerodynamicSystem_GetSpeedOfSound(t *testing.T) {
 	speed := aero.GetSpeedOfSound(20)
 	require.Greater(t, speed, 0.0)
 }
-
-// TEST: GIVEN a new AerodynamicsSystem
-// TEST: GIVEN a new AerodynamicsSystem
