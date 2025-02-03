@@ -11,11 +11,6 @@ import (
 	"github.com/bxrne/launchrail/pkg/types"
 )
 
-var (
-	// Cache atmospheric calculations
-	atmCache = sync.Map{}
-)
-
 // atmosphericData stores atmospheric data at a given altitude
 type atmosphericData struct {
 	density     float64
@@ -142,34 +137,8 @@ func (a *AerodynamicSystem) Priority() int {
 	return 2
 }
 
-// Add these methods to AerodynamicSystem
-func (a *AerodynamicSystem) calculateTemperature(altitude float64) float64 {
-	const (
-		T0 = 288.15 // K (15°C)
-		L  = 0.0065 // K/m
-	)
-	return T0 - L*altitude
-}
-
-// calculatePressure calculates atmospheric pressure at a given altitude
-func (a *AerodynamicSystem) calculatePressure(altitude, temperature float64) float64 {
-	const (
-		P0 = 101325 // Pa
-		g  = 9.81   // m/s²
-		R  = 287.05 // J/(kg·K)
-		T0 = 288.15 // K
-	)
-	return P0 * math.Pow(temperature/T0, -g/(R*0.0065))
-}
-
-// calculateDensity calculates air density at a given pressure and temperature
-func (a *AerodynamicSystem) calculateDensity(pressure, temperature float64) float64 {
-	const R = 287.05 // J/(kg·K)
-	return pressure / (R * temperature)
-}
-
 // calculateSoundSpeed calculates the speed of sound at a given temperature
-func (a *AerodynamicSystem) calculateSoundSpeed(temperature float64) float64 {
+func (a *AerodynamicSystem) GetSpeedOfSound(temperature float64) float64 {
 	const (
 		gamma = 1.4    // ratio of specific heats
 		R     = 287.05 // J/(kg·K)

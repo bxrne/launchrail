@@ -22,10 +22,14 @@ type FlightStats struct {
 // NewFlightStats creates a new FlightStats object
 func NewFlightStats() *FlightStats {
 	return &FlightStats{
-		Apogee:      -math.MaxFloat64,
-		MaxVelocity: -math.MaxFloat64,
-		MaxAccel:    -math.MaxFloat64,
-		MaxMach:     -math.MaxFloat64,
+		Apogee:            0,
+		MaxVelocity:       0,
+		MaxAccel:          0,
+		MaxMach:           0,
+		BurnTime:          0,
+		TimeToApogee:      0,
+		TotalFlightTime:   0,
+		GroundHitVelocity: 0,
 	}
 }
 
@@ -34,17 +38,20 @@ func (s *FlightStats) Update(time, altitude, velocity, accel, mach float64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Update apogee
 	if altitude > s.Apogee {
 		s.Apogee = altitude
 		s.TimeToApogee = time
 	}
 
+	// Update maximums using absolute values
 	s.MaxVelocity = math.Max(s.MaxVelocity, math.Abs(velocity))
 	s.MaxAccel = math.Max(s.MaxAccel, math.Abs(accel))
-	s.MaxMach = math.Max(s.MaxMach, mach)
+	s.MaxMach = math.Max(s.MaxMach, math.Abs(mach))
 	s.TotalFlightTime = time
 
-	if altitude <= 0 {
+	// Update ground hit velocity only when actually hitting ground
+	if altitude <= 0 && s.Apogee > 0 {
 		s.GroundHitVelocity = velocity
 	}
 }

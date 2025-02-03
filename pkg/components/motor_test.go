@@ -41,7 +41,7 @@ func TestMotorUpdate(t *testing.T) {
 	motor := components.NewMotor(ecs.BasicEntity{}, md, logger)
 	err := motor.Update(0.5)
 	assert.NoError(t, err)
-	assert.Equal(t, motor.GetThrust(), 5.0)
+	assert.Equal(t, 7.5, motor.GetThrust()) // Correct expected thrust after 0.5 seconds
 	assert.Less(t, motor.GetThrust(), 10.0)
 	assert.Less(t, motor.GetMass(), 2.0) // Mass should decrease
 }

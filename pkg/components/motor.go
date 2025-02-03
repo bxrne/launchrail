@@ -97,12 +97,23 @@ func (m *Motor) Update(dt float64) error {
 		return fmt.Errorf("invalid timestep")
 	}
 
+	// Update thrust before checking burnout
+	if !m.isCoasting {
+		m.thrust = m.interpolateThrust(m.elapsedTime)
+
+		// Update mass only if still burning
+		if m.Mass > 0 && m.thrust > 0 {
+			massLoss := (m.thrust * dt) / m.Props.AvgThrust
+			m.Mass = math.Max(0, m.Mass-massLoss)
+		}
+	}
+
+	m.elapsedTime += dt
+
+	// Check for burnout after updating
 	if m.elapsedTime >= m.burnTime {
 		return m.handleBurnout()
 	}
-
-	m.updateThrustAndMass(dt)
-	m.elapsedTime += dt
 
 	return nil
 }
@@ -181,6 +192,7 @@ func (m *Motor) interpolateThrust(totalDt float64) float64 {
 	// Add epsilon for floating point comparison
 	const eps = 1e-10
 
+	// Early exit conditions
 	if m.isCoasting || totalDt >= m.burnTime-eps {
 		m.isCoasting = true
 		m.thrust = 0
@@ -188,22 +200,26 @@ func (m *Motor) interpolateThrust(totalDt float64) float64 {
 		return 0
 	}
 
-	// Clamp to valid range
-	if totalDt < 0 {
+	// Get first thrust point if at start
+	if totalDt <= m.Thrustcurve[0][0] {
 		return m.Thrustcurve[0][1]
 	}
 
-	// Find interpolation points
+	// Linear interpolation between points
 	for i := 0; i < len(m.Thrustcurve)-1; i++ {
 		t1, thrust1 := m.Thrustcurve[i][0], m.Thrustcurve[i][1]
 		t2, thrust2 := m.Thrustcurve[i+1][0], m.Thrustcurve[i+1][1]
 
 		if t1 <= totalDt && totalDt < t2 {
+			// Linear interpolation formula
 			ratio := (totalDt - t1) / (t2 - t1)
 			return thrust1 + (thrust2-thrust1)*ratio
 		}
 	}
 
+	// Past end of thrust curve
+	m.isCoasting = true
+	m.state = MotorBurnout
 	return 0
 }
 

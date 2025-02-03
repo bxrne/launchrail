@@ -158,5 +158,15 @@ func (s *Simulation) updateSystems() error {
 			return err
 		}
 	}
+
+	// Update flight stats
+	s.stats.Update(
+		s.currentTime,
+		s.rocket.Position.Y,
+		s.rocket.Velocity.Y,
+		s.rocket.Acceleration.Y,
+		s.rocket.Velocity.Y/s.aerodynamicSystem.GetSpeedOfSound(s.rocket.Position.Y),
+	)
+
 	return nil
 }
