@@ -89,7 +89,7 @@ func TestPhysicsSystem_Update(t *testing.T) {
 			name:        "Landing detection",
 			mass:        1.0,
 			initialPos:  components.Position{Y: 0.1}, // Slightly above ground
-			initialVel:  components.Velocity{Y: -10},
+			initialVel:  components.Velocity{Y: 0},
 			motorState:  "COASTING",
 			dt:          0.016,
 			wantPosY:    0, // Should land
