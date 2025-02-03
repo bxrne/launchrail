@@ -5,6 +5,8 @@ import (
 	"sync"
 
 	"github.com/EngoEngine/ecs"
+	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/pkg/atmosphere"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/types"
 )
@@ -27,35 +29,27 @@ type AerodynamicSystem struct {
 	world    *ecs.World
 	entities []physicsEntity
 	workers  int
+	isa      *atmosphere.ISAModel
 }
 
-// physicsEntity represents an entity with physics components
-func NewAerodynamicSystem(world *ecs.World, workers int) *AerodynamicSystem {
+func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Config) *AerodynamicSystem {
 	return &AerodynamicSystem{
 		world:    world,
 		entities: make([]physicsEntity, 0),
 		workers:  workers,
+		isa:      atmosphere.NewISAModel(&cfg.Options.Launchsite.Atmosphere.ISAConfiguration),
 	}
 }
 
 // getAtmosphericData retrieves atmospheric data from cache or calculates it
 func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericData {
-	// Round to nearest meter for caching
-	roundedAlt := math.Floor(altitude)
-
-	if data, ok := atmCache.Load(roundedAlt); ok {
-		return data.(*atmosphericData)
+	isaData := a.isa.GetAtmosphere(altitude)
+	return &atmosphericData{
+		density:     isaData.Density,
+		pressure:    isaData.Pressure,
+		temperature: isaData.Temperature,
+		soundSpeed:  a.isa.GetSpeedOfSound(altitude),
 	}
-
-	// Calculate new atmospheric data
-	data := &atmosphericData{}
-	data.temperature = a.calculateTemperature(altitude)
-	data.pressure = a.calculatePressure(altitude, data.temperature)
-	data.density = a.calculateDensity(data.pressure, data.temperature)
-	data.soundSpeed = a.calculateSoundSpeed(data.temperature)
-
-	atmCache.Store(roundedAlt, data)
-	return data
 }
 
 // CalculateDrag now handles atmospheric effects and Mach number
@@ -185,16 +179,18 @@ func (a *AerodynamicSystem) calculateSoundSpeed(temperature float64) float64 {
 
 // calculateDragCoeff calculates the drag coefficient based on Mach number
 func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity physicsEntity) float64 {
-	// Basic drag coefficient calculation
-	baseCd := 0.2 // Base drag coefficient
-	// Transonic drag rise
+	// More accurate drag coefficient calculation
+	baseCd := 0.2 // Subsonic base drag
+
+	// Add wave drag in transonic region
 	if mach > 0.8 && mach < 1.2 {
-		baseCd *= 1 + 5*(mach-0.8)
+		// Prandtl-Glauert compressibility correction
+		baseCd *= 1 / math.Sqrt(1-math.Pow(mach, 2))
 	}
 
 	// Supersonic drag
 	if mach >= 1.2 {
-		baseCd = 0.3 / math.Sqrt(mach)
+		baseCd = 0.2 + 0.6*math.Exp(-0.6*(mach-1.2))
 	}
 
 	return baseCd

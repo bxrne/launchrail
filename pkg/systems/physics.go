@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/EngoEngine/ecs"
+	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/barrowman"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/types"
@@ -27,6 +28,7 @@ type PhysicsSystem struct {
 	workers      int
 	workChan     chan physicsEntity
 	resultChan   chan types.Vector3
+	gravity      float64
 }
 
 // Add TrapezoidFinset to physicsEntity
@@ -65,7 +67,7 @@ func (s *PhysicsSystem) Remove(basic ecs.BasicEntity) {
 }
 
 // NewPhysicsSystem creates a new PhysicsSystem
-func NewPhysicsSystem(world *ecs.World) *PhysicsSystem {
+func NewPhysicsSystem(world *ecs.World, cfg *config.Config) *PhysicsSystem {
 	workers := 4
 	return &PhysicsSystem{
 		world:        world,
@@ -74,6 +76,7 @@ func NewPhysicsSystem(world *ecs.World) *PhysicsSystem {
 		workChan:     make(chan physicsEntity, workers),
 		resultChan:   make(chan types.Vector3, workers),
 		cpCalculator: barrowman.NewCPCalculator(), // Initialize calculator
+		gravity:      cfg.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel,
 	}
 }
 
@@ -127,7 +130,7 @@ func (s *PhysicsSystem) applyForce(entity physicsEntity, force types.Vector3, dt
 
 	// Reset acceleration each frame
 	entity.Acceleration.X = 0
-	entity.Acceleration.Y = -9.81 // Gravity is constant
+	entity.Acceleration.Y = -s.gravity // Use configured gravity
 
 	// Calculate forces
 	var netForce float64

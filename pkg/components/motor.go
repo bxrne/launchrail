@@ -108,9 +108,6 @@ func (m *Motor) Update(dt float64) error {
 }
 
 func (m *Motor) handleBurnout() error {
-	if m.thrust > 0 {
-		return fmt.Errorf("motor still producing thrust after burn time: t=%v, thrust=%v", m.elapsedTime, m.thrust)
-	}
 	m.isCoasting = true
 	m.thrust = 0
 	m.state = MotorBurnout
@@ -181,7 +178,13 @@ func (m *Motor) Type() string {
 
 // interpolateThrust interpolates the thrust value at a given time point
 func (m *Motor) interpolateThrust(totalDt float64) float64 {
-	if m.isCoasting || totalDt >= m.burnTime {
+	// Add epsilon for floating point comparison
+	const eps = 1e-10
+
+	if m.isCoasting || totalDt >= m.burnTime-eps {
+		m.isCoasting = true
+		m.thrust = 0
+		m.state = MotorBurnout
 		return 0
 	}
 

@@ -50,9 +50,9 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.St
 	}
 
 	// Initialize systems with optimized worker counts
-	sim.physicsSystem = systems.NewPhysicsSystem(world)
-	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, 4) // Add worker count
-	sim.rulesSystem = systems.NewRulesSystem(world)                // Add this line
+	sim.physicsSystem = systems.NewPhysicsSystem(world, cfg)
+	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, 4, cfg) // Add worker count
+	sim.rulesSystem = systems.NewRulesSystem(world)                     // Add this line
 
 	// Initialize launch rail system with config values
 	sim.launchRailSystem = systems.NewLaunchRailSystem(
