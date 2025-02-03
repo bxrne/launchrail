@@ -238,9 +238,8 @@ func (s *PhysicsSystem) applyForce(entity physicsEntity, force types.Vector3, dt
 }
 
 // Add adds an entity to the system
-func (s *PhysicsSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
-	vel *components.Velocity, acc *components.Acceleration, mass *components.Mass, motor *components.Motor, bodytube *components.Bodytube, nosecone *components.Nosecone) {
-	s.entities = append(s.entities, physicsEntity{entity, pos, vel, acc, mass, motor, bodytube, nosecone, nil})
+func (s *PhysicsSystem) Add(se *SystemEntity) {
+	s.entities = append(s.entities, physicsEntity{se.Entity, se.Pos, se.Vel, se.Acc, se.Mass, se.Motor, se.Bodytube, se.Nosecone, se.Finset})
 }
 
 // Priority returns the system priority

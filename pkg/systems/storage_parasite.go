@@ -5,7 +5,6 @@ import (
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/storage"
-	"github.com/bxrne/launchrail/pkg/components"
 )
 
 // StorageParasiteSystem logs rocket state data to storage
@@ -67,13 +66,9 @@ func (s *StorageParasiteSystem) Priority() int {
 // Update the StorageParasiteSystem
 func (s *StorageParasiteSystem) Update(dt float32) {
 	// No need to track time here - data comes from simulation state
-	return
 }
 
 // Add adds entities to the system
-func (s *StorageParasiteSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
-	vel *components.Velocity, acc *components.Acceleration, mass *components.Mass,
-	motor *components.Motor, bodytube *components.Bodytube, nosecone *components.Nosecone,
-	finset *components.TrapezoidFinset) {
-	s.entities = append(s.entities, physicsEntity{entity, pos, vel, acc, mass, motor, bodytube, nosecone, finset})
+func (s *StorageParasiteSystem) Add(se *SystemEntity) {
+	s.entities = append(s.entities, physicsEntity{se.Entity, se.Pos, se.Vel, se.Acc, se.Mass, se.Motor, se.Bodytube, se.Nosecone, se.Finset})
 }

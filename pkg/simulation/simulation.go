@@ -62,8 +62,8 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.St
 	)
 
 	// Initialize parasite systems
-	sim.logParasiteSystem = systems.NewLogParasiteSystem(world, log)                 // For logging
-	sim.storageParasiteSystem = systems.NewStorageParasiteSystem(world, motionStore) // For motion storage
+	sim.logParasiteSystem = systems.NewLogParasiteSystem(world, log)
+	sim.storageParasiteSystem = systems.NewStorageParasiteSystem(world, motionStore)
 
 	// Start parasites
 	sim.logParasiteSystem.Start(sim.stateChan)
@@ -82,85 +82,26 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	// Create rocket entity with all components
 	s.rocket = entities.NewRocketEntity(s.world, orkData, motor)
 
-	// Add components to physics system
-	s.physicsSystem.Add(
-		s.rocket.BasicEntity,
-		s.rocket.Position,
-		s.rocket.Velocity,
-		s.rocket.Acceleration,
-		s.rocket.Mass,
-		motor,
-		s.rocket.GetComponent("bodytube").(*components.Bodytube),
-		s.rocket.GetComponent("nosecone").(*components.Nosecone),
-	)
+	// Create a single SystemEntity to reuse for all systems
+	sysEntity := &systems.SystemEntity{
+		Entity:   s.rocket.BasicEntity,
+		Pos:      s.rocket.Position,
+		Vel:      s.rocket.Velocity,
+		Acc:      s.rocket.Acceleration,
+		Mass:     s.rocket.Mass,
+		Motor:    motor,
+		Bodytube: s.rocket.GetComponent("bodytube").(*components.Bodytube),
+		Nosecone: s.rocket.GetComponent("nosecone").(*components.Nosecone),
+		Finset:   s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
+	}
 
-	// Get optional finset component
-	finset := s.rocket.GetComponent("finset").(*components.TrapezoidFinset)
-
-	// Add to aerodynamic system with finset
-	s.aerodynamicSystem.Add(
-		s.rocket.BasicEntity,
-		s.rocket.Position,
-		s.rocket.Velocity,
-		s.rocket.Acceleration,
-		s.rocket.Mass,
-		motor,
-		s.rocket.GetComponent("bodytube").(*components.Bodytube),
-		s.rocket.GetComponent("nosecone").(*components.Nosecone),
-		finset, // This may be nil
-	)
-
-	// Add to rules system
-	s.rulesSystem.Add(
-		s.rocket.BasicEntity,
-		s.rocket.Position,
-		s.rocket.Velocity,
-		s.rocket.Acceleration,
-		s.rocket.Mass,
-		motor,
-		s.rocket.GetComponent("bodytube").(*components.Bodytube),
-		s.rocket.GetComponent("nosecone").(*components.Nosecone),
-		finset,
-	)
-
-	// Add to launch rail system
-	s.launchRailSystem.Add(
-		s.rocket.BasicEntity,
-		s.rocket.Position,
-		s.rocket.Velocity,
-		s.rocket.Acceleration,
-		s.rocket.Mass,
-		motor,
-		s.rocket.GetComponent("bodytube").(*components.Bodytube),
-		s.rocket.GetComponent("nosecone").(*components.Nosecone),
-		finset,
-	)
-
-	// Add to log parasite system
-	s.logParasiteSystem.Add(
-		s.rocket.BasicEntity,
-		s.rocket.Position,
-		s.rocket.Velocity,
-		s.rocket.Acceleration,
-		s.rocket.Mass,
-		motor,
-		s.rocket.GetComponent("bodytube").(*components.Bodytube),
-		s.rocket.GetComponent("nosecone").(*components.Nosecone),
-		finset, // This may be nil
-	)
-
-	// Add to storage parasite system
-	s.storageParasiteSystem.Add(
-		s.rocket.BasicEntity,
-		s.rocket.Position,
-		s.rocket.Velocity,
-		s.rocket.Acceleration,
-		s.rocket.Mass,
-		motor,
-		s.rocket.GetComponent("bodytube").(*components.Bodytube),
-		s.rocket.GetComponent("nosecone").(*components.Nosecone),
-		finset, // This may be nil
-	)
+	// Add to all systems
+	s.physicsSystem.Add(sysEntity)
+	s.aerodynamicSystem.Add(sysEntity)
+	s.rulesSystem.Add(sysEntity)
+	s.launchRailSystem.Add(sysEntity)
+	s.logParasiteSystem.Add(sysEntity)
+	s.storageParasiteSystem.Add(sysEntity)
 
 	return nil
 }

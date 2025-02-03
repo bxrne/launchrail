@@ -194,12 +194,22 @@ func (a *AerodynamicSystem) Update(dt float32) error {
 	return nil
 }
 
+// SystemEntity represents an entity with physics components (Meta rocket)
+type SystemEntity struct {
+	Entity   *ecs.BasicEntity
+	Pos      *components.Position
+	Vel      *components.Velocity
+	Acc      *components.Acceleration
+	Mass     *components.Mass
+	Motor    *components.Motor
+	Bodytube *components.Bodytube
+	Nosecone *components.Nosecone
+	Finset   *components.TrapezoidFinset
+}
+
 // Add adds entities to the system
-func (a *AerodynamicSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
-	vel *components.Velocity, acc *components.Acceleration, mass *components.Mass,
-	motor *components.Motor, bodytube *components.Bodytube, nosecone *components.Nosecone,
-	finset *components.TrapezoidFinset) {
-	a.entities = append(a.entities, physicsEntity{entity, pos, vel, acc, mass, motor, bodytube, nosecone, finset})
+func (a *AerodynamicSystem) Add(as *SystemEntity) {
+	a.entities = append(a.entities, physicsEntity{as.Entity, as.Pos, as.Vel, as.Acc, as.Mass, as.Motor, as.Bodytube, as.Nosecone, as.Finset})
 }
 
 // Priority returns the system priority
@@ -255,7 +265,6 @@ func (a *AerodynamicSystem) calculateSoundSpeed(temperature float64) float64 {
 func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity physicsEntity) float64 {
 	// Basic drag coefficient calculation
 	baseCd := 0.2 // Base drag coefficient
-
 	// Transonic drag rise
 	if mach > 0.8 && mach < 1.2 {
 		baseCd *= 1 + 5*(mach-0.8)

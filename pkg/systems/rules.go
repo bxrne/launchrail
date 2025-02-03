@@ -2,7 +2,6 @@ package systems
 
 import (
 	"github.com/EngoEngine/ecs"
-	"github.com/bxrne/launchrail/pkg/components"
 )
 
 // Event represents a significant event in flight
@@ -33,11 +32,8 @@ func NewRulesSystem(world *ecs.World) *RulesSystem {
 }
 
 // Add adds a physics entity to the rules system
-func (s *RulesSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
-	vel *components.Velocity, acc *components.Acceleration, mass *components.Mass,
-	motor *components.Motor, bodytube *components.Bodytube, nosecone *components.Nosecone,
-	finset *components.TrapezoidFinset) {
-	s.entities = append(s.entities, physicsEntity{entity, pos, vel, acc, mass, motor, bodytube, nosecone, finset})
+func (s *RulesSystem) Add(se *SystemEntity) {
+	s.entities = append(s.entities, physicsEntity{se.Entity, se.Pos, se.Vel, se.Acc, se.Mass, se.Motor, se.Bodytube, se.Nosecone, se.Finset})
 }
 
 // Update applies rules of flight to entities

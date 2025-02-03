@@ -4,7 +4,6 @@ import (
 	"math"
 
 	"github.com/EngoEngine/ecs"
-	"github.com/bxrne/launchrail/pkg/components"
 )
 
 // LaunchRail represents a launch rail
@@ -42,11 +41,8 @@ func NewLaunchRailSystem(world *ecs.World, length, angle, orientation float64) *
 }
 
 // Add adds a physics entity to the launch rail system
-func (s *LaunchRailSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
-	vel *components.Velocity, acc *components.Acceleration, mass *components.Mass,
-	motor *components.Motor, bodytube *components.Bodytube, nosecone *components.Nosecone,
-	finset *components.TrapezoidFinset) {
-	s.entities = append(s.entities, physicsEntity{entity, pos, vel, acc, mass, motor, bodytube, nosecone, finset})
+func (s *LaunchRailSystem) Add(se *SystemEntity) {
+	s.entities = append(s.entities, physicsEntity{se.Entity, se.Pos, se.Vel, se.Acc, se.Mass, se.Motor, se.Bodytube, se.Nosecone, se.Finset})
 }
 
 // Update applies launch rail constraints to entities

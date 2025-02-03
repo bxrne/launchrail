@@ -2,7 +2,6 @@ package systems
 
 import (
 	"github.com/EngoEngine/ecs"
-	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/zerodha/logf"
 )
 
@@ -67,9 +66,6 @@ func (s *LogParasiteSystem) Update(dt float32) {
 }
 
 // Add adds entities to the system
-func (s *LogParasiteSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
-	vel *components.Velocity, acc *components.Acceleration, mass *components.Mass,
-	motor *components.Motor, bodytube *components.Bodytube, nosecone *components.Nosecone,
-	finset *components.TrapezoidFinset) {
-	s.entities = append(s.entities, physicsEntity{entity, pos, vel, acc, mass, motor, bodytube, nosecone, finset})
+func (s *LogParasiteSystem) Add(se *SystemEntity) {
+	s.entities = append(s.entities, physicsEntity{se.Entity, se.Pos, se.Vel, se.Acc, se.Mass, se.Motor, se.Bodytube, se.Nosecone, se.Finset})
 }
