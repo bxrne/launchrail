@@ -2,58 +2,25 @@ package systems
 
 import (
 	"github.com/EngoEngine/ecs"
-	"github.com/bxrne/launchrail/internal/storage"
-	"github.com/bxrne/launchrail/pkg/components"
-	"github.com/zerodha/logf"
 )
 
-type ParasiteSystem struct {
-	world    *ecs.World
-	entities []physicsEntity
-	storage  *storage.Storage
-	log      bool
-	logger   *logf.Logger
-	time     float64
+// RocketState represents the current state of the rocket for parasites
+type RocketState struct {
+	Time         float64
+	Altitude     float64
+	Velocity     float64
+	Acceleration float64
+	Thrust       float64
+	MotorState   string
 }
 
-func NewParasiteSystem(world *ecs.World, storage *storage.Storage, log bool, logger *logf.Logger) *ParasiteSystem {
-	return &ParasiteSystem{
-		world:    world,
-		entities: make([]physicsEntity, 0),
-		storage:  storage,
-		log:      log,
-		logger:   logger,
-		time:     0,
-	}
+// ParasiteSystem defines the interface for parasite systems
+type ParasiteSystem interface {
+	Update(dt float32) error
+	Add(entity *ecs.BasicEntity, components ...interface{})
+	Priority() int
+	Start(dataChan chan RocketState)
+	Stop()
 }
 
-func (s *ParasiteSystem) Priority() int {
-	return 1
-}
-
-func (s *ParasiteSystem) Update(dt float32) {
-	currentTime := s.time
-
-	for _, entity := range s.entities {
-		if s.storage != nil {
-			// Log only time and thrust
-			thrustValue := 0.0
-			if entity.Motor != nil {
-				thrustValue = entity.Motor.GetThrust()
-			}
-
-			s.logger.Debug("Motor thrust",
-				"time", currentTime,
-				"thrust", thrustValue)
-		}
-	}
-
-	s.time += float64(dt)
-}
-
-func (s *ParasiteSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
-	vel *components.Velocity, acc *components.Acceleration, mass *components.Mass,
-	motor *components.Motor, bodytube *components.Bodytube, nosecone *components.Nosecone,
-	finset *components.TrapezoidFinset) {
-	s.entities = append(s.entities, physicsEntity{entity, pos, vel, acc, mass, motor, bodytube, nosecone, finset})
-}
+// Update dataflow: Simulation -> RocketState -> Parasite Systems

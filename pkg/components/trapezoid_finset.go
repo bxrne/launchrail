@@ -31,7 +31,7 @@ func NewTrapezoidFinsetFromORK(basic ecs.BasicEntity, ork *openrocket.RocketDocu
 		TipChord:    finset.TipChord,
 		Span:        finset.Height,
 		SweepAngle:  finset.SweepLength,
-		Mass:        calculateFinMass(&finset),
+		Mass:        finset.GetMass(),
 		Position: Position{
 			X: finset.AxialOffset.Value,
 			Y: 0,
@@ -41,7 +41,7 @@ func NewTrapezoidFinsetFromORK(basic ecs.BasicEntity, ork *openrocket.RocketDocu
 }
 
 // calculateFinMass calculates mass based on material density and dimensions
-func calculateFinMass(fin *openrocket.TrapezoidFinset) float64 {
+func CalculateFinMass(fin *openrocket.TrapezoidFinset) float64 {
 	area := (fin.RootChord + fin.TipChord) * fin.Height / 2
 	volume := area * fin.Thickness
 	density := fin.Material.Density

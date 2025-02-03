@@ -12,6 +12,15 @@ import (
 	"github.com/zerodha/logf"
 )
 
+type MotorState string
+
+const (
+	MotorIgnited  MotorState = "IGNITED"
+	MotorBurning  MotorState = "BURNING"
+	MotorBurnout  MotorState = "BURNOUT"
+	MotorCoasting MotorState = "COASTING"
+)
+
 type Motor struct {
 	ID          ecs.BasicEntity
 	Position    types.Vector3
@@ -25,6 +34,7 @@ type Motor struct {
 	burnTime    float64
 	isCoasting  bool
 	logger      logf.Logger // Add logger
+	state       MotorState  // Add motor state
 }
 
 func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger) *Motor {
@@ -42,7 +52,8 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 		FSM:         NewMotorFSM(),
 		burnTime:    md.BurnTime,
 		isCoasting:  false,
-		logger:      logger, // Initialize logger
+		logger:      logger,        // Initialize logger
+		state:       MotorCoasting, // Initial state
 	}
 
 	// Initialize with first thrust point
@@ -89,6 +100,7 @@ func (m *Motor) Update(dt float64) error {
 		}
 		m.isCoasting = true
 		m.thrust = 0
+		m.state = MotorBurnout // Update state
 		return nil
 	}
 
@@ -103,14 +115,12 @@ func (m *Motor) Update(dt float64) error {
 			massLoss := (m.thrust * dt) / m.Props.AvgThrust
 			m.Mass = math.Max(0, m.Mass-massLoss)
 		}
-	}
 
-	m.logger.Debug("Motor state",
-		"time", m.elapsedTime,
-		"burnTime", m.burnTime,
-		"thrust", m.thrust,
-		"mass", m.Mass,
-		"coasting", m.isCoasting)
+		// Update state based on current thrust calculation
+		if m.elapsedTime > 0 {
+			m.state = MotorBurning
+		}
+	}
 
 	return nil
 }
@@ -138,7 +148,14 @@ func (m *Motor) GetThrust() float64 {
 func (m *Motor) IsCoasting() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.isCoasting
+	return m.state == MotorCoasting || m.state == MotorBurnout
+}
+
+// GetState returns the current state of the motor
+func (m *Motor) GetState() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return string(m.state)
 }
 
 // Reset resets the motor state for potential reuse
@@ -151,6 +168,7 @@ func (m *Motor) Reset() {
 	m.thrust = m.Thrustcurve[0][1]
 	m.Mass = m.Props.TotalMass
 	m.FSM = NewMotorFSM()
+	m.state = MotorCoasting // Reset state
 }
 
 func (m *Motor) GetMass() float64 {

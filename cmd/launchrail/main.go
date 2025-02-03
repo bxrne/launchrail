@@ -36,15 +36,34 @@ func main() {
 	}
 	log.Debug("OpenRocket data loaded", "Version", orkData.Version, "Creator", orkData.Creator)
 
-	// Initialize storage
-	motionStore, err := storage.NewStorage(cfg.App.BaseDir, "motion")
+	// Initialize storage with headers
+	storage, err := storage.NewStorage(cfg.App.BaseDir, "motion")
 	if err != nil {
-		log.Fatal("Failed to create motion storage", "Error", err)
+		log.Fatal("Failed to create storage", "error", err)
 	}
+	defer storage.Close()
+
+	err = storage.Init([]string{
+		"time",
+		"altitude",     // Changed from position_y for clarity
+		"velocity",     // Changed from velocity_y for clarity
+		"acceleration", // Changed from acceleration_y for clarity
+		"thrust",
+	})
+	if err != nil {
+		log.Fatal("Failed to init storage", "error", err)
+	}
+
+	// Configure logger with additional debug level
+	log.Debug("Storage initialized",
+		"path", storage.GetFilePath(),
+		"headers", fmt.Sprintf("%v", []string{"time", "altitude", "velocity", "acceleration", "thrust"}),
+	)
+
 	log.Debug("Storage for motion data initialized", "BaseDir", cfg.App.BaseDir)
 
 	// Create and run simulation with logger
-	sim, err := simulation.NewSimulation(cfg, log, motionStore)
+	sim, err := simulation.NewSimulation(cfg, log, storage)
 	if err != nil {
 		log.Fatal("Failed to create simulation", "Error", err)
 	}

@@ -25,28 +25,23 @@ func (c *CPCalculator) CalculateCP(nose *components.Nosecone, body *components.B
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Get vector from pool
-	cpContrib := vectorPool.Get().([]float64)
-	defer vectorPool.Put(cpContrib)
+	// Calculate individual CP locations
+	noseCP := c.calculateNoseCP(nose)
+	bodyCP := c.calculateBodyCP(body)
+	finCP := c.calculateFinCP(fins)
 
-	// Nosecone contribution
-	cpContrib[0] = c.calculateNoseCP(nose)
+	// Calculate areas
+	noseArea := nose.GetPlanformArea()
+	bodyArea := body.GetPlanformArea()
+	finArea := fins.GetPlanformArea()
+	totalArea := noseArea + bodyArea + finArea
 
-	// Body contribution
-	cpContrib[1] = c.calculateBodyCP(body)
-
-	// Fin contribution
-	// if fins != nil {
-	// 	cpContrib[2] = c.calculateFinCP(fins)
-	// }
-
-	// Weight contributions by area
-	totalArea := nose.GetPlanformArea() + body.GetPlanformArea()
-
-	cp := 0.0
-	for _, contrib := range cpContrib {
-		cp += contrib * (contrib / totalArea)
+	if totalArea <= 0 {
+		return 0
 	}
+
+	// Weight CP contributions by their respective areas
+	cp := (noseCP*noseArea + bodyCP*bodyArea + finCP*finArea) / totalArea
 
 	return cp
 }
@@ -61,20 +56,8 @@ func (c *CPCalculator) calculateBodyCP(body *components.Bodytube) float64 {
 }
 
 func (c *CPCalculator) calculateFinCP(fins *components.TrapezoidFinset) float64 {
-	// Calculate fin CP using Barrowman method
-	// See https://www.apogeerockets.com/education/downloads/Newsletter281.pdf
-	// for more details
-
-	var cp float64
-
-	// Calculate fin moment arm
-	momentArm := fins.Position.X + fins.RootChord/3
-
-	// Calculate fin CP
-	cp = momentArm + fins.RootChord/3
-
-	return cp
-
+	// Rough approximation: place fin CP at 0.75 of root chord
+	return 0.75 * fins.RootChord
 }
 
 // NewCPCalculator creates a new CPCalculator

@@ -154,43 +154,39 @@ func calculateDragCoefficient(mach, reynolds, shapeParameter float64) float64 {
 func (a *AerodynamicSystem) Update(dt float32) error {
 	workChan := make(chan physicsEntity, len(a.entities))
 	resultChan := make(chan types.Vector3, len(a.entities))
-	var wg sync.WaitGroup
 
-	// Start workers
+	var wg sync.WaitGroup
 	for i := 0; i < a.workers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for entity := range workChan {
+				// Perform a more accurate Mach-based drag calculation
 				force := a.CalculateDrag(entity)
 				resultChan <- force
 			}
 		}()
 	}
 
-	// Send work
 	for _, entity := range a.entities {
 		workChan <- entity
 	}
 	close(workChan)
 
-	// Wait for workers and close result channel
 	go func() {
 		wg.Wait()
 		close(resultChan)
 	}()
 
-	// Process results
 	i := 0
 	for force := range resultChan {
 		entity := a.entities[i]
-		acceleration := force.DivideScalar(entity.Mass.Value)
-		entity.Acceleration.X += float64(acceleration.X)
-		entity.Acceleration.Y += float64(acceleration.Y)
-		entity.Acceleration.Z += float64(acceleration.Z)
+		acc := force.DivideScalar(entity.Mass.Value)
+		entity.Acceleration.X += float64(acc.X)
+		entity.Acceleration.Y += float64(acc.Y)
+		entity.Acceleration.Z += float64(acc.Z)
 		i++
 	}
-
 	return nil
 }
 

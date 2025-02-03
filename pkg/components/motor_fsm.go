@@ -37,6 +37,11 @@ func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime flo
 	ctx := context.Background() // Create a background context
 	currentState := fsm.fsm.Current()
 
+	// Force the motor to go idle when empty or time exceeded
+	if mass <= 0 || elapsedTime >= burnTime {
+		return fsm.handlePotentiallyInactiveState(ctx, currentState)
+	}
+
 	// Use strictly less than for active state
 	if mass > 0 && elapsedTime < burnTime {
 		return fsm.handlePotentiallyActiveState(ctx, currentState)
