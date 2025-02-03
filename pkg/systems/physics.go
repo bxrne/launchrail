@@ -187,13 +187,8 @@ func (s *PhysicsSystem) applyForce(entity physicsEntity, force types.Vector3, dt
 
 	// Ground collision check with proper landing detection
 	if newPosition <= 0 {
-		if newVelocity < -1.0 { // Consider landed only if descent rate is significant
-			// Hard landing - stop movement
-			entity.Position.Y = 0
-			entity.Velocity.Y = 0
-			entity.Acceleration.Y = 0
-		} else if newVelocity > -1.0 && newVelocity < 0 {
-			// Soft landing - gradual stop
+		if newVelocity < 0 {
+			// Landing - stop movement
 			entity.Position.Y = 0
 			entity.Velocity.Y = 0
 			entity.Acceleration.Y = 0
