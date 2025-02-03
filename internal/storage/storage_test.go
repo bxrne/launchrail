@@ -126,5 +126,5 @@ func TestWriteInvalidData(t *testing.T) {
 	data := []string{"Value1", "Value2", "Value3"}
 	err = s.Write(data)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "data length does not match headers length")
+	assert.EqualError(t, err, "data length (3) does not match headers length (2)")
 }

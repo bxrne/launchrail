@@ -92,6 +92,34 @@ func (cfg *Config) Validate() error {
 		return fmt.Errorf("options.launchsite.altitude is required")
 	}
 
+	if cfg.Options.Launchsite.Atmosphere.ISAConfiguration.SpecificGasConstant == 0 {
+		return fmt.Errorf("options.launchsite.atmosphere.isa_configuration.specific_gas_constant is required")
+	}
+
+	if cfg.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel == 0 {
+		return fmt.Errorf("options.launchsite.atmosphere.isa_configuration.gravitational_accel is required")
+	}
+
+	if cfg.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelDensity == 0 {
+		return fmt.Errorf("options.launchsite.atmosphere.isa_configuration.sea_level_density is required")
+	}
+
+	if cfg.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelTemperature == 0 {
+		return fmt.Errorf("options.launchsite.atmosphere.isa_configuration.sea_level_temperature is required")
+	}
+
+	if cfg.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelPressure == 0 {
+		return fmt.Errorf("options.launchsite.atmosphere.isa_configuration.sea_level_pressure is required")
+	}
+
+	if cfg.Options.Launchsite.Atmosphere.ISAConfiguration.RatioSpecificHeats == 0 {
+		return fmt.Errorf("options.launchsite.atmosphere.isa_configuration.ratio_specific_heats is required")
+	}
+
+	if cfg.Options.Launchsite.Atmosphere.ISAConfiguration.TemperatureLapseRate == 0 {
+		return fmt.Errorf("options.launchsite.atmosphere.isa_configuration.temperature_lapse_rate is required")
+	}
+
 	if cfg.Simulation.Step == 0 {
 		return fmt.Errorf("simulation.step is required")
 	}

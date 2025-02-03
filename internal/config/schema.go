@@ -91,7 +91,7 @@ func (c *Config) String() map[string]string {
 	marshalled["options.launchsite.altitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Altitude)
 	marshalled["options.launchsite.atmosphere.isa_configuration.specific_gas_constant"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SpecificGasConstant)
 	marshalled["options.launchsite.atmosphere.isa_configuration.gravitational_accel"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel)
-	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_density"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelDensity)
+	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_density"] = fmt.Sprintf("%.3f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelDensity)
 	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_temperature"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelTemperature)
 	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_pressure"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelPressure)
 	marshalled["options.launchsite.atmosphere.isa_configuration.ratio_specific_heats"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.RatioSpecificHeats)

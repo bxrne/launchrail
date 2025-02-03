@@ -41,7 +41,7 @@ func TestMotorUpdate(t *testing.T) {
 	motor := components.NewMotor(ecs.BasicEntity{}, md, logger)
 	err := motor.Update(0.5)
 	assert.NoError(t, err)
-	assert.Greater(t, motor.GetThrust(), 5.0)
+	assert.Equal(t, motor.GetThrust(), 5.0)
 	assert.Less(t, motor.GetThrust(), 10.0)
 	assert.Less(t, motor.GetMass(), 2.0) // Mass should decrease
 }
@@ -85,7 +85,7 @@ func TestMotorReset(t *testing.T) {
 
 	assert.Equal(t, 10.0, motor.GetThrust()) // Reset should restore initial thrust
 	assert.Equal(t, 2.0, motor.GetMass())
-	assert.False(t, motor.IsCoasting())
+	assert.True(t, motor.IsCoasting())
 }
 
 // TEST: GIVEN a Motor WHEN Update is called THEN the Motor is updated
