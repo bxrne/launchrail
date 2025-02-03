@@ -6,6 +6,7 @@ import (
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/systems"
+	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,10 +26,10 @@ func TestRulesSystem_Add(t *testing.T) {
 
 	entity := systems.PhysicsEntity{
 		Entity:       &e,
-		Position:     &components.Position{},
-		Velocity:     &components.Velocity{},
-		Acceleration: &components.Acceleration{},
-		Mass:         &components.Mass{},
+		Position:     &types.Position{},
+		Velocity:     &types.Velocity{},
+		Acceleration: &types.Acceleration{},
+		Mass:         &types.Mass{},
 		Motor:        &components.Motor{},
 	}
 
@@ -46,40 +47,40 @@ func TestRulesSystem_Priority(t *testing.T) {
 func TestRulesSystem_Update(t *testing.T) {
 	tests := []struct {
 		name          string
-		position      components.Position
-		velocity      components.Velocity
+		position      types.Position
+		velocity      types.Velocity
 		motorState    string
 		expectedEvent systems.Event
 		description   string
 	}{
 		{
 			name:          "Pre-apogee ascending",
-			position:      components.Position{Y: 100},
-			velocity:      components.Velocity{Y: 10},
+			position:      types.Position{Vec: types.Vector3{Y: 100}},
+			velocity:      types.Velocity{Vec: types.Vector3{Y: 10}},
 			motorState:    "BURNOUT",
 			expectedEvent: systems.None,
 			description:   "Should not detect apogee while ascending",
 		},
 		{
 			name:          "Apogee detection",
-			position:      components.Position{Y: 100},
-			velocity:      components.Velocity{Y: -0.1},
+			position:      types.Position{Vec: types.Vector3{Y: 100}},
+			velocity:      types.Velocity{Vec: types.Vector3{Y: -0.1}},
 			motorState:    "BURNOUT",
 			expectedEvent: systems.Apogee,
 			description:   "Should detect apogee when velocity turns negative",
 		},
 		{
 			name:          "Post-apogee descending",
-			position:      components.Position{Y: 50},
-			velocity:      components.Velocity{Y: -10},
+			position:      types.Position{Vec: types.Vector3{Y: 50}},
+			velocity:      types.Velocity{Vec: types.Vector3{Y: -10}},
 			motorState:    "BURNOUT",
 			expectedEvent: systems.None,
 			description:   "Should not detect any event during descent",
 		},
 		{
 			name:          "Landing detection",
-			position:      components.Position{Y: 0},
-			velocity:      components.Velocity{Y: -5},
+			position:      types.Position{Vec: types.Vector3{Y: 0}},
+			velocity:      types.Velocity{Vec: types.Vector3{Y: -5}},
 			motorState:    "BURNOUT",
 			expectedEvent: systems.Land,
 			description:   "Should detect landing when reaching ground with negative velocity",
@@ -103,8 +104,8 @@ func TestRulesSystem_Update(t *testing.T) {
 				Entity:       &e,
 				Position:     &pos,
 				Velocity:     &vel,
-				Acceleration: &components.Acceleration{},
-				Mass:         &components.Mass{},
+				Acceleration: &types.Acceleration{},
+				Mass:         &types.Mass{},
 				Motor:        motor,
 			}
 
@@ -114,15 +115,15 @@ func TestRulesSystem_Update(t *testing.T) {
 			// If testing landing conditions, need to simulate apogee first
 			if tt.expectedEvent == systems.Land {
 				// First simulate apogee
-				entity.Position.Y = 100
-				entity.Velocity.Y = -0.1
+				entity.Position.Vec.Y = 100
+				entity.Velocity.Vec.Y = -0.1
 				entity.Motor.SetState("BURNOUT")
 				err := system.Update(0.016)
 				assert.NoError(t, err)
 
 				// Then simulate landing conditions
-				entity.Position.Y = 0
-				entity.Velocity.Y = -5
+				entity.Position.Vec.Y = 0
+				entity.Velocity.Vec.Y = -5
 			}
 
 			// Run the update
@@ -132,15 +133,15 @@ func TestRulesSystem_Update(t *testing.T) {
 			// Verify state based on expected event
 			switch tt.expectedEvent {
 			case systems.Apogee:
-				assert.True(t, entity.Velocity.Y < 0, "Velocity should be negative at apogee")
+				assert.True(t, entity.Velocity.Vec.Y < 0, "Velocity should be negative at apogee")
 				assert.Equal(t, "BURNOUT", entity.Motor.GetState(), "Motor should be burned out at apogee")
 			case systems.Land:
-				assert.Equal(t, float64(0), entity.Position.Y, "Position should be 0 at landing")
-				assert.Equal(t, float64(0), entity.Velocity.Y, "Velocity should be 0 at landing")
-				assert.Equal(t, float64(0), entity.Acceleration.Y, "Acceleration should be 0 at landing")
+				assert.Equal(t, float64(0), entity.Position.Vec.Y, "Position should be 0 at landing")
+				assert.Equal(t, float64(0), entity.Velocity.Vec.Y, "Velocity should be 0 at landing")
+				assert.Equal(t, float64(0), entity.Acceleration.Vec.Y, "Acceleration should be 0 at landing")
 			case systems.None:
 				if tt.name == "Pre-apogee ascending" {
-					assert.True(t, entity.Velocity.Y > 0, "Velocity should be positive while ascending")
+					assert.True(t, entity.Velocity.Vec.Y > 0, "Velocity should be positive while ascending")
 				}
 			}
 		})
@@ -155,10 +156,10 @@ func TestRulesSystem_Remove(t *testing.T) {
 
 	entity := systems.PhysicsEntity{
 		Entity:       &e,
-		Position:     &components.Position{},
-		Velocity:     &components.Velocity{},
-		Acceleration: &components.Acceleration{},
-		Mass:         &components.Mass{},
+		Position:     &types.Position{},
+		Velocity:     &types.Velocity{},
+		Acceleration: &types.Acceleration{},
+		Mass:         &types.Mass{},
 		Motor:        &components.Motor{},
 	}
 
