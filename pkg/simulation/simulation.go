@@ -141,7 +141,7 @@ func (s *Simulation) Run() error {
 
 	s.logger.Warn("Simulation reached max time without landing",
 		"maxTime", s.config.Simulation.MaxTime,
-		"finalAltitude", s.rocket.Position.Y)
+		"finalAltitude", s.rocket.Position.Vec.Y)
 
 	// Print stats even if max time reached
 	s.logger.Info("Flight Statistics",
@@ -162,10 +162,10 @@ func (s *Simulation) updateSystems() error {
 	// Update flight stats
 	s.stats.Update(
 		s.currentTime,
-		s.rocket.Position.Y,
-		s.rocket.Velocity.Y,
-		s.rocket.Acceleration.Y,
-		s.rocket.Velocity.Y/float64(s.aerodynamicSystem.GetSpeedOfSound(float32(s.rocket.Position.Y))),
+		s.rocket.Position.Vec.Y,
+		s.rocket.Velocity.Vec.Y,
+		s.rocket.Acceleration.Vec.Y,
+		s.rocket.Velocity.Vec.Y/float64(s.aerodynamicSystem.GetSpeedOfSound(float32(s.rocket.Position.Vec.Y))),
 	)
 
 	return nil

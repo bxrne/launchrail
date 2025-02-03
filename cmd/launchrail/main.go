@@ -63,8 +63,6 @@ func main() {
 		"headers", fmt.Sprintf("%v", []string{"time", "altitude", "velocity", "acceleration", "thrust"}),
 	)
 
-	log.Debug("Storage for motion data initialized", "BaseDir", cfg.App.BaseDir)
-
 	// Create simulation
 	sim, err := simulation.NewSimulation(cfg, log, storage)
 	if err != nil {

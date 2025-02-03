@@ -7,6 +7,7 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/systems"
+	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,10 +31,10 @@ func TestAerodynamicSystem_CalculateDrag(t *testing.T) {
 	// Create a physics entity
 	entity := systems.PhysicsEntity{
 		Entity:       &ecs.BasicEntity{},
-		Position:     &components.Position{Y: 0},
-		Velocity:     &components.Velocity{X: 0},
-		Acceleration: &components.Acceleration{},
-		Mass:         &components.Mass{},
+		Position:     &types.Position{},
+		Velocity:     &types.Velocity{},
+		Acceleration: &types.Acceleration{},
+		Mass:         &types.Mass{},
 		Motor:        &components.Motor{},
 		Bodytube:     &components.Bodytube{},
 		Nosecone:     &components.Nosecone{},
@@ -67,10 +68,10 @@ func TestAerodynamicSystem_Add(t *testing.T) {
 	// Create a physics entity
 	entity := systems.PhysicsEntity{
 		Entity:       &ecs.BasicEntity{},
-		Position:     &components.Position{Y: 0},
-		Velocity:     &components.Velocity{X: 0},
-		Acceleration: &components.Acceleration{},
-		Mass:         &components.Mass{},
+		Position:     &types.Position{},
+		Velocity:     &types.Velocity{},
+		Acceleration: &types.Acceleration{},
+		Mass:         &types.Mass{},
 		Motor:        &components.Motor{},
 		Bodytube:     &components.Bodytube{},
 		Nosecone:     &components.Nosecone{},

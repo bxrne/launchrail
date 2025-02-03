@@ -55,7 +55,7 @@ func (s *LaunchRailSystem) Update(dt float32) error {
 		// While on rail, constrain motion to rail direction
 		if s.onRail {
 			// Get total acceleration magnitude including thrust
-			totalAccel := entity.Acceleration.Y
+			totalAccel := entity.Acceleration.Vec.Y
 			if entity.Motor != nil {
 				thrust := entity.Motor.GetThrust()
 				totalAccel += thrust / entity.Mass.Value
@@ -63,19 +63,19 @@ func (s *LaunchRailSystem) Update(dt float32) error {
 
 			// Apply acceleration along rail direction
 			angleRad := s.rail.Angle
-			entity.Acceleration.X = float64(totalAccel) * math.Sin(angleRad)
-			entity.Acceleration.Y = float64(totalAccel) * math.Cos(angleRad)
-			entity.Acceleration.Z = 0
+			entity.Acceleration.Vec.X = float64(totalAccel) * math.Sin(angleRad)
+			entity.Acceleration.Vec.Y = float64(totalAccel) * math.Cos(angleRad)
+			entity.Acceleration.Vec.Z = 0
 
 			// Update velocity along rail
-			entity.Velocity.X = entity.Acceleration.X * float64(dt)
-			entity.Velocity.Y = entity.Acceleration.Y * float64(dt)
-			entity.Velocity.Z = 0
+			entity.Velocity.Vec.X = entity.Acceleration.Vec.X * float64(dt)
+			entity.Velocity.Vec.Y = entity.Acceleration.Vec.Y * float64(dt)
+			entity.Velocity.Vec.Z = 0
 
 			// Update position along rail
 			distanceAlongRail := math.Sqrt(
-				entity.Position.X*entity.Position.X +
-					entity.Position.Y*entity.Position.Y)
+				entity.Position.Vec.X*entity.Position.Vec.X +
+					entity.Position.Vec.Y*entity.Position.Vec.Y)
 
 			// Check if we've reached end of rail
 			if distanceAlongRail >= s.rail.Length {

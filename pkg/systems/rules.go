@@ -64,8 +64,8 @@ func (s *RulesSystem) processRules(dt float32) Event {
 }
 
 func (s *RulesSystem) checkApogee(entity PhysicsEntity) Event {
-	currentAlt := entity.Position.Y
-	currentVel := entity.Velocity.Y
+	currentAlt := entity.Position.Vec.Y
+	currentVel := entity.Velocity.Vec.Y
 
 	if currentAlt > s.maxAlt {
 		s.maxAlt = currentAlt
@@ -88,11 +88,11 @@ func (s *RulesSystem) checkLanding(entity PhysicsEntity) Event {
 	}
 
 	// Check if we've hit the ground with downward velocity
-	if entity.Position.Y <= 0 && entity.Velocity.Y < 0 {
+	if entity.Position.Vec.Y <= 0 && entity.Velocity.Vec.Y < 0 {
 		// Reset state on landing
-		entity.Position.Y = 0
-		entity.Velocity.Y = 0
-		entity.Acceleration.Y = 0
+		entity.Position.Vec.Y = 0
+		entity.Velocity.Vec.Y = 0
+		entity.Acceleration.Vec.Y = 0
 		entity.Motor.SetState("LANDED")
 		return Land
 	}
@@ -101,7 +101,7 @@ func (s *RulesSystem) checkLanding(entity PhysicsEntity) Event {
 
 // Remove removes an entity from the rules system
 func (s *RulesSystem) Remove(basic ecs.BasicEntity) {
-	var deleteIndex int = -1
+	var deleteIndex = -1
 	for i, e := range s.entities {
 		if e.Entity.ID() == basic.ID() {
 			deleteIndex = i
