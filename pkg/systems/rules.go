@@ -5,20 +5,19 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 )
 
-// enum for events
 type Event int
 
 const (
-	Apogee Event = iota
+	None Event = iota - 1
+	Apogee
 	Land
 )
 
 type RulesSystem struct {
 	world     *ecs.World
 	entities  []physicsEntity
-	hadApogee bool      // Track if apogee has been reached
-	maxAlt    float64   // Track max altitude for apogee detection
-	altitudes []float64 // Track all altitudes for landing detection (calculus)
+	hadApogee bool    // Track if apogee has been reached
+	maxAlt    float64 // Track max altitude for apogee detection
 }
 
 func NewRulesSystem(world *ecs.World) *RulesSystem {
@@ -27,7 +26,6 @@ func NewRulesSystem(world *ecs.World) *RulesSystem {
 		entities:  make([]physicsEntity, 0),
 		hadApogee: false,
 		maxAlt:    0,
-		altitudes: make([]float64, 0),
 	}
 }
 
@@ -40,26 +38,29 @@ func (s *RulesSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
 
 func (s *RulesSystem) Update(dt float32) Event {
 	for _, entity := range s.entities {
-		// Log data
-		s.altitudes = append(s.altitudes, entity.Position.Z)
+		// Update max altitude and track current values
+		currentAlt := entity.Position.Y
+		currentVel := entity.Velocity.Y
 
-		if entity.Position.Z > s.maxAlt {
-			s.maxAlt = entity.Position.Z
-		}
-
-		// check for apogee (rocket has ascended, delta vy is now 0 and its starts to fall and its motor is burnout)
-		if entity.Velocity.Z < 0 && entity.Motor.FSM.GetState() == "idle" && !s.hadApogee {
-			s.hadApogee = true
-			return Apogee
-		}
-
-		// check for landing (rocket has landed, delta vy is now 0 and its starts to fall) and acceleration < 0
-		if entity.Velocity.Z == 0 && s.hadApogee && entity.Acceleration.Z < 0 {
+		// Check for landing (negative altitude means ground penetration)
+		if currentAlt <= 0 {
 			return Land
 		}
 
+		// Track maximum altitude
+		if currentAlt > s.maxAlt {
+			s.maxAlt = currentAlt
+		}
+
+		// Detect apogee when velocity changes from positive to negative
+		// and motor has finished burning
+		if !s.hadApogee && currentVel < 0 && entity.Motor.IsCoasting() {
+			s.hadApogee = true
+			return Apogee
+		}
 	}
-	return -1
+
+	return None
 }
 
 func (s *RulesSystem) Remove(basic ecs.BasicEntity) {

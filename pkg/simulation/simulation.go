@@ -31,6 +31,7 @@ type Simulation struct {
 	doneChan              chan struct{}
 	stateChan             chan systems.RocketState
 	stats                 *stats.FlightStats
+	launchRailSystem      *systems.LaunchRailSystem
 }
 
 func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.Storage) (*Simulation, error) {
@@ -49,6 +50,14 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.St
 	sim.physicsSystem = systems.NewPhysicsSystem(world)
 	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, 4) // Add worker count
 	sim.rulesSystem = systems.NewRulesSystem(world)                // Add this line
+
+	// Initialize launch rail system with config values
+	sim.launchRailSystem = systems.NewLaunchRailSystem(
+		world,
+		cfg.Options.Launchrail.Length,
+		cfg.Options.Launchrail.Angle,
+		cfg.Options.Launchrail.Orientation,
+	)
 
 	// Initialize parasite systems
 	sim.logParasiteSystem = systems.NewLogParasiteSystem(world, log)                 // For logging
@@ -111,6 +120,19 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 		finset,
 	)
 
+	// Add to launch rail system
+	s.launchRailSystem.Add(
+		s.rocket.BasicEntity,
+		s.rocket.Position,
+		s.rocket.Velocity,
+		s.rocket.Acceleration,
+		s.rocket.Mass,
+		motor,
+		s.rocket.GetComponent("bodytube").(*components.Bodytube),
+		s.rocket.GetComponent("nosecone").(*components.Nosecone),
+		finset,
+	)
+
 	// Add to log parasite system
 	s.logParasiteSystem.Add(
 		s.rocket.BasicEntity,
@@ -151,6 +173,11 @@ func (s *Simulation) Run() error {
 	maxTime := float32(s.config.Simulation.MaxTime)
 
 	for currentTime < maxTime {
+		// Update launch rail constraints first
+		if err := s.launchRailSystem.Update(dt); err != nil {
+			return fmt.Errorf("launch rail error at t=%v: %w", currentTime, err)
+		}
+
 		// Update motor first to check for errors
 		motorState := "COASTING"
 		thrust := 0.0
