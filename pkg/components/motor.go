@@ -109,7 +109,9 @@ func (m *Motor) Update(dt float64) error {
 	}
 
 	ctx := context.Background()
-	m.FSM.Event(ctx, "ignite")
+	if err := m.FSM.Event(ctx, "ignite"); err != nil {
+		return fmt.Errorf("failed to transition to ignite state: %v", err)
+	}
 	return nil
 }
 
@@ -118,7 +120,9 @@ func (m *Motor) handleBurnout() error {
 	m.thrust = 0
 	m.state = MotorBurnout
 	ctx := context.Background()
-	m.FSM.Event(ctx, "burnout")
+	if err := m.FSM.Event(ctx, "burnout"); err != nil {
+		return fmt.Errorf("failed to transition to burnout state: %v", err)
+	}
 	return nil
 }
 
