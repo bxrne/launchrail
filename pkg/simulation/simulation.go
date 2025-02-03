@@ -2,7 +2,6 @@ package simulation
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
@@ -33,6 +32,8 @@ type Simulation struct {
 	stateChan             chan systems.RocketState
 	stats                 *stats.FlightStats
 	launchRailSystem      *systems.LaunchRailSystem
+	currentTime           float64
+	systems               []systems.System // Now using the System interface
 }
 
 // NewSimulation creates a new rocket simulation
@@ -70,6 +71,16 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.St
 	sim.storageParasiteSystem.Start(sim.stateChan)
 
 	sim.stats = stats.NewFlightStats()
+
+	// Add systems to the slice
+	sim.systems = []systems.System{
+		sim.physicsSystem,
+		sim.aerodynamicSystem,
+		sim.rulesSystem,
+		sim.launchRailSystem,
+		sim.logParasiteSystem,
+		sim.storageParasiteSystem,
+	}
 
 	return sim, nil
 }
@@ -121,105 +132,15 @@ func (s *Simulation) Run() error {
 		return fmt.Errorf("invalid max time: must be between 0 and 120")
 	}
 
-	dt := float32(s.config.Simulation.Step)
-	currentTime := float32(0)
-	maxTime := float32(s.config.Simulation.MaxTime)
-
-	for currentTime < maxTime {
-		// Update launch rail constraints first
-		if err := s.launchRailSystem.Update(dt); err != nil {
-			return fmt.Errorf("launch rail error at t=%v: %w", currentTime, err)
+	for s.currentTime < s.config.Simulation.MaxTime {
+		if err := s.updateSystems(); err != nil {
+			return err
 		}
-
-		// Update motor first to check for errors
-		motorState := "COASTING"
-		thrust := 0.0
-		if motor := s.rocket.GetComponent("motor").(*components.Motor); motor != nil {
-			if err := motor.Update(float64(dt)); err != nil {
-				return fmt.Errorf("motor error at t=%v: %w", currentTime, err)
-			}
-			thrust = motor.GetThrust()
-			motorState = motor.GetState()
-		}
-
-		// Update physics and aerodynamics
-		s.physicsSystem.Update(dt)
-		if err := s.aerodynamicSystem.Update(dt); err != nil {
-			s.logger.Error("Aerodynamic system update failed", "error", err)
-		}
-
-		// Check rules
-		event := s.rulesSystem.Update(dt)
-
-		// Create current state
-		state := systems.RocketState{
-			Time:         float64(currentTime),
-			Altitude:     s.rocket.Position.Y,
-			Velocity:     s.rocket.Velocity.Y,
-			Acceleration: s.rocket.Acceleration.Y,
-			Thrust:       thrust,
-			MotorState:   motorState,
-		}
-
-		// Update stats before handling events
-		mach := math.Abs(s.rocket.Velocity.Y) / 340.0
-		s.stats.Update(
-			float64(currentTime),
-			s.rocket.Position.Y,
-			s.rocket.Velocity.Y,
-			s.rocket.Acceleration.Y,
-			mach,
-		)
-
-		// Handle events and potentially modify state
-		switch event {
-		case systems.Apogee:
-			s.logger.Info("Apogee detected",
-				"time", currentTime,
-				"altitude", state.Altitude,
-				"velocity", state.Velocity,
-			)
-			s.stateChan <- state
-
-		case systems.Land:
-			// Log the final state before zeroing
-			s.stateChan <- state
-
-			s.logger.Info("Landing detected - simulation complete",
-				"time", currentTime,
-				"altitude", state.Altitude,
-				"velocity", state.Velocity,
-				"acceleration", state.Acceleration,
-			)
-
-			// Send final landed state
-			landedState := systems.RocketState{
-				Time:         float64(currentTime),
-				Altitude:     0,
-				Velocity:     0,
-				Acceleration: 0,
-				Thrust:       0,
-				MotorState:   "LANDED",
-			}
-
-			// Print stats before final state
-			s.logger.Info("Flight Statistics",
-				"stats", s.stats.String(),
-			)
-
-			s.stateChan <- landedState
-			close(s.doneChan)
-			return nil
-
-		default:
-			s.stateChan <- state
-		}
-
-		currentTime += dt
+		s.currentTime += s.config.Simulation.Step
 	}
 
 	s.logger.Warn("Simulation reached max time without landing",
-		"maxTime", maxTime,
+		"maxTime", s.config.Simulation.MaxTime,
 		"finalAltitude", s.rocket.Position.Y)
 
 	// Print stats even if max time reached
@@ -228,5 +149,14 @@ func (s *Simulation) Run() error {
 	)
 
 	close(s.doneChan)
+	return nil
+}
+
+func (s *Simulation) updateSystems() error {
+	for _, system := range s.systems {
+		if err := system.Update(float32(s.config.Simulation.Step)); err != nil {
+			return err
+		}
+	}
 	return nil
 }

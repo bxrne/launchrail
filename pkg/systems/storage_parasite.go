@@ -64,8 +64,9 @@ func (s *StorageParasiteSystem) Priority() int {
 }
 
 // Update the StorageParasiteSystem
-func (s *StorageParasiteSystem) Update(dt float32) {
+func (s *StorageParasiteSystem) Update(dt float32) error {
 	// No need to track time here - data comes from simulation state
+	return nil
 }
 
 // Add adds entities to the system

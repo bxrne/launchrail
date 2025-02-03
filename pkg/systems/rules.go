@@ -37,37 +37,56 @@ func (s *RulesSystem) Add(se *SystemEntity) {
 }
 
 // Update applies rules of flight to entities
-func (s *RulesSystem) Update(dt float32) Event {
+func (s *RulesSystem) Update(dt float32) error {
+	event := s.processRules(dt)
+	// Process the event if needed
+	switch event {
+	case Apogee:
+		// Do something
+	case Land:
+		// Do something
+	}
+
+	return nil
+}
+
+func (s *RulesSystem) processRules(dt float32) Event {
+	// Move existing Update logic here
 	for _, entity := range s.entities {
-		currentAlt := entity.Position.Y
-		currentVel := entity.Velocity.Y
-
-		// Track maximum altitude
-		if currentAlt > s.maxAlt {
-			s.maxAlt = currentAlt
+		if event := s.checkApogee(entity); event != None {
+			return event
 		}
-
-		// Detect apogee when velocity changes from positive to negative
-		// and motor has finished burning
-		if !s.hadApogee && currentVel < 0 {
-			motorState := entity.Motor.GetState()
-			// Only trigger if motor is burnout or coasting:
-			if motorState == "BURNOUT" || motorState == "COASTING" {
-				s.hadApogee = true
-				return Apogee
-			}
+		if event := s.checkLanding(entity); event != None {
+			return event
 		}
+	}
+	return None
+}
 
-		// Only check for landing after apogee
-		if s.hadApogee && currentAlt <= 0 {
-			// Ensure we're actually hitting the ground, not just passing through
-			if currentVel < 0 {
-				entity.Position.Y = 0     // Clamp to ground
-				entity.Velocity.Y = 0     // Stop movement
-				entity.Acceleration.Y = 0 // No more acceleration
-				return Land
-			}
+func (s *RulesSystem) checkApogee(entity physicsEntity) Event {
+	currentAlt := entity.Position.Y
+	currentVel := entity.Velocity.Y
+
+	if currentAlt > s.maxAlt {
+		s.maxAlt = currentAlt
+	}
+
+	if !s.hadApogee && currentVel < 0 {
+		motorState := entity.Motor.GetState()
+		if motorState == "BURNOUT" || motorState == "COASTING" {
+			s.hadApogee = true
+			return Apogee
 		}
+	}
+	return None
+}
+
+func (s *RulesSystem) checkLanding(entity physicsEntity) Event {
+	if s.hadApogee && entity.Position.Y <= 0 && entity.Velocity.Y < 0 {
+		entity.Position.Y = 0
+		entity.Velocity.Y = 0
+		entity.Acceleration.Y = 0
+		return Land
 	}
 	return None
 }

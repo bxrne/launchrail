@@ -78,7 +78,7 @@ func NewPhysicsSystem(world *ecs.World) *PhysicsSystem {
 }
 
 // Update applies forces to entities
-func (s *PhysicsSystem) Update(dt float32) {
+func (s *PhysicsSystem) Update(dt float32) error {
 	var wg sync.WaitGroup
 	workChan := make(chan physicsEntity, len(s.entities))
 	resultChan := make(chan types.Vector3, len(s.entities))
@@ -114,6 +114,7 @@ func (s *PhysicsSystem) Update(dt float32) {
 		s.applyForce(s.entities[i], force, dt)
 		i++
 	}
+	return nil
 }
 
 // applyForce applies forces to an entity

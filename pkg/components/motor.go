@@ -97,63 +97,35 @@ func (m *Motor) Update(dt float64) error {
 		return fmt.Errorf("invalid timestep")
 	}
 
-	// Calculate thrust based on time step
-	if !m.isCoasting && m.elapsedTime < m.burnTime {
-		m.thrust = m.interpolateThrust(m.elapsedTime)
-
-		// Calculate mass loss proportional to timestep
-		if m.Mass > 0 && m.thrust > 0 {
-			massLossRate := (m.Props.TotalMass - m.Props.WetMass) / m.burnTime
-			m.Mass = math.Max(0, m.Mass-(massLossRate*dt))
-		}
-
-		m.elapsedTime += dt
-	}
-
-	// Call FSM to update internal state:
-	err := m.FSM.UpdateState(m.Mass, m.elapsedTime, m.burnTime)
-	if err != nil {
-		return err
-	}
-	// Reflect FSM state in Motor.state
-	switch m.FSM.GetState() {
-	case StateIdle:
-		m.state = MotorCoasting
-	case StateBurning:
-		m.state = MotorBurning
-	}
-
-	// Strict burn time and thrust validation
 	if m.elapsedTime >= m.burnTime {
-		if m.thrust > 0 {
-			return fmt.Errorf("motor still producing thrust after burn time: t=%v, thrust=%v",
-				m.elapsedTime, m.thrust)
-		}
-		m.isCoasting = true
-		m.thrust = 0
-		m.state = MotorBurnout // Update state
-		return nil
+		return m.handleBurnout()
 	}
 
+	m.updateThrustAndMass(dt)
 	m.elapsedTime += dt
 
-	// Only update thrust during burn
+	return nil
+}
+
+func (m *Motor) handleBurnout() error {
+	if m.thrust > 0 {
+		return fmt.Errorf("motor still producing thrust after burn time: t=%v, thrust=%v", m.elapsedTime, m.thrust)
+	}
+	m.isCoasting = true
+	m.thrust = 0
+	m.state = MotorBurnout
+	return nil
+}
+
+func (m *Motor) updateThrustAndMass(dt float64) {
 	if !m.isCoasting {
 		m.thrust = m.interpolateThrust(m.elapsedTime)
-
-		// Update mass only during thrust
 		if m.Mass > 0 && m.thrust > 0 {
 			massLoss := (m.thrust * dt) / m.Props.AvgThrust
 			m.Mass = math.Max(0, m.Mass-massLoss)
 		}
-
-		// Update state based on current thrust calculation
-		if m.elapsedTime > 0 {
-			m.state = MotorBurning
-		}
+		m.state = MotorBurning
 	}
-
-	return nil
 }
 
 // GetThrust returns the current thrust of the motor

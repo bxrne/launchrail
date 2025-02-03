@@ -14,11 +14,9 @@ type RocketState struct {
 	MotorState   string
 }
 
-// ParasiteSystem defines the interface for parasite systems
+// ParasiteSystem extends the base System interface
 type ParasiteSystem interface {
-	Update(dt float32) error
-	Add(entity *ecs.BasicEntity, components ...interface{})
-	Priority() int
+	ecs.System
 	Start(dataChan chan RocketState)
 	Stop()
 }

@@ -138,19 +138,6 @@ func (a *AerodynamicSystem) Update(dt float32) error {
 	return nil
 }
 
-// SystemEntity represents an entity with physics components (Meta rocket)
-type SystemEntity struct {
-	Entity   *ecs.BasicEntity
-	Pos      *components.Position
-	Vel      *components.Velocity
-	Acc      *components.Acceleration
-	Mass     *components.Mass
-	Motor    *components.Motor
-	Bodytube *components.Bodytube
-	Nosecone *components.Nosecone
-	Finset   *components.TrapezoidFinset
-}
-
 // Add adds entities to the system
 func (a *AerodynamicSystem) Add(as *SystemEntity) {
 	a.entities = append(a.entities, physicsEntity{as.Entity, as.Pos, as.Vel, as.Acc, as.Mass, as.Motor, as.Bodytube, as.Nosecone, as.Finset})
