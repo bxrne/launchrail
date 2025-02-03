@@ -165,7 +165,7 @@ func (s *Simulation) updateSystems() error {
 		s.rocket.Position.Y,
 		s.rocket.Velocity.Y,
 		s.rocket.Acceleration.Y,
-		s.rocket.Velocity.Y/s.aerodynamicSystem.GetSpeedOfSound(s.rocket.Position.Y),
+		s.rocket.Velocity.Y/float64(s.aerodynamicSystem.GetSpeedOfSound(float32(s.rocket.Position.Y))),
 	)
 
 	return nil

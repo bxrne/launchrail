@@ -100,5 +100,5 @@ func TestAerodynamicSystem_GetSpeedOfSound(t *testing.T) {
 	require.NotNil(t, aero)
 
 	speed := aero.GetSpeedOfSound(20)
-	require.Greater(t, speed, 0.0)
+	require.Equal(t, float32(340.29), speed)
 }

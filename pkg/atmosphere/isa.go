@@ -29,6 +29,11 @@ func NewISAModel(cfg *config.ISAConfiguration) *ISAModel {
 	}
 }
 
+// GetTemperature calculates the temperature at a given altitude
+func (isa *ISAModel) GetTemperature(altitude float64) float64 {
+	return isa.cfg.SeaLevelTemperature + isa.cfg.TemperatureLapseRate*altitude
+}
+
 // GetAtmosphere returns atmospheric data for a given altitude using memoization
 func (isa *ISAModel) GetAtmosphere(altitude float64) AtmosphereData {
 	// Round altitude to nearest meter for caching

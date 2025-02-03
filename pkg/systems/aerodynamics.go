@@ -47,6 +47,11 @@ func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericDat
 	}
 }
 
+// GetTemperature calculates the temperature at a given altitude
+func (a *AerodynamicSystem) getTemperature(altitude float32) float32 {
+	return float32(a.isa.GetTemperature(float64(altitude)))
+}
+
 // CalculateDrag now handles atmospheric effects and Mach number
 func (a *AerodynamicSystem) CalculateDrag(entity PhysicsEntity) types.Vector3 {
 	// Get atmospheric data
@@ -138,12 +143,12 @@ func (a *AerodynamicSystem) Priority() int {
 }
 
 // calculateSoundSpeed calculates the speed of sound at a given temperature
-func (a *AerodynamicSystem) GetSpeedOfSound(temperature float64) float64 {
-	const (
-		gamma = 1.4    // ratio of specific heats
-		R     = 287.05 // J/(kg·K)
-	)
-	return math.Sqrt(gamma * R * temperature)
+func (a *AerodynamicSystem) GetSpeedOfSound(altitude float32) float32 {
+	temperature := a.getTemperature(altitude)
+	if temperature <= 0 {
+		return 340.29 // Return sea level speed of sound as fallback
+	}
+	return float32(math.Sqrt(float64(1.4 * 287.05 * temperature)))
 }
 
 // calculateDragCoeff calculates the drag coefficient based on Mach number
