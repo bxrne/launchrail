@@ -24,3 +24,12 @@ options:
     latitude: 37.7749
     longitude: -122.4194
     altitude: 1.0
+    atmosphere:
+      isa_configuration: 
+        specific_gas_constant: 287.05
+        gravitational_accel: 9.81
+        sea_level_density: 1.225
+        sea_level_temperature: 288.15
+        sea_level_pressure: 101325.0
+        ratio_specific_heats: 1.4
+        temperature_lapse_rate: 0.0065

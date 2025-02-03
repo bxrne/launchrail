@@ -28,9 +28,26 @@ type Launchrail struct {
 
 // Launchsite represents the launchsite configuration.
 type Launchsite struct {
-	Latitude  float64 `mapstructure:"latitude"`
-	Longitude float64 `mapstructure:"longitude"`
-	Altitude  float64 `mapstructure:"altitude"`
+	Latitude   float64    `mapstructure:"latitude"`
+	Longitude  float64    `mapstructure:"longitude"`
+	Altitude   float64    `mapstructure:"altitude"`
+	Atmosphere Atmosphere `mapstructure:"atmosphere"`
+}
+
+// Atmosphere represents the atmosphere configuration.
+type Atmosphere struct {
+	ISAConfiguration ISAConfiguration `mapstructure:"isa_configuration"`
+}
+
+// ISAConfiguration represents the ISA configuration.
+type ISAConfiguration struct {
+	SpecificGasConstant  float64 `mapstructure:"specific_gas_constant"`
+	GravitationalAccel   float64 `mapstructure:"gravitational_accel"`
+	SeaLevelDensity      float64 `mapstructure:"sea_level_density"`
+	SeaLevelTemperature  float64 `mapstructure:"sea_level_temperature"`
+	SeaLevelPressure     float64 `mapstructure:"sea_level_pressure"`
+	RatioSpecificHeats   float64 `mapstructure:"ratio_specific_heats"`
+	TemperatureLapseRate float64 `mapstructure:"temperature_lapse_rate"`
 }
 
 // Options represents the application options.
@@ -72,7 +89,15 @@ func (c *Config) String() map[string]string {
 	marshalled["options.launchsite.latitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Latitude)
 	marshalled["options.launchsite.longitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Longitude)
 	marshalled["options.launchsite.altitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Altitude)
+	marshalled["options.launchsite.atmosphere.isa_configuration.specific_gas_constant"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SpecificGasConstant)
+	marshalled["options.launchsite.atmosphere.isa_configuration.gravitational_accel"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel)
+	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_density"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelDensity)
+	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_temperature"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelTemperature)
+	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_pressure"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelPressure)
+	marshalled["options.launchsite.atmosphere.isa_configuration.ratio_specific_heats"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.RatioSpecificHeats)
+	marshalled["options.launchsite.atmosphere.isa_configuration.temperature_lapse_rate"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.TemperatureLapseRate)
 	marshalled["simulation.step"] = fmt.Sprintf("%.2f", c.Simulation.Step)
 	marshalled["simulation.max_time"] = fmt.Sprintf("%.2f", c.Simulation.MaxTime)
+
 	return marshalled
 }

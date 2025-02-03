@@ -3,11 +3,14 @@ package atmosphere
 import (
 	"math"
 	"sync"
+
+	"github.com/bxrne/launchrail/internal/config"
 )
 
 // ISAModel implements the International Standard Atmosphere
 type ISAModel struct {
 	cache map[float64]AtmosphereData
+	cfg   *config.ISAConfiguration
 	mu    sync.RWMutex
 }
 
@@ -17,19 +20,10 @@ type AtmosphereData struct {
 	Pressure    float64
 }
 
-const (
-	R_AIR      = 287.05287 // Specific gas constant for air [J/(kg·K)]
-	G_0        = 9.80665   // Gravitational acceleration [m/s^2]
-	RHO_0      = 1.225     // Sea level density [kg/m^3]
-	T_0        = 288.15    // Sea level temperature [K]
-	P_0        = 101325.0  // Sea level pressure [Pa]
-	GAMMA      = 1.4       // Ratio of specific heats for air
-	LAPSE_RATE = -0.0065   // Temperature lapse rate [K/m]
-)
-
-func NewISAModel() *ISAModel {
+func NewISAModel(cfg *config.ISAConfiguration) *ISAModel {
 	return &ISAModel{
 		cache: make(map[float64]AtmosphereData),
+		cfg:   cfg,
 	}
 }
 
@@ -46,9 +40,9 @@ func (isa *ISAModel) GetAtmosphere(altitude float64) AtmosphereData {
 	isa.mu.RUnlock()
 
 	// Calculate new values
-	temp := T_0 + LAPSE_RATE*altitude
-	pressure := P_0 * math.Pow(temp/T_0, -G_0/(LAPSE_RATE*R_AIR))
-	density := pressure / (R_AIR * temp)
+	temp := isa.cfg.SeaLevelTemperature + isa.cfg.TemperatureLapseRate*altitude // T_0 (sea level temperature) - Lapse rate * altitude
+	pressure := isa.cfg.SeaLevelPressure * math.Pow(temp/isa.cfg.SeaLevelTemperature, -isa.cfg.GravitationalAccel/(isa.cfg.TemperatureLapseRate*isa.cfg.SpecificGasConstant))
+	density := pressure / (isa.cfg.SpecificGasConstant * temp)
 
 	data := AtmosphereData{
 		Density:     density,
@@ -67,5 +61,5 @@ func (isa *ISAModel) GetAtmosphere(altitude float64) AtmosphereData {
 // GetSpeedOfSound calculates speed of sound at given altitude
 func (isa *ISAModel) GetSpeedOfSound(altitude float64) float64 {
 	atm := isa.GetAtmosphere(altitude)
-	return math.Sqrt(GAMMA * R_AIR * atm.Temperature)
+	return math.Sqrt(isa.cfg.RatioSpecificHeats * isa.cfg.SpecificGasConstant * atm.Temperature)
 }
