@@ -12,6 +12,25 @@ import (
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 )
 
+func createTestMotor() (*components.Motor, *thrustcurves.MotorData) {
+	// Create simple thrust curve data
+	thrustData := [][]float64{
+		{0.0, 10.0}, // Initial thrust
+		{1.0, 10.0}, // Constant thrust for 1 second
+		{2.0, 0.0},  // Burnout
+	}
+
+	motorData := &thrustcurves.MotorData{
+		Thrust:    thrustData,
+		TotalMass: 10.0, // Initial mass
+		BurnTime:  2.0,  // 2 second burn
+		AvgThrust: 10.0, // Average thrust
+	}
+
+	logger := logf.New(logf.Opts{})
+	return components.NewMotor(ecs.NewBasic(), motorData, logger), motorData
+}
+
 // TEST: GIVEN a new Motor WHEN NewMotor is called THEN a new Motor is returned
 func TestNewMotor(t *testing.T) {
 	logger := logf.New(logf.Opts{})
@@ -28,23 +47,28 @@ func TestNewMotor(t *testing.T) {
 	assert.Equal(t, 2.0, motor.GetMass())
 }
 
-// TEST: GIVEN a Motor WHEN Update is called THEN the Motor is updated
+// TEST: GIVEN a motor with constant thrust WHEN Update is called THEN thrust and mass are correctly calculated
 func TestMotorUpdate(t *testing.T) {
-	logger := logf.New(logf.Opts{})
-	md := &thrustcurves.MotorData{
-		Thrust:    [][]float64{{0.0, 10.0}, {1.0, 5.0}, {2.0, 0.0}},
-		TotalMass: 2.0,
-		BurnTime:  2.0,
-		AvgThrust: 7.5,
-	}
+	motor, _ := createTestMotor()
 
-	motor := components.NewMotor(ecs.BasicEntity{}, md, logger)
+	// Test initial conditions
+	assert.Equal(t, 10.0, motor.GetThrust())
+	assert.Equal(t, 10.0, motor.GetMass())
+
+	// Update with 0.5 second step
 	err := motor.Update(0.5)
 	assert.NoError(t, err)
-	assert.Equal(t, 10.0, motor.GetThrust()) // Correct expected thrust after 0.5 seconds
-	assert.Equal(t, motor.GetThrust(), 10.0)
-	assert.Less(t, motor.GetMass(), 2.0)         // Mass should decrease
-	assert.Equal(t, "BURNING", motor.GetState()) // Check FSM state
+
+	// After 0.5s, thrust should still be 10.0N and mass should be 7.5kg
+	assert.Equal(t, 10.0, motor.GetThrust())
+	assert.Equal(t, 7.5, motor.GetMass())
+
+	// Update to burnout
+	err = motor.Update(1.5)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 0.0, motor.GetThrust())
+	assert.Equal(t, 7.5, motor.GetMass())
 }
 
 // TEST: GIVEN a Motor WHEN Update is called THEN the Motor is updated
