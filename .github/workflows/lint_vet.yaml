@@ -1,5 +1,4 @@
 name: Lint and Vet
-ne
 
 on:
   push:
