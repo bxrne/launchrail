@@ -93,17 +93,17 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	// Create rocket entity with all components
 	s.rocket = entities.NewRocketEntity(s.world, orkData, motor)
 
-	// Create a single SystemEntity to reuse for all systems
-	sysEntity := &systems.SystemEntity{
-		Entity:   s.rocket.BasicEntity,
-		Pos:      s.rocket.Position,
-		Vel:      s.rocket.Velocity,
-		Acc:      s.rocket.Acceleration,
-		Mass:     s.rocket.Mass,
-		Motor:    motor,
-		Bodytube: s.rocket.GetComponent("bodytube").(*components.Bodytube),
-		Nosecone: s.rocket.GetComponent("nosecone").(*components.Nosecone),
-		Finset:   s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
+	// Create a single PhysicsEntity to reuse for all systems
+	sysEntity := &systems.PhysicsEntity{
+		Entity:       s.rocket.BasicEntity,
+		Position:     s.rocket.Position,
+		Velocity:     s.rocket.Velocity,
+		Acceleration: s.rocket.Acceleration,
+		Mass:         s.rocket.Mass,
+		Motor:        motor,
+		Bodytube:     s.rocket.GetComponent("bodytube").(*components.Bodytube),
+		Nosecone:     s.rocket.GetComponent("nosecone").(*components.Nosecone),
+		Finset:       s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
 	}
 
 	// Add to all systems

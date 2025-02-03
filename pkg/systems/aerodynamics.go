@@ -22,7 +22,7 @@ type atmosphericData struct {
 // AerodynamicSystem calculates aerodynamic forces on entities
 type AerodynamicSystem struct {
 	world    *ecs.World
-	entities []physicsEntity
+	entities []PhysicsEntity
 	workers  int
 	isa      *atmosphere.ISAModel
 }
@@ -30,7 +30,7 @@ type AerodynamicSystem struct {
 func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Config) *AerodynamicSystem {
 	return &AerodynamicSystem{
 		world:    world,
-		entities: make([]physicsEntity, 0),
+		entities: make([]PhysicsEntity, 0),
 		workers:  workers,
 		isa:      atmosphere.NewISAModel(&cfg.Options.Launchsite.Atmosphere.ISAConfiguration),
 	}
@@ -48,7 +48,7 @@ func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericDat
 }
 
 // CalculateDrag now handles atmospheric effects and Mach number
-func (a *AerodynamicSystem) CalculateDrag(entity physicsEntity) types.Vector3 {
+func (a *AerodynamicSystem) CalculateDrag(entity PhysicsEntity) types.Vector3 {
 	// Get atmospheric data
 	atmData := a.getAtmosphericData(entity.Position.Y)
 
@@ -89,7 +89,7 @@ func calculateReferenceArea(nosecone *components.Nosecone, bodytube *components.
 
 // Update implements parallel force calculation and application
 func (a *AerodynamicSystem) Update(dt float32) error {
-	workChan := make(chan physicsEntity, len(a.entities))
+	workChan := make(chan PhysicsEntity, len(a.entities))
 	resultChan := make(chan types.Vector3, len(a.entities))
 
 	var wg sync.WaitGroup
@@ -128,8 +128,8 @@ func (a *AerodynamicSystem) Update(dt float32) error {
 }
 
 // Add adds entities to the system
-func (a *AerodynamicSystem) Add(as *SystemEntity) {
-	a.entities = append(a.entities, physicsEntity{as.Entity, as.Pos, as.Vel, as.Acc, as.Mass, as.Motor, as.Bodytube, as.Nosecone, as.Finset})
+func (a *AerodynamicSystem) Add(as *PhysicsEntity) {
+	a.entities = append(a.entities, PhysicsEntity{as.Entity, as.Position, as.Velocity, as.Acceleration, as.Mass, as.Motor, as.Bodytube, as.Nosecone, as.Finset})
 }
 
 // Priority returns the system priority
@@ -147,7 +147,7 @@ func (a *AerodynamicSystem) GetSpeedOfSound(temperature float64) float64 {
 }
 
 // calculateDragCoeff calculates the drag coefficient based on Mach number
-func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity physicsEntity) float64 {
+func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity PhysicsEntity) float64 {
 	// More accurate drag coefficient calculation
 	baseCd := 0.2 // Subsonic base drag
 

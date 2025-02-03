@@ -11,7 +11,7 @@ import (
 type StorageParasiteSystem struct {
 	world    *ecs.World
 	storage  *storage.Storage
-	entities []physicsEntity
+	entities []PhysicsEntity
 	dataChan chan RocketState
 	done     chan struct{}
 }
@@ -21,7 +21,7 @@ func NewStorageParasiteSystem(world *ecs.World, storage *storage.Storage) *Stora
 	return &StorageParasiteSystem{
 		world:    world,
 		storage:  storage,
-		entities: make([]physicsEntity, 0),
+		entities: make([]PhysicsEntity, 0),
 		done:     make(chan struct{}),
 	}
 }
@@ -70,6 +70,6 @@ func (s *StorageParasiteSystem) Update(dt float32) error {
 }
 
 // Add adds entities to the system
-func (s *StorageParasiteSystem) Add(se *SystemEntity) {
-	s.entities = append(s.entities, physicsEntity{se.Entity, se.Pos, se.Vel, se.Acc, se.Mass, se.Motor, se.Bodytube, se.Nosecone, se.Finset})
+func (s *StorageParasiteSystem) Add(pe *PhysicsEntity) {
+	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset})
 }

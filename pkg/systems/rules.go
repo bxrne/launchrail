@@ -16,7 +16,7 @@ const (
 // RulesSystem enforces rules of flight
 type RulesSystem struct {
 	world     *ecs.World
-	entities  []physicsEntity
+	entities  []PhysicsEntity
 	hadApogee bool    // Track if apogee has been reached
 	maxAlt    float64 // Track max altitude for apogee detection
 }
@@ -25,15 +25,15 @@ type RulesSystem struct {
 func NewRulesSystem(world *ecs.World) *RulesSystem {
 	return &RulesSystem{
 		world:     world,
-		entities:  make([]physicsEntity, 0),
+		entities:  make([]PhysicsEntity, 0),
 		hadApogee: false,
 		maxAlt:    0,
 	}
 }
 
 // Add adds a physics entity to the rules system
-func (s *RulesSystem) Add(se *SystemEntity) {
-	s.entities = append(s.entities, physicsEntity{se.Entity, se.Pos, se.Vel, se.Acc, se.Mass, se.Motor, se.Bodytube, se.Nosecone, se.Finset})
+func (s *RulesSystem) Add(pe *PhysicsEntity) {
+	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset})
 }
 
 // Update applies rules of flight to entities
@@ -63,7 +63,7 @@ func (s *RulesSystem) processRules(dt float32) Event {
 	return None
 }
 
-func (s *RulesSystem) checkApogee(entity physicsEntity) Event {
+func (s *RulesSystem) checkApogee(entity PhysicsEntity) Event {
 	currentAlt := entity.Position.Y
 	currentVel := entity.Velocity.Y
 
@@ -81,7 +81,7 @@ func (s *RulesSystem) checkApogee(entity physicsEntity) Event {
 	return None
 }
 
-func (s *RulesSystem) checkLanding(entity physicsEntity) Event {
+func (s *RulesSystem) checkLanding(entity PhysicsEntity) Event {
 	if s.hadApogee && entity.Position.Y <= 0 && entity.Velocity.Y < 0 {
 		entity.Position.Y = 0
 		entity.Velocity.Y = 0
@@ -95,7 +95,7 @@ func (s *RulesSystem) checkLanding(entity physicsEntity) Event {
 func (s *RulesSystem) Remove(basic ecs.BasicEntity) {
 	var deleteIndex int = -1
 	for i, e := range s.entities {
-		if e.BasicEntity.ID() == basic.ID() {
+		if e.Entity.ID() == basic.ID() {
 			deleteIndex = i
 			break
 		}

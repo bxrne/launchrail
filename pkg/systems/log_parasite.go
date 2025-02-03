@@ -9,7 +9,7 @@ import (
 type LogParasiteSystem struct {
 	world    *ecs.World
 	logger   *logf.Logger
-	entities []physicsEntity
+	entities []PhysicsEntity
 	dataChan chan RocketState
 	done     chan struct{}
 }
@@ -19,7 +19,7 @@ func NewLogParasiteSystem(world *ecs.World, logger *logf.Logger) *LogParasiteSys
 	return &LogParasiteSystem{
 		world:    world,
 		logger:   logger,
-		entities: make([]physicsEntity, 0),
+		entities: make([]PhysicsEntity, 0),
 		done:     make(chan struct{}),
 	}
 }
@@ -66,6 +66,6 @@ func (s *LogParasiteSystem) Update(dt float32) error {
 }
 
 // Add adds entities to the system
-func (s *LogParasiteSystem) Add(se *SystemEntity) {
-	s.entities = append(s.entities, physicsEntity{se.Entity, se.Pos, se.Vel, se.Acc, se.Mass, se.Motor, se.Bodytube, se.Nosecone, se.Finset})
+func (s *LogParasiteSystem) Add(pe *PhysicsEntity) {
+	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset})
 }

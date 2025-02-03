@@ -7,7 +7,6 @@ import (
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/barrowman"
-	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/types"
 )
 
@@ -23,29 +22,16 @@ var (
 // PhysicsSystem calculates forces on entities
 type PhysicsSystem struct {
 	world        *ecs.World
-	entities     []physicsEntity
+	entities     []PhysicsEntity
 	cpCalculator *barrowman.CPCalculator
 	workers      int
-	workChan     chan physicsEntity
+	workChan     chan PhysicsEntity
 	resultChan   chan types.Vector3
 	gravity      float64
 }
 
-// Add TrapezoidFinset to physicsEntity
-type physicsEntity struct {
-	*ecs.BasicEntity
-	*components.Position
-	*components.Velocity
-	*components.Acceleration
-	*components.Mass
-	*components.Motor
-	*components.Bodytube
-	*components.Nosecone
-	*components.TrapezoidFinset // Add this field
-}
-
 // calculateStabilityForces calculates stability forces for an entity
-func (s *PhysicsSystem) calculateStabilityForces(force *types.Vector3, stabilityMargin float64, entity physicsEntity) {
+func (s *PhysicsSystem) calculateStabilityForces(force *types.Vector3, stabilityMargin float64, entity PhysicsEntity) {
 	// Basic stability force calculation
 	const stabilityFactor = 0.1
 
@@ -58,7 +44,7 @@ func (s *PhysicsSystem) calculateStabilityForces(force *types.Vector3, stability
 func (s *PhysicsSystem) Remove(basic ecs.BasicEntity) {
 	var deleteIndex int
 	for i, entity := range s.entities {
-		if entity.BasicEntity.ID() == basic.ID() {
+		if entity.Entity.ID() == basic.ID() {
 			deleteIndex = i
 			break
 		}
@@ -71,9 +57,9 @@ func NewPhysicsSystem(world *ecs.World, cfg *config.Config) *PhysicsSystem {
 	workers := 4
 	return &PhysicsSystem{
 		world:        world,
-		entities:     make([]physicsEntity, 0),
+		entities:     make([]PhysicsEntity, 0),
 		workers:      workers,
-		workChan:     make(chan physicsEntity, workers),
+		workChan:     make(chan PhysicsEntity, workers),
 		resultChan:   make(chan types.Vector3, workers),
 		cpCalculator: barrowman.NewCPCalculator(), // Initialize calculator
 		gravity:      cfg.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel,
@@ -83,7 +69,7 @@ func NewPhysicsSystem(world *ecs.World, cfg *config.Config) *PhysicsSystem {
 // Update applies forces to entities
 func (s *PhysicsSystem) Update(dt float32) error {
 	var wg sync.WaitGroup
-	workChan := make(chan physicsEntity, len(s.entities))
+	workChan := make(chan PhysicsEntity, len(s.entities))
 	resultChan := make(chan types.Vector3, len(s.entities))
 
 	// Launch multiple workers for concurrent force calculations
@@ -121,7 +107,7 @@ func (s *PhysicsSystem) Update(dt float32) error {
 }
 
 // applyForce applies forces to an entity
-func (s *PhysicsSystem) applyForce(entity physicsEntity, force types.Vector3, dt float32) {
+func (s *PhysicsSystem) applyForce(entity PhysicsEntity, force types.Vector3, dt float32) {
 	// Validate timestep
 	dt64 := float64(dt)
 	if dt64 <= 0 || math.IsNaN(dt64) || dt64 > 0.1 {
@@ -202,8 +188,8 @@ func (s *PhysicsSystem) applyForce(entity physicsEntity, force types.Vector3, dt
 }
 
 // Add adds an entity to the system
-func (s *PhysicsSystem) Add(se *SystemEntity) {
-	s.entities = append(s.entities, physicsEntity{se.Entity, se.Pos, se.Vel, se.Acc, se.Mass, se.Motor, se.Bodytube, se.Nosecone, se.Finset})
+func (s *PhysicsSystem) Add(pe *PhysicsEntity) {
+	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset})
 }
 
 // Priority returns the system priority

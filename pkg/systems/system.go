@@ -11,21 +11,20 @@ type System interface {
 	Update(dt float32) error
 
 	// Add adds entities to the system
-	Add(se *SystemEntity)
-
+	Add(pe *PhysicsEntity)
 	// Priority returns the system priority for execution order
 	Priority() int
 }
 
-// SystemEntity represents an entity with physics components (Meta rocket)
-type SystemEntity struct {
-	Entity   *ecs.BasicEntity
-	Pos      *components.Position
-	Vel      *components.Velocity
-	Acc      *components.Acceleration
-	Mass     *components.Mass
-	Motor    *components.Motor
-	Bodytube *components.Bodytube
-	Nosecone *components.Nosecone
-	Finset   *components.TrapezoidFinset
+// PhysicsEntity represents an entity with physics components (Meta rocket)
+type PhysicsEntity struct {
+	Entity       *ecs.BasicEntity
+	Position     *components.Position
+	Velocity     *components.Velocity
+	Acceleration *components.Acceleration
+	Mass         *components.Mass
+	Motor        *components.Motor
+	Bodytube     *components.Bodytube
+	Nosecone     *components.Nosecone
+	Finset       *components.TrapezoidFinset // Add this field
 }
