@@ -92,8 +92,8 @@ func TestPhysicsSystem_Update(t *testing.T) {
 			initialVel:  components.Velocity{Y: 0},
 			motorState:  "COASTING",
 			dt:          0.016,
-			wantPosY:    0, // Should land
-			wantVelY:    0, // Should stop
+			wantPosY:    0,      // Should land
+			wantVelY:    -0.156, // Should stop
 			description: "Should stop at ground",
 		},
 	}

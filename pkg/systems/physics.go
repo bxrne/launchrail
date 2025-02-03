@@ -22,7 +22,7 @@ var (
 // PhysicsSystem calculates forces on entities
 type PhysicsSystem struct {
 	world        *ecs.World
-	entities     []PhysicsEntity
+	entities     []*PhysicsEntity // Changed to store pointers
 	cpCalculator *barrowman.CPCalculator
 	workers      int
 	workChan     chan PhysicsEntity
@@ -57,7 +57,7 @@ func NewPhysicsSystem(world *ecs.World, cfg *config.Config) *PhysicsSystem {
 	workers := 4
 	return &PhysicsSystem{
 		world:        world,
-		entities:     make([]PhysicsEntity, 0),
+		entities:     make([]*PhysicsEntity, 0),
 		workers:      workers,
 		workChan:     make(chan PhysicsEntity, workers),
 		resultChan:   make(chan types.Vector3, workers),
@@ -69,7 +69,7 @@ func NewPhysicsSystem(world *ecs.World, cfg *config.Config) *PhysicsSystem {
 // Update applies forces to entities
 func (s *PhysicsSystem) Update(dt float32) error {
 	var wg sync.WaitGroup
-	workChan := make(chan PhysicsEntity, len(s.entities))
+	workChan := make(chan *PhysicsEntity, len(s.entities)) // Changed to pointer channel
 	resultChan := make(chan types.Vector3, len(s.entities))
 
 	// Launch multiple workers for concurrent force calculations
@@ -81,7 +81,7 @@ func (s *PhysicsSystem) Update(dt float32) error {
 				force := vectorPool.Get().(*types.Vector3)
 				*force = types.Vector3{} // reset force
 				// ...existing or refined stability/forces code...
-				s.calculateStabilityForces(force, 0.0, entity)
+				s.calculateStabilityForces(force, 0.0, *entity) // Dereference for backwards compatibility
 				resultChan <- *force
 				vectorPool.Put(force)
 			}
@@ -174,38 +174,35 @@ func (s *PhysicsSystem) updateEntityState(entity *PhysicsEntity, netForce float6
 	entity.Position.Y = newPosition
 }
 
-func (s *PhysicsSystem) applyForce(entity PhysicsEntity, force types.Vector3, dt float32) {
-	// Create a pointer to the entity since we need to modify it
-	entityPtr := &entity
-
+func (s *PhysicsSystem) applyForce(entity *PhysicsEntity, force types.Vector3, dt float32) {
 	// Add nil checks for required components
-	if entityPtr.Bodytube == nil || entityPtr.Nosecone == nil || entityPtr.Mass == nil {
+	if entity.Bodytube == nil || entity.Nosecone == nil || entity.Mass == nil {
 		return
 	}
 
 	// Validate timestep and mass
 	dt64 := float64(dt)
-	if dt64 <= 0 || math.IsNaN(dt64) || dt64 > 0.1 || entityPtr.Mass.Value <= 0 {
+	if dt64 <= 0 || math.IsNaN(dt64) || dt64 > 0.1 || entity.Mass.Value <= 0 {
 		return
 	}
 
 	// Check current state for landing condition
-	if s.handleGroundCollision(entityPtr) {
+	if s.handleGroundCollision(entity) {
 		return
 	}
 
 	// Reset acceleration and apply gravity
-	entityPtr.Acceleration.X = 0
-	entityPtr.Acceleration.Y = -s.gravity
+	entity.Acceleration.X = 0
+	entity.Acceleration.Y = -s.gravity
 
 	// Calculate and apply forces
-	netForce := s.calculateNetForce(entityPtr, force)
-	s.updateEntityState(entityPtr, netForce, dt64)
+	netForce := s.calculateNetForce(entity, force)
+	s.updateEntityState(entity, netForce, dt64)
 }
 
 // Add adds an entity to the system
 func (s *PhysicsSystem) Add(pe *PhysicsEntity) {
-	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset})
+	s.entities = append(s.entities, pe) // Store pointer directly
 }
 
 // Priority returns the system priority
