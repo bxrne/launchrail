@@ -92,6 +92,20 @@ func (m *Motor) Update(dt float64) error {
 		return fmt.Errorf("invalid timestep")
 	}
 
+	// Calculate thrust based on time step
+	if !m.isCoasting && m.elapsedTime < m.burnTime {
+		m.thrust = m.interpolateThrust(m.elapsedTime)
+
+		// Calculate mass loss proportional to timestep
+		if m.Mass > 0 && m.thrust > 0 {
+			massLossRate := (m.Props.TotalMass - m.Props.WetMass) / m.burnTime
+			m.Mass = math.Max(0, m.Mass-(massLossRate*dt))
+		}
+
+		m.elapsedTime += dt
+		return nil
+	}
+
 	// Strict burn time and thrust validation
 	if m.elapsedTime >= m.burnTime {
 		if m.thrust > 0 {
@@ -129,19 +143,11 @@ func (m *Motor) GetThrust() float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// Multiple safety checks
-	if m.isCoasting ||
-		m.elapsedTime >= m.burnTime ||
-		m.Mass <= 0 {
+	if m.isCoasting || m.elapsedTime >= m.burnTime {
 		return 0
 	}
 
-	// Validate thrust value
-	if math.IsNaN(m.thrust) || math.IsInf(m.thrust, 0) || m.thrust < 0 {
-		return 0
-	}
-
-	return m.thrust
+	return m.thrust * (1.0 - (m.elapsedTime / m.burnTime)) // Scale thrust by burn progress
 }
 
 // IsCoasting returns true if the motor has completed its burn

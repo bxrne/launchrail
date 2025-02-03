@@ -38,14 +38,8 @@ func (s *RulesSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
 
 func (s *RulesSystem) Update(dt float32) Event {
 	for _, entity := range s.entities {
-		// Update max altitude and track current values
 		currentAlt := entity.Position.Y
 		currentVel := entity.Velocity.Y
-
-		// Check for landing (negative altitude means ground penetration)
-		if currentAlt <= 0 {
-			return Land
-		}
 
 		// Track maximum altitude
 		if currentAlt > s.maxAlt {
@@ -58,8 +52,18 @@ func (s *RulesSystem) Update(dt float32) Event {
 			s.hadApogee = true
 			return Apogee
 		}
-	}
 
+		// Only check for landing after apogee
+		if s.hadApogee && currentAlt <= 0 {
+			// Ensure we're actually hitting the ground, not just passing through
+			if currentVel < 0 {
+				entity.Position.Y = 0     // Clamp to ground
+				entity.Velocity.Y = 0     // Stop movement
+				entity.Acceleration.Y = 0 // No more acceleration
+				return Land
+			}
+		}
+	}
 	return None
 }
 

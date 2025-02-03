@@ -1,5 +1,5 @@
 app:
-  name: ["launchrail-dev", "launchrail-prod"] 
+  name: "launchrail-dev"
   version: "0.0.1"
 
 logging:
@@ -9,16 +9,16 @@ external:
   openrocket_version: "23.09"
 
 simulation:
-  step: "0.01"
-  max_time: "10.0"
+  step: 0.001
+  max_time: 30.0
 
 options:
   motor_designation: "269H110-14A"
   openrocket_file: "../../openrocket/l1.ork"
   launchrail:
-    length: "a" 
-    angle: 0.0"a"
-    orientation: "0.0"
+    length: 2.0
+    angle: 5.0
+    orientation: 0.0
   launchsite:
     latitude: ["37.7749", "37.7749"]
     longitude: [["-122.4194", "-122.4194"]]

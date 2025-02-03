@@ -168,6 +168,14 @@ func (s *Simulation) Run() error {
 		s.storageParasiteSystem.Stop()
 	}()
 
+	// Validate simulation parameters
+	if s.config.Simulation.Step <= 0 || s.config.Simulation.Step > 0.01 {
+		return fmt.Errorf("invalid simulation step: must be between 0 and 0.01")
+	}
+	if s.config.Simulation.MaxTime <= 0 || s.config.Simulation.MaxTime > 120 {
+		return fmt.Errorf("invalid max time: must be between 0 and 120")
+	}
+
 	dt := float32(s.config.Simulation.Step)
 	currentTime := float32(0)
 	maxTime := float32(s.config.Simulation.MaxTime)
@@ -198,7 +206,7 @@ func (s *Simulation) Run() error {
 		// Check rules
 		event := s.rulesSystem.Update(dt)
 
-		// Send current state before handling events
+		// Create current state
 		state := systems.RocketState{
 			Time:         float64(currentTime),
 			Altitude:     s.rocket.Position.Y,
@@ -207,10 +215,9 @@ func (s *Simulation) Run() error {
 			Thrust:       thrust,
 			MotorState:   motorState,
 		}
-		s.stateChan <- state
 
-		// Update stats
-		mach := math.Abs(s.rocket.Velocity.Y) / 340.0 // approximate sound speed
+		// Update stats before handling events
+		mach := math.Abs(s.rocket.Velocity.Y) / 340.0
 		s.stats.Update(
 			float64(currentTime),
 			s.rocket.Position.Y,
@@ -219,29 +226,28 @@ func (s *Simulation) Run() error {
 			mach,
 		)
 
-		// Handle events
+		// Handle events and potentially modify state
 		switch event {
 		case systems.Apogee:
 			s.logger.Info("Apogee detected",
 				"time", currentTime,
-				"altitude", s.rocket.Position.Y,
-				"velocity", s.rocket.Velocity.Y,
+				"altitude", state.Altitude,
+				"velocity", state.Velocity,
 			)
+			s.stateChan <- state
 
 		case systems.Land:
+			// Log the final state before zeroing
+			s.stateChan <- state
+
 			s.logger.Info("Landing detected - simulation complete",
 				"time", currentTime,
-				"altitude", s.rocket.Position.Y,
-				"velocity", s.rocket.Velocity.Y,
-				"acceleration", s.rocket.Acceleration.Y,
+				"altitude", state.Altitude,
+				"velocity", state.Velocity,
+				"acceleration", state.Acceleration,
 			)
 
-			// Ensure final state shows landed position
-			s.rocket.Position.Y = 0
-			s.rocket.Velocity.Y = 0
-			s.rocket.Acceleration.Y = 0
-
-			// Send final state update
+			// Send final landed state
 			landedState := systems.RocketState{
 				Time:         float64(currentTime),
 				Altitude:     0,
@@ -250,16 +256,18 @@ func (s *Simulation) Run() error {
 				Thrust:       0,
 				MotorState:   "LANDED",
 			}
-			s.stateChan <- landedState
 
-			// Print final stats
+			// Print stats before final state
 			s.logger.Info("Flight Statistics",
 				"stats", s.stats.String(),
 			)
 
-			// Close channels and return
+			s.stateChan <- landedState
 			close(s.doneChan)
 			return nil
+
+		default:
+			s.stateChan <- state
 		}
 
 		currentTime += dt
