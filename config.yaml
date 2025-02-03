@@ -7,7 +7,7 @@ logging:
   level: "debug"
 
 simulation:
-  step: 1 # 60hz
+  step: 0.01  # Much smaller timestep for numerical stability
   max_time: 300.0
 
 external:

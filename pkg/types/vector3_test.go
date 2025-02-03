@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/bxrne/launchrail/pkg/ecs/types"
+	"github.com/bxrne/launchrail/pkg/types"
 )
 
 // Generate tests for Vector3 methods

@@ -3,7 +3,7 @@ package components_test
 import (
 	"testing"
 
-	"github.com/bxrne/launchrail/pkg/ecs/components"
+	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/stretchr/testify/assert"
 )
 

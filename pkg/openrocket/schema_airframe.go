@@ -30,6 +30,11 @@ type BodyTube struct {
 	Subcomponents BodyTubeSubcomponents `xml:"subcomponents"`
 }
 
+// GetMass returns the mass of the bodytube
+func (b *BodyTube) GetMass() float64 {
+	return b.Material.Density * b.Length * b.Thickness
+}
+
 // String returns full string representation of the BodyTube
 func (b *BodyTube) String() string {
 	return fmt.Sprintf("BodyTube{Name=%s, ID=%s, Finish=%s, Material=%s, Length=%.2f, Thickness=%.2f, Radius=%s, Subcomponents=%s}", b.Name, b.ID, b.Finish, b.Material.String(), b.Length, b.Thickness, b.Radius, b.Subcomponents.String())

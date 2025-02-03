@@ -1,9 +1,11 @@
 package components_test
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/bxrne/launchrail/pkg/ecs/components"
+	"github.com/EngoEngine/ecs"
+	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,7 +18,7 @@ func TestNewMotor(t *testing.T) {
 		AvgThrust: 15,
 	}
 
-	motor := components.NewMotor(1, md)
+	motor := components.NewMotor(ecs.NewBasic(), md)
 
 	assert.NotNil(t, motor, "Motor should be created successfully")
 	assert.Equal(t, float64(10), motor.GetThrust(), "Initial thrust should match the first point in the thrust curve")
@@ -32,7 +34,7 @@ func TestMotor_UpdateBurningState(t *testing.T) {
 		AvgThrust: 15,
 	}
 
-	motor := components.NewMotor(1, md)
+	motor := components.NewMotor(ecs.NewBasic(), md)
 
 	// Simulate motor update during burn
 	err := motor.Update(0.5)
@@ -50,7 +52,7 @@ func TestMotor_UpdateIdleState(t *testing.T) {
 		AvgThrust: 15,
 	}
 
-	motor := components.NewMotor(1, md)
+	motor := components.NewMotor(ecs.NewBasic(), md)
 
 	// Simulate motor burn to completion
 	err := motor.Update(2.5)
@@ -69,7 +71,7 @@ func TestMotor_UpdateInvalidTimestep(t *testing.T) {
 		AvgThrust: 15,
 	}
 
-	motor := components.NewMotor(1, md)
+	motor := components.NewMotor(ecs.NewBasic(), md)
 
 	// Simulate invalid timestep
 	err := motor.Update(-1.0)
@@ -85,7 +87,7 @@ func TestMotor_ThrustInterpolation(t *testing.T) {
 		AvgThrust: 15,
 	}
 
-	motor := components.NewMotor(1, md)
+	motor := components.NewMotor(ecs.NewBasic(), md)
 
 	// Simulate motor update to test thrust interpolation
 	err := motor.Update(0.5)
@@ -109,8 +111,8 @@ func TestMotor_StringRepresentation(t *testing.T) {
 		AvgThrust: 15,
 	}
 
-	motor := components.NewMotor(1, md)
+	motor := components.NewMotor(ecs.NewBasic(), md)
 
-	expectedString := "Motor{ID: 1, Position: Vector3{X: 0.00, Y: 0.00, Z: 0.00}, Mass: 50.000000, Thrust: 10.000000}"
+	expectedString := fmt.Sprintf("Motor{ID: %d, Position: Vector3{X: 0.00, Y: 0.00, Z: 0.00}, Mass: 50.000000, Thrust: 10.000000}", motor.ID.ID())
 	assert.Equal(t, expectedString, motor.String(), "String representation of the Motor should match the expected format")
 }
