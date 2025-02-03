@@ -21,6 +21,10 @@ type RocketEntity struct {
 
 // NewRocketEntity creates a new rocket entity from OpenRocket data
 func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor *components.Motor) *RocketEntity {
+	if orkData == nil || motor == nil {
+		return nil
+	}
+
 	basic := ecs.NewBasic()
 
 	// Create base rocket entity
@@ -33,19 +37,29 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 		components:   make(map[string]interface{}),
 	}
 
-	// Calculate total mass from OpenRocket data
-	totalMass := calculateTotalMass(orkData)
-	rocket.Mass.Value = totalMass
-
-	// Store components in map with type as key
+	// Store components with proper error handling
 	rocket.components["motor"] = motor
-	bodytube_obj, err := components.NewBodytubeFromORK(ecs.NewBasic(), orkData)
+
+	bodytube, err := components.NewBodytubeFromORK(ecs.NewBasic(), orkData)
 	if err != nil {
 		return nil
 	}
-	rocket.components["bodytube"] = bodytube_obj
-	rocket.components["nosecone"] = components.NewNoseconeFromORK(ecs.NewBasic(), orkData)
-	rocket.components["finset"] = components.NewTrapezoidFinsetFromORK(ecs.NewBasic(), orkData)
+	rocket.components["bodytube"] = bodytube
+
+	nosecone := components.NewNoseconeFromORK(ecs.NewBasic(), orkData)
+	if nosecone == nil {
+		return nil
+	}
+	rocket.components["nosecone"] = nosecone
+
+	finset := components.NewTrapezoidFinsetFromORK(ecs.NewBasic(), orkData)
+	if finset == nil {
+		return nil
+	}
+	rocket.components["finset"] = finset
+
+	// Calculate total mass
+	rocket.Mass.Value = calculateTotalMass(orkData)
 
 	return rocket
 }

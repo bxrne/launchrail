@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 
 	"github.com/EngoEngine/ecs"
 
@@ -42,16 +43,31 @@ func NewBodytube(id ecs.BasicEntity, radius, length, mass, thickness float64) *B
 
 // NewBodytubeFromORK creates a new bodytube instance from an ORK Document
 func NewBodytubeFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument) (*Bodytube, error) {
-	orkBodytube := orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube
-	radiusString := orkBodytube.Radius
-
-	if radiusString[:4] == "auto" {
-		radiusString = radiusString[5:]
+	if orkData == nil || len(orkData.Subcomponents.Stages) == 0 {
+		return nil, fmt.Errorf("invalid OpenRocket data: missing stages")
 	}
 
-	radius, err := strconv.ParseFloat(radiusString, 64)
-	if err != nil {
-		return nil, err
+	orkBodytube := orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube
+
+	// Parse radius which may be in "auto X.XX" format
+	radiusStr := orkBodytube.Radius
+	var radius float64
+	if strings.HasPrefix(radiusStr, "auto") {
+		parts := strings.Split(radiusStr, " ")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid radius format: %s", radiusStr)
+		}
+		var err error
+		radius, err = strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid radius value: %v", err)
+		}
+	} else {
+		var err error
+		radius, err = strconv.ParseFloat(radiusStr, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid radius value: %v", err)
+		}
 	}
 
 	// Calculate areas and volume
