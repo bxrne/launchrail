@@ -62,7 +62,8 @@ func TestMotorBurnout(t *testing.T) {
 
 	// Simulate full burn
 	for i := 0; i < 30; i++ { // Ensures we pass burn time
-		motor.Update(0.1)
+		err := motor.Update(0.1)
+		assert.NoError(t, err)
 	}
 
 	assert.True(t, motor.IsCoasting(), "Motor should be coasting after burn")

@@ -42,26 +42,6 @@ type physicsEntity struct {
 	*components.TrapezoidFinset // Add this field
 }
 
-// calculateCG calculates the center of gravity for an entity
-func (s *PhysicsSystem) calculateCG(entity physicsEntity) float64 {
-	// Simple CG calculation - assuming uniform mass distribution
-	totalMass := entity.Mass.Value
-	totalMoment := 0.0
-
-	// Add moments from each component
-	if entity.Nosecone != nil {
-		totalMoment += entity.Nosecone.GetMass() * entity.Nosecone.Position.X
-	}
-	if entity.Bodytube != nil {
-		totalMoment += entity.Bodytube.GetMass() * entity.Bodytube.Position.X
-	}
-	if entity.Motor != nil {
-		totalMoment += entity.Motor.GetMass() * entity.Motor.Position.X
-	}
-
-	return totalMoment / totalMass
-}
-
 // calculateStabilityForces calculates stability forces for an entity
 func (s *PhysicsSystem) calculateStabilityForces(force *types.Vector3, stabilityMargin float64, entity physicsEntity) {
 	// Basic stability force calculation
@@ -133,30 +113,6 @@ func (s *PhysicsSystem) Update(dt float32) {
 	for force := range resultChan {
 		s.applyForce(s.entities[i], force, dt)
 		i++
-	}
-}
-
-// Update applies forces to entities
-func (s *PhysicsSystem) processForces(wg *sync.WaitGroup) {
-	defer wg.Done()
-	for entity := range s.workChan {
-		// Get vector from pool
-		force := vectorPool.Get().(*types.Vector3)
-		defer vectorPool.Put(force)
-
-		// Only calculate CP if we have a finset
-		var stabilityMargin float64
-		if entity.TrapezoidFinset != nil {
-			// Calculate CP and CG
-			cp := s.cpCalculator.CalculateCP(entity.Nosecone, entity.Bodytube, entity.TrapezoidFinset)
-			cg := s.calculateCG(entity)
-			stabilityMargin = (cp - cg) / entity.Bodytube.Radius
-		}
-
-		// Calculate forces based on stability
-		s.calculateStabilityForces(force, stabilityMargin, entity)
-
-		s.resultChan <- *force
 	}
 }
 

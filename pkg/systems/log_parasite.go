@@ -62,7 +62,6 @@ func (s *LogParasiteSystem) Priority() int {
 // Update the LogParasiteSystem
 func (s *LogParasiteSystem) Update(dt float32) {
 	// No need to track time here - data comes from simulation state
-	return
 }
 
 // Add adds entities to the system

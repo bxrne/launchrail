@@ -98,62 +98,6 @@ func calculateReferenceArea(nosecone *components.Nosecone, bodytube *components.
 	return math.Max(noseArea, tubeArea)
 }
 
-// getAtmosphericDensity implements the International Standard Atmosphere model
-func getAtmosphericDensity(altitude float64) float64 {
-	// Constants for ISA model
-	const (
-		rho0 = 1.225     // sea level density in kg/m^3
-		T0   = 288.15    // sea level temperature in K
-		L    = 0.0065    // temperature lapse rate in K/m
-		g    = 9.80665   // gravitational acceleration in m/s^2
-		R    = 287.05287 // specific gas constant for air in J/(kg·K)
-	)
-
-	if altitude < 11000 { // troposphere
-		return rho0 * math.Pow(1-(L*altitude)/T0, g/(R*L)-1)
-	}
-	// Add stratosphere calculations if needed
-	return rho0 * math.Exp(-g*altitude/(R*T0))
-}
-
-// getSpeedOfSound calculates the speed of sound based on altitude
-func getSpeedOfSound(altitude float64) float64 {
-	// Constants
-	const (
-		gamma = 1.4    // ratio of specific heats for air
-		R     = 287.05 // specific gas constant for air in J/(kg·K)
-		T0    = 288.15 // sea level temperature in K
-		L     = 0.0065 // temperature lapse rate in K/m
-	)
-
-	// Temperature at altitude
-	T := T0 - L*altitude
-	return math.Sqrt(gamma * R * T)
-}
-
-// calculateDragCoefficient calculates drag coefficient based on Mach number and Reynolds number
-func calculateDragCoefficient(mach, reynolds, shapeParameter float64) float64 {
-	// Base drag coefficient (subsonic)
-	cd0 := 0.15 + 0.2*shapeParameter
-
-	// Transonic correction (Mach 0.8 to 1.2)
-	if mach > 0.8 && mach < 1.2 {
-		cd0 *= 1 + 5*(mach-0.8)
-	}
-
-	// Supersonic correction
-	if mach >= 1.2 {
-		cd0 = 0.3 / math.Sqrt(mach)
-	}
-
-	// Reynolds number correction
-	if reynolds < 1e5 {
-		cd0 *= 1.5
-	}
-
-	return cd0
-}
-
 // Update implements parallel force calculation and application
 func (a *AerodynamicSystem) Update(dt float32) error {
 	workChan := make(chan physicsEntity, len(a.entities))
@@ -217,15 +161,6 @@ func (a *AerodynamicSystem) Priority() int {
 	return 2
 }
 
-// calculateReynoldsNumber calculates the Reynolds number for a given speed, diameter, and air density
-func calculateReynoldsNumber(speed, diameter, airDensity float64) float64 {
-	// Reynolds number = (speed * diameter) / kinematic viscosity
-	// kinematic viscosity = dynamic viscosity / density
-	// dynamic viscosity of air at 15°C = 1.81e-5 Pa·s
-	kinematicViscosity := 1.81e-5 / airDensity
-	return (speed * diameter) / kinematicViscosity
-}
-
 // Add these methods to AerodynamicSystem
 func (a *AerodynamicSystem) calculateTemperature(altitude float64) float64 {
 	const (
@@ -276,4 +211,22 @@ func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity physicsEntit
 	}
 
 	return baseCd
+}
+
+// getAtmosphericDensity implements the International Standard Atmosphere model
+func getAtmosphericDensity(altitude float64) float64 {
+	// Constants for ISA model
+	const (
+		rho0 = 1.225     // sea level density in kg/m^3
+		T0   = 288.15    // sea level temperature in K
+		L    = 0.0065    // temperature lapse rate in K/m
+		g    = 9.80665   // gravitational acceleration in m/s^2
+		R    = 287.05287 // specific gas constant for air in J/(kg·K)
+	)
+
+	if altitude < 11000 { // troposphere
+		return rho0 * math.Pow(1-(L*altitude)/T0, g/(R*L)-1)
+	}
+	// Add stratosphere calculations if needed
+	return rho0 * math.Exp(-g*altitude/(R*T0))
 }
