@@ -56,9 +56,9 @@ func (v Vector3) MultiplyScalar(scalar float64) Vector3 {
 // INFO: Ensure the scalar is not zero to avoid division by zero.
 func (v Vector3) DivideScalar(scalar float64) Vector3 {
 	if scalar == 0 {
-		// WARN: Avoiding division by zero which would lead to NaN values.
-		return v // Return original vector instead of dividing by zero
+		return v.DivideScalar(math.SmallestNonzeroFloat64)
 	}
+
 	return Vector3{
 		X: v.X / scalar,
 		Y: v.Y / scalar,

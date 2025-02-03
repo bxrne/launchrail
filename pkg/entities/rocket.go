@@ -6,15 +6,16 @@ import (
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/openrocket"
+	"github.com/bxrne/launchrail/pkg/types"
 )
 
 // RocketEntity represents a complete rocket with all its components
 type RocketEntity struct {
 	*ecs.BasicEntity
-	*components.Position
-	*components.Velocity
-	*components.Acceleration
-	*components.Mass
+	*types.Position
+	*types.Velocity
+	*types.Acceleration
+	*types.Mass
 	components map[string]interface{} // Change to map for easier lookup
 	mu         sync.RWMutex
 }
@@ -30,10 +31,10 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 	// Create base rocket entity
 	rocket := &RocketEntity{
 		BasicEntity:  &basic,
-		Position:     &components.Position{BasicEntity: basic},
-		Velocity:     &components.Velocity{BasicEntity: basic},
-		Acceleration: &components.Acceleration{BasicEntity: basic},
-		Mass:         &components.Mass{BasicEntity: basic},
+		Position:     &types.Position{BasicEntity: basic},
+		Velocity:     &types.Velocity{BasicEntity: basic},
+		Acceleration: &types.Acceleration{BasicEntity: basic},
+		Mass:         &types.Mass{BasicEntity: basic},
 		components:   make(map[string]interface{}),
 	}
 
