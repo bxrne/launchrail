@@ -12,6 +12,7 @@ import (
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 )
 
+// TEST: GIVEN a new Motor WHEN NewMotor is called THEN a new Motor is returned
 func TestNewMotor(t *testing.T) {
 	logger := logf.New(logf.Opts{})
 	md := &thrustcurves.MotorData{
@@ -27,6 +28,7 @@ func TestNewMotor(t *testing.T) {
 	assert.Equal(t, 2.0, motor.GetMass())
 }
 
+// TEST: GIVEN a Motor WHEN Update is called THEN the Motor is updated
 func TestMotorUpdate(t *testing.T) {
 	logger := logf.New(logf.Opts{})
 	md := &thrustcurves.MotorData{
@@ -44,6 +46,7 @@ func TestMotorUpdate(t *testing.T) {
 	assert.Less(t, motor.GetMass(), 2.0) // Mass should decrease
 }
 
+// TEST: GIVEN a Motor WHEN Update is called THEN the Motor is updated
 func TestMotorBurnout(t *testing.T) {
 	id := ecs.BasicEntity{}
 	md := &thrustcurves.MotorData{
@@ -66,6 +69,7 @@ func TestMotorBurnout(t *testing.T) {
 	assert.Zero(t, motor.GetThrust(), "Thrust should be zero after burnout")
 }
 
+// TEST: GIVEN a Motor WHEN Update is called THEN the Motor is updated
 func TestMotorReset(t *testing.T) {
 	logger := logf.New(logf.Opts{})
 	md := &thrustcurves.MotorData{
@@ -84,6 +88,7 @@ func TestMotorReset(t *testing.T) {
 	assert.False(t, motor.IsCoasting())
 }
 
+// TEST: GIVEN a Motor WHEN Update is called THEN the Motor is updated
 func TestInvalidUpdate(t *testing.T) {
 	logger := logf.New(logf.Opts{})
 	md := &thrustcurves.MotorData{

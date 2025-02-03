@@ -14,6 +14,7 @@ var (
 	atmCache = sync.Map{}
 )
 
+// atmosphericData stores atmospheric data at a given altitude
 type atmosphericData struct {
 	density     float64
 	pressure    float64
@@ -21,12 +22,14 @@ type atmosphericData struct {
 	soundSpeed  float64
 }
 
+// AerodynamicSystem calculates aerodynamic forces on entities
 type AerodynamicSystem struct {
 	world    *ecs.World
 	entities []physicsEntity
 	workers  int
 }
 
+// physicsEntity represents an entity with physics components
 func NewAerodynamicSystem(world *ecs.World, workers int) *AerodynamicSystem {
 	return &AerodynamicSystem{
 		world:    world,
@@ -35,6 +38,7 @@ func NewAerodynamicSystem(world *ecs.World, workers int) *AerodynamicSystem {
 	}
 }
 
+// getAtmosphericData retrieves atmospheric data from cache or calculates it
 func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericData {
 	// Round to nearest meter for caching
 	roundedAlt := math.Floor(altitude)
@@ -221,6 +225,7 @@ func (a *AerodynamicSystem) calculateTemperature(altitude float64) float64 {
 	return T0 - L*altitude
 }
 
+// calculatePressure calculates atmospheric pressure at a given altitude
 func (a *AerodynamicSystem) calculatePressure(altitude, temperature float64) float64 {
 	const (
 		P0 = 101325 // Pa
@@ -231,11 +236,13 @@ func (a *AerodynamicSystem) calculatePressure(altitude, temperature float64) flo
 	return P0 * math.Pow(temperature/T0, -g/(R*0.0065))
 }
 
+// calculateDensity calculates air density at a given pressure and temperature
 func (a *AerodynamicSystem) calculateDensity(pressure, temperature float64) float64 {
 	const R = 287.05 // J/(kg·K)
 	return pressure / (R * temperature)
 }
 
+// calculateSoundSpeed calculates the speed of sound at a given temperature
 func (a *AerodynamicSystem) calculateSoundSpeed(temperature float64) float64 {
 	const (
 		gamma = 1.4    // ratio of specific heats
@@ -244,6 +251,7 @@ func (a *AerodynamicSystem) calculateSoundSpeed(temperature float64) float64 {
 	return math.Sqrt(gamma * R * temperature)
 }
 
+// calculateDragCoeff calculates the drag coefficient based on Mach number
 func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity physicsEntity) float64 {
 	// Basic drag coefficient calculation
 	baseCd := 0.2 // Base drag coefficient

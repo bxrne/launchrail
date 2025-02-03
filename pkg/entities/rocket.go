@@ -64,8 +64,7 @@ func calculateTotalMass(orkData *openrocket.RocketDocument) float64 {
 	return totalMass
 }
 
-// Add these methods to RocketEntity:
-
+// AddComponent adds a component to the entity
 func (r *RocketEntity) GetComponent(name string) interface{} {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

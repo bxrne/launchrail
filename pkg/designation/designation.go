@@ -10,6 +10,7 @@ import (
 // Designation represents a motor designation string
 type Designation string
 
+// NOTE: TotalImpulse-Class-AverageThrust-DelayTime-Variant (e.g. "269H110-14A" is a valid designation)
 var schema = `^(\d+)([A-Z]+)(\d+)-(\d+)([A-Z]+)$`
 
 // New creates a new designation from a string
@@ -36,6 +37,7 @@ func (d Designation) validate() (bool, error) {
 	return true, nil
 }
 
+// Describe the designation
 func (d *Designation) Describe() (string, error) {
 	var totalImpulse float64
 	var class string

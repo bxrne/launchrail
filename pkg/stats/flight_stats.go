@@ -6,6 +6,7 @@ import (
 	"sync"
 )
 
+// FlightStats represents statistics for a rocket flight
 type FlightStats struct {
 	mu                sync.RWMutex
 	Apogee            float64
@@ -18,6 +19,7 @@ type FlightStats struct {
 	GroundHitVelocity float64
 }
 
+// NewFlightStats creates a new FlightStats object
 func NewFlightStats() *FlightStats {
 	return &FlightStats{
 		Apogee:      -math.MaxFloat64,
@@ -27,6 +29,7 @@ func NewFlightStats() *FlightStats {
 	}
 }
 
+// Update updates the flight statistics with new data
 func (s *FlightStats) Update(time, altitude, velocity, accel, mach float64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -46,6 +49,7 @@ func (s *FlightStats) Update(time, altitude, velocity, accel, mach float64) {
 	}
 }
 
+// String returns a string representation of the flight statistics
 func (s *FlightStats) String() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

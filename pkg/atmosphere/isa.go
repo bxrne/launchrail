@@ -14,12 +14,14 @@ type ISAModel struct {
 	mu    sync.RWMutex
 }
 
+// AtmosphereData contains atmospheric properties at a given altitude
 type AtmosphereData struct {
 	Density     float64
 	Temperature float64
 	Pressure    float64
 }
 
+// NewISAModel creates a new ISAModel with the given configuration
 func NewISAModel(cfg *config.ISAConfiguration) *ISAModel {
 	return &ISAModel{
 		cache: make(map[float64]AtmosphereData),

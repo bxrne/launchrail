@@ -11,11 +11,13 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 )
 
+// TEST: GIVEN a new CP calculator WHEN NewCPCalculator is called THEN a new CPCalculator is returned
 func TestNewCPCalculator(t *testing.T) {
 	cpCalc := barrowman.NewCPCalculator()
 	require.NotNil(t, cpCalc)
 }
 
+// TEST: GIVEN a nosecone, bodytube, and finset WHEN CalculateCP is called THEN the CP is calculated
 func TestCalculateCP(t *testing.T) {
 	cpCalc := barrowman.NewCPCalculator()
 	nose := &components.Nosecone{Length: 1.0}

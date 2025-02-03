@@ -8,11 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TEST: GIVEN a new MotorFSM WHEN InitialState is called THEN the state is "idle"
 func TestMotorFSM_InitialState(t *testing.T) {
 	fsm := components.NewMotorFSM()
 	assert.Equal(t, components.StateIdle, fsm.GetState(), "FSM should start in 'idle' state")
 }
 
+// TEST: GIVEN a new MotorFSM WHEN StateTransitions is called THEN the state transitions are correct
 func TestMotorFSM_StateTransitions(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -47,6 +49,7 @@ func TestMotorFSM_StateTransitions(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN a new MotorFSM WHEN ConcurrentUpdates is called THEN the state is valid
 func TestMotorFSM_ConcurrentUpdates(t *testing.T) {
 	fsm := components.NewMotorFSM()
 
@@ -65,6 +68,7 @@ func TestMotorFSM_ConcurrentUpdates(t *testing.T) {
 	assert.Contains(t, []string{components.StateIdle, components.StateBurning}, state)
 }
 
+// TEST: GIVEN a new MotorFSM WHEN NegativeValues is called THEN the state is valid
 func TestMotorFSM_NegativeValues(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -86,6 +90,7 @@ func TestMotorFSM_NegativeValues(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN a new MotorFSM WHEN InvalidState is called THEN the state is valid
 func TestMotorFSM_StateString(t *testing.T) {
 	fsm := components.NewMotorFSM()
 	assert.Equal(t, "idle", fsm.GetState())
@@ -94,6 +99,7 @@ func TestMotorFSM_StateString(t *testing.T) {
 	assert.Equal(t, "burning", fsm.GetState())
 }
 
+// TEST: GIVEN a new MotorFSM WHEN RapidStateChanges is called THEN the state is valid
 func TestMotorFSM_RapidStateChanges(t *testing.T) {
 	fsm := components.NewMotorFSM()
 

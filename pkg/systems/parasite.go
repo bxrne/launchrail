@@ -22,5 +22,3 @@ type ParasiteSystem interface {
 	Start(dataChan chan RocketState)
 	Stop()
 }
-
-// Update dataflow: Simulation -> RocketState -> Parasite Systems

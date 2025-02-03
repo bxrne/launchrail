@@ -12,12 +12,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TEST: GIVEN a new Bodytube WHEN Type is called THEN "Bodytube" is returned
 func TestBodytubeType(t *testing.T) {
 	bt := components.Bodytube{}
 
 	assert.Equal(t, "Bodytube", bt.Type(), "Type should return 'Bodytube'")
 }
 
+// TEST: GIVEN a new Bodytube WHEN String is called THEN a string representation is returned
 func TestBodytubeString(t *testing.T) {
 	bt := components.Bodytube{
 		ID:           ecs.NewBasic(),
@@ -33,6 +35,7 @@ func TestBodytubeString(t *testing.T) {
 	assert.Equal(t, expected, bt.String(), "String representation should match expected format")
 }
 
+// TEST: GIVEN a new Bodytube WHEN SetID is called THEN the ID is updated
 func TestBodytubeUpdate(t *testing.T) {
 	bt := components.Bodytube{}
 
@@ -41,6 +44,7 @@ func TestBodytubeUpdate(t *testing.T) {
 	assert.NoError(t, err, "Update should not return an error")
 }
 
+// TEST: GIVEN a new Bodytube WHEN Remove is called THEN the component is removed
 func TestNewBodytube(t *testing.T) {
 	id := ecs.NewBasic()
 	radius := 1.0
@@ -58,6 +62,7 @@ func TestNewBodytube(t *testing.T) {
 	assert.Equal(t, thickness, bt.Thickness, "Bodytube thickness should match")
 }
 
+// TEST: GIVEN a new Bodytube WHEN NewBodytubeFromORK is called THEN a new Bodytube is created
 func TestBodytubeFromORK(t *testing.T) {
 	id := ecs.NewBasic()
 	orkDoc := &openrocket.RocketDocument{
@@ -90,6 +95,7 @@ func TestBodytubeFromORK(t *testing.T) {
 	assert.Equal(t, 1.2, bt.Density)
 }
 
+// TEST: GIVEN a new Bodytube WHEN NewBodytubeFromORK is called THEN a new Bodytube is created with auto radius
 func TestBodytubeGetters(t *testing.T) {
 	bt := components.Bodytube{
 		Radius:      0.5,
@@ -120,6 +126,7 @@ func TestBodytubeGetters(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN a new Bodytube WHEN NewBodytubeFromORK is called THEN a new Bodytube is created with auto radius
 func TestBodytubeFromORKInvalidRadius(t *testing.T) {
 	id := ecs.NewBasic()
 	orkDoc := &openrocket.RocketDocument{

@@ -12,8 +12,10 @@ import (
 	"github.com/zerodha/logf"
 )
 
+// MotorState represents the current state of the motor
 type MotorState string
 
+// MotorState constants
 const (
 	MotorIgnited  MotorState = "IGNITED"
 	MotorBurning  MotorState = "BURNING"
@@ -21,6 +23,7 @@ const (
 	MotorCoasting MotorState = "COASTING"
 )
 
+// Motor represents a rocket motor component
 type Motor struct {
 	ID          ecs.BasicEntity
 	Position    types.Vector3
@@ -37,6 +40,7 @@ type Motor struct {
 	state       MotorState  // Add motor state
 }
 
+// NewMotor creates a new motor component from thrust curve data
 func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger) *Motor {
 	if md == nil || len(md.Thrust) == 0 {
 		panic("invalid motor data")
@@ -84,6 +88,7 @@ func validateThrustCurve(curve [][]float64) [][]float64 {
 	return curve
 }
 
+// Update updates the motor state based on the current time step
 func (m *Motor) Update(dt float64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -139,6 +144,7 @@ func (m *Motor) Update(dt float64) error {
 	return nil
 }
 
+// GetThrust returns the current thrust of the motor
 func (m *Motor) GetThrust() float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -177,16 +183,19 @@ func (m *Motor) Reset() {
 	m.state = MotorCoasting // Reset state
 }
 
+// GetMass returns the current mass of the motor
 func (m *Motor) GetMass() float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.Mass
 }
 
+// Type returns the type of the motor component
 func (m *Motor) Type() string {
 	return "Motor"
 }
 
+// interpolateThrust interpolates the thrust value at a given time point
 func (m *Motor) interpolateThrust(totalDt float64) float64 {
 	if m.isCoasting || totalDt >= m.burnTime {
 		return 0
@@ -211,10 +220,12 @@ func (m *Motor) interpolateThrust(totalDt float64) float64 {
 	return 0
 }
 
+// String returns a string representation of the motor component
 func (m *Motor) String() string {
 	return fmt.Sprintf("Motor{ID: %d, Position: %s, Mass: %f, Thrust: %f}", m.ID.ID(), m.Position.String(), m.Mass, m.thrust)
 }
 
+// GetPlanformArea returns the planform area of the motor
 func (m *Motor) GetPlanformArea() float64 {
 	return 0
 }

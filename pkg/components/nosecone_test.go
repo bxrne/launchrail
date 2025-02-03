@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TEST: GIVEN a new Nosecone WHEN Type is called THEN "Nosecone" is returned
 func TestNewNosecone(t *testing.T) {
 	id := ecs.NewBasic()
 	radius := 1.0
@@ -31,6 +32,7 @@ func TestNewNosecone(t *testing.T) {
 	assert.Equal(t, shapeParameter, nosecone.ShapeParameter, "Nosecone shape parameter should match")
 }
 
+// TEST: GIVEN a new Nosecone WHEN Type is called THEN "Nosecone" is returned
 func TestNosecone_String(t *testing.T) {
 	nosecone := components.Nosecone{
 		ID:           ecs.NewBasic(),
@@ -47,6 +49,7 @@ func TestNosecone_String(t *testing.T) {
 	assert.Equal(t, expected, nosecone.String(), "String representation should match expected format")
 }
 
+// TEST: GIVEN a new Nosecone WHEN Update is called THEN the component is updated
 func TestNosecone_Update(t *testing.T) {
 	id := ecs.NewBasic()
 	radius := 1.0
@@ -61,6 +64,7 @@ func TestNosecone_Update(t *testing.T) {
 	assert.NoError(t, err, "Update should not return an error")
 }
 
+// TEST: GIVEN a new Nosecone WHEN Remove is called THEN the component is removed
 func TestNoseconeFromORK(t *testing.T) {
 	id := ecs.NewBasic()
 	orkDoc := &openrocket.RocketDocument{
@@ -101,6 +105,7 @@ func TestNoseconeFromORK(t *testing.T) {
 	assert.Equal(t, 1.2, nc.Density)
 }
 
+// TEST: GIVEN a new Nosecone WHEN Getters are called THEN the expected values are returned
 func TestNoseconeGetters(t *testing.T) {
 	nc := components.Nosecone{
 		Radius:      0.5,

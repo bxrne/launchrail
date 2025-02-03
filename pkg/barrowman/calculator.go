@@ -6,15 +6,6 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 )
 
-var (
-	// Object pools for frequently allocated items
-	vectorPool = sync.Pool{
-		New: func() interface{} {
-			return make([]float64, 3)
-		},
-	}
-)
-
 // CPCalculator handles center of pressure calculations using Barrowman method
 type CPCalculator struct {
 	mu sync.RWMutex
@@ -46,15 +37,18 @@ func (c *CPCalculator) CalculateCP(nose *components.Nosecone, body *components.B
 	return cp
 }
 
+// calculateNoseCP calculates the CP of a nosecone
 func (c *CPCalculator) calculateNoseCP(nose *components.Nosecone) float64 {
 	// Von Karman ogive approximation
 	return 0.466 * nose.Length
 }
 
+// calculateBodyCP calculates the CP of a bodytube
 func (c *CPCalculator) calculateBodyCP(body *components.Bodytube) float64 {
 	return body.Length / 2
 }
 
+// calculateFinCP calculates the CP of a finset
 func (c *CPCalculator) calculateFinCP(fins *components.TrapezoidFinset) float64 {
 	// Rough approximation: place fin CP at 0.75 of root chord
 	return 0.75 * fins.RootChord

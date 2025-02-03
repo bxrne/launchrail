@@ -17,6 +17,7 @@ import (
 	"github.com/zerodha/logf"
 )
 
+// Simulation represents a rocket simulation
 type Simulation struct {
 	world                 *ecs.World
 	physicsSystem         *systems.PhysicsSystem
@@ -34,6 +35,7 @@ type Simulation struct {
 	launchRailSystem      *systems.LaunchRailSystem
 }
 
+// NewSimulation creates a new rocket simulation
 func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.Storage) (*Simulation, error) {
 	world := &ecs.World{}
 
@@ -72,6 +74,7 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.St
 	return sim, nil
 }
 
+// LoadRocket loads a rocket entity into the simulation
 func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *thrustcurves.MotorData) error {
 	// Create motor component with logger
 	motor := components.NewMotor(ecs.NewBasic(), motorData, *s.logger)
@@ -162,6 +165,7 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	return nil
 }
 
+// Run executes the simulation
 func (s *Simulation) Run() error {
 	defer func() {
 		s.logParasiteSystem.Stop()

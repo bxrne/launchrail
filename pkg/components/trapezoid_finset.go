@@ -16,6 +16,7 @@ type TrapezoidFinset struct {
 	Mass       float64
 }
 
+// GetMass returns the mass of the finset
 func (f *TrapezoidFinset) GetMass() float64 {
 	return f.Mass
 }

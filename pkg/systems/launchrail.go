@@ -7,12 +7,14 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 )
 
+// LaunchRail represents a launch rail
 type LaunchRail struct {
 	Length      float64
 	Angle       float64 // Angle from vertical in degrees
 	Orientation float64 // Compass orientation in degrees
 }
 
+// LaunchRailSystem constrains entities to a launch rail
 type LaunchRailSystem struct {
 	world     *ecs.World
 	entities  []physicsEntity
@@ -21,6 +23,7 @@ type LaunchRailSystem struct {
 	railExitY float64 // Y position at rail exit
 }
 
+// Add adds a physics entity to the launch rail system
 func NewLaunchRailSystem(world *ecs.World, length, angle, orientation float64) *LaunchRailSystem {
 	// Convert angle to radians
 	angleRad := angle * math.Pi / 180.0
@@ -38,6 +41,7 @@ func NewLaunchRailSystem(world *ecs.World, length, angle, orientation float64) *
 	}
 }
 
+// Add adds a physics entity to the launch rail system
 func (s *LaunchRailSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
 	vel *components.Velocity, acc *components.Acceleration, mass *components.Mass,
 	motor *components.Motor, bodytube *components.Bodytube, nosecone *components.Nosecone,
@@ -45,6 +49,7 @@ func (s *LaunchRailSystem) Add(entity *ecs.BasicEntity, pos *components.Position
 	s.entities = append(s.entities, physicsEntity{entity, pos, vel, acc, mass, motor, bodytube, nosecone, finset})
 }
 
+// Update applies launch rail constraints to entities
 func (s *LaunchRailSystem) Update(dt float32) error {
 	if !s.onRail {
 		return nil
@@ -86,6 +91,7 @@ func (s *LaunchRailSystem) Update(dt float32) error {
 	return nil
 }
 
+// Priority returns the system priority
 func (s *LaunchRailSystem) Priority() int {
 	return 1 // Run before physics system
 }

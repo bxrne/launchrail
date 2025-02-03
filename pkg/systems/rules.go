@@ -5,6 +5,7 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 )
 
+// Event represents a significant event in flight
 type Event int
 
 const (
@@ -13,6 +14,7 @@ const (
 	Land
 )
 
+// RulesSystem enforces rules of flight
 type RulesSystem struct {
 	world     *ecs.World
 	entities  []physicsEntity
@@ -20,6 +22,7 @@ type RulesSystem struct {
 	maxAlt    float64 // Track max altitude for apogee detection
 }
 
+// NewRulesSystem creates a new RulesSystem
 func NewRulesSystem(world *ecs.World) *RulesSystem {
 	return &RulesSystem{
 		world:     world,
@@ -29,6 +32,7 @@ func NewRulesSystem(world *ecs.World) *RulesSystem {
 	}
 }
 
+// Add adds a physics entity to the rules system
 func (s *RulesSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
 	vel *components.Velocity, acc *components.Acceleration, mass *components.Mass,
 	motor *components.Motor, bodytube *components.Bodytube, nosecone *components.Nosecone,
@@ -36,6 +40,7 @@ func (s *RulesSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
 	s.entities = append(s.entities, physicsEntity{entity, pos, vel, acc, mass, motor, bodytube, nosecone, finset})
 }
 
+// Update applies rules of flight to entities
 func (s *RulesSystem) Update(dt float32) Event {
 	for _, entity := range s.entities {
 		currentAlt := entity.Position.Y
@@ -67,6 +72,7 @@ func (s *RulesSystem) Update(dt float32) Event {
 	return None
 }
 
+// Remove removes an entity from the rules system
 func (s *RulesSystem) Remove(basic ecs.BasicEntity) {
 	var deleteIndex int = -1
 	for i, e := range s.entities {
@@ -80,6 +86,7 @@ func (s *RulesSystem) Remove(basic ecs.BasicEntity) {
 	}
 }
 
+// Priority returns the system priority
 func (s *RulesSystem) Priority() int {
 	return 100 // Run after all other systems
 }

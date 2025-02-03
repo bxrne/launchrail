@@ -8,6 +8,7 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 )
 
+// StorageParasiteSystem logs rocket state data to storage
 type StorageParasiteSystem struct {
 	world    *ecs.World
 	storage  *storage.Storage
@@ -16,6 +17,7 @@ type StorageParasiteSystem struct {
 	done     chan struct{}
 }
 
+// NewStorageParasiteSystem creates a new StorageParasiteSystem
 func NewStorageParasiteSystem(world *ecs.World, storage *storage.Storage) *StorageParasiteSystem {
 	return &StorageParasiteSystem{
 		world:    world,
@@ -25,15 +27,18 @@ func NewStorageParasiteSystem(world *ecs.World, storage *storage.Storage) *Stora
 	}
 }
 
+// Start the StorageParasiteSystem
 func (s *StorageParasiteSystem) Start(dataChan chan RocketState) {
 	s.dataChan = dataChan
 	go s.processData()
 }
 
+// Stop the StorageParasiteSystem
 func (s *StorageParasiteSystem) Stop() {
 	close(s.done)
 }
 
+// processData logs rocket state data
 func (s *StorageParasiteSystem) processData() {
 	for {
 		select {
@@ -54,15 +59,18 @@ func (s *StorageParasiteSystem) processData() {
 	}
 }
 
+// Priority returns the system priority
 func (s *StorageParasiteSystem) Priority() int {
 	return 1
 }
 
+// Update the StorageParasiteSystem
 func (s *StorageParasiteSystem) Update(dt float32) {
 	// No need to track time here - data comes from simulation state
 	return
 }
 
+// Add adds entities to the system
 func (s *StorageParasiteSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
 	vel *components.Velocity, acc *components.Acceleration, mass *components.Mass,
 	motor *components.Motor, bodytube *components.Bodytube, nosecone *components.Nosecone,

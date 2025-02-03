@@ -6,6 +6,7 @@ import (
 	"github.com/zerodha/logf"
 )
 
+// LogParasiteSystem logs rocket state data
 type LogParasiteSystem struct {
 	world    *ecs.World
 	logger   *logf.Logger
@@ -14,6 +15,7 @@ type LogParasiteSystem struct {
 	done     chan struct{}
 }
 
+// NewLogParasiteSystem creates a new LogParasiteSystem
 func NewLogParasiteSystem(world *ecs.World, logger *logf.Logger) *LogParasiteSystem {
 	return &LogParasiteSystem{
 		world:    world,
@@ -23,15 +25,18 @@ func NewLogParasiteSystem(world *ecs.World, logger *logf.Logger) *LogParasiteSys
 	}
 }
 
+// Start the LogParasiteSystem
 func (s *LogParasiteSystem) Start(dataChan chan RocketState) {
 	s.dataChan = dataChan
 	go s.processData()
 }
 
+// Stop the LogParasiteSystem
 func (s *LogParasiteSystem) Stop() {
 	close(s.done)
 }
 
+// processData logs rocket state data
 func (s *LogParasiteSystem) processData() {
 	for {
 		select {
@@ -50,15 +55,18 @@ func (s *LogParasiteSystem) processData() {
 	}
 }
 
+// Priority returns the system priority
 func (s *LogParasiteSystem) Priority() int {
 	return 1
 }
 
+// Update the LogParasiteSystem
 func (s *LogParasiteSystem) Update(dt float32) {
 	// No need to track time here - data comes from simulation state
 	return
 }
 
+// Add adds entities to the system
 func (s *LogParasiteSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
 	vel *components.Velocity, acc *components.Acceleration, mass *components.Mass,
 	motor *components.Motor, bodytube *components.Bodytube, nosecone *components.Nosecone,

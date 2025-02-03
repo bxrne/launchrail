@@ -56,6 +56,7 @@ func NewStorage(baseDir, dir string) (*Storage, error) {
 	}, nil
 }
 
+// Init initializes the storage service with headers
 func (s *Storage) Init(headers []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -68,6 +69,7 @@ func (s *Storage) Init(headers []string) error {
 	return nil
 }
 
+// Write writes a record to the storage service
 func (s *Storage) Write(data []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -90,6 +92,7 @@ func (s *Storage) Write(data []string) error {
 	return nil
 }
 
+// Close closes the storage service
 func (s *Storage) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -110,6 +113,7 @@ func (s *Storage) Close() error {
 	return nil
 }
 
+// GetFilePath returns the file path of the storage service
 func (s *Storage) GetFilePath() string {
 	return s.filePath
 }

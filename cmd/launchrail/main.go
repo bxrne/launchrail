@@ -13,12 +13,14 @@ import (
 )
 
 func main() {
+	// Load config
 	cfg, err := config.GetConfig()
 	if err != nil {
 		fmt.Printf("Failed to load config: %v\n", err)
 		return
 	}
 
+	// Initialize logger
 	log := logger.GetLogger(cfg)
 	log.Info("Config loaded", "Name", cfg.App.Name, "Version", cfg.App.Version)
 
@@ -43,6 +45,7 @@ func main() {
 	}
 	defer storage.Close()
 
+	// Set headers for storage of motion data
 	err = storage.Init([]string{
 		"time",
 		"altitude",     // Changed from position_y for clarity
@@ -62,23 +65,26 @@ func main() {
 
 	log.Debug("Storage for motion data initialized", "BaseDir", cfg.App.BaseDir)
 
-	// Create and run simulation with logger
+	// Create simulation
 	sim, err := simulation.NewSimulation(cfg, log, storage)
 	if err != nil {
 		log.Fatal("Failed to create simulation", "Error", err)
 	}
 	log.Debug("Simulation created")
 
+	// Load rocket data
 	err = sim.LoadRocket(&orkData.Rocket, motorData)
 	if err != nil {
 		log.Fatal("Failed to load rocket data", "Error", err)
 	}
 	log.Debug("Rocket data loaded")
 
+	// Run simulation
 	err = sim.Run()
 	if err != nil {
 		log.Fatal("Simulation failed", "Error", err)
 	}
 
 	log.Info("Simulation completed successfully")
+	log.Debug("Simulation data saved", "Path", storage.GetFilePath())
 }

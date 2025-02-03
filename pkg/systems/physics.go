@@ -25,6 +25,7 @@ var (
 	}
 )
 
+// PhysicsSystem calculates forces on entities
 type PhysicsSystem struct {
 	world        *ecs.World
 	entities     []physicsEntity
@@ -47,6 +48,7 @@ type physicsEntity struct {
 	*components.TrapezoidFinset // Add this field
 }
 
+// calculateCG calculates the center of gravity for an entity
 func (s *PhysicsSystem) calculateCG(entity physicsEntity) float64 {
 	// Simple CG calculation - assuming uniform mass distribution
 	totalMass := entity.Mass.Value
@@ -66,6 +68,7 @@ func (s *PhysicsSystem) calculateCG(entity physicsEntity) float64 {
 	return totalMoment / totalMass
 }
 
+// calculateStabilityForces calculates stability forces for an entity
 func (s *PhysicsSystem) calculateStabilityForces(force *types.Vector3, stabilityMargin float64, entity physicsEntity) {
 	// Basic stability force calculation
 	const stabilityFactor = 0.1
@@ -75,6 +78,7 @@ func (s *PhysicsSystem) calculateStabilityForces(force *types.Vector3, stability
 	force.Y += correctionForce
 }
 
+// Remove removes an entity from the system
 func (s *PhysicsSystem) Remove(basic ecs.BasicEntity) {
 	var deleteIndex int
 	for i, entity := range s.entities {
@@ -86,6 +90,7 @@ func (s *PhysicsSystem) Remove(basic ecs.BasicEntity) {
 	s.entities = append(s.entities[:deleteIndex], s.entities[deleteIndex+1:]...)
 }
 
+// NewPhysicsSystem creates a new PhysicsSystem
 func NewPhysicsSystem(world *ecs.World) *PhysicsSystem {
 	workers := 4
 	return &PhysicsSystem{
@@ -98,6 +103,7 @@ func NewPhysicsSystem(world *ecs.World) *PhysicsSystem {
 	}
 }
 
+// Update applies forces to entities
 func (s *PhysicsSystem) Update(dt float32) {
 	var wg sync.WaitGroup
 	workChan := make(chan physicsEntity, len(s.entities))
@@ -136,6 +142,7 @@ func (s *PhysicsSystem) Update(dt float32) {
 	}
 }
 
+// Update applies forces to entities
 func (s *PhysicsSystem) processForces(wg *sync.WaitGroup) {
 	defer wg.Done()
 	for entity := range s.workChan {
@@ -159,6 +166,7 @@ func (s *PhysicsSystem) processForces(wg *sync.WaitGroup) {
 	}
 }
 
+// applyForce applies forces to an entity
 func (s *PhysicsSystem) applyForce(entity physicsEntity, force types.Vector3, dt float32) {
 	// Validate timestep
 	dt64 := float64(dt)
@@ -230,14 +238,18 @@ func (s *PhysicsSystem) applyForce(entity physicsEntity, force types.Vector3, dt
 	entity.Position.Y = newPosition
 }
 
+// Add adds an entity to the system
 func (s *PhysicsSystem) Add(entity *ecs.BasicEntity, pos *components.Position,
 	vel *components.Velocity, acc *components.Acceleration, mass *components.Mass, motor *components.Motor, bodytube *components.Bodytube, nosecone *components.Nosecone) {
 	s.entities = append(s.entities, physicsEntity{entity, pos, vel, acc, mass, motor, bodytube, nosecone, nil})
 }
 
+// Priority returns the system priority
 func (s *PhysicsSystem) Priority() int {
 	return 1 // Runs after forces are applied
 }
+
+// String returns the system name
 func (s *PhysicsSystem) String() string {
 	return "PhysicsSystem"
 }
