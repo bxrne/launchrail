@@ -13,19 +13,19 @@ const (
 	StateBurning = "burning"
 )
 
-// MotorFSM manages the state of the motor
+// MotorFSM represents the finite state machine for the motor
 type MotorFSM struct {
-	fsm *fsm.FSM
+	*fsm.FSM
 }
 
-// NewMotorFSM creates a new MotorFSM instance
+// NewMotorFSM creates a new FSM for the motor
 func NewMotorFSM() *MotorFSM {
 	return &MotorFSM{
-		fsm: fsm.NewFSM(
-			StateIdle,
+		FSM: fsm.NewFSM(
+			string(StateIdle), // Set initial state to "idle"
 			fsm.Events{
-				{Name: "ignite", Src: []string{StateIdle}, Dst: StateBurning},
-				{Name: "extinguish", Src: []string{StateBurning}, Dst: StateIdle},
+				{Name: "ignite", Src: []string{string(StateIdle)}, Dst: string(StateBurning)},
+				{Name: "burnout", Src: []string{string(StateBurning)}, Dst: string(StateIdle)},
 			},
 			fsm.Callbacks{},
 		),
@@ -35,7 +35,7 @@ func NewMotorFSM() *MotorFSM {
 // UpdateState updates the state based on mass and elapsed time
 func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime float64) error {
 	ctx := context.Background() // Create a background context
-	currentState := fsm.fsm.Current()
+	currentState := fsm.Current()
 
 	// Force the motor to go idle when empty or time exceeded
 	if mass <= 0 || elapsedTime >= burnTime {
@@ -53,7 +53,7 @@ func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime flo
 func (fsm *MotorFSM) handlePotentiallyActiveState(ctx context.Context, currentState string) error {
 	switch currentState {
 	case StateIdle:
-		return fsm.fsm.Event(ctx, "ignite")
+		return fsm.Event(ctx, "ignite")
 	case StateBurning:
 		// Already in burning state, no action needed
 		return nil
@@ -66,7 +66,7 @@ func (fsm *MotorFSM) handlePotentiallyActiveState(ctx context.Context, currentSt
 func (fsm *MotorFSM) handlePotentiallyInactiveState(ctx context.Context, currentState string) error {
 	switch currentState {
 	case StateBurning:
-		return fsm.fsm.Event(ctx, "extinguish")
+		return fsm.Event(ctx, "burnout")
 	case StateIdle:
 		// Already in idle state, no action needed
 		return nil
@@ -77,5 +77,5 @@ func (fsm *MotorFSM) handlePotentiallyInactiveState(ctx context.Context, current
 
 // GetState returns the current state of the FSM
 func (fsm *MotorFSM) GetState() string {
-	return fsm.fsm.Current()
+	return fsm.Current()
 }

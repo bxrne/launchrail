@@ -1,6 +1,7 @@
 package components
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sync"
@@ -97,16 +98,8 @@ func (m *Motor) Update(dt float64) error {
 		return fmt.Errorf("invalid timestep")
 	}
 
-	// Update thrust before checking burnout
-	if !m.isCoasting {
-		m.thrust = m.interpolateThrust(m.elapsedTime)
-
-		// Update mass only if still burning
-		if m.Mass > 0 && m.thrust > 0 {
-			massLoss := (m.thrust * dt) / m.Props.AvgThrust
-			m.Mass = math.Max(0, m.Mass-massLoss)
-		}
-	}
+	// Update thrust and mass
+	m.updateThrustAndMass(dt)
 
 	m.elapsedTime += dt
 
@@ -115,6 +108,8 @@ func (m *Motor) Update(dt float64) error {
 		return m.handleBurnout()
 	}
 
+	ctx := context.Background()
+	m.FSM.Event(ctx, "ignite")
 	return nil
 }
 
@@ -122,6 +117,8 @@ func (m *Motor) handleBurnout() error {
 	m.isCoasting = true
 	m.thrust = 0
 	m.state = MotorBurnout
+	ctx := context.Background()
+	m.FSM.Event(ctx, "burnout")
 	return nil
 }
 
@@ -172,7 +169,7 @@ func (m *Motor) Reset() {
 	m.thrust = m.Thrustcurve[0][1]
 	m.Mass = m.Props.TotalMass
 	m.FSM = NewMotorFSM()
-	m.state = MotorCoasting // Reset state
+	m.state = MotorIgnited // Reset state
 }
 
 // GetMass returns the current mass of the motor
