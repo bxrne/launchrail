@@ -33,6 +33,14 @@ type TrapezoidFinset struct {
 	Height         float64        `xml:"height"`
 }
 
+// GetMass calculates mass based on material density and dimensions
+func (t *TrapezoidFinset) GetMass() float64 {
+	area := (t.RootChord + t.TipChord) * t.Height / 2
+	volume := area * t.Thickness
+	density := t.Material.Density
+	return volume * density
+}
+
 // String returns full string representation of the TrapezoidFinset
 func (t *TrapezoidFinset) String() string {
 	var tabPosition string

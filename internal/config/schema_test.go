@@ -33,6 +33,17 @@ func TestConfigString(t *testing.T) {
 				Latitude:  0.00,
 				Longitude: 0.00,
 				Altitude:  0.00,
+				Atmosphere: config.Atmosphere{
+					ISAConfiguration: config.ISAConfiguration{
+						SpecificGasConstant:  287.05,
+						GravitationalAccel:   9.81,
+						SeaLevelDensity:      1.225,
+						SeaLevelTemperature:  288.15,
+						SeaLevelPressure:     101325.0,
+						RatioSpecificHeats:   1.4,
+						TemperatureLapseRate: -0.0065,
+					},
+				},
 			},
 		},
 		Simulation: config.Simulation{
@@ -55,8 +66,15 @@ func TestConfigString(t *testing.T) {
 		"options.launchsite.latitude":    "0.00",
 		"options.launchsite.longitude":   "0.00",
 		"options.launchsite.altitude":    "0.00",
-		"simulation.step":                "0.00",
-		"simulation.max_time":            "0.00",
+		"options.launchsite.atmosphere.isa_configuration.specific_gas_constant":  "287.05",
+		"options.launchsite.atmosphere.isa_configuration.gravitational_accel":    "9.81",
+		"options.launchsite.atmosphere.isa_configuration.sea_level_density":      "1.225",
+		"options.launchsite.atmosphere.isa_configuration.sea_level_temperature":  "288.15",
+		"options.launchsite.atmosphere.isa_configuration.sea_level_pressure":     "101325.00",
+		"options.launchsite.atmosphere.isa_configuration.ratio_specific_heats":   "1.40",
+		"options.launchsite.atmosphere.isa_configuration.temperature_lapse_rate": "-0.01",
+		"simulation.step":     "0.00",
+		"simulation.max_time": "0.00",
 	}
 
 	actual := cfg.String()

@@ -29,6 +29,7 @@ require (
 )
 
 require (
+	github.com/EngoEngine/ecs v1.0.5
 	github.com/looplab/fsm v1.0.2
 	github.com/stretchr/testify v1.10.0
 	github.com/zerodha/logf v0.5.5

@@ -7,8 +7,8 @@ logging:
   level: "debug"
 
 simulation:
-  step: 1 # 60hz
-  max_time: 300.0
+  step: 0.001
+  max_time: 30.0
 
 external:
   openrocket_version: "23.09"
@@ -17,10 +17,19 @@ options:
   motor_designation: "269H110-14A"
   openrocket_file: "./testdata/openrocket/l1.ork"
   launchrail:
-    length: 3.0 
-    angle: 2.0
-    orientation: 1.0
+    length: 2.0
+    angle: 5.0
+    orientation: 0.01
   launchsite:
     latitude: 37.7749
     longitude: -122.4194
     altitude: 1.0
+    atmosphere:
+      isa_configuration: 
+        specific_gas_constant: 287.05
+        gravitational_accel: 9.81
+        sea_level_density: 1.225
+        sea_level_temperature: 288.15
+        sea_level_pressure: 101325.0
+        ratio_specific_heats: 1.4
+        temperature_lapse_rate: 0.0065

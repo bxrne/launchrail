@@ -410,3 +410,143 @@ func TestGetConfigMissingSimulationMaxTime(t *testing.T) {
 		}
 	})
 }
+
+// TEST: GIVEN a config with missing atmosphere.isa_configuration.specific_gas_constant WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingISAConfigurationSpecificGasConstant(t *testing.T) {
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.Launchsite.Atmosphere.ISAConfiguration.SpecificGasConstant = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.launchsite.atmosphere.isa_configuration.specific_gas_constant is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing atmosphere.isa_configuration.gravitational_accel WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingISAConfigurationGravitationalAccel(t *testing.T) {
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.launchsite.atmosphere.isa_configuration.gravitational_accel is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing atmosphere.isa_configuration.sea_level_density WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingISAConfigurationSeaLevelDensity(t *testing.T) {
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelDensity = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.launchsite.atmosphere.isa_configuration.sea_level_density is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing atmosphere.isa_configuration.sea_level_temperature WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingISAConfigurationSeaLevelTemperature(t *testing.T) {
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelTemperature = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.launchsite.atmosphere.isa_configuration.sea_level_temperature is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing atmosphere.isa_configuration.sea_level_pressure WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingISAConfigurationSeaLevelPressure(t *testing.T) {
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelPressure = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.launchsite.atmosphere.isa_configuration.sea_level_pressure is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing atmosphere.isa_configuration.ratio_specific_heats WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingISAConfigurationRatioSpecificHeats(t *testing.T) {
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.Launchsite.Atmosphere.ISAConfiguration.RatioSpecificHeats = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.launchsite.atmosphere.isa_configuration.ratio_specific_heats is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing atmosphere.isa_configuration.temperature_lapse_rate WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingISAConfigurationTemperatureLapseRate(t *testing.T) {
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Options.Launchsite.Atmosphere.ISAConfiguration.TemperatureLapseRate = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "options.launchsite.atmosphere.isa_configuration.temperature_lapse_rate is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
