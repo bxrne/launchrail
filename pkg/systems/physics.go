@@ -173,15 +173,15 @@ func (s *PhysicsSystem) applyForce(entity physicsEntity, force types.Vector3, dt
 	// Calculate forces
 	var netForce float64
 
-	// Add thrust only during burn
+	// Add thrust in POSITIVE Y direction (upward)
 	if !entity.Motor.IsCoasting() {
 		thrust := entity.Motor.GetThrust()
-		netForce += thrust
+		netForce += thrust // Add thrust as positive force
 	}
 
-	// Add weight
-	weight := entity.Mass.Value * 9.81
-	netForce -= weight
+	// Add weight (already accounted for in initial acceleration)
+	// weight := entity.Mass.Value * 9.81
+	// netForce -= weight   // REMOVE THIS - we already have gravity in acceleration
 
 	// Calculate drag
 	velocity := math.Sqrt(entity.Velocity.X*entity.Velocity.X +
@@ -210,8 +210,8 @@ func (s *PhysicsSystem) applyForce(entity physicsEntity, force types.Vector3, dt
 		}
 	}
 
-	// Calculate acceleration
-	entity.Acceleration.Y = netForce / entity.Mass.Value
+	// Calculate final acceleration (adding to gravity)
+	entity.Acceleration.Y += netForce / entity.Mass.Value // ADD to existing acceleration
 
 	// Semi-implicit Euler integration
 	newVelocity := entity.Velocity.Y + entity.Acceleration.Y*dt64

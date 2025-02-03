@@ -212,3 +212,10 @@ func (m *Motor) String() string {
 func (m *Motor) GetPlanformArea() float64 {
 	return 0
 }
+
+// Add method to get elapsed time
+func (m *Motor) GetElapsedTime() float64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.elapsedTime
+}

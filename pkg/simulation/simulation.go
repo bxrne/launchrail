@@ -2,6 +2,7 @@ package simulation
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
@@ -9,7 +10,9 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/entities"
 	"github.com/bxrne/launchrail/pkg/openrocket"
+	"github.com/bxrne/launchrail/pkg/stats"
 	"github.com/bxrne/launchrail/pkg/systems"
+
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/zerodha/logf"
 )
@@ -20,12 +23,14 @@ type Simulation struct {
 	aerodynamicSystem     *systems.AerodynamicSystem
 	logParasiteSystem     *systems.LogParasiteSystem
 	storageParasiteSystem *systems.StorageParasiteSystem
+	rulesSystem           *systems.RulesSystem
 	rocket                *entities.RocketEntity
 	config                *config.Config
 	logger                *logf.Logger
 	updateChan            chan struct{}
 	doneChan              chan struct{}
 	stateChan             chan systems.RocketState
+	stats                 *stats.FlightStats
 }
 
 func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.Storage) (*Simulation, error) {
@@ -43,6 +48,7 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.St
 	// Initialize systems with optimized worker counts
 	sim.physicsSystem = systems.NewPhysicsSystem(world)
 	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, 4) // Add worker count
+	sim.rulesSystem = systems.NewRulesSystem(world)                // Add this line
 
 	// Initialize parasite systems
 	sim.logParasiteSystem = systems.NewLogParasiteSystem(world, log)                 // For logging
@@ -51,6 +57,8 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.St
 	// Start parasites
 	sim.logParasiteSystem.Start(sim.stateChan)
 	sim.storageParasiteSystem.Start(sim.stateChan)
+
+	sim.stats = stats.NewFlightStats()
 
 	return sim, nil
 }
@@ -88,6 +96,19 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 		s.rocket.GetComponent("bodytube").(*components.Bodytube),
 		s.rocket.GetComponent("nosecone").(*components.Nosecone),
 		finset, // This may be nil
+	)
+
+	// Add to rules system
+	s.rulesSystem.Add(
+		s.rocket.BasicEntity,
+		s.rocket.Position,
+		s.rocket.Velocity,
+		s.rocket.Acceleration,
+		s.rocket.Mass,
+		motor,
+		s.rocket.GetComponent("bodytube").(*components.Bodytube),
+		s.rocket.GetComponent("nosecone").(*components.Nosecone),
+		finset,
 	)
 
 	// Add to log parasite system
@@ -129,22 +150,6 @@ func (s *Simulation) Run() error {
 	currentTime := float32(0)
 	maxTime := float32(s.config.Simulation.MaxTime)
 
-	defer func() {
-		if r := recover(); r != nil {
-			switch r {
-			case "Simulation ended: Ground impact":
-				s.logger.Info("Simulation completed: Ground impact detected")
-			default:
-				// Log any other panics and re-panic
-				s.logger.Error("Simulation failed", "error", r)
-				panic(r)
-			}
-		}
-	}()
-
-	go s.runPhysicsSystem(dt)
-	go s.runAerodynamicSystem(dt)
-
 	for currentTime < maxTime {
 		// Update motor first to check for errors
 		motorState := "COASTING"
@@ -157,11 +162,17 @@ func (s *Simulation) Run() error {
 			motorState = motor.GetState()
 		}
 
-		// Signal systems to update
-		s.updateChan <- struct{}{}
+		// Update physics and aerodynamics
+		s.physicsSystem.Update(dt)
+		if err := s.aerodynamicSystem.Update(dt); err != nil {
+			s.logger.Error("Aerodynamic system update failed", "error", err)
+		}
 
-		// Send state to parasites with current simulation time
-		s.stateChan <- systems.RocketState{
+		// Check rules
+		event := s.rulesSystem.Update(dt)
+
+		// Send current state before handling events
+		state := systems.RocketState{
 			Time:         float64(currentTime),
 			Altitude:     s.rocket.Position.Y,
 			Velocity:     s.rocket.Velocity.Y,
@@ -169,36 +180,73 @@ func (s *Simulation) Run() error {
 			Thrust:       thrust,
 			MotorState:   motorState,
 		}
+		s.stateChan <- state
+
+		// Update stats
+		mach := math.Abs(s.rocket.Velocity.Y) / 340.0 // approximate sound speed
+		s.stats.Update(
+			float64(currentTime),
+			s.rocket.Position.Y,
+			s.rocket.Velocity.Y,
+			s.rocket.Acceleration.Y,
+			mach,
+		)
+
+		// Handle events
+		switch event {
+		case systems.Apogee:
+			s.logger.Info("Apogee detected",
+				"time", currentTime,
+				"altitude", s.rocket.Position.Y,
+				"velocity", s.rocket.Velocity.Y,
+			)
+
+		case systems.Land:
+			s.logger.Info("Landing detected - simulation complete",
+				"time", currentTime,
+				"altitude", s.rocket.Position.Y,
+				"velocity", s.rocket.Velocity.Y,
+				"acceleration", s.rocket.Acceleration.Y,
+			)
+
+			// Ensure final state shows landed position
+			s.rocket.Position.Y = 0
+			s.rocket.Velocity.Y = 0
+			s.rocket.Acceleration.Y = 0
+
+			// Send final state update
+			landedState := systems.RocketState{
+				Time:         float64(currentTime),
+				Altitude:     0,
+				Velocity:     0,
+				Acceleration: 0,
+				Thrust:       0,
+				MotorState:   "LANDED",
+			}
+			s.stateChan <- landedState
+
+			// Print final stats
+			s.logger.Info("Flight Statistics",
+				"stats", s.stats.String(),
+			)
+
+			// Close channels and return
+			close(s.doneChan)
+			return nil
+		}
 
 		currentTime += dt
 	}
 
-	// Signal systems to stop
+	s.logger.Warn("Simulation reached max time without landing",
+		"maxTime", maxTime,
+		"finalAltitude", s.rocket.Position.Y)
+
+	// Print stats even if max time reached
+	s.logger.Info("Flight Statistics",
+		"stats", s.stats.String(),
+	)
+
 	close(s.doneChan)
-
 	return nil
-}
-
-func (s *Simulation) runPhysicsSystem(dt float32) {
-	for {
-		select {
-		case <-s.updateChan:
-			s.physicsSystem.Update(dt)
-		case <-s.doneChan:
-			return
-		}
-	}
-}
-
-func (s *Simulation) runAerodynamicSystem(dt float32) {
-	for {
-		select {
-		case <-s.updateChan:
-			if err := s.aerodynamicSystem.Update(dt); err != nil {
-				s.logger.Error("Aerodynamic system update failed", "error", err)
-			}
-		case <-s.doneChan:
-			return
-		}
-	}
 }
