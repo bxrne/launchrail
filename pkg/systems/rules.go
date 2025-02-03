@@ -53,9 +53,13 @@ func (s *RulesSystem) Update(dt float32) Event {
 
 		// Detect apogee when velocity changes from positive to negative
 		// and motor has finished burning
-		if !s.hadApogee && currentVel < 0 && entity.Motor.IsCoasting() {
-			s.hadApogee = true
-			return Apogee
+		if !s.hadApogee && currentVel < 0 {
+			motorState := entity.Motor.GetState()
+			// Only trigger if motor is burnout or coasting:
+			if motorState == "BURNOUT" || motorState == "COASTING" {
+				s.hadApogee = true
+				return Apogee
+			}
 		}
 
 		// Only check for landing after apogee

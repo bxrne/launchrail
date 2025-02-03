@@ -77,7 +77,7 @@ func (a *AerodynamicSystem) CalculateDrag(entity physicsEntity) types.Vector3 {
 	cd := a.calculateDragCoeff(machNumber, entity)
 
 	// Calculate reference area
-	area := math.Pi * entity.Bodytube.Radius * entity.Bodytube.Radius
+	area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
 
 	// Calculate drag force
 	forceMagnitude := 0.5 * cd * atmData.density * area * velocity * velocity

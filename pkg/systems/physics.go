@@ -17,12 +17,6 @@ var (
 			return &types.Vector3{}
 		},
 	}
-
-	forcePool = sync.Pool{
-		New: func() interface{} {
-			return make([]types.Vector3, 0, 10)
-		},
-	}
 )
 
 // PhysicsSystem calculates forces on entities
@@ -180,26 +174,21 @@ func (s *PhysicsSystem) applyForce(entity physicsEntity, force types.Vector3, dt
 
 	// Calculate forces
 	var netForce float64
-
 	// Add thrust in POSITIVE Y direction (upward)
 	if !entity.Motor.IsCoasting() {
 		thrust := entity.Motor.GetThrust()
 		netForce += thrust // Add thrust as positive force
 	}
 
-	// Add weight (already accounted for in initial acceleration)
-	// weight := entity.Mass.Value * 9.81
-	// netForce -= weight   // REMOVE THIS - we already have gravity in acceleration
-
 	// Calculate drag
 	velocity := math.Sqrt(entity.Velocity.X*entity.Velocity.X +
 		entity.Velocity.Y*entity.Velocity.Y)
 	if velocity > 0 {
 		// Air density decreases with altitude
-		rho := 1.225 * math.Exp(-entity.Position.Y/7400.0)
+		rho := getAtmosphericDensity(entity.Position.Y)
 
 		// Reference area
-		area := math.Pi * entity.Bodytube.Radius * entity.Bodytube.Radius
+		area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
 
 		// Drag coefficient increases with velocity
 		cd := 0.3
@@ -216,7 +205,18 @@ func (s *PhysicsSystem) applyForce(entity physicsEntity, force types.Vector3, dt
 		} else {
 			netForce += dragForce
 		}
+
+		// apply passed in force
+		netForce += force.Y
+
 	}
+
+	// Calculate lift
+	liftCoefficient := 0.5 // Simplified lift coefficient
+	area := math.Pi * entity.Bodytube.Radius * entity.Bodytube.Radius
+	rho := 1.225 * math.Exp(-entity.Position.Y/7400.0)
+	liftForce := 0.5 * rho * liftCoefficient * area * velocity * velocity
+	netForce += liftForce
 
 	// Calculate final acceleration (adding to gravity)
 	entity.Acceleration.Y += netForce / entity.Mass.Value // ADD to existing acceleration
@@ -227,10 +227,9 @@ func (s *PhysicsSystem) applyForce(entity physicsEntity, force types.Vector3, dt
 
 	// Ground collision check
 	if newPosition <= 0 && newVelocity < 0 {
-		// entity.Position.Y = 0
-		// entity.Velocity.Y = 0
-		// entity.Acceleration.Y = 0
-		// panic("Simulation ended: Ground impact")
+		entity.Position.Y = 0
+		entity.Velocity.Y = 0
+		entity.Acceleration.Y = 0
 	}
 
 	// Update state

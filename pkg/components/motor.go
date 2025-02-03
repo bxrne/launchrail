@@ -56,8 +56,8 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 		FSM:         NewMotorFSM(),
 		burnTime:    md.BurnTime,
 		isCoasting:  false,
-		logger:      logger,        // Initialize logger
-		state:       MotorCoasting, // Initial state
+		logger:      logger,       // Initialize logger
+		state:       MotorIgnited, // Initial state
 	}
 
 	// Initialize with first thrust point
@@ -108,7 +108,19 @@ func (m *Motor) Update(dt float64) error {
 		}
 
 		m.elapsedTime += dt
-		return nil
+	}
+
+	// Call FSM to update internal state:
+	err := m.FSM.UpdateState(m.Mass, m.elapsedTime, m.burnTime)
+	if err != nil {
+		return err
+	}
+	// Reflect FSM state in Motor.state
+	switch m.FSM.GetState() {
+	case StateIdle:
+		m.state = MotorCoasting
+	case StateBurning:
+		m.state = MotorBurning
 	}
 
 	// Strict burn time and thrust validation
@@ -153,7 +165,7 @@ func (m *Motor) GetThrust() float64 {
 		return 0
 	}
 
-	return m.thrust * (1.0 - (m.elapsedTime / m.burnTime)) // Scale thrust by burn progress
+	return m.thrust
 }
 
 // IsCoasting returns true if the motor has completed its burn
