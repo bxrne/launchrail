@@ -43,13 +43,13 @@ func NewBodytube(id ecs.BasicEntity, radius, length, mass, thickness float64) *B
 // NewBodytubeFromORK creates a new bodytube instance from an ORK Document
 func NewBodytubeFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument) (*Bodytube, error) {
 	orkBodytube := orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube
-	radius_string := orkBodytube.Radius
+	radiusString := orkBodytube.Radius
 
-	if radius_string[:4] == "auto" {
-		radius_string = radius_string[5:]
+	if radiusString[:4] == "auto" {
+		radiusString = radiusString[5:]
 	}
 
-	radius, err := strconv.ParseFloat(radius_string, 64)
+	radius, err := strconv.ParseFloat(radiusString, 64)
 	if err != nil {
 		return nil, err
 	}
