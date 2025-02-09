@@ -2,6 +2,7 @@ package simulation
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
@@ -159,14 +160,40 @@ func (s *Simulation) updateSystems() error {
 		}
 	}
 
-	// Update flight stats
+	vel := s.rocket.Velocity.Vec.Y
+	acc := s.rocket.Acceleration.Vec.Y
+	if math.IsNaN(acc) {
+		acc = 0
+	}
+	speedOfSound := s.aerodynamicSystem.GetSpeedOfSound(float32(s.rocket.Position.Vec.Y))
+	mach := 0.0
+	if speedOfSound > 1e-8 {
+		mach = vel / float64(speedOfSound)
+	}
+	if math.IsNaN(mach) || math.IsInf(mach, 0) {
+		mach = 0
+	}
+
 	s.stats.Update(
 		s.currentTime,
 		s.rocket.Position.Vec.Y,
-		s.rocket.Velocity.Vec.Y,
-		s.rocket.Acceleration.Vec.Y,
-		s.rocket.Velocity.Vec.Y/float64(s.aerodynamicSystem.GetSpeedOfSound(float32(s.rocket.Position.Vec.Y))),
+		vel,
+		acc,
+		mach,
 	)
+
+	motorComp, ok := s.rocket.GetComponent("motor").(*components.Motor)
+	if ok {
+		motorComp.Update(s.config.Simulation.Step)
+		s.stateChan <- systems.RocketState{
+			Time:         s.currentTime,
+			Altitude:     s.rocket.Position.Vec.Y,
+			Velocity:     vel,
+			Acceleration: acc,
+			Thrust:       motorComp.GetThrust(),
+			MotorState:   motorComp.GetState(),
+		}
+	}
 
 	return nil
 }

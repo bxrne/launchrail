@@ -91,7 +91,7 @@ func (s *RulesSystem) checkLanding(entity PhysicsEntity) Event {
 	if entity.Position.Vec.Y <= 0 && entity.Velocity.Vec.Y < 0 {
 		// Reset state on landing
 		entity.Position.Vec.Y = 0
-		entity.Velocity.Vec.Y = 0
+		// entity.Velocity.Vec.Y = 0 // Removed to preserve ground hit velocity
 		entity.Acceleration.Vec.Y = 0
 		entity.Motor.SetState("LANDED")
 		return Land
