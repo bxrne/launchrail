@@ -1,9 +1,11 @@
 package systems_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/EngoEngine/ecs"
+	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/systems"
 	"github.com/bxrne/launchrail/pkg/types"
@@ -14,14 +16,18 @@ import (
 // TEST: GIVEN a new RulesSystem WHEN NewRulesSystem is called THEN a new RulesSystem is returned
 func TestNewRulesSystem(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewRulesSystem(world)
+	err := os.Setenv("CONFIG_PATH", "/Users/adambyrne/code/launchrail/config.yaml")
+	require.NoError(t, err)
+	cfg := &config.Config{}
+	system := systems.NewRulesSystem(world, cfg)
 	require.NotNil(t, system)
 }
 
 // TEST: GIVEN a RulesSystem WHEN Add is called THEN the entity is added to the system
 func TestRulesSystem_Add(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewRulesSystem(world)
+	cfg := &config.Config{}
+	system := systems.NewRulesSystem(world, cfg)
 	e := ecs.NewBasic()
 
 	entity := systems.PhysicsEntity{
@@ -39,7 +45,8 @@ func TestRulesSystem_Add(t *testing.T) {
 // TEST: GIVEN a RulesSystem WHEN Priority is called THEN the correct priority is returned
 func TestRulesSystem_Priority(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewRulesSystem(world)
+	cfg := &config.Config{}
+	system := systems.NewRulesSystem(world, cfg)
 	assert.Equal(t, 100, system.Priority())
 }
 
@@ -90,7 +97,8 @@ func TestRulesSystem_Update(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			world := &ecs.World{}
-			system := systems.NewRulesSystem(world)
+			cfg := &config.Config{}
+			system := systems.NewRulesSystem(world, cfg)
 			e := ecs.NewBasic()
 
 			// Create position, velocity and motor with initial states
@@ -151,7 +159,8 @@ func TestRulesSystem_Update(t *testing.T) {
 // TEST: GIVEN a RulesSystem WHEN Remove is called THEN the entity is removed from the system
 func TestRulesSystem_Remove(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewRulesSystem(world)
+	cfg := &config.Config{}
+	system := systems.NewRulesSystem(world, cfg)
 	e := ecs.NewBasic()
 
 	entity := systems.PhysicsEntity{

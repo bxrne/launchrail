@@ -103,6 +103,9 @@ func TestNewSimulation(t *testing.T) {
 	cfg, logger, store, cleanup := setupTest(t)
 	defer cleanup()
 
+	err := os.Setenv("CONFIG_PATH", "/Users/adambyrne/code/launchrail/config.yaml")
+	require.NoError(t, err)
+
 	sim, err := simulation.NewSimulation(cfg, logger, store)
 	assert.NoError(t, err)
 	assert.NotNil(t, sim)

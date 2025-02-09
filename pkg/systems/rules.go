@@ -25,12 +25,7 @@ type RulesSystem struct {
 }
 
 // NewRulesSystem creates a new RulesSystem
-func NewRulesSystem(world *ecs.World) *RulesSystem {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		panic(err)
-	}
-
+func NewRulesSystem(world *ecs.World, cfg *config.Config) *RulesSystem {
 	return &RulesSystem{
 		world:     world,
 		entities:  make([]PhysicsEntity, 0),
