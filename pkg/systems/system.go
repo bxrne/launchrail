@@ -3,6 +3,7 @@ package systems
 import (
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/pkg/components"
+	"github.com/bxrne/launchrail/pkg/types"
 )
 
 // System defines the interface that all systems must implement
@@ -16,15 +17,15 @@ type System interface {
 	Priority() int
 }
 
-// PhysicsEntity represents an entity with physics components (Meta rocket)
+// PhysicsEntity represents an entity with physics components (Meta rocket but could be reused for payload?)
 type PhysicsEntity struct {
 	Entity       *ecs.BasicEntity
-	Position     *components.Position
-	Velocity     *components.Velocity
-	Acceleration *components.Acceleration
-	Mass         *components.Mass
+	Position     *types.Position
+	Velocity     *types.Velocity
+	Acceleration *types.Acceleration
+	Mass         *types.Mass
 	Motor        *components.Motor
 	Bodytube     *components.Bodytube
 	Nosecone     *components.Nosecone
-	Finset       *components.TrapezoidFinset // Add this field
+	Finset       *components.TrapezoidFinset
 }

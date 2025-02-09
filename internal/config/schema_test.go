@@ -73,8 +73,9 @@ func TestConfigString(t *testing.T) {
 		"options.launchsite.atmosphere.isa_configuration.sea_level_pressure":     "101325.00",
 		"options.launchsite.atmosphere.isa_configuration.ratio_specific_heats":   "1.40",
 		"options.launchsite.atmosphere.isa_configuration.temperature_lapse_rate": "-0.01",
-		"simulation.step":     "0.00",
-		"simulation.max_time": "0.00",
+		"simulation.step":             "0.00",
+		"simulation.max_time":         "0.00",
+		"simulation.ground_tolerance": "0.00",
 	}
 
 	actual := cfg.String()

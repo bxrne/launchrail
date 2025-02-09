@@ -3,6 +3,7 @@ package components
 import (
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/pkg/openrocket"
+	"github.com/bxrne/launchrail/pkg/types"
 )
 
 // TrapezoidFinset represents a trapezoidal fin
@@ -12,7 +13,7 @@ type TrapezoidFinset struct {
 	TipChord   float64
 	Span       float64
 	SweepAngle float64
-	Position   Position
+	Position   types.Position
 	Mass       float64
 }
 
@@ -33,10 +34,12 @@ func NewTrapezoidFinsetFromORK(basic ecs.BasicEntity, ork *openrocket.RocketDocu
 		Span:        finset.Height,
 		SweepAngle:  finset.SweepLength,
 		Mass:        finset.GetMass(),
-		Position: Position{
-			X: finset.AxialOffset.Value,
-			Y: 0,
-			Z: 0,
+		Position: types.Position{
+			Vec: types.Vector3{
+				X: finset.AxialOffset.Value,
+				Y: 0,
+				Z: 0,
+			},
 		},
 	}
 }

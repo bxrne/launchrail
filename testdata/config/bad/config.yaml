@@ -11,6 +11,7 @@ external:
 simulation:
   step: 0.001
   max_time: 30.0
+  ground_tolerance: 0.01 # Add ground tolerance
 
 options:
   motor_designation: "269H110-14A"

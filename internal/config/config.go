@@ -128,5 +128,9 @@ func (cfg *Config) Validate() error {
 		return fmt.Errorf("simulation.max_time is required")
 	}
 
+	if cfg.Simulation.GroundTolerance == 0 {
+		return fmt.Errorf("simulation.ground_tolerance is required")
+	}
+
 	return nil
 }
