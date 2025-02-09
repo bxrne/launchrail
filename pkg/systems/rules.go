@@ -2,6 +2,7 @@ package systems
 
 import (
 	"github.com/EngoEngine/ecs"
+	"github.com/bxrne/launchrail/internal/config"
 )
 
 // Event represents a significant event in flight
@@ -19,15 +20,23 @@ type RulesSystem struct {
 	entities  []PhysicsEntity
 	hadApogee bool    // Track if apogee has been reached
 	maxAlt    float64 // Track max altitude for apogee detection
+	lastEvent Event
+	cfg       *config.Config
 }
 
 // NewRulesSystem creates a new RulesSystem
 func NewRulesSystem(world *ecs.World) *RulesSystem {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		panic(err)
+	}
+
 	return &RulesSystem{
 		world:     world,
 		entities:  make([]PhysicsEntity, 0),
 		hadApogee: false,
 		maxAlt:    0,
+		cfg:       cfg,
 	}
 }
 
@@ -56,8 +65,9 @@ func (s *RulesSystem) processRules(dt float32) Event {
 		if event := s.checkApogee(entity); event != None {
 			return event
 		}
-		if event := s.checkLanding(entity); event != None {
-			return event
+		if evt := s.checkLanding(entity); evt == Land {
+			s.lastEvent = Land
+			return Land
 		}
 	}
 	return None
@@ -88,15 +98,20 @@ func (s *RulesSystem) checkLanding(entity PhysicsEntity) Event {
 	}
 
 	// Check if we've hit the ground with downward velocity
-	if entity.Position.Vec.Y <= 0 && entity.Velocity.Vec.Y < 0 {
-		// Reset state on landing
-		entity.Position.Vec.Y = 0
-		// entity.Velocity.Vec.Y = 0 // Removed to preserve ground hit velocity
+	if entity.Position.Vec.Y <= s.cfg.Simulation.GroundTolerance && entity.Velocity.Vec.Y < 0 {
+		// Capture the ground-hit velocity before zeroing
+		s.lastEvent = Land
+		entity.Velocity.Vec.Y = 0
 		entity.Acceleration.Vec.Y = 0
 		entity.Motor.SetState("LANDED")
 		return Land
 	}
 	return None
+}
+
+// Provide a getter for last event
+func (s *RulesSystem) GetLastEvent() Event {
+	return s.lastEvent
 }
 
 // Remove removes an entity from the rules system

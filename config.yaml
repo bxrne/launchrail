@@ -8,7 +8,8 @@ logging:
 
 simulation:
   step: 0.001
-  max_time: 120.0
+  max_time: 300.0
+  ground_tolerance: 0.03 # Add ground tolerance
 
 external:
   openrocket_version: "23.09"
