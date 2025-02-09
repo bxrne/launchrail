@@ -184,7 +184,10 @@ func (s *Simulation) updateSystems() error {
 
 	motorComp, ok := s.rocket.GetComponent("motor").(*components.Motor)
 	if ok {
-		motorComp.Update(s.config.Simulation.Step)
+		err := motorComp.Update(s.config.Simulation.Step)
+		if err != nil {
+			panic(err)
+		}
 		s.stateChan <- systems.RocketState{
 			Time:         s.currentTime,
 			Altitude:     s.rocket.Position.Vec.Y,
