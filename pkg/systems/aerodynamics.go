@@ -55,16 +55,16 @@ func (a *AerodynamicSystem) getTemperature(altitude float32) float32 {
 // CalculateDrag now handles atmospheric effects and Mach number
 func (a *AerodynamicSystem) CalculateDrag(entity PhysicsEntity) types.Vector3 {
 	// Get atmospheric data
-	atmData := a.getAtmosphericData(entity.Position.Y)
+	atmData := a.getAtmosphericData(entity.Position.Vec.Y)
 
 	// Get vector from pool
 	dragForce := vectorPool.Get().(*types.Vector3)
 	defer vectorPool.Put(dragForce)
 
 	// Calculate mach number
-	velocity := math.Sqrt(entity.Velocity.X*entity.Velocity.X +
-		entity.Velocity.Y*entity.Velocity.Y +
-		entity.Velocity.Z*entity.Velocity.Z)
+	velocity := math.Sqrt(entity.Velocity.Vec.X*entity.Velocity.Vec.X +
+		entity.Velocity.Vec.Y*entity.Velocity.Vec.Y +
+		entity.Velocity.Vec.Z*entity.Velocity.Vec.Z)
 	machNumber := velocity / atmData.soundSpeed
 
 	// Calculate drag coefficient using Barrowman method
@@ -77,9 +77,9 @@ func (a *AerodynamicSystem) CalculateDrag(entity PhysicsEntity) types.Vector3 {
 	forceMagnitude := 0.5 * cd * atmData.density * area * velocity * velocity
 
 	// Apply force in opposite direction of velocity
-	dragForce.X = -entity.Velocity.X * forceMagnitude / velocity
-	dragForce.Y = -entity.Velocity.Y * forceMagnitude / velocity
-	dragForce.Z = -entity.Velocity.Z * forceMagnitude / velocity
+	dragForce.X = -entity.Velocity.Vec.X * forceMagnitude / velocity
+	dragForce.Y = -entity.Velocity.Vec.Y * forceMagnitude / velocity
+	dragForce.Z = -entity.Velocity.Vec.Z * forceMagnitude / velocity
 
 	return *dragForce
 }
@@ -124,9 +124,9 @@ func (a *AerodynamicSystem) Update(dt float32) error {
 	for force := range resultChan {
 		entity := a.entities[i]
 		acc := force.DivideScalar(entity.Mass.Value)
-		entity.Acceleration.X += float64(acc.X)
-		entity.Acceleration.Y += float64(acc.Y)
-		entity.Acceleration.Z += float64(acc.Z)
+		entity.Acceleration.Vec.X += float64(acc.X)
+		entity.Acceleration.Vec.Y += float64(acc.Y)
+		entity.Acceleration.Vec.Z += float64(acc.Z)
 		i++
 	}
 	return nil

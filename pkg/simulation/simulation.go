@@ -2,6 +2,7 @@ package simulation
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
@@ -51,8 +52,10 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.St
 
 	// Initialize systems with optimized worker counts
 	sim.physicsSystem = systems.NewPhysicsSystem(world, cfg)
-	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, 4, cfg) // Add worker count
-	sim.rulesSystem = systems.NewRulesSystem(world)                     // Add this line
+	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, 4, cfg)
+	rules := systems.NewRulesSystem(world, cfg)
+
+	sim.rulesSystem = rules
 
 	// Initialize launch rail system with config values
 	sim.launchRailSystem = systems.NewLaunchRailSystem(
@@ -88,7 +91,10 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.St
 // LoadRocket loads a rocket entity into the simulation
 func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *thrustcurves.MotorData) error {
 	// Create motor component with logger
-	motor := components.NewMotor(ecs.NewBasic(), motorData, *s.logger)
+	motor, err := components.NewMotor(ecs.NewBasic(), motorData, *s.logger)
+	if err != nil {
+		return err
+	}
 
 	// Create rocket entity with all components
 	s.rocket = entities.NewRocketEntity(s.world, orkData, motor)
@@ -128,22 +134,20 @@ func (s *Simulation) Run() error {
 	if s.config.Simulation.Step <= 0 || s.config.Simulation.Step > 0.01 {
 		return fmt.Errorf("invalid simulation step: must be between 0 and 0.01")
 	}
-	if s.config.Simulation.MaxTime <= 0 || s.config.Simulation.MaxTime > 120 {
-		return fmt.Errorf("invalid max time: must be between 0 and 120")
-	}
 
-	for s.currentTime < s.config.Simulation.MaxTime {
+	for {
 		if err := s.updateSystems(); err != nil {
 			return err
+		}
+		// Stop if landed
+		if s.rulesSystem.GetLastEvent() == systems.Land {
+			s.logger.Info("Rocket has landed; stopping simulation")
+			break
 		}
 		s.currentTime += s.config.Simulation.Step
 	}
 
-	s.logger.Warn("Simulation reached max time without landing",
-		"maxTime", s.config.Simulation.MaxTime,
-		"finalAltitude", s.rocket.Position.Y)
-
-	// Print stats even if max time reached
+	// Print stats after landing
 	s.logger.Info("Flight Statistics",
 		"stats", s.stats.String(),
 	)
@@ -159,14 +163,43 @@ func (s *Simulation) updateSystems() error {
 		}
 	}
 
-	// Update flight stats
+	vel := s.rocket.Velocity.Vec.Y
+	acc := s.rocket.Acceleration.Vec.Y
+	if math.IsNaN(acc) {
+		acc = 0
+	}
+	speedOfSound := s.aerodynamicSystem.GetSpeedOfSound(float32(s.rocket.Position.Vec.Y))
+	mach := 0.0
+	if speedOfSound > 1e-8 {
+		mach = vel / float64(speedOfSound)
+	}
+	if math.IsNaN(mach) || math.IsInf(mach, 0) {
+		mach = 0
+	}
+
 	s.stats.Update(
 		s.currentTime,
-		s.rocket.Position.Y,
-		s.rocket.Velocity.Y,
-		s.rocket.Acceleration.Y,
-		s.rocket.Velocity.Y/float64(s.aerodynamicSystem.GetSpeedOfSound(float32(s.rocket.Position.Y))),
+		s.rocket.Position.Vec.Y,
+		vel,
+		acc,
+		mach,
 	)
+
+	motorComp, ok := s.rocket.GetComponent("motor").(*components.Motor)
+	if ok {
+		err := motorComp.Update(s.config.Simulation.Step)
+		if err != nil {
+			panic(err)
+		}
+		s.stateChan <- systems.RocketState{
+			Time:         s.currentTime,
+			Altitude:     s.rocket.Position.Vec.Y,
+			Velocity:     vel,
+			Acceleration: acc,
+			Thrust:       motorComp.GetThrust(),
+			MotorState:   motorComp.GetState(),
+		}
+	}
 
 	return nil
 }

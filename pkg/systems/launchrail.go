@@ -51,37 +51,46 @@ func (s *LaunchRailSystem) Update(dt float32) error {
 		return nil
 	}
 
+	const gravity = 9.81
+
 	for _, entity := range s.entities {
-		// While on rail, constrain motion to rail direction
-		if s.onRail {
-			// Get total acceleration magnitude including thrust
-			totalAccel := entity.Acceleration.Y
-			if entity.Motor != nil {
-				thrust := entity.Motor.GetThrust()
-				totalAccel += thrust / entity.Mass.Value
-			}
+		if !s.onRail {
+			continue
+		}
 
-			// Apply acceleration along rail direction
-			angleRad := s.rail.Angle
-			entity.Acceleration.X = float64(totalAccel) * math.Sin(angleRad)
-			entity.Acceleration.Y = float64(totalAccel) * math.Cos(angleRad)
-			entity.Acceleration.Z = 0
+		// Get total acceleration magnitude including thrust
+		angleRad := s.rail.Angle
+		thrust := 0.0
+		if entity.Motor != nil {
+			thrust = entity.Motor.GetThrust()
+		}
 
-			// Update velocity along rail
-			entity.Velocity.X = entity.Acceleration.X * float64(dt)
-			entity.Velocity.Y = entity.Acceleration.Y * float64(dt)
-			entity.Velocity.Z = 0
+		netForce := thrust - (entity.Mass.Value * gravity)
+		if netForce <= 0 {
+			// Hold rocket on rail, zero out motion
+			entity.Acceleration.Vec.X = 0
+			entity.Acceleration.Vec.Y = 0
+			entity.Velocity.Vec.X = 0
+			entity.Velocity.Vec.Y = 0
+		} else {
+			// Rocket can leave rail
+			entity.Acceleration.Vec.X = netForce / entity.Mass.Value * math.Sin(angleRad)
+			entity.Acceleration.Vec.Y = netForce / entity.Mass.Value * math.Cos(angleRad)
+			entity.Velocity.Vec.X += entity.Acceleration.Vec.X * float64(dt)
+			entity.Velocity.Vec.Y += entity.Acceleration.Vec.Y * float64(dt)
+			entity.Position.Vec.X += entity.Velocity.Vec.X * float64(dt)
+			entity.Position.Vec.Y += entity.Velocity.Vec.Y * float64(dt)
+		}
 
-			// Update position along rail
-			distanceAlongRail := math.Sqrt(
-				entity.Position.X*entity.Position.X +
-					entity.Position.Y*entity.Position.Y)
+		// Update position along rail
+		distanceAlongRail := math.Sqrt(
+			entity.Position.Vec.X*entity.Position.Vec.X +
+				entity.Position.Vec.Y*entity.Position.Vec.Y)
 
-			// Check if we've reached end of rail
-			if distanceAlongRail >= s.rail.Length {
-				s.onRail = false
-				return nil
-			}
+		// Check if we've reached end of rail
+		if distanceAlongRail >= s.rail.Length {
+			s.onRail = false
+			return nil
 		}
 	}
 	return nil

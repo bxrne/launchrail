@@ -60,8 +60,9 @@ type Options struct {
 
 // Simulation represents the simulation configuration.
 type Simulation struct {
-	Step    float64 `mapstructure:"step"`
-	MaxTime float64 `mapstructure:"max_time"`
+	Step            float64 `mapstructure:"step"`
+	MaxTime         float64 `mapstructure:"max_time"`
+	GroundTolerance float64 `mapstructure:"ground_tolerance"` // Add ground tolerance
 }
 
 // Config represents the overall application configuration.
@@ -98,6 +99,7 @@ func (c *Config) String() map[string]string {
 	marshalled["options.launchsite.atmosphere.isa_configuration.temperature_lapse_rate"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.TemperatureLapseRate)
 	marshalled["simulation.step"] = fmt.Sprintf("%.2f", c.Simulation.Step)
 	marshalled["simulation.max_time"] = fmt.Sprintf("%.2f", c.Simulation.MaxTime)
+	marshalled["simulation.ground_tolerance"] = fmt.Sprintf("%.2f", c.Simulation.GroundTolerance)
 
 	return marshalled
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/systems"
+	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,10 +29,10 @@ func TestLaunchRailSystem_Add(t *testing.T) {
 
 	entity := &systems.PhysicsEntity{
 		Entity:       &ecs.BasicEntity{},
-		Position:     &components.Position{},
-		Velocity:     &components.Velocity{},
-		Acceleration: &components.Acceleration{},
-		Mass:         &components.Mass{Value: 1.0},
+		Position:     &types.Position{},
+		Velocity:     &types.Velocity{},
+		Acceleration: &types.Acceleration{},
+		Mass:         &types.Mass{Value: 1.0},
 		Motor:        &components.Motor{},
 	}
 
@@ -45,8 +46,8 @@ func TestLaunchRailSystem_Update(t *testing.T) {
 		length         float64
 		angle          float64
 		orientation    float64
-		initialPos     components.Position
-		initialVel     components.Velocity
+		initialPos     types.Position
+		initialVel     types.Velocity
 		thrust         float64
 		expectedOnRail bool
 	}{
@@ -55,10 +56,12 @@ func TestLaunchRailSystem_Update(t *testing.T) {
 			length:      2.0,
 			angle:       5.0,
 			orientation: 0.0,
-			initialPos: components.Position{
-				X: 0.0,
-				Y: 0.0,
-				Z: 0.0,
+			initialPos: types.Position{
+				Vec: types.Vector3{
+					X: 0.0,
+					Y: 0.0,
+					Z: 0.0,
+				},
 			},
 			thrust:         100.0, // Add thrust to simulate motor
 			expectedOnRail: true,
@@ -68,10 +71,12 @@ func TestLaunchRailSystem_Update(t *testing.T) {
 			length:      2.0,
 			angle:       5.0,
 			orientation: 0.0,
-			initialPos: components.Position{
-				X: 0.0,
-				Y: 3.0,
-				Z: 0.0,
+			initialPos: types.Position{
+				Vec: types.Vector3{
+					X: 0.0,
+					Y: 3.0,
+					Z: 0.0,
+				},
 			},
 			thrust:         100.0,
 			expectedOnRail: false,
@@ -87,10 +92,10 @@ func TestLaunchRailSystem_Update(t *testing.T) {
 			motor := &components.Motor{}
 			entity := &systems.PhysicsEntity{
 				Entity:       &ecs.BasicEntity{},
-				Position:     &components.Position{X: tt.initialPos.X, Y: tt.initialPos.Y, Z: tt.initialPos.Z},
-				Velocity:     &components.Velocity{},
-				Acceleration: &components.Acceleration{},
-				Mass:         &components.Mass{Value: 1.0},
+				Position:     &types.Position{Vec: types.Vector3{X: tt.initialPos.Vec.X, Y: tt.initialPos.Vec.Y, Z: tt.initialPos.Vec.Z}},
+				Velocity:     &types.Velocity{},
+				Acceleration: &types.Acceleration{},
+				Mass:         &types.Mass{Value: 1.0},
 				Motor:        motor,
 			}
 
@@ -109,8 +114,8 @@ func TestLaunchRailSystem_Update(t *testing.T) {
 				expectedRatio := math.Tan(angleRad)
 
 				// Only check ratio if we've moved significantly
-				if entity.Position.Y > 0.1 {
-					actualRatio := entity.Position.X / entity.Position.Y
+				if entity.Position.Vec.Y > 0.1 {
+					actualRatio := entity.Position.Vec.X / entity.Position.Vec.Y
 					require.InDelta(t, expectedRatio, actualRatio, 0.001,
 						"Position not following rail angle. Expected ratio %v, got %v",
 						expectedRatio, actualRatio)

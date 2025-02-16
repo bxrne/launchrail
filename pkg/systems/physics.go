@@ -107,10 +107,10 @@ func (s *PhysicsSystem) Update(dt float32) error {
 }
 
 func (s *PhysicsSystem) handleGroundCollision(entity *PhysicsEntity) bool {
-	if entity.Position.Y <= 0 {
-		entity.Position.Y = 0
-		entity.Velocity.Y = 0
-		entity.Acceleration.Y = 0
+	if entity.Position.Vec.Y <= 0 {
+		entity.Position.Vec.Y = 0
+		entity.Velocity.Vec.Y = 0
+		entity.Acceleration.Vec.Y = 0
 		return true
 	}
 	return false
@@ -128,10 +128,10 @@ func (s *PhysicsSystem) calculateNetForce(entity *PhysicsEntity, force types.Vec
 	}
 
 	// Calculate velocity magnitude for drag
-	velocity := math.Sqrt(entity.Velocity.X*entity.Velocity.X + entity.Velocity.Y*entity.Velocity.Y)
+	velocity := math.Sqrt(entity.Velocity.Vec.X*entity.Velocity.Vec.X + entity.Velocity.Vec.Y*entity.Velocity.Vec.Y)
 
 	if velocity > 0 {
-		rho := getAtmosphericDensity(entity.Position.Y)
+		rho := getAtmosphericDensity(entity.Position.Vec.Y)
 		if math.IsNaN(rho) {
 			rho = 1.225 // Use sea level density as fallback
 		}
@@ -145,7 +145,7 @@ func (s *PhysicsSystem) calculateNetForce(entity *PhysicsEntity, force types.Vec
 		dragForce := 0.5 * rho * cd * area * velocity * velocity
 
 		// Apply drag in opposite direction of velocity
-		if entity.Velocity.Y > 0 {
+		if entity.Velocity.Vec.Y > 0 {
 			netForce -= dragForce
 		} else {
 			netForce += dragForce
@@ -159,19 +159,19 @@ func (s *PhysicsSystem) calculateNetForce(entity *PhysicsEntity, force types.Vec
 }
 
 func (s *PhysicsSystem) updateEntityState(entity *PhysicsEntity, netForce float64, dt float64) {
-	entity.Acceleration.Y += netForce / entity.Mass.Value
+	entity.Acceleration.Vec.Y += netForce / entity.Mass.Value
 
 	// Semi-implicit Euler integration
-	newVelocity := entity.Velocity.Y + entity.Acceleration.Y*dt
-	newPosition := entity.Position.Y + newVelocity*dt
+	newVelocity := entity.Velocity.Vec.Y + entity.Acceleration.Vec.Y*dt
+	newPosition := entity.Position.Vec.Y + newVelocity*dt
 
 	if newPosition <= 0 {
 		s.handleGroundCollision(entity)
 		return
 	}
 
-	entity.Velocity.Y = newVelocity
-	entity.Position.Y = newPosition
+	entity.Velocity.Vec.Y = newVelocity
+	entity.Position.Vec.Y = newPosition
 }
 
 func (s *PhysicsSystem) applyForce(entity *PhysicsEntity, force types.Vector3, dt float32) {
@@ -192,8 +192,8 @@ func (s *PhysicsSystem) applyForce(entity *PhysicsEntity, force types.Vector3, d
 	}
 
 	// Reset acceleration and apply gravity
-	entity.Acceleration.X = 0
-	entity.Acceleration.Y = -s.gravity
+	entity.Acceleration.Vec.X = 0
+	entity.Acceleration.Vec.Y = -s.gravity
 
 	// Calculate and apply forces
 	netForce := s.calculateNetForce(entity, force)

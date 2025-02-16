@@ -28,7 +28,13 @@ func createTestMotor() (*components.Motor, *thrustcurves.MotorData) {
 	}
 
 	logger := logf.New(logf.Opts{})
-	return components.NewMotor(ecs.NewBasic(), motorData, logger), motorData
+	motor, err := components.NewMotor(ecs.NewBasic(), motorData, logger)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return motor, motorData
 }
 
 // TEST: GIVEN a new Motor WHEN NewMotor is called THEN a new Motor is returned
@@ -41,7 +47,8 @@ func TestNewMotor(t *testing.T) {
 		AvgThrust: 7.5,
 	}
 
-	motor := components.NewMotor(ecs.BasicEntity{}, md, logger)
+	motor, err := components.NewMotor(ecs.BasicEntity{}, md, logger)
+	require.NoError(t, err)
 	require.NotNil(t, motor)
 	assert.Equal(t, 10.0, motor.GetThrust()) // Initial thrust should be first thrust point
 	assert.Equal(t, 2.0, motor.GetMass())
@@ -81,7 +88,8 @@ func TestMotorBurnout(t *testing.T) {
 		TotalMass: 1.0,
 	}
 	logger := logf.New(logf.Opts{})
-	motor := components.NewMotor(id, md, logger)
+	motor, err := components.NewMotor(id, md, logger)
+	require.NoError(t, err)
 
 	require.NotNil(t, motor)
 
@@ -105,7 +113,9 @@ func TestMotorReset(t *testing.T) {
 		AvgThrust: 7.5,
 	}
 
-	motor := components.NewMotor(ecs.BasicEntity{}, md, logger)
+	motor, err := components.NewMotor(ecs.BasicEntity{}, md, logger)
+	require.NoError(t, err)
+
 	_ = motor.Update(1.5)
 	motor.Reset()
 
@@ -125,7 +135,8 @@ func TestInvalidUpdate(t *testing.T) {
 		AvgThrust: 7.5,
 	}
 
-	motor := components.NewMotor(ecs.BasicEntity{}, md, logger)
-	err := motor.Update(-0.1) // Invalid negative timestep
+	motor, err := components.NewMotor(ecs.BasicEntity{}, md, logger)
+	require.NoError(t, err)
+	err = motor.Update(-0.1) // Invalid negative timestep
 	assert.Error(t, err)
 }

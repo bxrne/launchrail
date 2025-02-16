@@ -8,6 +8,7 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/systems"
+	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,10 +41,10 @@ func TestPhysicsSystem_Add(t *testing.T) {
 
 	entity := systems.PhysicsEntity{
 		Entity:       &e,
-		Position:     &components.Position{},
-		Velocity:     &components.Velocity{},
-		Acceleration: &components.Acceleration{},
-		Mass:         &components.Mass{Value: 1.0},
+		Position:     &types.Position{},
+		Velocity:     &types.Velocity{},
+		Acceleration: &types.Acceleration{},
+		Mass:         &types.Mass{Value: 1.0},
 		Motor:        &components.Motor{},
 	}
 
@@ -55,8 +56,8 @@ func TestPhysicsSystem_Update(t *testing.T) {
 	tests := []struct {
 		name        string
 		mass        float64
-		initialPos  components.Position
-		initialVel  components.Velocity
+		initialPos  types.Position
+		initialVel  types.Velocity
 		motorState  string
 		dt          float32
 		wantPosY    float64
@@ -66,8 +67,8 @@ func TestPhysicsSystem_Update(t *testing.T) {
 		{
 			name:        "Ground start no thrust",
 			mass:        1.0,
-			initialPos:  components.Position{Y: 0},
-			initialVel:  components.Velocity{Y: 0},
+			initialPos:  types.Position{Vec: types.Vector3{Y: 0}},
+			initialVel:  types.Velocity{Vec: types.Vector3{Y: 0}},
 			motorState:  "READY",
 			dt:          0.016,
 			wantPosY:    0,
@@ -77,8 +78,8 @@ func TestPhysicsSystem_Update(t *testing.T) {
 		{
 			name:        "Mid-flight coasting",
 			mass:        1.0,
-			initialPos:  components.Position{Y: 100},
-			initialVel:  components.Velocity{Y: 50},
+			initialPos:  types.Position{Vec: types.Vector3{Y: 100}},
+			initialVel:  types.Velocity{Vec: types.Vector3{Y: 50}},
 			motorState:  "COASTING",
 			dt:          0.016,
 			wantPosY:    100.8,
@@ -88,8 +89,8 @@ func TestPhysicsSystem_Update(t *testing.T) {
 		{
 			name:        "Landing detection",
 			mass:        1.0,
-			initialPos:  components.Position{Y: 0.1}, // Slightly above ground
-			initialVel:  components.Velocity{Y: 0},
+			initialPos:  types.Position{Vec: types.Vector3{Y: 0.1}}, // Slightly above ground
+			initialVel:  types.Velocity{Vec: types.Vector3{Y: 0}},
 			motorState:  "COASTING",
 			dt:          0.016,
 			wantPosY:    0,      // Should land
@@ -124,8 +125,8 @@ func TestPhysicsSystem_Update(t *testing.T) {
 				Entity:       &e,
 				Position:     &tt.initialPos,
 				Velocity:     &tt.initialVel,
-				Acceleration: &components.Acceleration{},
-				Mass:         &components.Mass{Value: tt.mass},
+				Acceleration: &types.Acceleration{},
+				Mass:         &types.Mass{Value: tt.mass},
 				Motor:        motor,
 				// Initialize required components that were missing
 				Bodytube: &components.Bodytube{Radius: 0.05, Length: 1.0}, // Add reasonable defaults
@@ -140,10 +141,10 @@ func TestPhysicsSystem_Update(t *testing.T) {
 			assert.NoError(t, err)
 
 			// Verify results with reasonable tolerance for floating point
-			assert.InDelta(t, tt.wantPosY, entity.Position.Y, 0.1,
-				"Position Y mismatch: want %.2f, got %.2f", tt.wantPosY, entity.Position.Y)
-			assert.InDelta(t, tt.wantVelY, entity.Velocity.Y, 0.1,
-				"Velocity Y mismatch: want %.2f, got %.2f", tt.wantVelY, entity.Velocity.Y)
+			assert.InDelta(t, tt.wantPosY, entity.Position.Vec.Y, 0.1,
+				"Position Y mismatch: want %.2f, got %.2f", tt.wantPosY, entity.Position.Vec.Y)
+			assert.InDelta(t, tt.wantVelY, entity.Velocity.Vec.Y, 0.1,
+				"Velocity Y mismatch: want %.2f, got %.2f", tt.wantVelY, entity.Velocity.Vec.Y)
 		})
 	}
 }
@@ -157,10 +158,10 @@ func TestPhysicsSystem_Remove(t *testing.T) {
 
 	entity := systems.PhysicsEntity{
 		Entity:       &e,
-		Position:     &components.Position{},
-		Velocity:     &components.Velocity{},
-		Acceleration: &components.Acceleration{},
-		Mass:         &components.Mass{},
+		Position:     &types.Position{},
+		Velocity:     &types.Velocity{},
+		Acceleration: &types.Acceleration{},
+		Mass:         &types.Mass{},
 		Motor:        &components.Motor{},
 	}
 
@@ -197,10 +198,10 @@ func TestPhysicsSystem_Concurrent(t *testing.T) {
 		e := ecs.NewBasic()
 		entity := systems.PhysicsEntity{
 			Entity:       &e,
-			Position:     &components.Position{Y: float64(i * 10)},
-			Velocity:     &components.Velocity{Y: 10},
-			Acceleration: &components.Acceleration{},
-			Mass:         &components.Mass{Value: 1.0},
+			Position:     &types.Position{Vec: types.Vector3{Y: float64(i * 10)}},
+			Velocity:     &types.Velocity{Vec: types.Vector3{Y: 10}},
+			Acceleration: &types.Acceleration{},
+			Mass:         &types.Mass{Value: 1.0},
 			Motor:        &components.Motor{},
 		}
 		system.Add(&entity)
