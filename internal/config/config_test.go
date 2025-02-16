@@ -38,6 +38,16 @@ func TestGetConfig(t *testing.T) {
 			t.Errorf("Expected no error, got: %s", err)
 		}
 
+		err = cfg.Validate()
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg_str := cfg.String()
+		if cfg_str == nil {
+			t.Error("Expected config string to be non-empty")
+		}
+
 		if cfg == nil {
 			t.Error("Expected config to be non-nil")
 		}
@@ -545,6 +555,26 @@ func TestGetConfigMissingISAConfigurationTemperatureLapseRate(t *testing.T) {
 		}
 
 		expected := "options.launchsite.atmosphere.isa_configuration.temperature_lapse_rate is required"
+		if err.Error() != expected {
+			t.Errorf("Expected %s, got %s", expected, err)
+		}
+	})
+}
+
+// TEST: GIVEN a config with missing simulation.GroundTolerance WHEN Validate is called THEN an error is returned
+func TestGetConfigMissingSimulationGroundTolerance(t *testing.T) {
+	withWorkingDir(t, "../..", func(cfg *config.Config, err error) {
+		if err != nil {
+			t.Errorf("Expected no error, got: %s", err)
+		}
+
+		cfg.Simulation.GroundTolerance = 0
+		err = cfg.Validate()
+		if err == nil {
+			t.Error("Expected an error, got nil")
+		}
+
+		expected := "simulation.ground_tolerance is required"
 		if err.Error() != expected {
 			t.Errorf("Expected %s, got %s", expected, err)
 		}
