@@ -42,9 +42,9 @@ type Motor struct {
 }
 
 // NewMotor creates a new motor component from thrust curve data
-func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger) *Motor {
+func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger) (*Motor, error) {
 	if md == nil || len(md.Thrust) == 0 {
-		panic("invalid motor data")
+		return nil, fmt.Errorf("thrust curve data is required")
 	}
 
 	m := &Motor{
@@ -63,7 +63,7 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 
 	// Initialize with first thrust point
 	m.thrust = m.Thrustcurve[0][1]
-	return m
+	return m, nil
 }
 
 // validateThrustCurve ensures thrust curve data is valid and properly formatted

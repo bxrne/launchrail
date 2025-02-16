@@ -91,7 +91,10 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.St
 // LoadRocket loads a rocket entity into the simulation
 func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *thrustcurves.MotorData) error {
 	// Create motor component with logger
-	motor := components.NewMotor(ecs.NewBasic(), motorData, *s.logger)
+	motor, err := components.NewMotor(ecs.NewBasic(), motorData, *s.logger)
+	if err != nil {
+		return err
+	}
 
 	// Create rocket entity with all components
 	s.rocket = entities.NewRocketEntity(s.world, orkData, motor)
