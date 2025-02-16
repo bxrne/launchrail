@@ -85,5 +85,6 @@ func TestRun(t *testing.T) {
 		t.Errorf("Error loading rocket: %v", err)
 	}
 
+	// nolint: errcheck
 	go sim.Run()
 }
