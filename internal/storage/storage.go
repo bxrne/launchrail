@@ -46,7 +46,6 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 		return nil, err
 	}
 
-	// Create the file with timestamp
 	filePath := filepath.Join(dir, fmt.Sprintf("%s.csv", store))
 
 	file, err := os.Create(filePath)

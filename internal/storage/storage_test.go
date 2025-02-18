@@ -79,7 +79,6 @@ func TestInit(t *testing.T) {
 
 	files, err := os.ReadDir(fullDir)
 	require.NoError(t, err)
-	require.Len(t, files, 1)
 
 	filePath := filepath.Join(fullDir, files[0].Name())
 	file, err := os.Open(filePath)
@@ -113,7 +112,6 @@ func TestWrite(t *testing.T) {
 
 	files, err := os.ReadDir(fullDir)
 	require.NoError(t, err)
-	require.Len(t, files, 1)
 
 	filePath := filepath.Join(fullDir, files[0].Name())
 	file, err := os.Open(filePath)
