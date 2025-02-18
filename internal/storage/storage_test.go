@@ -26,12 +26,30 @@ func setupTest(t *testing.T) (string, string, func()) {
 	return baseDir, dir, cleanup
 }
 
-// TEST: GIVEN a base directory and a directory name WHEN NewStorage is called THEN a new storage instance is created
-func TestNewStorage(t *testing.T) {
+// TEST: GIVEN a base directory and a directory name WHEN NewStorage for MOTION data is called THEN a new storage instance is created
+func TestNewStorageMotion(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
 
-	_, err := storage.NewStorage(baseDir, dir)
+	_, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	require.NoError(t, err)
+
+	homeDir, _ := os.UserHomeDir()
+	expectedBaseDir := filepath.Join(homeDir, baseDir)
+	expectedDir := filepath.Join(expectedBaseDir, dir)
+
+	_, err = os.Stat(expectedBaseDir)
+	assert.NoError(t, err)
+	_, err = os.Stat(expectedDir)
+	assert.NoError(t, err)
+}
+
+// TEST: GIVEN a base directory and a directory name WHEN NewStorage for EVENTS data is called THEN a new storage instance is created
+func TestNewStorageEvents(t *testing.T) {
+	baseDir, dir, cleanup := setupTest(t)
+	defer cleanup()
+
+	_, err := storage.NewStorage(baseDir, dir, storage.EVENTS)
 	require.NoError(t, err)
 
 	homeDir, _ := os.UserHomeDir()
@@ -49,7 +67,7 @@ func TestInit(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
 
-	s, err := storage.NewStorage(baseDir, dir)
+	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
 	require.NoError(t, err)
 
 	headers := []string{"Column1", "Column2", "Column3"}
@@ -79,7 +97,7 @@ func TestWrite(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
 
-	s, err := storage.NewStorage(baseDir, dir)
+	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
 	require.NoError(t, err)
 
 	headers := []string{"Column1", "Column2", "Column3"}
@@ -116,7 +134,7 @@ func TestWriteInvalidData(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
 
-	s, err := storage.NewStorage(baseDir, dir)
+	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
 	require.NoError(t, err)
 
 	headers := []string{"Column1", "Column2"}

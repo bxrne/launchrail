@@ -83,3 +83,55 @@ func TestConfigString(t *testing.T) {
 		t.Errorf("Expected %v, got %v", expected, actual)
 	}
 }
+
+// TEST: GIVEN a configuration WHEN Bytes is called THEN a byte representation of the configuration is returned
+func TestConfigBytes(t *testing.T) {
+	cfg := config.Config{
+		App: config.App{
+			Name:    "launchrail-test",
+			Version: "0.0.0",
+			BaseDir: "/tmp",
+		},
+		Logging: config.Logging{
+			Level: "info",
+		},
+		External: config.External{
+			OpenRocketVersion: "15.03",
+		},
+		Options: config.Options{
+			MotorDesignation: "G80-7T",
+			OpenRocketFile:   "test/fixtures/rocket.ork",
+			Launchrail: config.Launchrail{
+				Length:      0.00,
+				Angle:       0.00,
+				Orientation: 0.00,
+			},
+			Launchsite: config.Launchsite{
+				Latitude:  0.00,
+				Longitude: 0.00,
+				Altitude:  0.00,
+				Atmosphere: config.Atmosphere{
+					ISAConfiguration: config.ISAConfiguration{
+						SpecificGasConstant:  287.05,
+						GravitationalAccel:   9.81,
+						SeaLevelDensity:      1.225,
+						SeaLevelTemperature:  288.15,
+						SeaLevelPressure:     101325.0,
+						RatioSpecificHeats:   1.4,
+						TemperatureLapseRate: -0.0065,
+					},
+				},
+			},
+		},
+		Simulation: config.Simulation{
+			Step:    0.00,
+			MaxTime: 0.00,
+		},
+	}
+
+	expected := "&{App:{Name:launchrail-test Version:0.0.0 BaseDir:/tmp} Logging:{Level:info} External:{OpenRocketVersion:15.03} Options:{MotorDesignation:G80-7T OpenRocketFile:test/fixtures/rocket.ork Launchrail:{Length:0 Angle:0 Orientation:0} Launchsite:{Latitude:0 Longitude:0 Altitude:0 Atmosphere:{ISAConfiguration:{SpecificGasConstant:287.05 GravitationalAccel:9.81 SeaLevelDensity:1.225 SeaLevelTemperature:288.15 SeaLevelPressure:101325 RatioSpecificHeats:1.4 TemperatureLapseRate:-0.0065}}}} Simulation:{Step:0 MaxTime:0 GroundTolerance:0}}"
+	actual := string(cfg.Bytes())
+	if expected != actual {
+		t.Errorf("Expected %s, got %s", expected, actual)
+	}
+}

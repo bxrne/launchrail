@@ -21,6 +21,20 @@ func TestSchemaOpenrocketDocumentString(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN a OpenrocketDocument struct WHEN calling the Bytes method THEN return a byte representation of the OpenrocketDocument
+func TestSchemaOpenrocketDocumentByte(t *testing.T) {
+	ord := &openrocket.OpenrocketDocument{
+		Version: "version",
+		Creator: "creator",
+		Rocket:  openrocket.RocketDocument{},
+	}
+
+	expected := "OpenrocketDocument{Version=version, Creator=creator, Rocket=RocketDocument{Name=, ID=, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, Designer=, Revision=, MotorConfiguration=MotorConfiguration{ConfigID=, Default=false, Stages=()}, ReferenceType=, Subcomponents={Subcomponents{Stages=()}}}}"
+	if string(ord.Bytes()) != expected {
+		t.Errorf("Expected %s, got %s", expected, string(ord.Bytes()))
+	}
+}
+
 // TEST: GIVEN a OpenrocketDocument struct WHEN calling the Describe method then a shortform version of String() is returned
 func TestSchemaOpenrocketDocumentDescribe(t *testing.T) {
 	ord := &openrocket.OpenrocketDocument{
