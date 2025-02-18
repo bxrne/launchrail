@@ -28,4 +28,5 @@ type PhysicsEntity struct {
 	Bodytube     *components.Bodytube
 	Nosecone     *components.Nosecone
 	Finset       *components.TrapezoidFinset
+	Parachute    *components.Parachute
 }

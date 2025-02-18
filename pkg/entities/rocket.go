@@ -59,6 +59,12 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 	}
 	rocket.components["finset"] = finset
 
+	parachute, err := components.NewParachuteFromORK(ecs.NewBasic(), orkData)
+	if err != nil {
+		panic(err)
+	}
+	rocket.components["parachute"] = parachute
+
 	// Calculate total mass
 	rocket.Mass.Value = calculateTotalMass(orkData)
 

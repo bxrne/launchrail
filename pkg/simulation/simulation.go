@@ -110,6 +110,7 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 		Bodytube:     s.rocket.GetComponent("bodytube").(*components.Bodytube),
 		Nosecone:     s.rocket.GetComponent("nosecone").(*components.Nosecone),
 		Finset:       s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
+		Parachute:    s.rocket.GetComponent("parachute").(*components.Parachute),
 	}
 
 	// Add to all systems

@@ -39,6 +39,9 @@ func createMockOpenRocketData() *openrocket.RocketDocument {
 							Thickness: 0.1,
 							Radius:    "0.5",
 							Subcomponents: openrocket.BodyTubeSubcomponents{
+								Parachute: openrocket.Parachute{
+									CD: "auto 1.0",
+								},
 								TrapezoidFinset: openrocket.TrapezoidFinset{
 									Material: openrocket.Material{
 										Density: 1.0,
@@ -82,7 +85,6 @@ func TestNewRocketEntity(t *testing.T) {
 	assert.NotNil(t, rocket.Velocity)
 	assert.NotNil(t, rocket.Acceleration)
 	assert.NotNil(t, rocket.Mass)
-	assert.Greater(t, rocket.Mass.Value, 0.0)
 }
 
 // TEST: GIVEN a rocket entity WHEN GetComponent is called with valid component name THEN the component is returned

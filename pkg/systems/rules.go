@@ -37,7 +37,7 @@ func NewRulesSystem(world *ecs.World, cfg *config.Config) *RulesSystem {
 
 // Add adds a physics entity to the rules system
 func (s *RulesSystem) Add(pe *PhysicsEntity) {
-	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset})
+	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset, pe.Parachute})
 }
 
 // Update applies rules of flight to entities
