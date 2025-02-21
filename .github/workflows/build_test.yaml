@@ -31,11 +31,8 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Build the project cmd, pkg, internal (ignore plugins as they will have package main)
+      - name: Build the simulation
         run: go build ./cmd/... ./pkg/... ./internal/...
-
-      - name: Build the plugins
-        run: go build -buildmode=plugin ./plugins/... -o ./plugins/ -v
 
       - name: Run tests without coverage
         if: matrix.os != 'ubuntu-latest'
@@ -44,6 +41,9 @@ jobs:
       - name: Run tests with coverage
         if: matrix.os == 'ubuntu-latest'
         run: go test -cover -coverprofile=coverage.out ./...
+      
+      - name: Build the plugins 
+        run: go build -buildmode=plugin ./plugins/... -v
 
       - name: SonarQube Scan
         if: matrix.os == 'ubuntu-latest'
