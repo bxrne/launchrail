@@ -31,8 +31,11 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Build the project
-        run: go build -v ./...
+      - name: Build the project cmd, pkg, internal (ignore plugins as they will have package main)
+        run: go build ./cmd/... ./pkg/... ./internal/...
+
+      - name: Build the plugins
+        run: go build -buildmode=plugin ./plugins/... -o ./plugins/ -v
 
       - name: Run tests without coverage
         if: matrix.os != 'ubuntu-latest'
