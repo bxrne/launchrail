@@ -43,7 +43,7 @@ jobs:
         run: go test -cover -coverprofile=coverage.out ./...
       
       - name: Build the plugins 
-        run: go build -buildmode=plugin ./plugins/... -v
+        run: go build -buildmode=plugin ./plugins/...
 
       - name: SonarQube Scan
         if: matrix.os == 'ubuntu-latest'
