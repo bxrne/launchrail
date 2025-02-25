@@ -48,30 +48,10 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 
 	filePath := filepath.Join(dir, fmt.Sprintf("%s.csv", store))
 
-	// Open file without O_APPEND to avoid Windows-specific issues; we manage file position manually.
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, 0644)
+	// Open file with write-only and append flags for proper behavior on Windows.
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create/open file: %v", err)
-	}
-
-	// Get file info to check if it's a new file
-	fileInfo, err := file.Stat()
-	if err != nil {
-		file.Close()
-		return nil, fmt.Errorf("failed to get file info: %v", err)
-	}
-
-	// If it's a new file, seek to start. If existing file, seek to end for append.
-	if fileInfo.Size() == 0 {
-		_, err = file.Seek(0, 0)
-		if err != nil {
-			return nil, fmt.Errorf("failed to seek file: %v", err)
-		}
-	} else {
-		_, err = file.Seek(0, 2) // Seek to end for append
-		if err != nil {
-			return nil, fmt.Errorf("failed to seek file: %v", err)
-		}
 	}
 
 	return &Storage{
