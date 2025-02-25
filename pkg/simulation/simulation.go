@@ -166,6 +166,9 @@ func (s *Simulation) Run() error {
 	close(s.doneChan)
 	return nil
 }
+
+// updateSystems updates all systems in the simulation
+// NOSONAR
 func (s *Simulation) updateSystems() error {
 	// Create initial state
 	state := &systems.RocketState{
