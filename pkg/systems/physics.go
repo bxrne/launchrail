@@ -68,7 +68,7 @@ func NewPhysicsSystem(world *ecs.World, cfg *config.Config) *PhysicsSystem {
 }
 
 // Update applies forces to entities
-func (s *PhysicsSystem) Update(dt float32) error {
+func (s *PhysicsSystem) Update(dt float64) error {
 	var wg sync.WaitGroup
 	workChan := make(chan *PhysicsEntity, len(s.entities)) // Changed to pointer channel
 	resultChan := make(chan types.Vector3, len(s.entities))
@@ -175,7 +175,7 @@ func (s *PhysicsSystem) updateEntityState(entity *PhysicsEntity, netForce float6
 	entity.Position.Vec.Y = newPosition
 }
 
-func (s *PhysicsSystem) applyForce(entity *PhysicsEntity, force types.Vector3, dt float32) {
+func (s *PhysicsSystem) applyForce(entity *PhysicsEntity, force types.Vector3, dt float64) {
 	// Add nil checks for required components
 	if entity.Bodytube == nil || entity.Nosecone == nil || entity.Mass == nil {
 		return

@@ -28,8 +28,8 @@ type AerodynamicSystem struct {
 }
 
 // GetAirDensity returns the air density at a given altitude
-func (a *AerodynamicSystem) GetAirDensity(altitude float32) float32 {
-	return float32(a.getAtmosphericData(float64(altitude)).density)
+func (a *AerodynamicSystem) GetAirDensity(altitude float64) float64 {
+	return float64(a.getAtmosphericData(float64(altitude)).density)
 }
 
 // NewAerodynamicSystem creates a new AerodynamicSystem
@@ -54,8 +54,8 @@ func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericDat
 }
 
 // GetTemperature calculates the temperature at a given altitude
-func (a *AerodynamicSystem) getTemperature(altitude float32) float32 {
-	return float32(a.isa.GetTemperature(float64(altitude)))
+func (a *AerodynamicSystem) getTemperature(altitude float64) float64 {
+	return float64(a.isa.GetTemperature(float64(altitude)))
 }
 
 // CalculateDrag now handles atmospheric effects and Mach number
@@ -99,7 +99,7 @@ func calculateReferenceArea(nosecone *components.Nosecone, bodytube *components.
 }
 
 // Update implements parallel force calculation and application
-func (a *AerodynamicSystem) Update(dt float32) error {
+func (a *AerodynamicSystem) Update(dt float64) error {
 	workChan := make(chan PhysicsEntity, len(a.entities))
 	resultChan := make(chan types.Vector3, len(a.entities))
 
@@ -149,12 +149,12 @@ func (a *AerodynamicSystem) Priority() int {
 }
 
 // calculateSoundSpeed calculates the speed of sound at a given temperature
-func (a *AerodynamicSystem) GetSpeedOfSound(altitude float32) float32 {
+func (a *AerodynamicSystem) GetSpeedOfSound(altitude float64) float64 {
 	temperature := a.getTemperature(altitude)
 	if temperature <= 0 {
 		return 340.29 // Return sea level speed of sound as fallback
 	}
-	return float32(math.Sqrt(float64(1.4 * 287.05 * temperature)))
+	return float64(math.Sqrt(float64(1.4 * 287.05 * temperature)))
 }
 
 // calculateDragCoeff calculates the drag coefficient based on Mach number

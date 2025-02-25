@@ -172,7 +172,7 @@ func (s *Simulation) Run() error {
 func (s *Simulation) updateCoreSystems(state *systems.RocketState) error {
 	// Update core systems
 	for _, system := range s.systems {
-		if err := system.Update(float32(s.config.Simulation.Step)); err != nil {
+		if err := system.Update(float64(s.config.Simulation.Step)); err != nil {
 			return err
 		}
 	}
@@ -180,7 +180,7 @@ func (s *Simulation) updateCoreSystems(state *systems.RocketState) error {
 	// Apply parachute effects if deployed
 	if parachute := s.rocket.GetComponent("parachute").(*components.Parachute); parachute.Deployed {
 		// Apply additional drag force from parachute
-		rho := s.aerodynamicSystem.GetAirDensity(float32(s.rocket.Position.Vec.Y))
+		rho := s.aerodynamicSystem.GetAirDensity(float64(s.rocket.Position.Vec.Y))
 		vel := s.rocket.Velocity.Vec.Y
 		dragForce := -0.5 * float64(rho) * parachute.DragCoefficient * parachute.Area * vel * math.Abs(vel)
 		s.rocket.Acceleration.Vec.Y += dragForce / s.rocket.Mass.Value
@@ -194,7 +194,7 @@ func (s *Simulation) updateCoreSystems(state *systems.RocketState) error {
 	}
 
 	// Calculate Mach number
-	speedOfSound := s.aerodynamicSystem.GetSpeedOfSound(float32(s.rocket.Position.Vec.Y))
+	speedOfSound := s.aerodynamicSystem.GetSpeedOfSound(float64(s.rocket.Position.Vec.Y))
 	mach := 0.0
 	if speedOfSound > 1e-8 {
 		mach = vel / float64(speedOfSound)

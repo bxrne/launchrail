@@ -46,7 +46,7 @@ func (s *LaunchRailSystem) Add(pe *PhysicsEntity) {
 }
 
 // Update applies launch rail constraints to entities
-func (s *LaunchRailSystem) Update(dt float32) error {
+func (s *LaunchRailSystem) Update(dt float64) error {
 	if !s.onRail {
 		return nil
 	}

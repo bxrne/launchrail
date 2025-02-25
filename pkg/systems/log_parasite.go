@@ -60,7 +60,7 @@ func (s *LogParasiteSystem) Priority() int {
 }
 
 // Update the LogParasiteSystem
-func (s *LogParasiteSystem) Update(dt float32) error {
+func (s *LogParasiteSystem) Update(dt float64) error {
 	// No need to track time here - data comes from simulation state
 	return nil
 }
