@@ -43,6 +43,7 @@ jobs:
         run: go test -cover -coverprofile=coverage.out ./...
       
       - name: Build the plugins 
+        if: matrix.os != 'windows-latest'
         run: go build -buildmode=plugin ./plugins/...
 
       - name: SonarQube Scan
