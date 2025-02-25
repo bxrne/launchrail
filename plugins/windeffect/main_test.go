@@ -1,16 +1,15 @@
-package windeffect_test
+package main
 
 import (
 	"math"
 	"testing"
 
 	"github.com/bxrne/launchrail/pkg/systems"
-	"github.com/bxrne/launchrail/plugins/windeffect"
 	"github.com/zerodha/logf"
 )
 
 func TestWindEffectPlugin_Initialize(t *testing.T) {
-	p := &windeffect.WindEffectPlugin{}
+	p := &WindEffectPlugin{}
 	logger := logf.New(logf.Opts{})
 
 	err := p.Initialize(logger)
@@ -20,21 +19,21 @@ func TestWindEffectPlugin_Initialize(t *testing.T) {
 }
 
 func TestWindEffectPlugin_Name(t *testing.T) {
-	p := &windeffect.WindEffectPlugin{}
+	p := &WindEffectPlugin{}
 	if p.Name() != "WindEffect" {
 		t.Errorf("Expected name to be WindEffect, got %s", p.Name())
 	}
 }
 
 func TestWindEffectPlugin_Version(t *testing.T) {
-	p := &windeffect.WindEffectPlugin{}
+	p := &WindEffectPlugin{}
 	if p.Version() != "1.0.0" {
 		t.Errorf("Expected version to be 1.0.0, got %s", p.Version())
 	}
 }
 
 func TestWindEffectPlugin_BeforeSimStep(t *testing.T) {
-	p := &windeffect.WindEffectPlugin{}
+	p := &WindEffectPlugin{}
 	state := &systems.RocketState{
 		Time:     0, // This will make sin(time) = 1
 		Velocity: 10.0,
@@ -52,7 +51,7 @@ func TestWindEffectPlugin_BeforeSimStep(t *testing.T) {
 }
 
 func TestWindEffectPlugin_AfterSimStep(t *testing.T) {
-	p := &windeffect.WindEffectPlugin{}
+	p := &WindEffectPlugin{}
 	state := &systems.RocketState{}
 
 	err := p.AfterSimStep(state)

@@ -1,4 +1,4 @@
-package windeffect
+package main
 
 import (
 	"github.com/bxrne/launchrail/pkg/systems"
