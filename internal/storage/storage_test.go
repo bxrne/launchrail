@@ -28,8 +28,11 @@ func TestNewStorageMotion(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
 
-	_, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
 	require.NoError(t, err)
+
+	// Close the storage before cleanup
+	require.NoError(t, s.Close())
 
 	expectedBaseDir := baseDir // baseDir is already absolute.
 	expectedDir := filepath.Join(expectedBaseDir, dir)
@@ -44,8 +47,11 @@ func TestNewStorageEvents(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
 
-	_, err := storage.NewStorage(baseDir, dir, storage.EVENTS)
+	s, err := storage.NewStorage(baseDir, dir, storage.EVENTS)
 	require.NoError(t, err)
+
+	// Close the storage before cleanup
+	require.NoError(t, s.Close())
 
 	expectedBaseDir := baseDir
 	expectedDir := filepath.Join(expectedBaseDir, dir)
@@ -67,13 +73,10 @@ func TestInit(t *testing.T) {
 	err = s.Init(headers)
 	require.NoError(t, err)
 
-	// Close to flush and release the file.
-	err = s.Close()
-	require.NoError(t, err)
+	// Close to flush and release the file
+	require.NoError(t, s.Close())
 
-	// Increase sleep duration to ensure data is flushed.
-	time.Sleep(500 * time.Millisecond)
-
+	// Remove sleep as it's no longer needed since we properly close the file
 	fullDir := filepath.Join(baseDir, dir)
 	files, err := os.ReadDir(fullDir)
 	require.NoError(t, err)
@@ -105,12 +108,9 @@ func TestWrite(t *testing.T) {
 	err = s.Write(data)
 	require.NoError(t, err)
 
-	err = s.Close()
-	require.NoError(t, err)
+	require.NoError(t, s.Close())
 
-	// Increase sleep duration to ensure data is fully flushed.
-	time.Sleep(500 * time.Millisecond)
-
+	// Remove sleep as it's no longer needed
 	fullDir := filepath.Join(baseDir, dir)
 	files, err := os.ReadDir(fullDir)
 	require.NoError(t, err)
@@ -136,6 +136,9 @@ func TestWriteInvalidData(t *testing.T) {
 
 	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
 	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, s.Close())
+	}()
 
 	headers := []string{"Column1", "Column2"}
 	err = s.Init(headers)
