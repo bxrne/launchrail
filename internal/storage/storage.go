@@ -48,9 +48,24 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 
 	filePath := filepath.Join(dir, fmt.Sprintf("%s.csv", store))
 
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, 0644)
+	// Open file in append mode, create if it doesn't exist
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create file: %v", err)
+		return nil, fmt.Errorf("failed to create/open file: %v", err)
+	}
+
+	// Get file info to check if it's a new file
+	fileInfo, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, fmt.Errorf("failed to get file info: %v", err)
+	}
+
+	// If it's a new file, seek to start. If existing file, seek to end
+	if fileInfo.Size() == 0 {
+		file.Seek(0, 0)
+	} else {
+		file.Seek(0, 2) // Seek to end for append
 	}
 
 	return &Storage{
