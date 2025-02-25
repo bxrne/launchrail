@@ -48,7 +48,7 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 
 	filePath := filepath.Join(dir, fmt.Sprintf("%s.csv", store))
 
-	file, err := os.Create(filePath)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create file: %v", err)
 	}
