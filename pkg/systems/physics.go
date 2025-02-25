@@ -34,6 +34,7 @@ type PhysicsSystem struct {
 func (s *PhysicsSystem) calculateStabilityForces(force *types.Vector3, stabilityMargin float64, entity PhysicsEntity) {
 	// Basic stability force calculation
 	const stabilityFactor = 0.1
+	_ = entity
 
 	// Apply corrective force based on stability margin
 	correctionForce := stabilityMargin * stabilityFactor

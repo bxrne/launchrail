@@ -56,6 +56,7 @@ func (s *RulesSystem) Update(dt float32) error {
 }
 
 func (s *RulesSystem) processRules(dt float32) Event {
+	_ = dt
 	for _, entity := range s.entities {
 		if event := s.checkApogee(entity); event != None {
 			// Deploy parachute if trigger is set to apogee

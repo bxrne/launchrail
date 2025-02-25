@@ -162,6 +162,8 @@ func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity PhysicsEntit
 	// More accurate drag coefficient calculation
 	baseCd := 0.2 // Subsonic base drag
 
+	_ = entity // Placeholder for future drag coefficient calculations
+
 	// Add wave drag in transonic region
 	if mach > 0.8 && mach < 1.2 {
 		// Prandtl-Glauert compressibility correction
