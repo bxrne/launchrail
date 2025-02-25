@@ -74,6 +74,9 @@ func TestInit(t *testing.T) {
 	err = s.Init(headers)
 	require.NoError(t, err)
 
+	// Ensure the file is closed after writing
+	s.Close()
+
 	homeDir, _ := os.UserHomeDir()
 	fullDir := filepath.Join(homeDir, baseDir, dir)
 
@@ -106,6 +109,9 @@ func TestWrite(t *testing.T) {
 	data := []string{"Value1", "Value2", "Value3"}
 	err = s.Write(data)
 	require.NoError(t, err)
+
+	// Ensure the file is closed after writing
+	s.Close()
 
 	homeDir, _ := os.UserHomeDir()
 	fullDir := filepath.Join(homeDir, baseDir, dir)
