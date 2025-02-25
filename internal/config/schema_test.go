@@ -46,6 +46,9 @@ func TestConfigString(t *testing.T) {
 				},
 			},
 		},
+		Plugins: config.Plugins{
+			Paths: []string{"fake_plugin.so"},
+		},
 		Simulation: config.Simulation{
 			Step:    0.00,
 			MaxTime: 0.00,
@@ -76,6 +79,7 @@ func TestConfigString(t *testing.T) {
 		"simulation.step":             "0.00",
 		"simulation.max_time":         "0.00",
 		"simulation.ground_tolerance": "0.00",
+		"plugins.paths":               "fake_plugin.so",
 	}
 
 	actual := cfg.String()

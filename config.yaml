@@ -11,6 +11,10 @@ simulation:
   max_time: 300.0
   ground_tolerance: 0.03 # Add ground tolerance
 
+plugins:
+  paths:
+    - "./plugins/windeffect.so"
+
 external:
   openrocket_version: "23.09"
 
