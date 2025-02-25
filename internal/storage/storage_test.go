@@ -13,6 +13,9 @@ import (
 )
 
 func setupTest(t *testing.T) (string, string, func()) {
+	// Add a longer delay to ensure the file system has enough time to flush the data
+	time.Sleep(500 * time.Millisecond)
+
 	homeDir, err := os.UserHomeDir()
 	require.NoError(t, err)
 
@@ -21,6 +24,9 @@ func setupTest(t *testing.T) (string, string, func()) {
 	fullBaseDir := filepath.Join(homeDir, baseDir)
 
 	cleanup := func() {
+		// Add a longer delay to ensure the file system has enough time to flush the data
+		time.Sleep(500 * time.Millisecond)
+
 		os.RemoveAll(fullBaseDir)
 	}
 
