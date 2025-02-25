@@ -19,6 +19,11 @@ type External struct {
 	OpenRocketVersion string `mapstructure:"openrocket_version"`
 }
 
+// Plugins represents runtime plugins to enrich the simulation
+type Plugins struct {
+	Paths []string `mapstructure:"paths"`
+}
+
 // Launchrail represents the launchrail configuration.
 type Launchrail struct {
 	Length      float64 `mapstructure:"length"`
@@ -72,6 +77,7 @@ type Config struct {
 	External   External   `mapstructure:"external"`
 	Options    Options    `mapstructure:"options"`
 	Simulation Simulation `mapstructure:"simulation"`
+	Plugins    Plugins    `mapstructure:"plugins"`
 }
 
 // String returns the configuration as a map of strings, useful for testing.
@@ -100,6 +106,12 @@ func (c *Config) String() map[string]string {
 	marshalled["simulation.step"] = fmt.Sprintf("%.2f", c.Simulation.Step)
 	marshalled["simulation.max_time"] = fmt.Sprintf("%.2f", c.Simulation.MaxTime)
 	marshalled["simulation.ground_tolerance"] = fmt.Sprintf("%.2f", c.Simulation.GroundTolerance)
+
+	if len(c.Plugins.Paths) > 0 {
+		marshalled["plugins.paths"] = c.Plugins.Paths[0]
+	} else {
+		marshalled["plugins.paths"] = ""
+	}
 
 	return marshalled
 }
