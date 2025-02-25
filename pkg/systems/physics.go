@@ -21,13 +21,14 @@ var (
 
 // PhysicsSystem calculates forces on entities
 type PhysicsSystem struct {
-	world        *ecs.World
-	entities     []*PhysicsEntity // Changed to store pointers
-	cpCalculator *barrowman.CPCalculator
-	workers      int
-	workChan     chan PhysicsEntity
-	resultChan   chan types.Vector3
-	gravity      float64
+	world           *ecs.World
+	entities        []*PhysicsEntity // Changed to store pointers
+	cpCalculator    *barrowman.CPCalculator
+	workers         int
+	workChan        chan PhysicsEntity
+	resultChan      chan types.Vector3
+	gravity         float64
+	groundTolerance float64
 }
 
 // calculateStabilityForces calculates stability forces for an entity
@@ -57,13 +58,14 @@ func (s *PhysicsSystem) Remove(basic ecs.BasicEntity) {
 func NewPhysicsSystem(world *ecs.World, cfg *config.Config) *PhysicsSystem {
 	workers := 4
 	return &PhysicsSystem{
-		world:        world,
-		entities:     make([]*PhysicsEntity, 0),
-		workers:      workers,
-		workChan:     make(chan PhysicsEntity, workers),
-		resultChan:   make(chan types.Vector3, workers),
-		cpCalculator: barrowman.NewCPCalculator(), // Initialize calculator
-		gravity:      cfg.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel,
+		world:           world,
+		entities:        make([]*PhysicsEntity, 0),
+		workers:         workers,
+		workChan:        make(chan PhysicsEntity, workers),
+		resultChan:      make(chan types.Vector3, workers),
+		cpCalculator:    barrowman.NewCPCalculator(), // Initialize calculator
+		gravity:         cfg.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel,
+		groundTolerance: cfg.Simulation.GroundTolerance,
 	}
 }
 
@@ -108,7 +110,8 @@ func (s *PhysicsSystem) Update(dt float64) error {
 }
 
 func (s *PhysicsSystem) handleGroundCollision(entity *PhysicsEntity) bool {
-	if entity.Position.Vec.Y <= 0 {
+	groundTolerance := s.groundTolerance
+	if entity.Position.Vec.Y <= groundTolerance {
 		entity.Position.Vec.Y = 0
 		entity.Velocity.Vec.Y = 0
 		entity.Acceleration.Vec.Y = 0

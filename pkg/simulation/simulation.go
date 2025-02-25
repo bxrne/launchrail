@@ -145,18 +145,20 @@ func (s *Simulation) Run() error {
 		return fmt.Errorf("invalid simulation step: must be between 0 and 0.01")
 	}
 
+	lastEvent := systems.None
 	for {
-
 		if err := s.updateSystems(); err != nil {
 			return err
 		}
-		// Stop if landed
-		if s.rulesSystem.GetLastEvent() == systems.Land {
+
+		currentEvent := s.rulesSystem.GetLastEvent()
+		if currentEvent == systems.Land && lastEvent != systems.Land {
 			s.logger.Info("Rocket has landed; stopping simulation")
 			break
 		}
-		s.currentTime += s.config.Simulation.Step
+		lastEvent = currentEvent
 
+		s.currentTime += s.config.Simulation.Step
 	}
 
 	// Print stats after landing
