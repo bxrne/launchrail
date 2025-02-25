@@ -62,7 +62,7 @@ func (s *RulesSystem) processRules(entity *PhysicsEntity) Event {
 		return None
 	}
 
-	// Check for apogee only after motor burnout and negative velocity
+	// Check for apogee
 	if !s.hasApogee &&
 		entity.Motor.GetState() == "BURNOUT" &&
 		entity.Velocity.Vec.Y < 0 {
@@ -74,16 +74,14 @@ func (s *RulesSystem) processRules(entity *PhysicsEntity) Event {
 		return Apogee
 	}
 
-	// Only check for landing after apogee has been detected
-	if s.hasApogee && !s.hasLanded {
-		groundTolerance := s.config.Simulation.GroundTolerance
-		if entity.Position.Vec.Y <= groundTolerance {
-			entity.Position.Vec.Y = 0
-			entity.Velocity.Vec.Y = 0
-			entity.Acceleration.Vec.Y = 0
-			s.hasLanded = true
-			return Land
-		}
+	// Check for landing after apogee using ground tolerance
+	groundTolerance := s.config.Simulation.GroundTolerance
+	if s.hasApogee && entity.Position.Vec.Y <= groundTolerance && !s.hasLanded {
+		entity.Position.Vec.Y = 0
+		entity.Velocity.Vec.Y = 0
+		entity.Acceleration.Vec.Y = 0
+		s.hasLanded = true
+		return Land
 	}
 
 	return None
