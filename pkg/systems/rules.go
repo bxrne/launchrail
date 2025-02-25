@@ -9,7 +9,7 @@ import (
 type Event int
 
 const (
-	None Event = iota - 1
+	None Event = iota
 	Apogee
 	Land
 )
@@ -17,109 +17,77 @@ const (
 // RulesSystem enforces rules of flight
 type RulesSystem struct {
 	world     *ecs.World
-	entities  []PhysicsEntity
-	hadApogee bool    // Track if apogee has been reached
-	maxAlt    float64 // Track max altitude for apogee detection
-	lastEvent Event
-	cfg       *config.Config
+	config    *config.Config
+	entities  []*PhysicsEntity
+	hasApogee bool
+}
+
+// GetLastEvent returns the last event detected by the rules system
+func (s *RulesSystem) GetLastEvent() Event {
+	if s.hasApogee {
+		return Apogee
+	}
+	return None
 }
 
 // NewRulesSystem creates a new RulesSystem
-func NewRulesSystem(world *ecs.World, cfg *config.Config) *RulesSystem {
+func NewRulesSystem(world *ecs.World, config *config.Config) *RulesSystem {
 	return &RulesSystem{
 		world:     world,
-		entities:  make([]PhysicsEntity, 0),
-		hadApogee: false,
-		maxAlt:    0,
-		cfg:       cfg,
+		config:    config,
+		entities:  make([]*PhysicsEntity, 0),
+		hasApogee: false,
 	}
 }
 
 // Add adds a physics entity to the rules system
-func (s *RulesSystem) Add(pe *PhysicsEntity) {
-	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset})
+func (s *RulesSystem) Add(entity *PhysicsEntity) {
+	s.entities = append(s.entities, entity)
 }
 
 // Update applies rules of flight to entities
-func (s *RulesSystem) Update(dt float32) error {
-	event := s.processRules(dt)
-	// Process the event if needed
-	switch event {
-	case Apogee:
-		// Do something
-	case Land:
-		// Do something
+func (s *RulesSystem) Update(dt float64) error {
+	for _, entity := range s.entities {
+		s.processRules(entity)
 	}
-
 	return nil
 }
 
-func (s *RulesSystem) processRules(dt float32) Event {
-	// Move existing Update logic here
-	for _, entity := range s.entities {
-		if event := s.checkApogee(entity); event != None {
-			return event
-		}
-		if evt := s.checkLanding(entity); evt == Land {
-			s.lastEvent = Land
-			return Land
-		}
-	}
-	return None
-}
-
-func (s *RulesSystem) checkApogee(entity PhysicsEntity) Event {
-	currentAlt := entity.Position.Vec.Y
-	currentVel := entity.Velocity.Vec.Y
-
-	if currentAlt > s.maxAlt {
-		s.maxAlt = currentAlt
-	}
-
-	if !s.hadApogee && currentVel < 0 {
-		motorState := entity.Motor.GetState()
-		if motorState == "BURNOUT" || motorState == "COASTING" {
-			s.hadApogee = true
-			return Apogee
-		}
-	}
-	return None
-}
-
-func (s *RulesSystem) checkLanding(entity PhysicsEntity) Event {
-	// Only check for landing if we've passed apogee
-	if !s.hadApogee {
+func (s *RulesSystem) processRules(entity *PhysicsEntity) Event {
+	if entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Motor == nil {
 		return None
 	}
 
-	// Check if we've hit the ground with downward velocity
-	if entity.Position.Vec.Y <= s.cfg.Simulation.GroundTolerance && entity.Velocity.Vec.Y < 0 {
-		// Capture the ground-hit velocity before zeroing
-		s.lastEvent = Land
+	// Check for apogee
+	if !s.hasApogee &&
+		entity.Motor.GetState() == "BURNOUT" &&
+		entity.Velocity.Vec.Y < 0 {
+		s.hasApogee = true
+		return Apogee
+	}
+
+	// Check for landing after apogee
+	if s.hasApogee && entity.Position.Vec.Y <= 0 {
+		entity.Position.Vec.Y = 0
 		entity.Velocity.Vec.Y = 0
 		entity.Acceleration.Vec.Y = 0
-		entity.Motor.SetState("LANDED")
 		return Land
 	}
-	return None
-}
 
-// Provide a getter for last event
-func (s *RulesSystem) GetLastEvent() Event {
-	return s.lastEvent
+	return None
 }
 
 // Remove removes an entity from the rules system
 func (s *RulesSystem) Remove(basic ecs.BasicEntity) {
-	var deleteIndex = -1
+	var del = -1
 	for i, e := range s.entities {
 		if e.Entity.ID() == basic.ID() {
-			deleteIndex = i
+			del = i
 			break
 		}
 	}
-	if deleteIndex >= 0 {
-		s.entities = append(s.entities[:deleteIndex], s.entities[deleteIndex+1:]...)
+	if del >= 0 {
+		s.entities = append(s.entities[:del], s.entities[del+1:]...)
 	}
 }
 

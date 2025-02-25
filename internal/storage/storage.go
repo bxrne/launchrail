@@ -6,7 +6,16 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
+)
+
+// StorageType is the type of storage service (MOTION, EVENTS, etc.)
+type StorageType string
+
+const (
+	// MOTION storage StorageType
+	MOTION StorageType = "MOTION"
+	// EVENTS storage StorageType
+	EVENTS StorageType = "EVENTS"
 )
 
 // Storage is a service that writes csv's to disk
@@ -21,8 +30,7 @@ type Storage struct {
 }
 
 // NewStorage creates a new storage service
-func NewStorage(baseDir, dir string) (*Storage, error) {
-
+func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -38,9 +46,7 @@ func NewStorage(baseDir, dir string) (*Storage, error) {
 		return nil, err
 	}
 
-	// Create the file with timestamp
-	timestamp := time.Now().Format("20060102_150405")
-	filePath := filepath.Join(dir, fmt.Sprintf("simulation_%s.csv", timestamp))
+	filePath := filepath.Join(dir, fmt.Sprintf("%s.csv", store))
 
 	file, err := os.Create(filePath)
 	if err != nil {

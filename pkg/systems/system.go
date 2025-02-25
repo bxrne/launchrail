@@ -9,7 +9,7 @@ import (
 // System defines the interface that all systems must implement
 type System interface {
 	// Update updates the system state
-	Update(dt float32) error
+	Update(dt float64) error
 
 	// Add adds entities to the system
 	Add(pe *PhysicsEntity)
@@ -28,4 +28,5 @@ type PhysicsEntity struct {
 	Bodytube     *components.Bodytube
 	Nosecone     *components.Nosecone
 	Finset       *components.TrapezoidFinset
+	Parachute    *components.Parachute
 }

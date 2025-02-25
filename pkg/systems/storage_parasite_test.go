@@ -21,7 +21,7 @@ func setupStorageTest(t *testing.T) (*storage.Storage, func()) {
 	dir := "test_data"
 	fullBaseDir := filepath.Join(homeDir, baseDir)
 
-	storage, err := storage.NewStorage(baseDir, dir)
+	storage, err := storage.NewStorage(baseDir, dir, storage.MOTION)
 	require.NoError(t, err)
 
 	headers := []string{"Time", "Altitude", "Velocity", "Acceleration", "Thrust"}

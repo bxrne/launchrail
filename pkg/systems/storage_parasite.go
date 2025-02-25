@@ -64,12 +64,12 @@ func (s *StorageParasiteSystem) Priority() int {
 }
 
 // Update the StorageParasiteSystem
-func (s *StorageParasiteSystem) Update(dt float32) error {
+func (s *StorageParasiteSystem) Update(dt float64) error {
 	// No need to track time here - data comes from simulation state
 	return nil
 }
 
 // Add adds entities to the system
 func (s *StorageParasiteSystem) Add(pe *PhysicsEntity) {
-	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset})
+	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset, pe.Parachute})
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/pkg/diff"
 	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/simulation"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
@@ -38,8 +39,11 @@ func main() {
 	}
 	log.Debug("OpenRocket data loaded", "Version", orkData.Version, "Creator", orkData.Creator)
 
+	simulationHash := diff.CombinedHash(orkData.Bytes(), cfg.Bytes())
+	log.Debug("Simulation hash", "Hash", simulationHash)
+
 	// Initialize storage with headers
-	storage, err := storage.NewStorage(cfg.App.BaseDir, "motion")
+	storage, err := storage.NewStorage(cfg.App.BaseDir, simulationHash, storage.MOTION)
 	if err != nil {
 		log.Fatal("Failed to create storage", "error", err)
 	}

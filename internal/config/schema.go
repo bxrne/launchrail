@@ -115,3 +115,8 @@ func (c *Config) String() map[string]string {
 
 	return marshalled
 }
+
+// Bytes returns the configuration as bytes
+func (c *Config) Bytes() []byte {
+	return []byte(fmt.Sprintf("%+v", c))
+}

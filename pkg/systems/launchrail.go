@@ -42,11 +42,11 @@ func NewLaunchRailSystem(world *ecs.World, length, angle, orientation float64) *
 
 // Add adds a physics entity to the launch rail system
 func (s *LaunchRailSystem) Add(pe *PhysicsEntity) {
-	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset})
+	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset, pe.Parachute})
 }
 
 // Update applies launch rail constraints to entities
-func (s *LaunchRailSystem) Update(dt float32) error {
+func (s *LaunchRailSystem) Update(dt float64) error {
 	if !s.onRail {
 		return nil
 	}

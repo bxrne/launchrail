@@ -27,6 +27,12 @@ type AerodynamicSystem struct {
 	isa      *atmosphere.ISAModel
 }
 
+// GetAirDensity returns the air density at a given altitude
+func (a *AerodynamicSystem) GetAirDensity(altitude float64) float64 {
+	return float64(a.getAtmosphericData(float64(altitude)).density)
+}
+
+// NewAerodynamicSystem creates a new AerodynamicSystem
 func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Config) *AerodynamicSystem {
 	return &AerodynamicSystem{
 		world:    world,
@@ -48,8 +54,8 @@ func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericDat
 }
 
 // GetTemperature calculates the temperature at a given altitude
-func (a *AerodynamicSystem) getTemperature(altitude float32) float32 {
-	return float32(a.isa.GetTemperature(float64(altitude)))
+func (a *AerodynamicSystem) getTemperature(altitude float64) float64 {
+	return float64(a.isa.GetTemperature(float64(altitude)))
 }
 
 // CalculateDrag now handles atmospheric effects and Mach number
@@ -93,7 +99,7 @@ func calculateReferenceArea(nosecone *components.Nosecone, bodytube *components.
 }
 
 // Update implements parallel force calculation and application
-func (a *AerodynamicSystem) Update(dt float32) error {
+func (a *AerodynamicSystem) Update(dt float64) error {
 	workChan := make(chan PhysicsEntity, len(a.entities))
 	resultChan := make(chan types.Vector3, len(a.entities))
 
@@ -134,7 +140,7 @@ func (a *AerodynamicSystem) Update(dt float32) error {
 
 // Add adds entities to the system
 func (a *AerodynamicSystem) Add(as *PhysicsEntity) {
-	a.entities = append(a.entities, PhysicsEntity{as.Entity, as.Position, as.Velocity, as.Acceleration, as.Mass, as.Motor, as.Bodytube, as.Nosecone, as.Finset})
+	a.entities = append(a.entities, PhysicsEntity{as.Entity, as.Position, as.Velocity, as.Acceleration, as.Mass, as.Motor, as.Bodytube, as.Nosecone, as.Finset, as.Parachute})
 }
 
 // Priority returns the system priority
@@ -143,18 +149,20 @@ func (a *AerodynamicSystem) Priority() int {
 }
 
 // calculateSoundSpeed calculates the speed of sound at a given temperature
-func (a *AerodynamicSystem) GetSpeedOfSound(altitude float32) float32 {
+func (a *AerodynamicSystem) GetSpeedOfSound(altitude float64) float64 {
 	temperature := a.getTemperature(altitude)
 	if temperature <= 0 {
 		return 340.29 // Return sea level speed of sound as fallback
 	}
-	return float32(math.Sqrt(float64(1.4 * 287.05 * temperature)))
+	return float64(math.Sqrt(float64(1.4 * 287.05 * temperature)))
 }
 
 // calculateDragCoeff calculates the drag coefficient based on Mach number
 func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity PhysicsEntity) float64 {
 	// More accurate drag coefficient calculation
 	baseCd := 0.2 // Subsonic base drag
+
+	_ = entity // Placeholder for future drag coefficient calculations
 
 	// Add wave drag in transonic region
 	if mach > 0.8 && mach < 1.2 {

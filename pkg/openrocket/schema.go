@@ -17,6 +17,11 @@ type OpenrocketDocument struct {
 	Rocket  RocketDocument `xml:"rocket"`
 }
 
+// Bytes returns the byte representation of the OpenrocketDocument
+func (o *OpenrocketDocument) Bytes() []byte {
+	return []byte(fmt.Sprintf("%+v", o))
+}
+
 // Validate checks if the OpenrocketDocument is valid for this program
 func (o *OpenrocketDocument) Validate(cfg *config.Config) error {
 	// Check if the OpenRocket version matches the expected version

@@ -59,7 +59,7 @@ func TestPhysicsSystem_Update(t *testing.T) {
 		initialPos  types.Position
 		initialVel  types.Velocity
 		motorState  string
-		dt          float32
+		dt          float64
 		wantPosY    float64
 		wantVelY    float64
 		description string
