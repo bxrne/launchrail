@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/stretchr/testify/assert"
@@ -75,7 +76,11 @@ func TestInit(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ensure the file is closed after writing
-	s.Close()
+	err = s.Close()
+	require.NoError(t, err)
+
+	// Add a small delay to ensure the file system has enough time to flush the data
+	time.Sleep(100 * time.Millisecond)
 
 	homeDir, _ := os.UserHomeDir()
 	fullDir := filepath.Join(homeDir, baseDir, dir)
@@ -111,7 +116,11 @@ func TestWrite(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ensure the file is closed after writing
-	s.Close()
+	err = s.Close()
+	require.NoError(t, err)
+
+	// Add a small delay to ensure the file system has enough time to flush the data
+	time.Sleep(100 * time.Millisecond)
 
 	homeDir, _ := os.UserHomeDir()
 	fullDir := filepath.Join(homeDir, baseDir, dir)
