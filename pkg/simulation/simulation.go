@@ -167,24 +167,8 @@ func (s *Simulation) Run() error {
 	return nil
 }
 
-// updateSystems updates all systems in the simulation
-// NOSONAR
-func (s *Simulation) updateSystems() error {
-	// Create initial state
-	state := &systems.RocketState{
-		Time:         s.currentTime,
-		Altitude:     s.rocket.Position.Vec.Y,
-		Velocity:     s.rocket.Velocity.Vec.Y,
-		Acceleration: s.rocket.Acceleration.Vec.Y,
-	}
-
-	// Execute plugin BeforeSimStep hooks
-	for _, plugin := range s.pluginManager.GetPlugins() {
-		if err := plugin.BeforeSimStep(state); err != nil {
-			return fmt.Errorf("plugin %s BeforeSimStep error: %w", plugin.Name(), err)
-		}
-	}
-
+// updateCoreSystems updates the core systems in the simulation (no plugins)
+func (s *Simulation) updateCoreSystems(state *systems.RocketState) error {
 	// Update core systems
 	for _, system := range s.systems {
 		if err := system.Update(float32(s.config.Simulation.Step)); err != nil {
@@ -230,17 +214,42 @@ func (s *Simulation) updateSystems() error {
 		state.Acceleration = acc
 		state.Thrust = motorComp.GetThrust()
 		state.MotorState = motorComp.GetState()
-
-		// Execute plugin AfterSimStep hooks
-		for _, plugin := range s.pluginManager.GetPlugins() {
-			if err := plugin.AfterSimStep(state); err != nil {
-				return fmt.Errorf("plugin %s AfterSimStep error: %w", plugin.Name(), err)
-			}
-		}
-
-		// Send final state to channel
-		s.stateChan <- *state
 	}
+
+	return nil
+}
+
+// updateSystems updates all systems in the simulation
+func (s *Simulation) updateSystems() error {
+	// Create initial state
+	state := &systems.RocketState{
+		Time:         s.currentTime,
+		Altitude:     s.rocket.Position.Vec.Y,
+		Velocity:     s.rocket.Velocity.Vec.Y,
+		Acceleration: s.rocket.Acceleration.Vec.Y,
+	}
+
+	// Execute plugin BeforeSimStep hooks
+	for _, plugin := range s.pluginManager.GetPlugins() {
+		if err := plugin.BeforeSimStep(state); err != nil {
+			return fmt.Errorf("plugin %s BeforeSimStep error: %w", plugin.Name(), err)
+		}
+	}
+
+	// Update core systems
+	if err := s.updateCoreSystems(state); err != nil {
+		return err
+	}
+
+	// Execute plugin AfterSimStep hooks
+	for _, plugin := range s.pluginManager.GetPlugins() {
+		if err := plugin.AfterSimStep(state); err != nil {
+			return fmt.Errorf("plugin %s AfterSimStep error: %w", plugin.Name(), err)
+		}
+	}
+
+	// Send final state to channel
+	s.stateChan <- *state
 
 	return nil
 }
