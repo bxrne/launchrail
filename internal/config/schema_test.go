@@ -131,9 +131,12 @@ func TestConfigBytes(t *testing.T) {
 			Step:    0.00,
 			MaxTime: 0.00,
 		},
+		Plugins: config.Plugins{
+			Paths: []string{"fake_plugin.so"},
+		},
 	}
 
-	expected := "&{App:{Name:launchrail-test Version:0.0.0 BaseDir:/tmp} Logging:{Level:info} External:{OpenRocketVersion:15.03} Options:{MotorDesignation:G80-7T OpenRocketFile:test/fixtures/rocket.ork Launchrail:{Length:0 Angle:0 Orientation:0} Launchsite:{Latitude:0 Longitude:0 Altitude:0 Atmosphere:{ISAConfiguration:{SpecificGasConstant:287.05 GravitationalAccel:9.81 SeaLevelDensity:1.225 SeaLevelTemperature:288.15 SeaLevelPressure:101325 RatioSpecificHeats:1.4 TemperatureLapseRate:-0.0065}}}} Simulation:{Step:0 MaxTime:0 GroundTolerance:0}}"
+	expected := "&{App:{Name:launchrail-test Version:0.0.0 BaseDir:/tmp} Logging:{Level:info} External:{OpenRocketVersion:15.03} Options:{MotorDesignation:G80-7T OpenRocketFile:test/fixtures/rocket.ork Launchrail:{Length:0 Angle:0 Orientation:0} Launchsite:{Latitude:0 Longitude:0 Altitude:0 Atmosphere:{ISAConfiguration:{SpecificGasConstant:287.05 GravitationalAccel:9.81 SeaLevelDensity:1.225 SeaLevelTemperature:288.15 SeaLevelPressure:101325 RatioSpecificHeats:1.4 TemperatureLapseRate:-0.0065}}}} Simulation:{Step:0 MaxTime:0 GroundTolerance:0} Plugins:{Paths:[fake_plugin.so]}}"
 	actual := string(cfg.Bytes())
 	if expected != actual {
 		t.Errorf("Expected %s, got %s", expected, actual)
