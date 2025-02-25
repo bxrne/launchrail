@@ -177,6 +177,15 @@ func (s *Simulation) updateCoreSystems(state *systems.RocketState) error {
 		}
 	}
 
+	// Apply parachute effects if deployed
+	if parachute := s.rocket.GetComponent("parachute").(*components.Parachute); parachute.Deployed {
+		// Apply additional drag force from parachute
+		rho := s.aerodynamicSystem.GetAirDensity(float32(s.rocket.Position.Vec.Y))
+		vel := s.rocket.Velocity.Vec.Y
+		dragForce := -0.5 * float64(rho) * parachute.DragCoefficient * parachute.Area * vel * math.Abs(vel)
+		s.rocket.Acceleration.Vec.Y += dragForce / s.rocket.Mass.Value
+	}
+
 	// Calculate velocity and acceleration
 	vel := s.rocket.Velocity.Vec.Y
 	acc := s.rocket.Acceleration.Vec.Y

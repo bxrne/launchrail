@@ -122,3 +122,13 @@ func (p *Parachute) GetVolume() float64 {
 func (p *Parachute) GetSurfaceArea() float64 {
 	return 0.0
 }
+
+// IsDeployed returns whether the parachute is currently deployed
+func (p *Parachute) IsDeployed() bool {
+	return p.Deployed
+}
+
+// Deploy deploys the parachute
+func (p *Parachute) Deploy() {
+	p.Deployed = true
+}

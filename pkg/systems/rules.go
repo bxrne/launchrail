@@ -3,6 +3,7 @@ package systems
 import (
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/pkg/components"
 )
 
 // Event represents a significant event in flight
@@ -55,9 +56,12 @@ func (s *RulesSystem) Update(dt float32) error {
 }
 
 func (s *RulesSystem) processRules(dt float32) Event {
-	// Move existing Update logic here
 	for _, entity := range s.entities {
 		if event := s.checkApogee(entity); event != None {
+			// Deploy parachute if trigger is set to apogee
+			if entity.Parachute.Trigger == components.ParachuteTriggerApogee {
+				entity.Parachute.Deployed = true
+			}
 			return event
 		}
 		if evt := s.checkLanding(entity); evt == Land {

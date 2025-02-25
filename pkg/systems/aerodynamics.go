@@ -27,6 +27,12 @@ type AerodynamicSystem struct {
 	isa      *atmosphere.ISAModel
 }
 
+// GetAirDensity returns the air density at a given altitude
+func (a *AerodynamicSystem) GetAirDensity(altitude float32) float32 {
+	return float32(a.getAtmosphericData(float64(altitude)).density)
+}
+
+// NewAerodynamicSystem creates a new AerodynamicSystem
 func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Config) *AerodynamicSystem {
 	return &AerodynamicSystem{
 		world:    world,
