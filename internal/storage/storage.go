@@ -63,9 +63,15 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 
 	// If it's a new file, seek to start. If existing file, seek to end
 	if fileInfo.Size() == 0 {
-		file.Seek(0, 0)
+		_, err = file.Seek(0, 0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to seek file: %v", err)
+		}
 	} else {
-		file.Seek(0, 2) // Seek to end for append
+		_, err = file.Seek(0, 2) // Seek to end for append
+		if err != nil {
+			return nil, fmt.Errorf("failed to seek file: %v", err)
+		}
 	}
 
 	return &Storage{
