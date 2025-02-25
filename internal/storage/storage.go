@@ -93,6 +93,9 @@ func (s *Storage) Init(headers []string) error {
 		return fmt.Errorf("failed to write headers: %v", err)
 	}
 	s.writer.Flush()
+	if err := s.writer.Error(); err != nil {
+		return fmt.Errorf("failed to flush headers: %v", err)
+	}
 	return nil
 }
 
