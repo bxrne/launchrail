@@ -29,14 +29,18 @@ type Storage struct {
 	file     *os.File
 }
 
-// NewStorage creates a new storage service
+// NewStorage creates a new storage service.
+// If the provided baseDir is not absolute, it is prepended with the user's home directory.
 func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
+	// If baseDir is not absolute, prepend the user's home directory.
+	if !filepath.IsAbs(baseDir) {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, err
+		}
+		baseDir = filepath.Join(homeDir, baseDir)
 	}
 
-	baseDir = filepath.Join(homeDir, baseDir)
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return nil, err
 	}
@@ -48,8 +52,8 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 
 	filePath := filepath.Join(dir, fmt.Sprintf("%s.csv", store))
 
-	// Open file with write-only and append flags for proper behavior on Windows.
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	// Open file in read/write mode with append flag.
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create/open file: %v", err)
 	}
@@ -63,7 +67,7 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 	}, nil
 }
 
-// Init initializes the storage service with headers
+// Init initializes the storage service with headers.
 func (s *Storage) Init(headers []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -79,7 +83,7 @@ func (s *Storage) Init(headers []string) error {
 	return nil
 }
 
-// Write writes a record to the storage service
+// Write writes a record to the storage service.
 func (s *Storage) Write(data []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -88,13 +92,11 @@ func (s *Storage) Write(data []string) error {
 		return fmt.Errorf("data length (%d) does not match headers length (%d)", len(data), len(s.headers))
 	}
 
-	// Write record and immediately flush to ensure it's written to disk
 	if err := s.writer.Write(data); err != nil {
 		return fmt.Errorf("failed to write data: %v", err)
 	}
 	s.writer.Flush()
 
-	// Check for flush errors
 	if err := s.writer.Error(); err != nil {
 		return fmt.Errorf("failed to flush data: %v", err)
 	}
@@ -102,7 +104,7 @@ func (s *Storage) Write(data []string) error {
 	return nil
 }
 
-// Close closes the storage service
+// Close closes the storage service.
 func (s *Storage) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -123,7 +125,7 @@ func (s *Storage) Close() error {
 	return nil
 }
 
-// GetFilePath returns the file path of the storage service
+// GetFilePath returns the file path of the storage service.
 func (s *Storage) GetFilePath() string {
 	return s.filePath
 }
