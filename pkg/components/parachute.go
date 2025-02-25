@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/EngoEngine/ecs"
@@ -18,7 +19,19 @@ type Parachute struct {
 	DragCoefficient float64
 	Strands         int
 	Area            float64
+	Trigger         ParachuteTrigger
+	Deployed        bool
 }
+
+// ParachuteTrigger represents the trigger configuration of the parachute
+type ParachuteTrigger string
+
+const (
+	// ParachuteTriggerNone represents no trigger
+	ParachuteTriggerNone ParachuteTrigger = "none"
+	// ParachuteTriggerApogee represents an apogee trigger
+	ParachuteTriggerApogee ParachuteTrigger = "apogee"
+)
 
 // String returns a string representation of the Parachute struct
 func (p *Parachute) String() string {
@@ -27,14 +40,15 @@ func (p *Parachute) String() string {
 }
 
 // NewParachute creates a new parachute instance
-func NewParachute(id ecs.BasicEntity, diameter, dragCoefficient float64, strands int) *Parachute {
+func NewParachute(id ecs.BasicEntity, diameter, dragCoefficient float64, strands int, trigger ParachuteTrigger) *Parachute {
 	return &Parachute{
 		ID:              id,
 		Position:        types.Vector3{X: 0, Y: 0, Z: 0},
 		Diameter:        diameter,
 		DragCoefficient: dragCoefficient,
 		Strands:         strands,
-		Area:            0.25 * 3.14159 * diameter * diameter,
+		Area:            0.25 * math.Pi * diameter * diameter,
+		Trigger:         trigger,
 	}
 }
 
@@ -69,6 +83,7 @@ func NewParachuteFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument)
 		DragCoefficient: drag,
 		Strands:         orkParachute.LineCount,
 		Area:            0.25 * 3.14159 * orkParachute.Diameter * orkParachute.Diameter,
+		Trigger:         ParachuteTrigger(orkParachute.DeployEvent),
 	}, nil
 }
 
