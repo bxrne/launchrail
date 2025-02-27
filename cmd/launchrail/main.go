@@ -43,14 +43,14 @@ func main() {
 	log.Debug("Simulation hash", "Hash", simulationHash)
 
 	// Initialize storage with headers
-	storage, err := storage.NewStorage(cfg.App.BaseDir, simulationHash, storage.MOTION)
+	motion_storage, err := storage.NewStorage(cfg.App.BaseDir, simulationHash, storage.MOTION)
 	if err != nil {
 		log.Fatal("Failed to create storage", "error", err)
 	}
-	defer storage.Close()
+	defer motion_storage.Close()
 
 	// Set headers for storage of motion data
-	err = storage.Init([]string{
+	err = motion_storage.Init([]string{
 		"time",
 		"altitude",     // Changed from position_y for clarity
 		"velocity",     // Changed from velocity_y for clarity
@@ -62,13 +62,33 @@ func main() {
 	}
 
 	// Configure logger with additional debug level
-	log.Debug("Storage initialized",
-		"path", storage.GetFilePath(),
+	log.Debug("Motion storage initialized",
+		"path", motion_storage.GetFilePath(),
 		"headers", fmt.Sprintf("%v", []string{"time", "altitude", "velocity", "acceleration", "thrust"}),
 	)
 
+	events_storage, err := storage.NewStorage(cfg.App.BaseDir, simulationHash, storage.EVENTS)
+	if err != nil {
+		log.Fatal("Failed to create storage", "error", err)
+	}
+
+	err = events_storage.Init([]string{
+		"time",
+		"motor_status",
+		"parachute_status",
+	})
+
+	if err != nil {
+		log.Fatal("Failed to init storage", "error", err)
+	}
+
+	log.Debug("Events storage initialized",
+		"path", events_storage.GetFilePath(),
+		"headers", fmt.Sprintf("%v", []string{"time", "motor_status", "parachute_status"}),
+	)
+
 	// Create simulation
-	sim, err := simulation.NewSimulation(cfg, log, storage)
+	sim, err := simulation.NewSimulation(cfg, log, &storage.Stores{Motion: motion_storage, Events: events_storage})
 	if err != nil {
 		log.Fatal("Failed to create simulation", "Error", err)
 	}
@@ -88,5 +108,6 @@ func main() {
 	}
 
 	log.Info("Simulation completed successfully")
-	log.Debug("Simulation data saved", "Path", storage.GetFilePath())
+	log.Debug("Simulation motion data saved", "Path", motion_storage.GetFilePath())
+	log.Debug("Simulation events data saved", "Path", events_storage.GetFilePath())
 }

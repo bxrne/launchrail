@@ -20,27 +20,28 @@ import (
 
 // Simulation represents a rocket simulation
 type Simulation struct {
-	world                 *ecs.World
-	physicsSystem         *systems.PhysicsSystem
-	aerodynamicSystem     *systems.AerodynamicSystem
-	logParasiteSystem     *systems.LogParasiteSystem
-	storageParasiteSystem *systems.StorageParasiteSystem
-	rulesSystem           *systems.RulesSystem
-	rocket                *entities.RocketEntity
-	config                *config.Config
-	logger                *logf.Logger
-	updateChan            chan struct{}
-	doneChan              chan struct{}
-	stateChan             chan systems.RocketState
-	stats                 *stats.FlightStats
-	launchRailSystem      *systems.LaunchRailSystem
-	currentTime           float64
-	systems               []systems.System
-	pluginManager         *plugin.Manager
+	world             *ecs.World
+	physicsSystem     *systems.PhysicsSystem
+	aerodynamicSystem *systems.AerodynamicSystem
+	logParasiteSystem *systems.LogParasiteSystem
+	motionParasite    *systems.StorageParasiteSystem
+	eventsParasite    *systems.StorageParasiteSystem
+	rulesSystem       *systems.RulesSystem
+	rocket            *entities.RocketEntity
+	config            *config.Config
+	logger            *logf.Logger
+	updateChan        chan struct{}
+	doneChan          chan struct{}
+	stateChan         chan systems.RocketState
+	stats             *stats.FlightStats
+	launchRailSystem  *systems.LaunchRailSystem
+	currentTime       float64
+	systems           []systems.System
+	pluginManager     *plugin.Manager
 }
 
 // NewSimulation creates a new rocket simulation
-func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.Storage) (*Simulation, error) {
+func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores) (*Simulation, error) {
 	world := &ecs.World{}
 
 	sim := &Simulation{
@@ -74,13 +75,15 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.St
 		cfg.Options.Launchrail.Orientation,
 	)
 
-	// Initialize parasite systems
+	// Initialize parasite systems with specific store types
 	sim.logParasiteSystem = systems.NewLogParasiteSystem(world, log)
-	sim.storageParasiteSystem = systems.NewStorageParasiteSystem(world, motionStore)
+	sim.motionParasite = systems.NewStorageParasiteSystem(world, stores.Motion, storage.MOTION)
+	sim.eventsParasite = systems.NewStorageParasiteSystem(world, stores.Events, storage.EVENTS)
 
 	// Start parasites
 	sim.logParasiteSystem.Start(sim.stateChan)
-	sim.storageParasiteSystem.Start(sim.stateChan)
+	sim.motionParasite.Start(sim.stateChan)
+	sim.eventsParasite.Start(sim.stateChan)
 
 	sim.stats = stats.NewFlightStats()
 
@@ -91,7 +94,7 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, motionStore *storage.St
 		sim.rulesSystem,
 		sim.launchRailSystem,
 		sim.logParasiteSystem,
-		sim.storageParasiteSystem,
+		sim.motionParasite,
 	}
 
 	return sim, nil
@@ -128,7 +131,7 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	s.rulesSystem.Add(sysEntity)
 	s.launchRailSystem.Add(sysEntity)
 	s.logParasiteSystem.Add(sysEntity)
-	s.storageParasiteSystem.Add(sysEntity)
+	s.motionParasite.Add(sysEntity)
 
 	return nil
 }
@@ -137,7 +140,7 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 func (s *Simulation) Run() error {
 	defer func() {
 		s.logParasiteSystem.Stop()
-		s.storageParasiteSystem.Stop()
+		s.motionParasite.Stop()
 	}()
 
 	// Validate simulation parameters
@@ -237,12 +240,14 @@ func (s *Simulation) updateCoreSystems(state *systems.RocketState) error {
 
 // updateSystems updates all systems in the simulation
 func (s *Simulation) updateSystems() error {
-	// Create initial state
+	// Create initial state with parachute status
+	parachute := s.rocket.GetComponent("parachute").(*components.Parachute)
 	state := &systems.RocketState{
-		Time:         s.currentTime,
-		Altitude:     s.rocket.Position.Vec.Y,
-		Velocity:     s.rocket.Velocity.Vec.Y,
-		Acceleration: s.rocket.Acceleration.Vec.Y,
+		Time:              s.currentTime,
+		Altitude:          s.rocket.Position.Vec.Y,
+		Velocity:          s.rocket.Velocity.Vec.Y,
+		Acceleration:      s.rocket.Acceleration.Vec.Y,
+		ParachuteDeployed: parachute.IsDeployed(),
 	}
 
 	// Execute plugin BeforeSimStep hooks

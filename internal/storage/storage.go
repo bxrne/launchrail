@@ -29,6 +29,12 @@ type Storage struct {
 	file     *os.File
 }
 
+// Stores is a collection of storage services
+type Stores struct {
+	Motion *Storage
+	Events *Storage
+}
+
 // NewStorage creates a new storage service.
 // If the provided baseDir is not absolute, it is prepended with the user's home directory.
 func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error) {
