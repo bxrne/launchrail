@@ -20,10 +20,14 @@ type RulesSystem struct {
 	config    *config.Config
 	entities  []*PhysicsEntity
 	hasApogee bool
+	hasLanded bool // Add this field
 }
 
 // GetLastEvent returns the last event detected by the rules system
 func (s *RulesSystem) GetLastEvent() Event {
+	if s.hasLanded {
+		return Land
+	}
 	if s.hasApogee {
 		return Apogee
 	}
@@ -63,14 +67,20 @@ func (s *RulesSystem) processRules(entity *PhysicsEntity) Event {
 		entity.Motor.GetState() == "BURNOUT" &&
 		entity.Velocity.Vec.Y < 0 {
 		s.hasApogee = true
+		// Deploy parachute if it exists and is triggered by apogee
+		if entity.Parachute != nil && entity.Parachute.Trigger == "apogee" {
+			entity.Parachute.Deploy()
+		}
 		return Apogee
 	}
 
-	// Check for landing after apogee
-	if s.hasApogee && entity.Position.Vec.Y <= 0 {
+	// Check for landing after apogee using ground tolerance
+	groundTolerance := s.config.Simulation.GroundTolerance
+	if s.hasApogee && entity.Position.Vec.Y <= groundTolerance && !s.hasLanded {
 		entity.Position.Vec.Y = 0
 		entity.Velocity.Vec.Y = 0
 		entity.Acceleration.Vec.Y = 0
+		s.hasLanded = true
 		return Land
 	}
 

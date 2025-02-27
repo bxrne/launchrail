@@ -65,32 +65,36 @@ func (s *LaunchRailSystem) Update(dt float64) error {
 			thrust = entity.Motor.GetThrust()
 		}
 
-		netForce := thrust - (entity.Mass.Value * gravity)
-		if netForce <= 0 {
-			// Hold rocket on rail, zero out motion
-			entity.Acceleration.Vec.X = 0
-			entity.Acceleration.Vec.Y = 0
+		// Calculate forces along rail direction
+		netForceAlongRail := thrust*math.Cos(angleRad) - entity.Mass.Value*gravity*math.Sin(angleRad)
+
+		if netForceAlongRail <= 0 {
+			// Hold rocket on rail at initial position
+			entity.Position.Vec.X = 0
+			entity.Position.Vec.Y = 0
 			entity.Velocity.Vec.X = 0
 			entity.Velocity.Vec.Y = 0
+			entity.Acceleration.Vec.X = 0
+			entity.Acceleration.Vec.Y = 0
 		} else {
-			// Rocket can leave rail
-			entity.Acceleration.Vec.X = netForce / entity.Mass.Value * math.Sin(angleRad)
-			entity.Acceleration.Vec.Y = netForce / entity.Mass.Value * math.Cos(angleRad)
-			entity.Velocity.Vec.X += entity.Acceleration.Vec.X * float64(dt)
-			entity.Velocity.Vec.Y += entity.Acceleration.Vec.Y * float64(dt)
-			entity.Position.Vec.X += entity.Velocity.Vec.X * float64(dt)
-			entity.Position.Vec.Y += entity.Velocity.Vec.Y * float64(dt)
-		}
+			// Apply forces along rail direction
+			entity.Acceleration.Vec.X = netForceAlongRail / entity.Mass.Value * math.Sin(angleRad)
+			entity.Acceleration.Vec.Y = netForceAlongRail / entity.Mass.Value * math.Cos(angleRad)
 
-		// Update position along rail
-		distanceAlongRail := math.Sqrt(
-			entity.Position.Vec.X*entity.Position.Vec.X +
-				entity.Position.Vec.Y*entity.Position.Vec.Y)
+			// Update velocity and position
+			entity.Velocity.Vec.X += entity.Acceleration.Vec.X * dt
+			entity.Velocity.Vec.Y += entity.Acceleration.Vec.Y * dt
+			entity.Position.Vec.X += entity.Velocity.Vec.X * dt
+			entity.Position.Vec.Y += entity.Velocity.Vec.Y * dt
 
-		// Check if we've reached end of rail
-		if distanceAlongRail >= s.rail.Length {
-			s.onRail = false
-			return nil
+			// Check if we've reached end of rail
+			distanceAlongRail := math.Sqrt(
+				entity.Position.Vec.X*entity.Position.Vec.X +
+					entity.Position.Vec.Y*entity.Position.Vec.Y)
+
+			if distanceAlongRail >= s.rail.Length {
+				s.onRail = false
+			}
 		}
 	}
 	return nil

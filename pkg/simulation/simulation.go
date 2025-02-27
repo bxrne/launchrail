@@ -146,17 +146,23 @@ func (s *Simulation) Run() error {
 	}
 
 	for {
-
 		if err := s.updateSystems(); err != nil {
 			return err
 		}
-		// Stop if landed
+
+		// Stop if landed - check rules system state
 		if s.rulesSystem.GetLastEvent() == systems.Land {
 			s.logger.Info("Rocket has landed; stopping simulation")
 			break
 		}
+
 		s.currentTime += s.config.Simulation.Step
 
+		// Also add a maximum time check to prevent infinite loops
+		if s.currentTime >= s.config.Simulation.MaxTime {
+			s.logger.Info("Reached maximum simulation time")
+			break
+		}
 	}
 
 	// Print stats after landing

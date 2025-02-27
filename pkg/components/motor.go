@@ -171,7 +171,12 @@ func (m *Motor) GetThrust() float64 {
 		return 0
 	}
 
-	return m.thrust
+	thrust := m.interpolateThrust(m.elapsedTime)
+	if math.IsNaN(thrust) || thrust < 0 {
+		return 0
+	}
+
+	return thrust
 }
 
 // IsCoasting returns true if the motor has completed its burn
@@ -221,36 +226,27 @@ func (m *Motor) Type() string {
 }
 
 func (m *Motor) interpolateThrust(totalDt float64) float64 {
-	// Add epsilon for floating point comparison
-	const eps = 1e-10
-
 	// Early exit conditions
-	if m.isCoasting || totalDt >= m.burnTime-eps {
+	if m.isCoasting || totalDt >= m.burnTime {
 		m.isCoasting = true
 		m.thrust = 0
 		m.state = MotorBurnout
 		return 0
 	}
 
-	// Handle time before first data point
-	if totalDt <= m.Thrustcurve[0][0] {
-		return m.Thrustcurve[0][1]
-	}
-
-	// Linear interpolation between points
+	// Find the appropriate thrust curve segment
 	for i := 0; i < len(m.Thrustcurve)-1; i++ {
 		t1, thrust1 := m.Thrustcurve[i][0], m.Thrustcurve[i][1]
 		t2, thrust2 := m.Thrustcurve[i+1][0], m.Thrustcurve[i+1][1]
 
-		if t1 <= totalDt && totalDt < t2 {
-			// Linear interpolation formula
+		if totalDt >= t1 && totalDt < t2 {
+			// Linear interpolation
 			ratio := (totalDt - t1) / (t2 - t1)
-			interpolatedThrust := thrust1 + ratio*(thrust2-thrust1)
-			return math.Max(0, interpolatedThrust) // Ensure non-negative thrust
+			return thrust1 + ratio*(thrust2-thrust1)
 		}
 	}
 
-	// Past end of thrust curve
+	// If we're past the last point, return 0
 	return 0
 }
 

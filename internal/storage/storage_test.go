@@ -5,37 +5,36 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// setupTest uses t.TempDir() to create an isolated temporary directory.
 func setupTest(t *testing.T) (string, string, func()) {
-	homeDir, err := os.UserHomeDir()
-	require.NoError(t, err)
-
-	baseDir := "test_base"
+	baseDir := t.TempDir() // Use temporary directory provided by the test framework.
 	dir := "test_dir"
-	fullBaseDir := filepath.Join(homeDir, baseDir)
-
 	cleanup := func() {
-		os.RemoveAll(fullBaseDir)
+		// Increase delay to ensure the filesystem has time to flush data.
+		time.Sleep(500 * time.Millisecond)
+		// t.TempDir() is automatically cleaned up.
 	}
-
 	return baseDir, dir, cleanup
 }
 
-// TEST: GIVEN a base directory and a directory name WHEN NewStorage for MOTION data is called THEN a new storage instance is created
 func TestNewStorageMotion(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
 
-	_, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
 	require.NoError(t, err)
 
-	homeDir, _ := os.UserHomeDir()
-	expectedBaseDir := filepath.Join(homeDir, baseDir)
+	// Close the storage before cleanup
+	require.NoError(t, s.Close())
+
+	expectedBaseDir := baseDir // baseDir is already absolute.
 	expectedDir := filepath.Join(expectedBaseDir, dir)
 
 	_, err = os.Stat(expectedBaseDir)
@@ -44,16 +43,17 @@ func TestNewStorageMotion(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TEST: GIVEN a base directory and a directory name WHEN NewStorage for EVENTS data is called THEN a new storage instance is created
 func TestNewStorageEvents(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
 
-	_, err := storage.NewStorage(baseDir, dir, storage.EVENTS)
+	s, err := storage.NewStorage(baseDir, dir, storage.EVENTS)
 	require.NoError(t, err)
 
-	homeDir, _ := os.UserHomeDir()
-	expectedBaseDir := filepath.Join(homeDir, baseDir)
+	// Close the storage before cleanup
+	require.NoError(t, s.Close())
+
+	expectedBaseDir := baseDir
 	expectedDir := filepath.Join(expectedBaseDir, dir)
 
 	_, err = os.Stat(expectedBaseDir)
@@ -62,7 +62,6 @@ func TestNewStorageEvents(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TEST: GIVEN a base directory and a directory name WHEN NewStorage is called THEN a new storage instance is created
 func TestInit(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
@@ -74,11 +73,14 @@ func TestInit(t *testing.T) {
 	err = s.Init(headers)
 	require.NoError(t, err)
 
-	homeDir, _ := os.UserHomeDir()
-	fullDir := filepath.Join(homeDir, baseDir, dir)
+	// Close to flush and release the file
+	require.NoError(t, s.Close())
 
+	// Remove sleep as it's no longer needed since we properly close the file
+	fullDir := filepath.Join(baseDir, dir)
 	files, err := os.ReadDir(fullDir)
 	require.NoError(t, err)
+	require.NotEmpty(t, files, "expected at least one file in %s", fullDir)
 
 	filePath := filepath.Join(fullDir, files[0].Name())
 	file, err := os.Open(filePath)
@@ -91,7 +93,6 @@ func TestInit(t *testing.T) {
 	assert.Equal(t, headers, readHeaders)
 }
 
-// TEST: GIVEN a base directory and a directory name WHEN NewStorage is called THEN a new storage instance is created
 func TestWrite(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
@@ -107,11 +108,13 @@ func TestWrite(t *testing.T) {
 	err = s.Write(data)
 	require.NoError(t, err)
 
-	homeDir, _ := os.UserHomeDir()
-	fullDir := filepath.Join(homeDir, baseDir, dir)
+	require.NoError(t, s.Close())
 
+	// Remove sleep as it's no longer needed
+	fullDir := filepath.Join(baseDir, dir)
 	files, err := os.ReadDir(fullDir)
 	require.NoError(t, err)
+	require.NotEmpty(t, files, "expected at least one file in %s", fullDir)
 
 	filePath := filepath.Join(fullDir, files[0].Name())
 	file, err := os.Open(filePath)
@@ -119,7 +122,7 @@ func TestWrite(t *testing.T) {
 	defer file.Close()
 
 	reader := csv.NewReader(file)
-	_, err = reader.Read()
+	_, err = reader.Read() // read headers
 	require.NoError(t, err)
 
 	readData, err := reader.Read()
@@ -127,13 +130,15 @@ func TestWrite(t *testing.T) {
 	assert.Equal(t, data, readData)
 }
 
-// TEST: GIVEN a base directory and a directory name WHEN NewStorage is called THEN a new storage instance is created
 func TestWriteInvalidData(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
 
 	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
 	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, s.Close())
+	}()
 
 	headers := []string{"Column1", "Column2"}
 	err = s.Init(headers)
