@@ -29,8 +29,7 @@ func (p *WindEffectPlugin) Version() string {
 
 func (p *WindEffectPlugin) BeforeSimStep(state *systems.RocketState) error {
 	// Apply wind effect based on altitude
-	windEffect := p.windSpeed * math.Sin(state.Time)
-	state.Velocity += windEffect * 0.1 // Apply 10% of wind effect
+	_ = p.windSpeed * math.Sin(state.Time)
 	return nil
 }
 

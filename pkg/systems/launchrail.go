@@ -69,7 +69,7 @@ func (s *LaunchRailSystem) Update(dt float64) error {
 		netForceAlongRail := thrust*math.Cos(angleRad) - entity.Mass.Value*gravity*math.Sin(angleRad)
 
 		if netForceAlongRail <= 0 {
-			// Hold rocket on rail at initial position
+			// Should only prevent negative motion, not reset to zero
 			entity.Position.Vec.X = 0
 			entity.Position.Vec.Y = 0
 			entity.Velocity.Vec.X = 0

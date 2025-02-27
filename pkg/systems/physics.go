@@ -112,10 +112,12 @@ func (s *PhysicsSystem) Update(dt float64) error {
 func (s *PhysicsSystem) handleGroundCollision(entity *PhysicsEntity) bool {
 	groundTolerance := s.groundTolerance
 	if entity.Position.Vec.Y <= groundTolerance {
-		entity.Position.Vec.Y = 0
-		entity.Velocity.Vec.Y = 0
-		entity.Acceleration.Vec.Y = 0
-		return true
+		if entity.Position.Vec.Y <= 0 {
+			entity.Position.Vec.Y = 0
+			entity.Velocity.Vec.Y = 0
+			entity.Acceleration.Vec.Y = 0
+			return true
+		}
 	}
 	return false
 }
