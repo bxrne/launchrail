@@ -1,0 +1,35 @@
+name: Benchmark
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.23
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Build the simulation
+        run: go build ./cmd/... ./pkg/... ./internal/...
+
+      - name: Run tests without coverage
+        if: matrix.os != 'ubuntu-latest'
+        run: go test -bench=./...
