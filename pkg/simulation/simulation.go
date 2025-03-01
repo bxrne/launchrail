@@ -80,14 +80,15 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 	sim.motionParasite = systems.NewStorageParasiteSystem(world, stores.Motion, storage.MOTION)
 	sim.eventsParasite = systems.NewStorageParasiteSystem(world, stores.Events, storage.EVENTS)
 
-	// Start parasites
+	// Start parasites (only once)
 	sim.logParasiteSystem.Start(sim.stateChan)
 	sim.motionParasite.Start(sim.stateChan)
 	sim.eventsParasite.Start(sim.stateChan)
 
 	sim.stats = stats.NewFlightStats()
 
-	// Add systems to the slice
+	// Add systems to the slice - Note: we should NOT add the event parasite here
+	// as it's meant to be independent
 	sim.systems = []systems.System{
 		sim.physicsSystem,
 		sim.aerodynamicSystem,

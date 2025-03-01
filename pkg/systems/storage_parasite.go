@@ -36,7 +36,7 @@ func (s *StorageParasiteSystem) Start(dataChan chan RocketState) {
 	if s.storeType == storage.MOTION {
 		s.storage.Init([]string{"Time", "Altitude", "Velocity", "Acceleration", "Thrust"})
 	} else if s.storeType == storage.EVENTS {
-		s.storage.Init([]string{"Time", "Event", "Details"})
+		s.storage.Init([]string{"time", "motor_status", "parachute_status"})
 	}
 
 	go s.processData()
@@ -64,28 +64,18 @@ func (s *StorageParasiteSystem) processData() {
 					fmt.Printf("Error writing motion record: %v\n", err)
 				}
 			} else if s.storeType == storage.EVENTS {
-				// Log motor state changes
-				if state.MotorState != "" {
-					record := []string{
-						fmt.Sprintf("%.6f", state.Time),
-						"MOTOR_STATE",
-						state.MotorState,
-					}
-					if err := s.storage.Write(record); err != nil {
-						fmt.Printf("Error writing event record: %v\n", err)
-					}
+				parachuteStatus := "NOT_DEPLOYED"
+				if state.ParachuteDeployed {
+					parachuteStatus = "DEPLOYED"
 				}
 
-				// Log parachute deployment
-				if state.ParachuteDeployed {
-					record := []string{
-						fmt.Sprintf("%.6f", state.Time),
-						"PARACHUTE",
-						"DEPLOYED",
-					}
-					if err := s.storage.Write(record); err != nil {
-						fmt.Printf("Error writing event record: %v\n", err)
-					}
+				record := []string{
+					fmt.Sprintf("%.6f", state.Time),
+					state.MotorState,
+					parachuteStatus,
+				}
+				if err := s.storage.Write(record); err != nil {
+					fmt.Printf("Error writing event record: %v\n", err)
 				}
 			}
 		case <-s.done:
