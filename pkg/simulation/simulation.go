@@ -82,8 +82,15 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 
 	// Start parasites (only once)
 	sim.logParasiteSystem.Start(sim.stateChan)
-	sim.motionParasite.Start(sim.stateChan)
-	sim.eventsParasite.Start(sim.stateChan)
+	err := sim.motionParasite.Start(sim.stateChan)
+	if err != nil {
+		return nil, err
+	}
+
+	err = sim.eventsParasite.Start(sim.stateChan)
+	if err != nil {
+		return nil, err
+	}
 
 	sim.stats = stats.NewFlightStats()
 

@@ -56,7 +56,8 @@ func TestStorageParasiteSystem_ProcessData(t *testing.T) {
 	system := systems.NewStorageParasiteSystem(world, s, storage.MOTION)
 
 	dataChan := make(chan systems.RocketState)
-	system.Start(dataChan)
+	err := system.Start(dataChan)
+	require.NoError(t, err)
 
 	testState := systems.RocketState{
 		Time:         1.0,
