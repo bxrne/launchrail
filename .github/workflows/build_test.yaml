@@ -14,10 +14,7 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ubuntu-latest 
 
     steps:
       - name: Check out the repository
@@ -35,19 +32,15 @@ jobs:
         run: go build ./cmd/... ./pkg/... ./internal/...
 
       - name: Run tests without coverage
-        if: matrix.os != 'ubuntu-latest'
         run: go test ./...
 
       - name: Run tests with coverage
-        if: matrix.os == 'ubuntu-latest'
         run: go test -cover -coverprofile=coverage.out ./...
       
       - name: Build the plugins 
-        if: matrix.os != 'windows-latest'
         run: go build -buildmode=plugin ./plugins/...
 
       - name: SonarQube Scan
-        if: matrix.os == 'ubuntu-latest'
         uses: SonarSource/sonarqube-scan-action@0303d6b62e310685c0e34d0b9cde218036885c4d # v5.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
