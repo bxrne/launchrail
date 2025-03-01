@@ -9,15 +9,27 @@ import (
 	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/simulation"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
+	"github.com/stretchr/testify/require"
 	"github.com/zerodha/logf"
 )
 
 // TEST: GIVEN nothing WHEN NewSimulation is called THEN a new Simulation is returned
 func TestNewSimulation(t *testing.T) {
 	cfg := &config.Config{}
-	log := &logf.Logger{}
-	motionStore := &storage.Storage{}
-	sim, err := simulation.NewSimulation(cfg, log, motionStore)
+	log := logf.New(logf.Opts{})
+
+	motionStore, err := storage.NewStorage(".launchrail", "test", storage.MOTION)
+	require.NoError(t, err)
+
+	eventsStore, err := storage.NewStorage(".launchrail", "test", storage.EVENTS)
+	require.NoError(t, err)
+
+	stores := &storage.Stores{
+		Motion: motionStore,
+		Events: eventsStore,
+	}
+
+	sim, err := simulation.NewSimulation(cfg, &log, stores)
 	if err != nil {
 		t.Errorf("Error creating new simulation: %v", err)
 	}
@@ -31,7 +43,7 @@ func TestLoadRocket(t *testing.T) {
 	cfg := &config.Config{}
 	log := &logf.Logger{}
 	motionStore := &storage.Storage{}
-	sim, _ := simulation.NewSimulation(cfg, log, motionStore)
+	sim, _ := simulation.NewSimulation(cfg, log, &storage.Stores{Motion: motionStore})
 
 	orkData, err := openrocket.Load("../../testdata/openrocket/l1.ork", "23.09")
 	if err != nil {
@@ -61,7 +73,7 @@ func TestRun(t *testing.T) {
 	cfg := &config.Config{}
 	log := &logf.Logger{}
 	motionStore := &storage.Storage{}
-	sim, _ := simulation.NewSimulation(cfg, log, motionStore)
+	sim, _ := simulation.NewSimulation(cfg, log, &storage.Stores{Motion: motionStore})
 
 	orkData, err := openrocket.Load("../../testdata/openrocket/l1.ork", "23.09")
 	if err != nil {
