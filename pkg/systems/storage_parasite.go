@@ -29,17 +29,26 @@ func NewStorageParasiteSystem(world *ecs.World, storage *storage.Storage, storeT
 }
 
 // Start the StorageParasiteSystem
-func (s *StorageParasiteSystem) Start(dataChan chan RocketState) {
+func (s *StorageParasiteSystem) Start(dataChan chan RocketState) error {
 	s.dataChan = dataChan
 
 	// Initialize headers based on store type
-	if s.storeType == storage.MOTION {
-		s.storage.Init([]string{"Time", "Altitude", "Velocity", "Acceleration", "Thrust"})
-	} else if s.storeType == storage.EVENTS {
-		s.storage.Init([]string{"time", "motor_status", "parachute_status"})
+	switch s.storeType {
+	case storage.MOTION:
+		err := s.storage.Init([]string{"Time", "Altitude", "Velocity", "Acceleration", "Thrust"})
+		if err != nil {
+			return fmt.Errorf("error initializing storage: %v", err)
+		}
+	case storage.EVENTS:
+		err := s.storage.Init([]string{"time", "motor_status", "parachute_status"})
+		if err != nil {
+			return fmt.Errorf("error initializing storage: %v", err)
+		}
 	}
 
 	go s.processData()
+
+	return nil
 }
 
 // Stop the StorageParasiteSystem
