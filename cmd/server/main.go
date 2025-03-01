@@ -34,7 +34,11 @@ func main() {
 	})
 
 	r.POST("/simulate", func(c *gin.Context) {
-		go simManager.Run() // Run simulation asynchronously
+		go func() {
+			if err := simManager.Run(); err != nil {
+				log.Error("Simulation failed", "error", err)
+			}
+		}()
 		c.JSON(http.StatusAccepted, gin.H{
 			"message": "Simulation started",
 		})
