@@ -29,6 +29,12 @@ type Storage struct {
 	file     *os.File
 }
 
+// Stores is a collection of storage services
+type Stores struct {
+	Motion *Storage
+	Events *Storage
+}
+
 // NewStorage creates a new storage service.
 // If the provided baseDir is not absolute, it is prepended with the user's home directory.
 func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error) {
@@ -73,6 +79,18 @@ func (s *Storage) Init(headers []string) error {
 	defer s.mu.Unlock()
 
 	s.headers = headers
+
+	// Truncate file before writing headers
+	if err := s.file.Truncate(0); err != nil {
+		return fmt.Errorf("failed to truncate file: %v", err)
+	}
+
+	// Reset file pointer to beginning
+	if _, err := s.file.Seek(0, 0); err != nil {
+		return fmt.Errorf("failed to seek to beginning: %v", err)
+	}
+
+	// Write headers
 	if err := s.writer.Write(headers); err != nil {
 		return fmt.Errorf("failed to write headers: %v", err)
 	}
@@ -80,6 +98,7 @@ func (s *Storage) Init(headers []string) error {
 	if err := s.writer.Error(); err != nil {
 		return fmt.Errorf("failed to flush headers: %v", err)
 	}
+
 	return nil
 }
 

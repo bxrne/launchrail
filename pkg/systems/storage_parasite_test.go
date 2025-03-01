@@ -39,10 +39,10 @@ func setupStorageTest(t *testing.T) (*storage.Storage, func()) {
 // TEST: GIVEN a new StorageParasiteSystem WHEN initialized THEN it should be created with correct defaults
 func TestNewStorageParasiteSystem(t *testing.T) {
 	world := &ecs.World{}
-	storage, cleanup := setupStorageTest(t)
+	s, cleanup := setupStorageTest(t)
 	defer cleanup()
 
-	system := systems.NewStorageParasiteSystem(world, storage)
+	system := systems.NewStorageParasiteSystem(world, s, storage.MOTION)
 
 	assert.NotNil(t, system)
 }
@@ -50,13 +50,14 @@ func TestNewStorageParasiteSystem(t *testing.T) {
 // TEST: GIVEN a running StorageParasiteSystem WHEN data is sent THEN it should write to storage
 func TestStorageParasiteSystem_ProcessData(t *testing.T) {
 	world := &ecs.World{}
-	storage, cleanup := setupStorageTest(t)
+	s, cleanup := setupStorageTest(t)
 	defer cleanup()
 
-	system := systems.NewStorageParasiteSystem(world, storage)
+	system := systems.NewStorageParasiteSystem(world, s, storage.MOTION)
 
 	dataChan := make(chan systems.RocketState)
-	system.Start(dataChan)
+	err := system.Start(dataChan)
+	require.NoError(t, err)
 
 	testState := systems.RocketState{
 		Time:         1.0,
@@ -80,10 +81,10 @@ func TestStorageParasiteSystem_ProcessData(t *testing.T) {
 // TEST: GIVEN a StorageParasiteSystem WHEN an entity is added THEN it should be stored in the system
 func TestStorageParasiteSystem_Add(t *testing.T) {
 	world := &ecs.World{}
-	storage, cleanup := setupStorageTest(t)
+	s, cleanup := setupStorageTest(t)
 	defer cleanup()
 
-	system := systems.NewStorageParasiteSystem(world, storage)
+	system := systems.NewStorageParasiteSystem(world, s, storage.MOTION)
 	e := ecs.NewBasic()
 
 	entity := systems.PhysicsEntity{
@@ -98,9 +99,9 @@ func TestStorageParasiteSystem_Add(t *testing.T) {
 // TEST: GIVEN a StorageParasiteSystem WHEN Priority is called THEN it should return correct priority
 func TestStorageParasiteSystem_Priority(t *testing.T) {
 	world := &ecs.World{}
-	storage, cleanup := setupStorageTest(t)
+	s, cleanup := setupStorageTest(t)
 	defer cleanup()
 
-	system := systems.NewStorageParasiteSystem(world, storage)
+	system := systems.NewStorageParasiteSystem(world, s, storage.MOTION)
 	assert.Equal(t, 1, system.Priority())
 }
