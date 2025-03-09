@@ -9,7 +9,7 @@ logging:
 simulation:
   step: 0.001
   max_time: 300.0
-  ground_tolerance: 0.03
+  ground_tolerance: 0.06
 
 plugins:
   paths:

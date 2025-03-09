@@ -23,6 +23,7 @@ type PhysicsEntity struct {
 	Position     *types.Position
 	Velocity     *types.Velocity
 	Acceleration *types.Acceleration
+	Orietation   *types.Orientation
 	Mass         *types.Mass
 	Motor        *components.Motor
 	Bodytube     *components.Bodytube

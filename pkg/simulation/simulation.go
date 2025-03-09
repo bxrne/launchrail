@@ -11,7 +11,6 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/entities"
 	"github.com/bxrne/launchrail/pkg/openrocket"
-	"github.com/bxrne/launchrail/pkg/stats"
 	"github.com/bxrne/launchrail/pkg/systems"
 
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
@@ -33,7 +32,6 @@ type Simulation struct {
 	updateChan        chan struct{}
 	doneChan          chan struct{}
 	stateChan         chan systems.RocketState
-	stats             *stats.FlightStats
 	launchRailSystem  *systems.LaunchRailSystem
 	currentTime       float64
 	systems           []systems.System
@@ -91,8 +89,6 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 	if err != nil {
 		return nil, err
 	}
-
-	sim.stats = stats.NewFlightStats()
 
 	// Add systems to the slice - Note: we should NOT add the event parasite here
 	// as it's meant to be independent
@@ -176,11 +172,6 @@ func (s *Simulation) Run() error {
 		}
 	}
 
-	// Print stats after landing
-	s.logger.Info("Flight Statistics",
-		"stats", s.stats.String(),
-	)
-
 	close(s.doneChan)
 	return nil
 }
@@ -219,15 +210,6 @@ func (s *Simulation) updateCoreSystems(state *systems.RocketState) error {
 	if math.IsNaN(mach) || math.IsInf(mach, 0) {
 		mach = 0
 	}
-
-	// Update statistics
-	s.stats.Update(
-		s.currentTime,
-		s.rocket.Position.Vec.Y,
-		vel,
-		acc,
-		mach,
-	)
 
 	// Update motor component
 	motorComp, ok := s.rocket.GetComponent("motor").(*components.Motor)

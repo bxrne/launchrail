@@ -15,8 +15,9 @@ type RocketEntity struct {
 	*types.Position
 	*types.Velocity
 	*types.Acceleration
+	*types.Orientation
 	*types.Mass
-	components map[string]interface{} // Change to map for easier lookup
+	components map[string]interface{}
 	mu         sync.RWMutex
 }
 
@@ -34,6 +35,7 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 		Position:     &types.Position{BasicEntity: basic},
 		Velocity:     &types.Velocity{BasicEntity: basic},
 		Acceleration: &types.Acceleration{BasicEntity: basic},
+		Orientation:  &types.Orientation{BasicEntity: basic},
 		Mass:         &types.Mass{BasicEntity: basic},
 		components:   make(map[string]interface{}),
 	}
