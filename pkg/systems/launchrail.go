@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/EngoEngine/ecs"
+	"github.com/bxrne/launchrail/pkg/states"
 )
 
 // LaunchRail represents a launch rail
@@ -16,7 +17,7 @@ type LaunchRail struct {
 // LaunchRailSystem constrains entities to a launch rail
 type LaunchRailSystem struct {
 	world     *ecs.World
-	entities  []PhysicsEntity
+	entities  []states.PhysicsState
 	rail      LaunchRail
 	onRail    bool
 	railExitY float64 // Y position at rail exit
@@ -29,7 +30,7 @@ func NewLaunchRailSystem(world *ecs.World, length, angle, orientation float64) *
 
 	return &LaunchRailSystem{
 		world:    world,
-		entities: make([]PhysicsEntity, 0),
+		entities: make([]states.PhysicsState, 0),
 		rail: LaunchRail{
 			Length:      length,
 			Angle:       angleRad,
@@ -41,9 +42,9 @@ func NewLaunchRailSystem(world *ecs.World, length, angle, orientation float64) *
 }
 
 // Add adds a physics entity to the launch rail system
-func (s *LaunchRailSystem) Add(pe *PhysicsEntity) {
+func (s *LaunchRailSystem) Add(pe *states.PhysicsState) {
 	s.entities = append(s.entities,
-		PhysicsEntity{
+		states.PhysicsState{
 			Entity:          pe.Entity,
 			Position:        pe.Position,
 			Velocity:        pe.Velocity,

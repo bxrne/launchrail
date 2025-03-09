@@ -11,8 +11,8 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/entities"
 	"github.com/bxrne/launchrail/pkg/openrocket"
+	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
-
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/zerodha/logf"
 )
@@ -31,7 +31,7 @@ type Simulation struct {
 	logger            *logf.Logger
 	updateChan        chan struct{}
 	doneChan          chan struct{}
-	stateChan         chan systems.RocketState
+	stateChan         chan *states.PhysicsState
 	launchRailSystem  *systems.LaunchRailSystem
 	currentTime       float64
 	systems           []systems.System
@@ -48,7 +48,7 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 		logger:        log,
 		updateChan:    make(chan struct{}),
 		doneChan:      make(chan struct{}),
-		stateChan:     make(chan systems.RocketState, 100),
+		stateChan:     make(chan *states.PhysicsState, 100),
 		pluginManager: plugin.NewManager(*log),
 	}
 
@@ -116,7 +116,7 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	s.rocket = entities.NewRocketEntity(s.world, orkData, motor)
 
 	// Create a single PhysicsEntity to reuse for all systems
-	sysEntity := &systems.PhysicsEntity{
+	sysEntity := &states.PhysicsState{
 		Entity:       s.rocket.BasicEntity,
 		Position:     s.rocket.Position,
 		Velocity:     s.rocket.Velocity,
@@ -177,7 +177,7 @@ func (s *Simulation) Run() error {
 }
 
 // updateCoreSystems updates the core systems in the simulation (no plugins)
-func (s *Simulation) updateCoreSystems(state *systems.RocketState) error {
+func (s *Simulation) updateCoreSystems(state *states.PhysicsState) error {
 	// Update core systems
 	for _, system := range s.systems {
 		if err := system.Update(float64(s.config.Simulation.Step)); err != nil {
@@ -186,43 +186,11 @@ func (s *Simulation) updateCoreSystems(state *systems.RocketState) error {
 	}
 
 	// Apply parachute effects if deployed
-	if parachute := s.rocket.GetComponent("parachute").(*components.Parachute); parachute.Deployed {
-		// Apply additional drag force from parachute
-		rho := s.aerodynamicSystem.GetAirDensity(float64(s.rocket.Position.Vec.Y))
-		vel := s.rocket.Velocity.Vec.Y
-		dragForce := -0.5 * float64(rho) * parachute.DragCoefficient * parachute.Area * vel * math.Abs(vel)
-		s.rocket.Acceleration.Vec.Y += dragForce / s.rocket.Mass.Value
-	}
-
-	// Calculate velocity and acceleration
-	vel := s.rocket.Velocity.Vec.Y
-	acc := s.rocket.Acceleration.Vec.Y
-	if math.IsNaN(acc) {
-		acc = 0
-	}
-
-	// Calculate Mach number
-	speedOfSound := s.aerodynamicSystem.GetSpeedOfSound(float64(s.rocket.Position.Vec.Y))
-	mach := 0.0
-	if speedOfSound > 1e-8 {
-		mach = vel / float64(speedOfSound)
-	}
-	if math.IsNaN(mach) || math.IsInf(mach, 0) {
-		mach = 0
-	}
-
-	// Update motor component
-	motorComp, ok := s.rocket.GetComponent("motor").(*components.Motor)
-	if ok {
-		if err := motorComp.Update(s.config.Simulation.Step); err != nil {
-			return fmt.Errorf("motor update error: %w", err)
-		}
-
-		// Update state with final values
-		state.Velocity = vel
-		state.Acceleration = acc
-		state.Thrust = motorComp.GetThrust()
-		state.MotorState = motorComp.GetState()
+	if state.Parachute.IsDeployed() {
+		rho := s.aerodynamicSystem.GetAirDensity(float64(state.Position.Vec.Y))
+		vel := state.Velocity.Vec.Y
+		dragForce := -0.5 * float64(rho) * state.Parachute.DragCoefficient * state.Parachute.Area * vel * math.Abs(vel)
+		state.Acceleration.Vec.Y += dragForce / state.Mass.Value
 	}
 
 	return nil
@@ -230,14 +198,19 @@ func (s *Simulation) updateCoreSystems(state *systems.RocketState) error {
 
 // updateSystems updates all systems in the simulation
 func (s *Simulation) updateSystems() error {
-	// Create initial state with parachute status
-	parachute := s.rocket.GetComponent("parachute").(*components.Parachute)
-	state := &systems.RocketState{
-		Time:              s.currentTime,
-		Altitude:          s.rocket.Position.Vec.Y,
-		Velocity:          s.rocket.Velocity.Vec.Y,
-		Acceleration:      s.rocket.Acceleration.Vec.Y,
-		ParachuteDeployed: parachute.IsDeployed(),
+	// Create state with current time
+	state := &states.PhysicsState{
+		Time:         s.currentTime,
+		Entity:       s.rocket.BasicEntity,
+		Position:     s.rocket.Position,
+		Velocity:     s.rocket.Velocity,
+		Acceleration: s.rocket.Acceleration,
+		Mass:         s.rocket.Mass,
+		Motor:        s.rocket.GetComponent("motor").(*components.Motor),
+		Bodytube:     s.rocket.GetComponent("bodytube").(*components.Bodytube),
+		Nosecone:     s.rocket.GetComponent("nosecone").(*components.Nosecone),
+		Finset:       s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
+		Parachute:    s.rocket.GetComponent("parachute").(*components.Parachute),
 	}
 
 	// Execute plugin BeforeSimStep hooks
@@ -260,7 +233,7 @@ func (s *Simulation) updateSystems() error {
 	}
 
 	// Send final state to channel
-	s.stateChan <- *state
+	s.stateChan <- state
 
 	return nil
 }

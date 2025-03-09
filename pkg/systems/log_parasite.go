@@ -2,6 +2,7 @@ package systems
 
 import (
 	"github.com/EngoEngine/ecs"
+	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/zerodha/logf"
 )
 
@@ -9,8 +10,8 @@ import (
 type LogParasiteSystem struct {
 	world    *ecs.World
 	logger   *logf.Logger
-	entities []PhysicsEntity
-	dataChan chan RocketState
+	entities []states.PhysicsState
+	dataChan chan *states.PhysicsState
 	done     chan struct{}
 }
 
@@ -19,13 +20,13 @@ func NewLogParasiteSystem(world *ecs.World, logger *logf.Logger) *LogParasiteSys
 	return &LogParasiteSystem{
 		world:    world,
 		logger:   logger,
-		entities: make([]PhysicsEntity, 0),
+		entities: make([]states.PhysicsState, 0),
 		done:     make(chan struct{}),
 	}
 }
 
 // Start the LogParasiteSystem
-func (s *LogParasiteSystem) Start(dataChan chan RocketState) {
+func (s *LogParasiteSystem) Start(dataChan chan *states.PhysicsState) {
 	s.dataChan = dataChan
 	go s.processData()
 }
@@ -42,11 +43,11 @@ func (s *LogParasiteSystem) processData() {
 		case state := <-s.dataChan:
 			s.logger.Debug("rocket_state",
 				"time", state.Time,
-				"altitude", state.Altitude,
-				"velocity", state.Velocity,
-				"acceleration", state.Acceleration,
-				"thrust", state.Thrust,
-				"motor_state", state.MotorState,
+				"altitude", state.Position.Vec.Y,
+				"velocity", state.Velocity.Vec.Y,
+				"acceleration", state.Acceleration.Vec.Y,
+				"thrust", state.Motor.GetThrust(),
+				"motor_state", state.Motor.GetState(),
 			)
 		case <-s.done:
 			return
@@ -66,9 +67,9 @@ func (s *LogParasiteSystem) Update(dt float64) error {
 }
 
 // Add adds entities to the system
-func (s *LogParasiteSystem) Add(pe *PhysicsEntity) {
+func (s *LogParasiteSystem) Add(pe *states.PhysicsState) {
 	s.entities = append(s.entities,
-		PhysicsEntity{
+		states.PhysicsState{
 			Entity:          pe.Entity,
 			Position:        pe.Position,
 			Velocity:        pe.Velocity,

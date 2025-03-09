@@ -5,14 +5,15 @@ import (
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/pkg/states"
 )
 
 // StorageParasiteSystem logs rocket state data to storage
 type StorageParasiteSystem struct {
 	world     *ecs.World
 	storage   *storage.Storage
-	entities  []PhysicsEntity
-	dataChan  chan RocketState
+	entities  []states.PhysicsState
+	dataChan  chan *states.PhysicsState
 	done      chan struct{}
 	storeType storage.StorageType
 }
@@ -22,14 +23,14 @@ func NewStorageParasiteSystem(world *ecs.World, storage *storage.Storage, storeT
 	return &StorageParasiteSystem{
 		world:     world,
 		storage:   storage,
-		entities:  make([]PhysicsEntity, 0),
+		entities:  make([]states.PhysicsState, 0),
 		done:      make(chan struct{}),
 		storeType: storeType,
 	}
 }
 
 // Start the StorageParasiteSystem
-func (s *StorageParasiteSystem) Start(dataChan chan RocketState) error {
+func (s *StorageParasiteSystem) Start(dataChan chan *states.PhysicsState) error {
 	s.dataChan = dataChan
 
 	s.storage.Init()
@@ -53,23 +54,23 @@ func (s *StorageParasiteSystem) processData() {
 			case storage.MOTION:
 				record := []string{
 					fmt.Sprintf("%.6f", state.Time),
-					fmt.Sprintf("%.6f", state.Altitude),
-					fmt.Sprintf("%.6f", state.Velocity),
-					fmt.Sprintf("%.6f", state.Acceleration),
-					fmt.Sprintf("%.6f", state.Thrust),
+					fmt.Sprintf("%.6f", state.Position.Vec.Y),
+					fmt.Sprintf("%.6f", state.Velocity.Vec.Y),
+					fmt.Sprintf("%.6f", state.Acceleration.Vec.Y),
+					fmt.Sprintf("%.6f", state.Motor.GetThrust()),
 				}
 				if err := s.storage.Write(record); err != nil {
 					fmt.Printf("Error writing motion record: %v\n", err)
 				}
 			case storage.EVENTS:
 				parachuteStatus := "NOT_DEPLOYED"
-				if state.ParachuteDeployed {
+				if state.Parachute.IsDeployed() {
 					parachuteStatus = "DEPLOYED"
 				}
 
 				record := []string{
 					fmt.Sprintf("%.6f", state.Time),
-					state.MotorState,
+					state.Motor.GetState(),
 					parachuteStatus,
 				}
 				if err := s.storage.Write(record); err != nil {
@@ -79,7 +80,6 @@ func (s *StorageParasiteSystem) processData() {
 			case storage.DYNAMICS:
 				record := []string{
 					fmt.Sprintf("%.6f", state.Time),
-					"0", // TODO: Add dynamics data
 					"0", // TODO: Add dynamics data
 					"0", // TODO: Add dynamics data
 					"0", // TODO: Add dynamics data
@@ -117,9 +117,9 @@ func (s *StorageParasiteSystem) Update(dt float64) error {
 }
 
 // Add adds entities to the system
-func (s *StorageParasiteSystem) Add(pe *PhysicsEntity) {
+func (s *StorageParasiteSystem) Add(pe *states.PhysicsState) {
 	s.entities = append(s.entities,
-		PhysicsEntity{
+		states.PhysicsState{
 			Entity:          pe.Entity,
 			Position:        pe.Position,
 			Velocity:        pe.Velocity,

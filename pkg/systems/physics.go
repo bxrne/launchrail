@@ -7,6 +7,7 @@ import (
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/barrowman"
+	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
 )
 
@@ -22,17 +23,17 @@ var (
 // PhysicsSystem calculates forces on entities
 type PhysicsSystem struct {
 	world           *ecs.World
-	entities        []*PhysicsEntity // Changed to store pointers
+	entities        []*states.PhysicsState // Changed to store pointers
 	cpCalculator    *barrowman.CPCalculator
 	workers         int
-	workChan        chan PhysicsEntity
+	workChan        chan states.PhysicsState
 	resultChan      chan types.Vector3
 	gravity         float64
 	groundTolerance float64
 }
 
 // calculateStabilityForces calculates stability forces for an entity
-func (s *PhysicsSystem) calculateStabilityForces(force *types.Vector3, stabilityMargin float64, entity PhysicsEntity) {
+func (s *PhysicsSystem) calculateStabilityForces(force *types.Vector3, stabilityMargin float64, entity states.PhysicsState) {
 	// Basic stability force calculation
 	const stabilityFactor = 0.1
 	_ = entity
@@ -59,9 +60,9 @@ func NewPhysicsSystem(world *ecs.World, cfg *config.Config) *PhysicsSystem {
 	workers := 4
 	return &PhysicsSystem{
 		world:           world,
-		entities:        make([]*PhysicsEntity, 0),
+		entities:        make([]*states.PhysicsState, 0),
 		workers:         workers,
-		workChan:        make(chan PhysicsEntity, workers),
+		workChan:        make(chan states.PhysicsState, workers),
 		resultChan:      make(chan types.Vector3, workers),
 		cpCalculator:    barrowman.NewCPCalculator(), // Initialize calculator
 		gravity:         cfg.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel,
@@ -72,7 +73,7 @@ func NewPhysicsSystem(world *ecs.World, cfg *config.Config) *PhysicsSystem {
 // Update applies forces to entities
 func (s *PhysicsSystem) Update(dt float64) error {
 	var wg sync.WaitGroup
-	workChan := make(chan *PhysicsEntity, len(s.entities)) // Changed to pointer channel
+	workChan := make(chan *states.PhysicsState, len(s.entities)) // Changed to pointer channel
 	resultChan := make(chan types.Vector3, len(s.entities))
 
 	// Launch multiple workers for concurrent force calculations
@@ -115,7 +116,7 @@ func (s *PhysicsSystem) Update(dt float64) error {
 	return nil
 }
 
-func (s *PhysicsSystem) handleGroundCollision(entity *PhysicsEntity) bool {
+func (s *PhysicsSystem) handleGroundCollision(entity *states.PhysicsState) bool {
 	groundTolerance := s.groundTolerance
 	if entity.Position.Vec.Y <= groundTolerance {
 		if entity.Position.Vec.Y <= 0 {
@@ -128,7 +129,7 @@ func (s *PhysicsSystem) handleGroundCollision(entity *PhysicsEntity) bool {
 	return false
 }
 
-func (s *PhysicsSystem) calculateNetForce(entity *PhysicsEntity, force types.Vector3) float64 {
+func (s *PhysicsSystem) calculateNetForce(entity *states.PhysicsState, force types.Vector3) float64 {
 	var netForce float64
 
 	// Add thrust if motor is active
@@ -170,7 +171,7 @@ func (s *PhysicsSystem) calculateNetForce(entity *PhysicsEntity, force types.Vec
 	return netForce
 }
 
-func (s *PhysicsSystem) updateEntityState(entity *PhysicsEntity, netForce float64, dt float64) {
+func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce float64, dt float64) {
 	entity.Acceleration.Vec.Y += netForce / entity.Mass.Value
 
 	// Semi-implicit Euler integration
@@ -186,7 +187,7 @@ func (s *PhysicsSystem) updateEntityState(entity *PhysicsEntity, netForce float6
 	entity.Position.Vec.Y = newPosition
 }
 
-func (s *PhysicsSystem) applyForce(entity *PhysicsEntity, force types.Vector3, dt float64) {
+func (s *PhysicsSystem) applyForce(entity *states.PhysicsState, force types.Vector3, dt float64) {
 	// Add nil checks for required components
 	if entity.Bodytube == nil || entity.Nosecone == nil || entity.Mass == nil {
 		return
@@ -213,7 +214,7 @@ func (s *PhysicsSystem) applyForce(entity *PhysicsEntity, force types.Vector3, d
 }
 
 // Add adds an entity to the system
-func (s *PhysicsSystem) Add(pe *PhysicsEntity) {
+func (s *PhysicsSystem) Add(pe *states.PhysicsState) {
 	s.entities = append(s.entities, pe) // Store pointer directly
 }
 

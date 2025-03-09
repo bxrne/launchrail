@@ -8,6 +8,7 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/atmosphere"
 	"github.com/bxrne/launchrail/pkg/components"
+	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
 )
 
@@ -22,7 +23,7 @@ type atmosphericData struct {
 // AerodynamicSystem calculates aerodynamic forces on entities
 type AerodynamicSystem struct {
 	world    *ecs.World
-	entities []PhysicsEntity
+	entities []states.PhysicsState
 	workers  int
 	isa      *atmosphere.ISAModel
 }
@@ -36,7 +37,7 @@ func (a *AerodynamicSystem) GetAirDensity(altitude float64) float64 {
 func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Config) *AerodynamicSystem {
 	return &AerodynamicSystem{
 		world:    world,
-		entities: make([]PhysicsEntity, 0),
+		entities: make([]states.PhysicsState, 0),
 		workers:  workers,
 		isa:      atmosphere.NewISAModel(&cfg.Options.Launchsite.Atmosphere.ISAConfiguration),
 	}
@@ -59,7 +60,7 @@ func (a *AerodynamicSystem) getTemperature(altitude float64) float64 {
 }
 
 // CalculateDrag now handles atmospheric effects and Mach number
-func (a *AerodynamicSystem) CalculateDrag(entity PhysicsEntity) types.Vector3 {
+func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vector3 {
 	// Get atmospheric data
 	atmData := a.getAtmosphericData(entity.Position.Vec.Y)
 
@@ -100,7 +101,7 @@ func calculateReferenceArea(nosecone *components.Nosecone, bodytube *components.
 
 // Update implements parallel force calculation and application
 func (a *AerodynamicSystem) Update(dt float64) error {
-	workChan := make(chan PhysicsEntity, len(a.entities))
+	workChan := make(chan states.PhysicsState, len(a.entities))
 	resultChan := make(chan types.Vector3, len(a.entities))
 
 	var wg sync.WaitGroup
@@ -139,8 +140,8 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 }
 
 // Add adds entities to the system
-func (a *AerodynamicSystem) Add(as *PhysicsEntity) {
-	a.entities = append(a.entities, PhysicsEntity{
+func (a *AerodynamicSystem) Add(as *states.PhysicsState) {
+	a.entities = append(a.entities, states.PhysicsState{
 		Entity:          as.Entity,
 		Position:        as.Position,
 		Velocity:        as.Velocity,
@@ -171,7 +172,7 @@ func (a *AerodynamicSystem) GetSpeedOfSound(altitude float64) float64 {
 }
 
 // calculateDragCoeff calculates the drag coefficient based on Mach number
-func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity PhysicsEntity) float64 {
+func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity states.PhysicsState) float64 {
 	// More accurate drag coefficient calculation
 	baseCd := 0.2 // Subsonic base drag
 

@@ -3,6 +3,7 @@ package systems
 import (
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/pkg/states"
 )
 
 // Event represents a significant event in flight
@@ -18,7 +19,7 @@ const (
 type RulesSystem struct {
 	world     *ecs.World
 	config    *config.Config
-	entities  []*PhysicsEntity
+	entities  []*states.PhysicsState
 	hasApogee bool
 	hasLanded bool // Add this field
 }
@@ -39,13 +40,13 @@ func NewRulesSystem(world *ecs.World, config *config.Config) *RulesSystem {
 	return &RulesSystem{
 		world:     world,
 		config:    config,
-		entities:  make([]*PhysicsEntity, 0),
+		entities:  make([]*states.PhysicsState, 0),
 		hasApogee: false,
 	}
 }
 
 // Add adds a physics entity to the rules system
-func (s *RulesSystem) Add(entity *PhysicsEntity) {
+func (s *RulesSystem) Add(entity *states.PhysicsState) {
 	s.entities = append(s.entities, entity)
 }
 
@@ -57,7 +58,7 @@ func (s *RulesSystem) Update(dt float64) error {
 	return nil
 }
 
-func (s *RulesSystem) processRules(entity *PhysicsEntity) Event {
+func (s *RulesSystem) processRules(entity *states.PhysicsState) Event {
 	if entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Motor == nil {
 		return None
 	}

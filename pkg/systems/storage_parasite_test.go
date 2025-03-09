@@ -86,7 +86,7 @@ func TestStorageParasiteSystem_Add(t *testing.T) {
 	system := systems.NewStorageParasiteSystem(world, s, storage.MOTION)
 	e := ecs.NewBasic()
 
-	entity := systems.PhysicsEntity{
+	entity := systems.simulation.PhysicsState{
 		Entity: &e,
 	}
 
