@@ -29,15 +29,35 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 
 	basic := ecs.NewBasic()
 
-	// Create base rocket entity
+	// Create base rocket entity with non-zero initial values
 	rocket := &RocketEntity{
-		BasicEntity:  &basic,
-		Position:     &types.Position{BasicEntity: basic},
-		Velocity:     &types.Velocity{BasicEntity: basic},
-		Acceleration: &types.Acceleration{BasicEntity: basic},
-		Orientation:  &types.Orientation{BasicEntity: basic},
-		Mass:         &types.Mass{BasicEntity: basic},
-		components:   make(map[string]interface{}),
+		BasicEntity: &basic,
+		Position: &types.Position{
+			BasicEntity: basic,
+			Vec:         types.Vector3{X: 0, Y: 0, Z: 0},
+		},
+		Velocity: &types.Velocity{
+			BasicEntity: basic,
+			Vec:         types.Vector3{X: 0, Y: 0, Z: 0},
+		},
+		Acceleration: &types.Acceleration{
+			BasicEntity: basic,
+			Vec:         types.Vector3{X: 0, Y: -9.81, Z: 0}, // Initialize with gravity
+		},
+		Orientation: &types.Orientation{
+			BasicEntity:     basic,
+			AngularVelocity: types.Vector3{X: 0, Y: 0, Z: 0},
+		},
+		Mass: &types.Mass{
+			BasicEntity: basic,
+			Value:       calculateTotalMass(orkData), // Set mass first
+		},
+		components: make(map[string]interface{}),
+	}
+
+	// Validate mass
+	if rocket.Mass.Value <= 0 {
+		return nil
 	}
 
 	// Store components with proper error handling
@@ -66,9 +86,6 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 		panic(err)
 	}
 	rocket.components["parachute"] = parachute
-
-	// Calculate total mass
-	rocket.Mass.Value = calculateTotalMass(orkData)
 
 	return rocket
 }

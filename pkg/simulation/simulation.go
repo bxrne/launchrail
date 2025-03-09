@@ -198,7 +198,11 @@ func (s *Simulation) updateCoreSystems(state *states.PhysicsState) error {
 
 // updateSystems updates all systems in the simulation
 func (s *Simulation) updateSystems() error {
-	// Create state with current time
+	if s.rocket == nil {
+		return fmt.Errorf("no rocket entity loaded")
+	}
+
+	// Create state with proper initialization from current rocket state
 	state := &states.PhysicsState{
 		Time:         s.currentTime,
 		Entity:       s.rocket.BasicEntity,
@@ -213,27 +217,52 @@ func (s *Simulation) updateSystems() error {
 		Parachute:    s.rocket.GetComponent("parachute").(*components.Parachute),
 	}
 
-	// Execute plugin BeforeSimStep hooks
-	for _, plugin := range s.pluginManager.GetPlugins() {
-		if err := plugin.BeforeSimStep(state); err != nil {
-			return fmt.Errorf("plugin %s BeforeSimStep error: %w", plugin.Name(), err)
-		}
-	}
-
-	// Update core systems
-	if err := s.updateCoreSystems(state); err != nil {
+	// Validate state before processing
+	if err := s.validateState(state); err != nil {
 		return err
 	}
 
-	// Execute plugin AfterSimStep hooks
-	for _, plugin := range s.pluginManager.GetPlugins() {
-		if err := plugin.AfterSimStep(state); err != nil {
-			return fmt.Errorf("plugin %s AfterSimStep error: %w", plugin.Name(), err)
+	// Execute systems in correct order
+	for _, system := range s.systems {
+		if err := system.Update(s.config.Simulation.Step); err != nil {
+			return fmt.Errorf("system %T update error: %w", system, err)
 		}
+
+		// Update rocket entity state after each system
+		s.rocket.Position = state.Position
+		s.rocket.Velocity = state.Velocity
+		s.rocket.Acceleration = state.Acceleration
+		s.rocket.Mass = state.Mass
 	}
 
-	// Send final state to channel
+	// Log state changes
+	s.logger.Debug("state_update",
+		"time", state.Time,
+		"pos_y", state.Position.Vec.Y,
+		"vel_y", state.Velocity.Vec.Y,
+		"acc_y", state.Acceleration.Vec.Y)
+
+	// Send state to channel
 	s.stateChan <- state
+
+	return nil
+}
+
+// Add validation function
+func (s *Simulation) validateState(state *states.PhysicsState) error {
+	if state.Position == nil || state.Velocity == nil ||
+		state.Acceleration == nil || state.Mass == nil {
+		return fmt.Errorf("invalid state: missing required components")
+	}
+
+	if state.Mass.Value <= 0 {
+		return fmt.Errorf("invalid state: mass must be positive")
+	}
+
+	if math.IsNaN(state.Position.Vec.Y) || math.IsNaN(state.Velocity.Vec.Y) ||
+		math.IsNaN(state.Acceleration.Vec.Y) {
+		return fmt.Errorf("invalid state: NaN values detected")
+	}
 
 	return nil
 }
