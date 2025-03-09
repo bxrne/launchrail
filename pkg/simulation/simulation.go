@@ -176,26 +176,6 @@ func (s *Simulation) Run() error {
 	return nil
 }
 
-// updateCoreSystems updates the core systems in the simulation (no plugins)
-func (s *Simulation) updateCoreSystems(state *states.PhysicsState) error {
-	// Update core systems
-	for _, system := range s.systems {
-		if err := system.Update(float64(s.config.Simulation.Step)); err != nil {
-			return err
-		}
-	}
-
-	// Apply parachute effects if deployed
-	if state.Parachute.IsDeployed() {
-		rho := s.aerodynamicSystem.GetAirDensity(float64(state.Position.Vec.Y))
-		vel := state.Velocity.Vec.Y
-		dragForce := -0.5 * float64(rho) * state.Parachute.DragCoefficient * state.Parachute.Area * vel * math.Abs(vel)
-		state.Acceleration.Vec.Y += dragForce / state.Mass.Value
-	}
-
-	return nil
-}
-
 // updateSystems updates all systems in the simulation
 func (s *Simulation) updateSystems() error {
 	if s.rocket == nil {
@@ -222,19 +202,6 @@ func (s *Simulation) updateSystems() error {
 		return err
 	}
 
-	// Execute systems
-	for _, system := range s.systems {
-		if err := system.Update(s.config.Simulation.Step); err != nil {
-			return fmt.Errorf("system %T update error: %w", system, err)
-		}
-	}
-
-	// Always propagate state back to rocket entity
-	s.rocket.Position.Vec = state.Position.Vec
-	s.rocket.Velocity.Vec = state.Velocity.Vec
-	s.rocket.Acceleration.Vec = state.Acceleration.Vec
-	s.rocket.Mass.Value = state.Mass.Value
-
 	// Execute plugins before systems
 	for _, plugin := range s.pluginManager.GetPlugins() {
 		if err := plugin.BeforeSimStep(state); err != nil {
@@ -242,14 +209,13 @@ func (s *Simulation) updateSystems() error {
 		}
 	}
 
-	// Execute systems in order and preserve state changes
+	// Execute systems in order and propagate state changes
 	for _, system := range s.systems {
 		if err := system.Update(s.config.Simulation.Step); err != nil {
 			return fmt.Errorf("system %T update error: %w", system, err)
 		}
 
-		// Important: Update the rocket entity's state after each system
-		// This ensures changes propagate between systems
+		// Propagate state changes to rocket entity after each system
 		s.rocket.Position.Vec = state.Position.Vec
 		s.rocket.Velocity.Vec = state.Velocity.Vec
 		s.rocket.Acceleration.Vec = state.Acceleration.Vec
