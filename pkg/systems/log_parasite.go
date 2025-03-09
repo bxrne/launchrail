@@ -67,5 +67,19 @@ func (s *LogParasiteSystem) Update(dt float64) error {
 
 // Add adds entities to the system
 func (s *LogParasiteSystem) Add(pe *PhysicsEntity) {
-	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset, pe.Parachute})
+	s.entities = append(s.entities,
+		PhysicsEntity{
+			Entity:          pe.Entity,
+			Position:        pe.Position,
+			Velocity:        pe.Velocity,
+			Acceleration:    pe.Acceleration,
+			Orientation:     pe.Orientation,
+			Mass:            pe.Mass,
+			Motor:           pe.Motor,
+			Bodytube:        pe.Bodytube,
+			Nosecone:        pe.Nosecone,
+			Finset:          pe.Finset,
+			Parachute:       pe.Parachute,
+			AngularVelocity: pe.AngularVelocity,
+		})
 }

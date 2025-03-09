@@ -104,6 +104,12 @@ func (s *PhysicsSystem) Update(dt float64) error {
 	i := 0
 	for force := range resultChan {
 		s.applyForce(s.entities[i], force, dt)
+		if s.entities[i].Orientation != nil {
+			// Integrate orientation with AngularVelocity
+			s.entities[i].Orientation.Quat.Integrate(
+				s.entities[i].Orientation.AngularVelocity, dt,
+			)
+		}
 		i++
 	}
 	return nil

@@ -140,7 +140,20 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 
 // Add adds entities to the system
 func (a *AerodynamicSystem) Add(as *PhysicsEntity) {
-	a.entities = append(a.entities, PhysicsEntity{as.Entity, as.Position, as.Velocity, as.Acceleration, as.Mass, as.Motor, as.Bodytube, as.Nosecone, as.Finset, as.Parachute})
+	a.entities = append(a.entities, PhysicsEntity{
+		Entity:          as.Entity,
+		Position:        as.Position,
+		Velocity:        as.Velocity,
+		Acceleration:    as.Acceleration,
+		Orientation:     as.Orientation,
+		Mass:            as.Mass,
+		Motor:           as.Motor,
+		Bodytube:        as.Bodytube,
+		Nosecone:        as.Nosecone,
+		Finset:          as.Finset,
+		Parachute:       as.Parachute,
+		AngularVelocity: as.AngularVelocity,
+	})
 }
 
 // Priority returns the system priority

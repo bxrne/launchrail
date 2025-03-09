@@ -85,3 +85,33 @@ func (q *Quaternion) Normalize() *Quaternion {
 func (q *Quaternion) Magnitude() float64 {
 	return q.X*q.X + q.Y*q.Y + q.Z*q.Z + q.W*q.W
 }
+
+// Integrate increments q by the angular velocity (radians/sec) over dt
+func (q *Quaternion) Integrate(omega Vector3, dt float64) *Quaternion {
+	// Small-angle approximation
+	halfDt := dt * 0.5
+	mag := math.Sqrt(omega.X*omega.X + omega.Y*omega.Y + omega.Z*omega.Z)
+	if mag == 0 {
+		return q
+	}
+
+	// Axis components
+	ax := omega.X / mag
+	ay := omega.Y / mag
+	az := omega.Z / mag
+
+	thetaOverTwo := mag * halfDt
+	sinTerm := math.Sin(thetaOverTwo)
+
+	dq := Quaternion{
+		W: math.Cos(thetaOverTwo),
+		X: ax * sinTerm,
+		Y: ay * sinTerm,
+		Z: az * sinTerm,
+	}
+
+	// q = q * dq (post multiplication)
+	newQ := q.Multiply(&dq).Normalize()
+	q.X, q.Y, q.Z, q.W = newQ.X, newQ.Y, newQ.Z, newQ.W
+	return q
+}
