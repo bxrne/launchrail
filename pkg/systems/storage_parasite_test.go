@@ -24,8 +24,7 @@ func setupStorageTest(t *testing.T) (*storage.Storage, func()) {
 	storage, err := storage.NewStorage(baseDir, dir, storage.MOTION)
 	require.NoError(t, err)
 
-	headers := []string{"Time", "Altitude", "Velocity", "Acceleration", "Thrust"}
-	err = storage.Init(headers)
+	err = storage.Init()
 	require.NoError(t, err)
 
 	cleanup := func() {

@@ -69,8 +69,7 @@ func TestInit(t *testing.T) {
 	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
 	require.NoError(t, err)
 
-	headers := []string{"Column1", "Column2", "Column3"}
-	err = s.Init(headers)
+	err = s.Init()
 	require.NoError(t, err)
 
 	// Close to flush and release the file
@@ -90,7 +89,7 @@ func TestInit(t *testing.T) {
 	reader := csv.NewReader(file)
 	readHeaders, err := reader.Read()
 	require.NoError(t, err)
-	assert.Equal(t, headers, readHeaders)
+	assert.Equal(t, storage.StorageHeaders[storage.MOTION], readHeaders)
 }
 
 func TestWrite(t *testing.T) {
@@ -100,11 +99,10 @@ func TestWrite(t *testing.T) {
 	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
 	require.NoError(t, err)
 
-	headers := []string{"Column1", "Column2", "Column3"}
-	err = s.Init(headers)
+	err = s.Init()
 	require.NoError(t, err)
 
-	data := []string{"Value1", "Value2", "Value3"}
+	data := []string{"Value1", "Value2", "Value3", "Value4", "Value5"}
 	err = s.Write(data)
 	require.NoError(t, err)
 
@@ -140,12 +138,11 @@ func TestWriteInvalidData(t *testing.T) {
 		require.NoError(t, s.Close())
 	}()
 
-	headers := []string{"Column1", "Column2"}
-	err = s.Init(headers)
+	err = s.Init()
 	require.NoError(t, err)
 
 	data := []string{"Value1", "Value2", "Value3"}
 	err = s.Write(data)
 	require.Error(t, err)
-	assert.EqualError(t, err, "data length (3) does not match headers length (2)")
+	assert.EqualError(t, err, "data length (3) does not match headers length (5)")
 }
