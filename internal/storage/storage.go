@@ -16,14 +16,29 @@ const (
 	MOTION StorageType = "MOTION"
 	// EVENTS storage StorageType
 	EVENTS StorageType = "EVENTS"
+	// DYNAMICS storage StorageType
+	DYNAMICS StorageType = "DYNAMICS"
 )
+
+// StorageHeaders is a map of columns for storage types
+var StorageHeaders = map[StorageType][]string{
+	MOTION: {
+		"time", "altitude", "velocity", "acceleration", "thrust",
+	},
+	EVENTS: {
+		"time", "motor_status", "parachute_status",
+	},
+	DYNAMICS: {
+		"time", "position_x", "position_y", "position_z", "velocity_x", "velocity_y", "velocity_z", "acceleration_x", "acceleration_y", "acceleration_z", "orientation_x", "orientation_y", "orientation_z", "orientation_w",
+	},
+}
 
 // Storage is a service that writes csv's to disk
 type Storage struct {
 	baseDir  string
 	dir      string
+	store    StorageType
 	mu       sync.RWMutex
-	headers  []string
 	filePath string
 	writer   *csv.Writer
 	file     *os.File
@@ -31,8 +46,9 @@ type Storage struct {
 
 // Stores is a collection of storage services
 type Stores struct {
-	Motion *Storage
-	Events *Storage
+	Motion   *Storage
+	Events   *Storage
+	Dynamics *Storage
 }
 
 // NewStorage creates a new storage service.
@@ -67,6 +83,7 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 	return &Storage{
 		baseDir:  baseDir,
 		dir:      dir,
+		store:    store,
 		filePath: filePath,
 		file:     file,
 		writer:   csv.NewWriter(file),
@@ -74,11 +91,9 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 }
 
 // Init initializes the storage service with headers.
-func (s *Storage) Init(headers []string) error {
+func (s *Storage) Init() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	s.headers = headers
 
 	// Truncate file before writing headers
 	if err := s.file.Truncate(0); err != nil {
@@ -91,6 +106,7 @@ func (s *Storage) Init(headers []string) error {
 	}
 
 	// Write headers
+	headers := StorageHeaders[s.store]
 	if err := s.writer.Write(headers); err != nil {
 		return fmt.Errorf("failed to write headers: %v", err)
 	}
@@ -107,8 +123,8 @@ func (s *Storage) Write(data []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if len(data) != len(s.headers) {
-		return fmt.Errorf("data length (%d) does not match headers length (%d)", len(data), len(s.headers))
+	if len(data) != len(StorageHeaders[s.store]) {
+		return fmt.Errorf("data length (%d) does not match headers length (%d)", len(data), len(StorageHeaders[s.store]))
 	}
 
 	if err := s.writer.Write(data); err != nil {

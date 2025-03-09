@@ -76,15 +76,13 @@ func (m *Manager) Initialize() error {
 }
 
 func (m *Manager) initializeStorages() error {
-	// Initialize motion storage	
+	// Initialize motion storage
 	motionStorage, err := storage.NewStorage(m.cfg.App.BaseDir, m.simHash, storage.MOTION)
 	if err != nil {
 		return err
 	}
 
-	if err := motionStorage.Init([]string{
-		"time", "altitude", "velocity", "acceleration", "thrust",
-	}); err != nil {
+	if err := motionStorage.Init(); err != nil {
 		return err
 	}
 
@@ -94,15 +92,23 @@ func (m *Manager) initializeStorages() error {
 		return err
 	}
 
-	if err := eventsStorage.Init([]string{
-		"time", "motor_status", "parachute_status",
-	}); err != nil {
+	if err := eventsStorage.Init(); err != nil {
+		return err
+	}
+
+	dynamicsStorage, err := storage.NewStorage(m.cfg.App.BaseDir, m.simHash, storage.DYNAMICS)
+	if err != nil {
+		return nil
+	}
+
+	if err := dynamicsStorage.Init(); err != nil {
 		return err
 	}
 
 	m.stores = &storage.Stores{
-		Motion: motionStorage,
-		Events: eventsStorage,
+		Motion:   motionStorage,
+		Events:   eventsStorage,
+		Dynamics: dynamicsStorage,
 	}
 
 	return nil

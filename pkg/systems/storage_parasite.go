@@ -32,19 +32,7 @@ func NewStorageParasiteSystem(world *ecs.World, storage *storage.Storage, storeT
 func (s *StorageParasiteSystem) Start(dataChan chan RocketState) error {
 	s.dataChan = dataChan
 
-	// Initialize headers based on store type
-	switch s.storeType {
-	case storage.MOTION:
-		err := s.storage.Init([]string{"Time", "Altitude", "Velocity", "Acceleration", "Thrust"})
-		if err != nil {
-			return fmt.Errorf("error initializing storage: %v", err)
-		}
-	case storage.EVENTS:
-		err := s.storage.Init([]string{"time", "motor_status", "parachute_status"})
-		if err != nil {
-			return fmt.Errorf("error initializing storage: %v", err)
-		}
-	}
+	s.storage.Init()
 
 	go s.processData()
 
@@ -61,7 +49,8 @@ func (s *StorageParasiteSystem) processData() {
 	for {
 		select {
 		case state := <-s.dataChan:
-			if s.storeType == storage.MOTION {
+			switch s.storeType {
+			case storage.MOTION:
 				record := []string{
 					fmt.Sprintf("%.6f", state.Time),
 					fmt.Sprintf("%.6f", state.Altitude),
@@ -72,7 +61,7 @@ func (s *StorageParasiteSystem) processData() {
 				if err := s.storage.Write(record); err != nil {
 					fmt.Printf("Error writing motion record: %v\n", err)
 				}
-			} else if s.storeType == storage.EVENTS {
+			case storage.EVENTS:
 				parachuteStatus := "NOT_DEPLOYED"
 				if state.ParachuteDeployed {
 					parachuteStatus = "DEPLOYED"
@@ -86,6 +75,29 @@ func (s *StorageParasiteSystem) processData() {
 				if err := s.storage.Write(record); err != nil {
 					fmt.Printf("Error writing event record: %v\n", err)
 				}
+
+			case storage.DYNAMICS:
+				record := []string{
+					fmt.Sprintf("%.6f", state.Time),
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+					"0", // TODO: Add dynamics data
+				}
+				if err := s.storage.Write(record); err != nil {
+					fmt.Printf("Error writing dynamics record: %v\n", err)
+				}
+
 			}
 		case <-s.done:
 			return
