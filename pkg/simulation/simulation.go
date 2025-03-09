@@ -202,7 +202,7 @@ func (s *Simulation) updateSystems() error {
 		return fmt.Errorf("no rocket entity loaded")
 	}
 
-	// Create state with proper initialization from current rocket state
+	// Re-use existing state rather than creating new one
 	state := &states.PhysicsState{
 		Time:         s.currentTime,
 		Entity:       s.rocket.BasicEntity,
@@ -217,33 +217,69 @@ func (s *Simulation) updateSystems() error {
 		Parachute:    s.rocket.GetComponent("parachute").(*components.Parachute),
 	}
 
-	// Validate state before processing
-	if err := s.validateState(state); err != nil {
+	// Update motor first
+	if err := state.Motor.Update(s.config.Simulation.Step); err != nil {
 		return err
 	}
 
-	// Execute systems in correct order
+	// Execute systems
+	for _, system := range s.systems {
+		if err := system.Update(s.config.Simulation.Step); err != nil {
+			return fmt.Errorf("system %T update error: %w", system, err)
+		}
+	}
+
+	// Always propagate state back to rocket entity
+	s.rocket.Position.Vec = state.Position.Vec
+	s.rocket.Velocity.Vec = state.Velocity.Vec
+	s.rocket.Acceleration.Vec = state.Acceleration.Vec
+	s.rocket.Mass.Value = state.Mass.Value
+
+	// Execute plugins before systems
+	for _, plugin := range s.pluginManager.GetPlugins() {
+		if err := plugin.BeforeSimStep(state); err != nil {
+			return fmt.Errorf("plugin %s BeforeSimStep error: %w", plugin.Name(), err)
+		}
+	}
+
+	// Execute systems in order and preserve state changes
 	for _, system := range s.systems {
 		if err := system.Update(s.config.Simulation.Step); err != nil {
 			return fmt.Errorf("system %T update error: %w", system, err)
 		}
 
-		// Update rocket entity state after each system
-		s.rocket.Position = state.Position
-		s.rocket.Velocity = state.Velocity
-		s.rocket.Acceleration = state.Acceleration
-		s.rocket.Mass = state.Mass
+		// Important: Update the rocket entity's state after each system
+		// This ensures changes propagate between systems
+		s.rocket.Position.Vec = state.Position.Vec
+		s.rocket.Velocity.Vec = state.Velocity.Vec
+		s.rocket.Acceleration.Vec = state.Acceleration.Vec
+		if state.Mass.Value > 0 {
+			s.rocket.Mass.Value = state.Mass.Value
+		}
 	}
 
-	// Log state changes
+	// Execute plugins after systems
+	for _, plugin := range s.pluginManager.GetPlugins() {
+		if err := plugin.AfterSimStep(state); err != nil {
+			return fmt.Errorf("plugin %s AfterSimStep error: %w", plugin.Name(), err)
+		}
+	}
+
+	// Log after all updates to show final state
 	s.logger.Debug("state_update",
 		"time", state.Time,
 		"pos_y", state.Position.Vec.Y,
 		"vel_y", state.Velocity.Vec.Y,
-		"acc_y", state.Acceleration.Vec.Y)
+		"acc_y", state.Acceleration.Vec.Y,
+		"thrust", state.Motor.GetThrust(),
+		"motor_state", state.Motor.GetState())
 
-	// Send state to channel
-	s.stateChan <- state
+	// Send state to parasites for recording
+	select {
+	case s.stateChan <- state:
+	default:
+		s.logger.Warn("state channel full, dropping frame")
+	}
 
 	return nil
 }

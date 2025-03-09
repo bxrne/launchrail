@@ -59,6 +59,13 @@ func (s *LaunchRailSystem) Update(dt float64) error {
 			continue
 		}
 
+		// Update motor first
+		if entity.Motor != nil {
+			if err := entity.Motor.Update(dt); err != nil {
+				return err
+			}
+		}
+
 		// Get total acceleration magnitude including thrust
 		angleRad := s.rail.Angle
 		thrust := 0.0
@@ -69,10 +76,7 @@ func (s *LaunchRailSystem) Update(dt float64) error {
 		// Calculate forces along rail direction
 		netForceAlongRail := thrust*math.Cos(angleRad) - entity.Mass.Value*gravity*math.Sin(angleRad)
 
-		if netForceAlongRail <= 0 {
-			// Should only prevent negative motion, not reset to zero
-			entity.Position.Vec.X = 0
-			entity.Position.Vec.Y = 0
+		if netForceAlongRail <= 0 && entity.Velocity.Vec.Y <= 0 {
 			entity.Velocity.Vec.X = 0
 			entity.Velocity.Vec.Y = 0
 			entity.Acceleration.Vec.X = 0

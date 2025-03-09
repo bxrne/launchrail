@@ -78,12 +78,14 @@ func (s *PhysicsSystem) Update(dt float64) error {
 	}
 
 	for _, entity := range s.entities {
-		// Skip invalid entities
-		if entity == nil || entity.Mass == nil || entity.Mass.Value <= 0 {
-			continue
+		// Update motor state first
+		if entity.Motor != nil {
+			if err := entity.Motor.Update(dt); err != nil {
+				return err
+			}
 		}
 
-		// Calculate forces first
+		// Calculate forces
 		netForce := s.calculateNetForce(entity, types.Vector3{})
 
 		// Update state
@@ -101,14 +103,11 @@ func (s *PhysicsSystem) Update(dt float64) error {
 }
 
 func (s *PhysicsSystem) handleGroundCollision(entity *states.PhysicsState) bool {
-	groundTolerance := s.groundTolerance
-	if entity.Position.Vec.Y <= groundTolerance {
-		if entity.Position.Vec.Y <= 0 {
-			entity.Position.Vec.Y = 0
-			entity.Velocity.Vec.Y = 0
-			entity.Acceleration.Vec.Y = 0
-			return true
-		}
+	if entity.Position.Vec.Y <= s.groundTolerance && entity.Velocity.Vec.Y <= 0 {
+		entity.Position.Vec.Y = 0
+		entity.Velocity.Vec.Y = 0
+		entity.Acceleration.Vec.Y = 0
+		return true
 	}
 	return false
 }
