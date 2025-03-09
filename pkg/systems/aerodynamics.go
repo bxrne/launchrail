@@ -23,7 +23,7 @@ type atmosphericData struct {
 // AerodynamicSystem calculates aerodynamic forces on entities
 type AerodynamicSystem struct {
 	world    *ecs.World
-	entities []states.PhysicsState
+	entities []*states.PhysicsState // Change to pointer slice
 	workers  int
 	isa      *atmosphere.ISAModel
 }
@@ -37,7 +37,7 @@ func (a *AerodynamicSystem) GetAirDensity(altitude float64) float64 {
 func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Config) *AerodynamicSystem {
 	return &AerodynamicSystem{
 		world:    world,
-		entities: make([]states.PhysicsState, 0),
+		entities: make([]*states.PhysicsState, 0),
 		workers:  workers,
 		isa:      atmosphere.NewISAModel(&cfg.Options.Launchsite.Atmosphere.ISAConfiguration),
 	}
@@ -101,7 +101,7 @@ func calculateReferenceArea(nosecone *components.Nosecone, bodytube *components.
 
 // Update implements parallel force calculation and application
 func (a *AerodynamicSystem) Update(dt float64) error {
-	workChan := make(chan states.PhysicsState, len(a.entities))
+	workChan := make(chan *states.PhysicsState, len(a.entities)) // Change to pointer channel
 	resultChan := make(chan types.Vector3, len(a.entities))
 
 	var wg sync.WaitGroup
@@ -111,7 +111,7 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 			defer wg.Done()
 			for entity := range workChan {
 				// Perform a more accurate Mach-based drag calculation
-				force := a.CalculateDrag(entity)
+				force := a.CalculateDrag(*entity)
 				resultChan <- force
 			}
 		}()
@@ -141,20 +141,7 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 
 // Add adds entities to the system
 func (a *AerodynamicSystem) Add(as *states.PhysicsState) {
-	a.entities = append(a.entities, states.PhysicsState{
-		Entity:          as.Entity,
-		Position:        as.Position,
-		Velocity:        as.Velocity,
-		Acceleration:    as.Acceleration,
-		Orientation:     as.Orientation,
-		Mass:            as.Mass,
-		Motor:           as.Motor,
-		Bodytube:        as.Bodytube,
-		Nosecone:        as.Nosecone,
-		Finset:          as.Finset,
-		Parachute:       as.Parachute,
-		AngularVelocity: as.AngularVelocity,
-	})
+	a.entities = append(a.entities, as) // Store pointer directly
 }
 
 // Priority returns the system priority

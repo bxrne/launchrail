@@ -17,7 +17,7 @@ type LaunchRail struct {
 // LaunchRailSystem constrains entities to a launch rail
 type LaunchRailSystem struct {
 	world     *ecs.World
-	entities  []states.PhysicsState
+	entities  []*states.PhysicsState // Change to pointer slice
 	rail      LaunchRail
 	onRail    bool
 	railExitY float64 // Y position at rail exit
@@ -30,7 +30,7 @@ func NewLaunchRailSystem(world *ecs.World, length, angle, orientation float64) *
 
 	return &LaunchRailSystem{
 		world:    world,
-		entities: make([]states.PhysicsState, 0),
+		entities: make([]*states.PhysicsState, 0),
 		rail: LaunchRail{
 			Length:      length,
 			Angle:       angleRad,
@@ -41,23 +41,9 @@ func NewLaunchRailSystem(world *ecs.World, length, angle, orientation float64) *
 	}
 }
 
-// Add adds a physics entity to the launch rail system
+// Add adds entities to the system
 func (s *LaunchRailSystem) Add(pe *states.PhysicsState) {
-	s.entities = append(s.entities,
-		states.PhysicsState{
-			Entity:          pe.Entity,
-			Position:        pe.Position,
-			Velocity:        pe.Velocity,
-			Acceleration:    pe.Acceleration,
-			Orientation:     pe.Orientation,
-			Mass:            pe.Mass,
-			Motor:           pe.Motor,
-			Bodytube:        pe.Bodytube,
-			Nosecone:        pe.Nosecone,
-			Finset:          pe.Finset,
-			Parachute:       pe.Parachute,
-			AngularVelocity: pe.AngularVelocity,
-		})
+	s.entities = append(s.entities, pe) // Store pointer directly
 }
 
 // Update applies launch rail constraints to entities

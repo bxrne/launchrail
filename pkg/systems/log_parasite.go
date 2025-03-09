@@ -10,7 +10,7 @@ import (
 type LogParasiteSystem struct {
 	world    *ecs.World
 	logger   *logf.Logger
-	entities []states.PhysicsState
+	entities []*states.PhysicsState // Change to pointer slice
 	dataChan chan *states.PhysicsState
 	done     chan struct{}
 }
@@ -20,7 +20,7 @@ func NewLogParasiteSystem(world *ecs.World, logger *logf.Logger) *LogParasiteSys
 	return &LogParasiteSystem{
 		world:    world,
 		logger:   logger,
-		entities: make([]states.PhysicsState, 0),
+		entities: make([]*states.PhysicsState, 0),
 		done:     make(chan struct{}),
 	}
 }
@@ -68,19 +68,5 @@ func (s *LogParasiteSystem) Update(dt float64) error {
 
 // Add adds entities to the system
 func (s *LogParasiteSystem) Add(pe *states.PhysicsState) {
-	s.entities = append(s.entities,
-		states.PhysicsState{
-			Entity:          pe.Entity,
-			Position:        pe.Position,
-			Velocity:        pe.Velocity,
-			Acceleration:    pe.Acceleration,
-			Orientation:     pe.Orientation,
-			Mass:            pe.Mass,
-			Motor:           pe.Motor,
-			Bodytube:        pe.Bodytube,
-			Nosecone:        pe.Nosecone,
-			Finset:          pe.Finset,
-			Parachute:       pe.Parachute,
-			AngularVelocity: pe.AngularVelocity,
-		})
+	s.entities = append(s.entities, pe) // Store pointer directly
 }

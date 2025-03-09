@@ -12,7 +12,7 @@ import (
 type StorageParasiteSystem struct {
 	world     *ecs.World
 	storage   *storage.Storage
-	entities  []states.PhysicsState
+	entities  []*states.PhysicsState // Change to pointer slice
 	dataChan  chan *states.PhysicsState
 	done      chan struct{}
 	storeType storage.StorageType
@@ -23,7 +23,7 @@ func NewStorageParasiteSystem(world *ecs.World, storage *storage.Storage, storeT
 	return &StorageParasiteSystem{
 		world:     world,
 		storage:   storage,
-		entities:  make([]states.PhysicsState, 0),
+		entities:  make([]*states.PhysicsState, 0),
 		done:      make(chan struct{}),
 		storeType: storeType,
 	}
@@ -92,7 +92,6 @@ func (s *StorageParasiteSystem) processData() {
 					"0", // TODO: Add dynamics data
 					"0", // TODO: Add dynamics data
 					"0", // TODO: Add dynamics data
-					"0", // TODO: Add dynamics data
 				}
 				if err := s.storage.Write(record); err != nil {
 					fmt.Printf("Error writing dynamics record: %v\n", err)
@@ -118,19 +117,5 @@ func (s *StorageParasiteSystem) Update(dt float64) error {
 
 // Add adds entities to the system
 func (s *StorageParasiteSystem) Add(pe *states.PhysicsState) {
-	s.entities = append(s.entities,
-		states.PhysicsState{
-			Entity:          pe.Entity,
-			Position:        pe.Position,
-			Velocity:        pe.Velocity,
-			Acceleration:    pe.Acceleration,
-			Orientation:     pe.Orientation,
-			Mass:            pe.Mass,
-			Motor:           pe.Motor,
-			Bodytube:        pe.Bodytube,
-			Nosecone:        pe.Nosecone,
-			Finset:          pe.Finset,
-			Parachute:       pe.Parachute,
-			AngularVelocity: pe.AngularVelocity,
-		})
+	s.entities = append(s.entities, pe) // Store pointer directly
 }
