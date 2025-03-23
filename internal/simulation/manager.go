@@ -98,7 +98,7 @@ func (m *Manager) initializeStorages() error {
 
 	dynamicsStorage, err := storage.NewStorage(m.cfg.App.BaseDir, m.simHash, storage.DYNAMICS)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	if err := dynamicsStorage.Init(); err != nil {
@@ -128,9 +128,26 @@ func (m *Manager) Run() error {
 }
 
 func (m *Manager) Close() error {
-	if m.stores != nil && m.stores.Motion != nil {
-		return m.stores.Motion.Close()
+	if m.stores != nil {
+		if m.stores.Motion != nil {
+			if err := m.stores.Motion.Close(); err != nil {
+				return err
+			}
+		}
+		if m.stores.Events != nil {
+			if err := m.stores.Events.Close(); err != nil {
+				return err
+			}
+		}
+		if m.stores.Dynamics != nil {
+			if err := m.stores.Dynamics.Close(); err != nil {
+				return err
+			}
+		}
 	}
+
+	m.log.Info("Simulation manager closed", "hash", m.simHash)
+
 	return nil
 }
 
