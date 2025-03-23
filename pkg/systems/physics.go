@@ -33,17 +33,6 @@ type PhysicsSystem struct {
 	groundTolerance float64
 }
 
-// calculateStabilityForces calculates stability forces for an entity
-func (s *PhysicsSystem) calculateStabilityForces(force *types.Vector3, stabilityMargin float64, entity states.PhysicsState) {
-	// Basic stability force calculation
-	const stabilityFactor = 0.1
-	_ = entity
-
-	// Apply corrective force based on stability margin
-	correctionForce := stabilityMargin * stabilityFactor
-	force.Y += correctionForce
-}
-
 // Remove removes an entity from the system
 func (s *PhysicsSystem) Remove(basic ecs.BasicEntity) {
 	var deleteIndex int
@@ -195,32 +184,6 @@ func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce 
 		// Integrate orientation quaternion
 		entity.Orientation.Integrate(*entity.AngularVelocity, dt)
 	}
-}
-
-func (s *PhysicsSystem) applyForce(entity *states.PhysicsState, force types.Vector3, dt float64) {
-	// Add nil checks for required components
-	if entity.Bodytube == nil || entity.Nosecone == nil || entity.Mass == nil {
-		return
-	}
-
-	// Validate timestep and mass
-	dt64 := float64(dt)
-	if dt64 <= 0 || math.IsNaN(dt64) || dt64 > 0.1 || entity.Mass.Value <= 0 {
-		return
-	}
-
-	// Check current state for landing condition
-	if s.handleGroundCollision(entity) {
-		return
-	}
-
-	// Reset acceleration and apply gravity
-	entity.Acceleration.Vec.X = 0
-	entity.Acceleration.Vec.Y = -s.gravity
-
-	// Calculate and apply forces
-	netForce := s.calculateNetForce(entity, force)
-	s.updateEntityState(entity, netForce, dt64)
 }
 
 // Add adds an entity to the system
