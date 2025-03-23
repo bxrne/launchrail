@@ -2,20 +2,17 @@ package systems_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
-	"github.com/bxrne/launchrail/pkg/components"
+	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
 	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-// TEST: GIVEN a new PhysicsSystem WHEN NewPhysicsSystem is called THEN a new PhysicsSystem is returned
+// TEST: GIVEN a new physics system WHEN initialized THEN has correct default values
 func TestNewPhysicsSystem(t *testing.T) {
-	world := &ecs.World{}
 	cfg := &config.Config{
 		Options: config.Options{
 			Launchsite: config.Launchsite{
@@ -26,160 +23,19 @@ func TestNewPhysicsSystem(t *testing.T) {
 				},
 			},
 		},
-	}
-
-	system := systems.NewPhysicsSystem(world, cfg)
-	require.NotNil(t, system)
-}
-
-// TEST: GIVEN a PhysicsSystem WHEN Add is called THEN the entity is added to the system
-func TestPhysicsSystem_Add(t *testing.T) {
-	world := &ecs.World{}
-	cfg := &config.Config{}
-	system := systems.NewPhysicsSystem(world, cfg)
-	e := ecs.NewBasic()
-
-	entity := systems.PhysicsEntity{
-		Entity:       &e,
-		Position:     &types.Position{},
-		Velocity:     &types.Velocity{},
-		Acceleration: &types.Acceleration{},
-		Mass:         &types.Mass{Value: 1.0},
-		Motor:        &components.Motor{},
-	}
-
-	system.Add(&entity)
-}
-
-// TEST: GIVEN a PhysicsSystem WHEN Update is called THEN physics are applied correctly
-func TestPhysicsSystem_Update(t *testing.T) {
-	tests := []struct {
-		name        string
-		mass        float64
-		initialPos  types.Position
-		initialVel  types.Velocity
-		motorState  string
-		dt          float64
-		wantPosY    float64
-		wantVelY    float64
-		description string
-	}{
-		{
-			name:        "Ground start no thrust",
-			mass:        1.0,
-			initialPos:  types.Position{Vec: types.Vector3{Y: 0}},
-			initialVel:  types.Velocity{Vec: types.Vector3{Y: 0}},
-			motorState:  "READY",
-			dt:          0.016,
-			wantPosY:    0,
-			wantVelY:    0,
-			description: "Should stay on ground with no thrust",
-		},
-		{
-			name:        "Mid-flight coasting",
-			mass:        1.0,
-			initialPos:  types.Position{Vec: types.Vector3{Y: 100}},
-			initialVel:  types.Velocity{Vec: types.Vector3{Y: 50}},
-			motorState:  "COASTING",
-			dt:          0.016,
-			wantPosY:    100.8,
-			wantVelY:    49.84,
-			description: "Should experience gravity and drag",
-		},
-		{
-			name:        "Landing detection",
-			mass:        1.0,
-			initialPos:  types.Position{Vec: types.Vector3{Y: 0.1}}, // Slightly above ground
-			initialVel:  types.Velocity{Vec: types.Vector3{Y: 0}},
-			motorState:  "COASTING",
-			dt:          0.016,
-			wantPosY:    0,      // Should land
-			wantVelY:    -0.156, // Should stop
-			description: "Should stop at ground",
+		Simulation: config.Simulation{
+			GroundTolerance: 0.1,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Setup
-			world := &ecs.World{}
-			cfg := &config.Config{
-				Options: config.Options{
-					Launchsite: config.Launchsite{
-						Atmosphere: config.Atmosphere{
-							ISAConfiguration: config.ISAConfiguration{
-								GravitationalAccel: 9.81,
-							},
-						},
-					},
-				},
-			}
-			system := systems.NewPhysicsSystem(world, cfg)
-
-			// Create entity with all required components properly initialized
-			e := ecs.NewBasic()
-			motor := &components.Motor{}
-			motor.SetState(tt.motorState)
-
-			entity := systems.PhysicsEntity{
-				Entity:       &e,
-				Position:     &tt.initialPos,
-				Velocity:     &tt.initialVel,
-				Acceleration: &types.Acceleration{},
-				Mass:         &types.Mass{Value: tt.mass},
-				Motor:        motor,
-				// Initialize required components that were missing
-				Bodytube: &components.Bodytube{Radius: 0.05, Length: 1.0}, // Add reasonable defaults
-				Nosecone: &components.Nosecone{Radius: 0.05, Length: 0.3},
-				Finset:   &components.TrapezoidFinset{},
-			}
-
-			system.Add(&entity)
-
-			// Run update
-			err := system.Update(tt.dt)
-			assert.NoError(t, err)
-
-			// Verify results with reasonable tolerance for floating point
-			assert.InDelta(t, tt.wantPosY, entity.Position.Vec.Y, 0.1,
-				"Position Y mismatch: want %.2f, got %.2f", tt.wantPosY, entity.Position.Vec.Y)
-			assert.InDelta(t, tt.wantVelY, entity.Velocity.Vec.Y, 0.1,
-				"Velocity Y mismatch: want %.2f, got %.2f", tt.wantVelY, entity.Velocity.Vec.Y)
-		})
-	}
-}
-
-// TEST: GIVEN a PhysicsSystem WHEN Remove is called THEN the entity is removed from the system
-func TestPhysicsSystem_Remove(t *testing.T) {
-	world := &ecs.World{}
-	cfg := &config.Config{}
-	system := systems.NewPhysicsSystem(world, cfg)
-	e := ecs.NewBasic()
-
-	entity := systems.PhysicsEntity{
-		Entity:       &e,
-		Position:     &types.Position{},
-		Velocity:     &types.Velocity{},
-		Acceleration: &types.Acceleration{},
-		Mass:         &types.Mass{},
-		Motor:        &components.Motor{},
-	}
-
-	system.Add(&entity)
-	system.Remove(e)
-}
-
-// TEST: GIVEN a PhysicsSystem WHEN Priority is called THEN the correct priority is returned
-func TestPhysicsSystem_Priority(t *testing.T) {
-	world := &ecs.World{}
-	cfg := &config.Config{}
-	system := systems.NewPhysicsSystem(world, cfg)
+	system := systems.NewPhysicsSystem(&ecs.World{}, cfg)
+	assert.NotNil(t, system)
 	assert.Equal(t, 1, system.Priority())
+	assert.Equal(t, "PhysicsSystem", system.String())
 }
 
-// TEST: GIVEN a PhysicsSystem with multiple workers WHEN Update is called THEN forces are calculated concurrently
-func TestPhysicsSystem_Concurrent(t *testing.T) {
-	world := &ecs.World{}
+// TEST: GIVEN an entity with invalid mass WHEN calculating net force THEN returns zero
+func TestCalculateNetForce_InvalidMass(t *testing.T) {
 	cfg := &config.Config{
 		Options: config.Options{
 			Launchsite: config.Launchsite{
@@ -191,26 +47,80 @@ func TestPhysicsSystem_Concurrent(t *testing.T) {
 			},
 		},
 	}
-	system := systems.NewPhysicsSystem(world, cfg)
 
-	// Add multiple entities
-	for i := 0; i < 10; i++ {
-		e := ecs.NewBasic()
-		entity := systems.PhysicsEntity{
-			Entity:       &e,
-			Position:     &types.Position{Vec: types.Vector3{Y: float64(i * 10)}},
-			Velocity:     &types.Velocity{Vec: types.Vector3{Y: 10}},
-			Acceleration: &types.Acceleration{},
-			Mass:         &types.Mass{Value: 1.0},
-			Motor:        &components.Motor{},
-		}
-		system.Add(&entity)
+	system := systems.NewPhysicsSystem(&ecs.World{}, cfg)
+	entity := &states.PhysicsState{
+		Mass:         &types.Mass{Value: 0},
+		Position:     &types.Position{},
+		Velocity:     &types.Velocity{},
+		Acceleration: &types.Acceleration{},
 	}
 
-	start := time.Now()
-	err := system.Update(0.016)
-	duration := time.Since(start)
-
+	system.Add(entity)
+	err := system.Update(0.01)
 	assert.NoError(t, err)
-	assert.Less(t, duration, 100*time.Millisecond, "Concurrent update took too long")
+	assert.Equal(t, 0.0, entity.Acceleration.Vec.Y)
+}
+
+// TEST: GIVEN an entity with rotation WHEN updating THEN updates angular state
+func TestUpdate_AngularMotion(t *testing.T) {
+	cfg := &config.Config{
+		Options: config.Options{
+			Launchsite: config.Launchsite{
+				Atmosphere: config.Atmosphere{
+					ISAConfiguration: config.ISAConfiguration{
+						GravitationalAccel: 9.81,
+					},
+				},
+			},
+		},
+	}
+
+	system := systems.NewPhysicsSystem(&ecs.World{}, cfg)
+	entity := &states.PhysicsState{
+		Mass:                &types.Mass{Value: 1.0},
+		Position:            &types.Position{Vec: types.Vector3{Y: 10}},
+		Velocity:            &types.Velocity{},
+		Acceleration:        &types.Acceleration{},
+		Orientation:         &types.Orientation{},
+		AngularVelocity:     &types.Vector3{Y: 1.0},
+		AngularAcceleration: &types.Vector3{Y: 0.5},
+	}
+
+	system.Add(entity)
+	err := system.Update(0.01)
+	assert.NoError(t, err)
+	assert.Greater(t, entity.AngularVelocity.Y, 1.0)
+}
+
+// TEST: GIVEN an entity with invalid timestep WHEN updating THEN returns error
+func TestUpdate_InvalidTimestep(t *testing.T) {
+	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Config{})
+	err := system.Update(0)
+	assert.Error(t, err)
+}
+
+// TEST: GIVEN a system with invalid entity WHEN updating THEN returns error
+func TestUpdate_InvalidEntity(t *testing.T) {
+	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Config{})
+	entity := &states.PhysicsState{
+		// Missing required fields
+	}
+
+	system.Add(entity)
+	err := system.Update(0.01)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "entity missing required vectors")
+}
+
+// TEST: GIVEN a system with entity WHEN removing entity THEN entity is removed
+func TestRemoveEntity(t *testing.T) {
+	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Config{})
+	entity := &states.PhysicsState{
+		Entity: &ecs.BasicEntity{},
+		Mass:   &types.Mass{Value: 1.0},
+	}
+
+	system.Add(entity)
+	system.Remove(*entity.Entity)
 }

@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/bxrne/launchrail/pkg/systems"
-	"github.com/zerodha/logf"
 	"math"
+
+	"github.com/bxrne/launchrail/pkg/states"
+	"github.com/zerodha/logf"
 )
 
 type WindEffectPlugin struct {
@@ -27,13 +28,14 @@ func (p *WindEffectPlugin) Version() string {
 	return "1.0.0"
 }
 
-func (p *WindEffectPlugin) BeforeSimStep(state *systems.RocketState) error {
-	// Apply wind effect based on altitude
-	_ = p.windSpeed * math.Sin(state.Time)
+func (p *WindEffectPlugin) BeforeSimStep(state *states.PhysicsState) error {
+
+	f := p.windSpeed * math.Sin(state.Time)
+	state.Velocity.Vec.X += f
 	return nil
 }
 
-func (p *WindEffectPlugin) AfterSimStep(state *systems.RocketState) error {
+func (p *WindEffectPlugin) AfterSimStep(state *states.PhysicsState) error {
 	return nil
 }
 

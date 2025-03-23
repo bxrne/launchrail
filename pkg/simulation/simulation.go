@@ -2,7 +2,6 @@ package simulation
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
@@ -11,9 +10,8 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/entities"
 	"github.com/bxrne/launchrail/pkg/openrocket"
-	"github.com/bxrne/launchrail/pkg/stats"
+	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
-
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/zerodha/logf"
 )
@@ -26,14 +24,14 @@ type Simulation struct {
 	logParasiteSystem *systems.LogParasiteSystem
 	motionParasite    *systems.StorageParasiteSystem
 	eventsParasite    *systems.StorageParasiteSystem
+	dynamicsParasite  *systems.StorageParasiteSystem
 	rulesSystem       *systems.RulesSystem
 	rocket            *entities.RocketEntity
 	config            *config.Config
 	logger            *logf.Logger
 	updateChan        chan struct{}
 	doneChan          chan struct{}
-	stateChan         chan systems.RocketState
-	stats             *stats.FlightStats
+	stateChan         chan *states.PhysicsState
 	launchRailSystem  *systems.LaunchRailSystem
 	currentTime       float64
 	systems           []systems.System
@@ -50,7 +48,7 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 		logger:        log,
 		updateChan:    make(chan struct{}),
 		doneChan:      make(chan struct{}),
-		stateChan:     make(chan systems.RocketState, 100),
+		stateChan:     make(chan *states.PhysicsState, 100),
 		pluginManager: plugin.NewManager(*log),
 	}
 
@@ -79,6 +77,7 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 	sim.logParasiteSystem = systems.NewLogParasiteSystem(world, log)
 	sim.motionParasite = systems.NewStorageParasiteSystem(world, stores.Motion, storage.MOTION)
 	sim.eventsParasite = systems.NewStorageParasiteSystem(world, stores.Events, storage.EVENTS)
+	sim.dynamicsParasite = systems.NewStorageParasiteSystem(world, stores.Dynamics, storage.DYNAMICS)
 
 	// Start parasites (only once)
 	sim.logParasiteSystem.Start(sim.stateChan)
@@ -92,7 +91,10 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 		return nil, err
 	}
 
-	sim.stats = stats.NewFlightStats()
+	err = sim.dynamicsParasite.Start(sim.stateChan)
+	if err != nil {
+		return nil, err
+	}
 
 	// Add systems to the slice - Note: we should NOT add the event parasite here
 	// as it's meant to be independent
@@ -103,6 +105,7 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 		sim.launchRailSystem,
 		sim.logParasiteSystem,
 		sim.motionParasite,
+		sim.dynamicsParasite,
 	}
 
 	return sim, nil
@@ -120,17 +123,20 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	s.rocket = entities.NewRocketEntity(s.world, orkData, motor)
 
 	// Create a single PhysicsEntity to reuse for all systems
-	sysEntity := &systems.PhysicsEntity{
-		Entity:       s.rocket.BasicEntity,
-		Position:     s.rocket.Position,
-		Velocity:     s.rocket.Velocity,
-		Acceleration: s.rocket.Acceleration,
-		Mass:         s.rocket.Mass,
-		Motor:        motor,
-		Bodytube:     s.rocket.GetComponent("bodytube").(*components.Bodytube),
-		Nosecone:     s.rocket.GetComponent("nosecone").(*components.Nosecone),
-		Finset:       s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
-		Parachute:    s.rocket.GetComponent("parachute").(*components.Parachute),
+	sysEntity := &states.PhysicsState{
+		Entity:              s.rocket.BasicEntity,
+		Position:            s.rocket.Position,
+		Velocity:            s.rocket.Velocity,
+		Acceleration:        s.rocket.Acceleration,
+		AngularVelocity:     s.rocket.AngularVelocity,
+		AngularAcceleration: s.rocket.AngularAcceleration,
+		Orientation:         s.rocket.Orientation,
+		Mass:                s.rocket.Mass,
+		Motor:               motor,
+		Bodytube:            s.rocket.GetComponent("bodytube").(*components.Bodytube),
+		Nosecone:            s.rocket.GetComponent("nosecone").(*components.Nosecone),
+		Finset:              s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
+		Parachute:           s.rocket.GetComponent("parachute").(*components.Parachute),
 	}
 
 	// Add to all systems
@@ -140,6 +146,8 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	s.launchRailSystem.Add(sysEntity)
 	s.logParasiteSystem.Add(sysEntity)
 	s.motionParasite.Add(sysEntity)
+	s.dynamicsParasite.Add(sysEntity)
+	s.eventsParasite.Add(sysEntity)
 
 	return nil
 }
@@ -149,6 +157,8 @@ func (s *Simulation) Run() error {
 	defer func() {
 		s.logParasiteSystem.Stop()
 		s.motionParasite.Stop()
+		s.eventsParasite.Stop()
+		s.dynamicsParasite.Stop()
 	}()
 
 	// Validate simulation parameters
@@ -176,109 +186,74 @@ func (s *Simulation) Run() error {
 		}
 	}
 
-	// Print stats after landing
-	s.logger.Info("Flight Statistics",
-		"stats", s.stats.String(),
-	)
-
 	close(s.doneChan)
-	return nil
-}
-
-// updateCoreSystems updates the core systems in the simulation (no plugins)
-func (s *Simulation) updateCoreSystems(state *systems.RocketState) error {
-	// Update core systems
-	for _, system := range s.systems {
-		if err := system.Update(float64(s.config.Simulation.Step)); err != nil {
-			return err
-		}
-	}
-
-	// Apply parachute effects if deployed
-	if parachute := s.rocket.GetComponent("parachute").(*components.Parachute); parachute.Deployed {
-		// Apply additional drag force from parachute
-		rho := s.aerodynamicSystem.GetAirDensity(float64(s.rocket.Position.Vec.Y))
-		vel := s.rocket.Velocity.Vec.Y
-		dragForce := -0.5 * float64(rho) * parachute.DragCoefficient * parachute.Area * vel * math.Abs(vel)
-		s.rocket.Acceleration.Vec.Y += dragForce / s.rocket.Mass.Value
-	}
-
-	// Calculate velocity and acceleration
-	vel := s.rocket.Velocity.Vec.Y
-	acc := s.rocket.Acceleration.Vec.Y
-	if math.IsNaN(acc) {
-		acc = 0
-	}
-
-	// Calculate Mach number
-	speedOfSound := s.aerodynamicSystem.GetSpeedOfSound(float64(s.rocket.Position.Vec.Y))
-	mach := 0.0
-	if speedOfSound > 1e-8 {
-		mach = vel / float64(speedOfSound)
-	}
-	if math.IsNaN(mach) || math.IsInf(mach, 0) {
-		mach = 0
-	}
-
-	// Update statistics
-	s.stats.Update(
-		s.currentTime,
-		s.rocket.Position.Vec.Y,
-		vel,
-		acc,
-		mach,
-	)
-
-	// Update motor component
-	motorComp, ok := s.rocket.GetComponent("motor").(*components.Motor)
-	if ok {
-		if err := motorComp.Update(s.config.Simulation.Step); err != nil {
-			return fmt.Errorf("motor update error: %w", err)
-		}
-
-		// Update state with final values
-		state.Velocity = vel
-		state.Acceleration = acc
-		state.Thrust = motorComp.GetThrust()
-		state.MotorState = motorComp.GetState()
-	}
-
 	return nil
 }
 
 // updateSystems updates all systems in the simulation
 func (s *Simulation) updateSystems() error {
-	// Create initial state with parachute status
-	parachute := s.rocket.GetComponent("parachute").(*components.Parachute)
-	state := &systems.RocketState{
-		Time:              s.currentTime,
-		Altitude:          s.rocket.Position.Vec.Y,
-		Velocity:          s.rocket.Velocity.Vec.Y,
-		Acceleration:      s.rocket.Acceleration.Vec.Y,
-		ParachuteDeployed: parachute.IsDeployed(),
+	if s.rocket == nil {
+		return fmt.Errorf("no rocket entity loaded")
 	}
 
-	// Execute plugin BeforeSimStep hooks
+	// Re-use existing state rather than creating new one
+	state := &states.PhysicsState{
+		Time:                s.currentTime,
+		Entity:              s.rocket.BasicEntity,
+		Position:            s.rocket.Position,
+		Orientation:         s.rocket.Orientation,
+		AngularVelocity:     s.rocket.AngularVelocity,
+		AngularAcceleration: s.rocket.AngularAcceleration,
+		Velocity:            s.rocket.Velocity,
+		Acceleration:        s.rocket.Acceleration,
+		Mass:                s.rocket.Mass,
+		Motor:               s.rocket.GetComponent("motor").(*components.Motor),
+		Bodytube:            s.rocket.GetComponent("bodytube").(*components.Bodytube),
+		Nosecone:            s.rocket.GetComponent("nosecone").(*components.Nosecone),
+		Finset:              s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
+		Parachute:           s.rocket.GetComponent("parachute").(*components.Parachute),
+	}
+
+	// Execute plugins before systems
 	for _, plugin := range s.pluginManager.GetPlugins() {
 		if err := plugin.BeforeSimStep(state); err != nil {
 			return fmt.Errorf("plugin %s BeforeSimStep error: %w", plugin.Name(), err)
 		}
 	}
 
-	// Update core systems
-	if err := s.updateCoreSystems(state); err != nil {
+	// Update motor first
+	if err := state.Motor.Update(s.config.Simulation.Step); err != nil {
 		return err
 	}
 
-	// Execute plugin AfterSimStep hooks
+	// Execute systems in order and propagate state changes
+	for _, system := range s.systems {
+		if err := system.Update(s.config.Simulation.Step); err != nil {
+			return fmt.Errorf("system %T update error: %w", system, err)
+		}
+
+		// Propagate state changes to rocket entity after each system
+		s.rocket.Position.Vec = state.Position.Vec
+		s.rocket.Velocity.Vec = state.Velocity.Vec
+		s.rocket.Acceleration.Vec = state.Acceleration.Vec
+		if state.Mass.Value > 0 {
+			s.rocket.Mass.Value = state.Mass.Value
+		}
+	}
+
+	// Execute plugins after systems
 	for _, plugin := range s.pluginManager.GetPlugins() {
 		if err := plugin.AfterSimStep(state); err != nil {
 			return fmt.Errorf("plugin %s AfterSimStep error: %w", plugin.Name(), err)
 		}
 	}
 
-	// Send final state to channel
-	s.stateChan <- *state
+	// Send state to parasites for recording
+	select {
+	case s.stateChan <- state:
+	default:
+		s.logger.Warn("state channel full, dropping frame")
+	}
 
 	return nil
 }

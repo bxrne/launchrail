@@ -1,7 +1,7 @@
 package plugin
 
 import (
-	"github.com/bxrne/launchrail/pkg/systems"
+	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/zerodha/logf"
 )
 
@@ -17,10 +17,10 @@ type SimulationPlugin interface {
 	Version() string
 
 	// BeforeSimStep is called before each simulation step
-	BeforeSimStep(state *systems.RocketState) error
+	BeforeSimStep(state *states.PhysicsState) error
 
 	// AfterSimStep is called after each simulation step
-	AfterSimStep(state *systems.RocketState) error
+	AfterSimStep(state *states.PhysicsState) error
 
 	// Cleanup is called when the simulation ends
 	Cleanup() error

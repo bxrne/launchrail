@@ -1,12 +1,14 @@
 package systems
 
 import (
+	"fmt"
 	"math"
 	"sync"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/barrowman"
+	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
 )
 
@@ -22,24 +24,13 @@ var (
 // PhysicsSystem calculates forces on entities
 type PhysicsSystem struct {
 	world           *ecs.World
-	entities        []*PhysicsEntity // Changed to store pointers
+	entities        []*states.PhysicsState // Changed to store pointers
 	cpCalculator    *barrowman.CPCalculator
 	workers         int
-	workChan        chan PhysicsEntity
+	workChan        chan states.PhysicsState
 	resultChan      chan types.Vector3
 	gravity         float64
 	groundTolerance float64
-}
-
-// calculateStabilityForces calculates stability forces for an entity
-func (s *PhysicsSystem) calculateStabilityForces(force *types.Vector3, stabilityMargin float64, entity PhysicsEntity) {
-	// Basic stability force calculation
-	const stabilityFactor = 0.1
-	_ = entity
-
-	// Apply corrective force based on stability margin
-	correctionForce := stabilityMargin * stabilityFactor
-	force.Y += correctionForce
 }
 
 // Remove removes an entity from the system
@@ -59,9 +50,9 @@ func NewPhysicsSystem(world *ecs.World, cfg *config.Config) *PhysicsSystem {
 	workers := 4
 	return &PhysicsSystem{
 		world:           world,
-		entities:        make([]*PhysicsEntity, 0),
+		entities:        make([]*states.PhysicsState, 0),
 		workers:         workers,
-		workChan:        make(chan PhysicsEntity, workers),
+		workChan:        make(chan states.PhysicsState, workers),
 		resultChan:      make(chan types.Vector3, workers),
 		cpCalculator:    barrowman.NewCPCalculator(), // Initialize calculator
 		gravity:         cfg.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel,
@@ -71,106 +62,120 @@ func NewPhysicsSystem(world *ecs.World, cfg *config.Config) *PhysicsSystem {
 
 // Update applies forces to entities
 func (s *PhysicsSystem) Update(dt float64) error {
-	var wg sync.WaitGroup
-	workChan := make(chan *PhysicsEntity, len(s.entities)) // Changed to pointer channel
-	resultChan := make(chan types.Vector3, len(s.entities))
-
-	// Launch multiple workers for concurrent force calculations
-	for i := 0; i < s.workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for entity := range workChan {
-				force := vectorPool.Get().(*types.Vector3)
-				*force = types.Vector3{} // reset force
-				// ...existing or refined stability/forces code...
-				s.calculateStabilityForces(force, 0.0, *entity) // Dereference for backwards compatibility
-				resultChan <- *force
-				vectorPool.Put(force)
-			}
-		}()
+	if dt <= 0 || math.IsNaN(dt) {
+		return fmt.Errorf("invalid timestep: %v", dt)
 	}
 
 	for _, entity := range s.entities {
-		workChan <- entity
+		if err := s.validateEntity(entity); err != nil {
+			return err
+		}
+
+		// Update motor state first
+		if entity.Motor != nil {
+			if err := entity.Motor.Update(dt); err != nil {
+				return err
+			}
+		}
+
+		// Calculate forces
+		netForce := s.calculateNetForce(entity, types.Vector3{})
+
+		// Update state
+		s.updateEntityState(entity, netForce, dt)
 	}
-	close(workChan)
 
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
+	return nil
+}
 
-	i := 0
-	for force := range resultChan {
-		s.applyForce(s.entities[i], force, dt)
-		i++
+func (s *PhysicsSystem) validateEntity(entity *states.PhysicsState) error {
+	if entity == nil {
+		return fmt.Errorf("nil entity")
+	}
+	if entity.Position == nil || entity.Velocity == nil || entity.Acceleration == nil {
+		return fmt.Errorf("entity missing required vectors")
+	}
+	if entity.Mass == nil {
+		return fmt.Errorf("entity missing mass")
 	}
 	return nil
 }
 
-func (s *PhysicsSystem) handleGroundCollision(entity *PhysicsEntity) bool {
-	groundTolerance := s.groundTolerance
-	if entity.Position.Vec.Y <= groundTolerance {
-		if entity.Position.Vec.Y <= 0 {
-			entity.Position.Vec.Y = 0
-			entity.Velocity.Vec.Y = 0
-			entity.Acceleration.Vec.Y = 0
-			return true
-		}
+func (s *PhysicsSystem) handleGroundCollision(entity *states.PhysicsState) bool {
+	if entity.Position.Vec.Y <= s.groundTolerance && entity.Velocity.Vec.Y <= 0 {
+		entity.Position.Vec.Y = 0
+		entity.Velocity.Vec.Y = 0
+		entity.Acceleration.Vec.Y = 0
+		return true
 	}
 	return false
 }
 
-func (s *PhysicsSystem) calculateNetForce(entity *PhysicsEntity, force types.Vector3) float64 {
-	var netForce float64
+func (s *PhysicsSystem) calculateNetForce(entity *states.PhysicsState, force types.Vector3) float64 {
+	if entity == nil || entity.Mass == nil || entity.Mass.Value <= 0 {
+		return 0
+	}
+
+	var netForce float64 = -s.gravity * entity.Mass.Value // Start with gravity
 
 	// Add thrust if motor is active
 	if entity.Motor != nil && !entity.Motor.IsCoasting() {
 		thrust := entity.Motor.GetThrust()
-		if !math.IsNaN(thrust) {
+		if !math.IsNaN(thrust) && !math.IsInf(thrust, 0) {
 			netForce += thrust
 		}
 	}
 
-	// Calculate velocity magnitude for drag
-	velocity := math.Sqrt(entity.Velocity.Vec.X*entity.Velocity.Vec.X + entity.Velocity.Vec.Y*entity.Velocity.Vec.Y)
+	// Add drag force
+	velocity := math.Sqrt(
+		entity.Velocity.Vec.X*entity.Velocity.Vec.X +
+			entity.Velocity.Vec.Y*entity.Velocity.Vec.Y)
 
-	if velocity > 0 {
+	if velocity > 0 && !math.IsNaN(velocity) {
 		rho := getAtmosphericDensity(entity.Position.Vec.Y)
-		if math.IsNaN(rho) {
-			rho = 1.225 // Use sea level density as fallback
+		if !math.IsNaN(rho) && rho > 0 {
+			area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
+			cd := 0.3 // Base drag coefficient
+			if velocity > 100 {
+				cd = 0.5
+			}
+			dragForce := 0.5 * rho * cd * area * velocity * velocity
+			netForce += -math.Copysign(dragForce, entity.Velocity.Vec.Y)
 		}
+	}
 
-		area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
-		cd := 0.3 // Base drag coefficient
-		if velocity > 100 {
-			cd = 0.5 // Increased drag at higher velocities
-		}
-
-		dragForce := 0.5 * rho * cd * area * velocity * velocity
-
-		// Apply drag in opposite direction of velocity
-		if entity.Velocity.Vec.Y > 0 {
-			netForce -= dragForce
-		} else {
-			netForce += dragForce
-		}
-
-		// Add external force
+	// Add external force
+	if !math.IsNaN(force.Y) && !math.IsInf(force.Y, 0) {
 		netForce += force.Y
 	}
 
 	return netForce
 }
 
-func (s *PhysicsSystem) updateEntityState(entity *PhysicsEntity, netForce float64, dt float64) {
-	entity.Acceleration.Vec.Y += netForce / entity.Mass.Value
+func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce float64, dt float64) {
+	if math.IsNaN(netForce) || math.IsInf(netForce, 0) {
+		return // Skip update if force is invalid
+	}
 
-	// Semi-implicit Euler integration
+	// Calculate acceleration
+	newAcceleration := netForce / entity.Mass.Value
+	if math.IsNaN(newAcceleration) || math.IsInf(newAcceleration, 0) {
+		return
+	}
+
+	// Update translational state
+	entity.Acceleration.Vec.Y = newAcceleration
 	newVelocity := entity.Velocity.Vec.Y + entity.Acceleration.Vec.Y*dt
 	newPosition := entity.Position.Vec.Y + newVelocity*dt
+	if math.IsNaN(newVelocity) || math.IsInf(newVelocity, 0) {
+		return
+	}
 
+	if math.IsNaN(newPosition) || math.IsInf(newPosition, 0) {
+		return
+	}
+
+	// Apply ground constraint
 	if newPosition <= 0 {
 		s.handleGroundCollision(entity)
 		return
@@ -178,36 +183,21 @@ func (s *PhysicsSystem) updateEntityState(entity *PhysicsEntity, netForce float6
 
 	entity.Velocity.Vec.Y = newVelocity
 	entity.Position.Vec.Y = newPosition
-}
 
-func (s *PhysicsSystem) applyForce(entity *PhysicsEntity, force types.Vector3, dt float64) {
-	// Add nil checks for required components
-	if entity.Bodytube == nil || entity.Nosecone == nil || entity.Mass == nil {
-		return
+	// Update rotation (6DOF)
+	if entity.Orientation != nil && entity.AngularVelocity != nil && entity.AngularAcceleration != nil {
+		// Simple angular integration
+		entity.AngularVelocity.X += entity.AngularAcceleration.X * dt
+		entity.AngularVelocity.Y += entity.AngularAcceleration.Y * dt
+		entity.AngularVelocity.Z += entity.AngularAcceleration.Z * dt
+
+		// Integrate orientation quaternion
+		entity.Orientation.Quat.Integrate(*entity.AngularVelocity, dt)
 	}
-
-	// Validate timestep and mass
-	dt64 := float64(dt)
-	if dt64 <= 0 || math.IsNaN(dt64) || dt64 > 0.1 || entity.Mass.Value <= 0 {
-		return
-	}
-
-	// Check current state for landing condition
-	if s.handleGroundCollision(entity) {
-		return
-	}
-
-	// Reset acceleration and apply gravity
-	entity.Acceleration.Vec.X = 0
-	entity.Acceleration.Vec.Y = -s.gravity
-
-	// Calculate and apply forces
-	netForce := s.calculateNetForce(entity, force)
-	s.updateEntityState(entity, netForce, dt64)
 }
 
 // Add adds an entity to the system
-func (s *PhysicsSystem) Add(pe *PhysicsEntity) {
+func (s *PhysicsSystem) Add(pe *states.PhysicsState) {
 	s.entities = append(s.entities, pe) // Store pointer directly
 }
 

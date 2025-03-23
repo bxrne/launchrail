@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/EngoEngine/ecs"
+	"github.com/bxrne/launchrail/pkg/states"
 )
 
 // LaunchRail represents a launch rail
@@ -16,7 +17,7 @@ type LaunchRail struct {
 // LaunchRailSystem constrains entities to a launch rail
 type LaunchRailSystem struct {
 	world     *ecs.World
-	entities  []PhysicsEntity
+	entities  []*states.PhysicsState // Change to pointer slice
 	rail      LaunchRail
 	onRail    bool
 	railExitY float64 // Y position at rail exit
@@ -29,7 +30,7 @@ func NewLaunchRailSystem(world *ecs.World, length, angle, orientation float64) *
 
 	return &LaunchRailSystem{
 		world:    world,
-		entities: make([]PhysicsEntity, 0),
+		entities: make([]*states.PhysicsState, 0),
 		rail: LaunchRail{
 			Length:      length,
 			Angle:       angleRad,
@@ -40,9 +41,9 @@ func NewLaunchRailSystem(world *ecs.World, length, angle, orientation float64) *
 	}
 }
 
-// Add adds a physics entity to the launch rail system
-func (s *LaunchRailSystem) Add(pe *PhysicsEntity) {
-	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset, pe.Parachute})
+// Add adds entities to the system
+func (s *LaunchRailSystem) Add(pe *states.PhysicsState) {
+	s.entities = append(s.entities, pe) // Store pointer directly
 }
 
 // Update applies launch rail constraints to entities
@@ -58,6 +59,13 @@ func (s *LaunchRailSystem) Update(dt float64) error {
 			continue
 		}
 
+		// Update motor first
+		if entity.Motor != nil {
+			if err := entity.Motor.Update(dt); err != nil {
+				return err
+			}
+		}
+
 		// Get total acceleration magnitude including thrust
 		angleRad := s.rail.Angle
 		thrust := 0.0
@@ -68,10 +76,7 @@ func (s *LaunchRailSystem) Update(dt float64) error {
 		// Calculate forces along rail direction
 		netForceAlongRail := thrust*math.Cos(angleRad) - entity.Mass.Value*gravity*math.Sin(angleRad)
 
-		if netForceAlongRail <= 0 {
-			// Should only prevent negative motion, not reset to zero
-			entity.Position.Vec.X = 0
-			entity.Position.Vec.Y = 0
+		if netForceAlongRail <= 0 && entity.Velocity.Vec.Y <= 0 {
 			entity.Velocity.Vec.X = 0
 			entity.Velocity.Vec.Y = 0
 			entity.Acceleration.Vec.X = 0
@@ -103,4 +108,19 @@ func (s *LaunchRailSystem) Update(dt float64) error {
 // Priority returns the system priority
 func (s *LaunchRailSystem) Priority() int {
 	return 1 // Run before physics system
+}
+
+// GetRail returns the launch rail configuration
+func (s *LaunchRailSystem) GetRail() LaunchRail {
+	return s.rail
+}
+
+// GetEntities returns the tracked entities
+func (s *LaunchRailSystem) GetEntities() []*states.PhysicsState {
+	return s.entities
+}
+
+// IsOnRail returns whether the system is still constraining to the rail
+func (s *LaunchRailSystem) IsOnRail() bool {
+	return s.onRail
 }

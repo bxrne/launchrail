@@ -8,6 +8,7 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/atmosphere"
 	"github.com/bxrne/launchrail/pkg/components"
+	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
 )
 
@@ -22,7 +23,7 @@ type atmosphericData struct {
 // AerodynamicSystem calculates aerodynamic forces on entities
 type AerodynamicSystem struct {
 	world    *ecs.World
-	entities []PhysicsEntity
+	entities []*states.PhysicsState // Change to pointer slice
 	workers  int
 	isa      *atmosphere.ISAModel
 }
@@ -36,7 +37,7 @@ func (a *AerodynamicSystem) GetAirDensity(altitude float64) float64 {
 func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Config) *AerodynamicSystem {
 	return &AerodynamicSystem{
 		world:    world,
-		entities: make([]PhysicsEntity, 0),
+		entities: make([]*states.PhysicsState, 0),
 		workers:  workers,
 		isa:      atmosphere.NewISAModel(&cfg.Options.Launchsite.Atmosphere.ISAConfiguration),
 	}
@@ -59,7 +60,7 @@ func (a *AerodynamicSystem) getTemperature(altitude float64) float64 {
 }
 
 // CalculateDrag now handles atmospheric effects and Mach number
-func (a *AerodynamicSystem) CalculateDrag(entity PhysicsEntity) types.Vector3 {
+func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vector3 {
 	// Get atmospheric data
 	atmData := a.getAtmosphericData(entity.Position.Vec.Y)
 
@@ -100,8 +101,9 @@ func calculateReferenceArea(nosecone *components.Nosecone, bodytube *components.
 
 // Update implements parallel force calculation and application
 func (a *AerodynamicSystem) Update(dt float64) error {
-	workChan := make(chan PhysicsEntity, len(a.entities))
+	workChan := make(chan *states.PhysicsState, len(a.entities))
 	resultChan := make(chan types.Vector3, len(a.entities))
+	momentChan := make(chan types.Vector3, len(a.entities))
 
 	var wg sync.WaitGroup
 	for i := 0; i < a.workers; i++ {
@@ -109,9 +111,13 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 		go func() {
 			defer wg.Done()
 			for entity := range workChan {
-				// Perform a more accurate Mach-based drag calculation
-				force := a.CalculateDrag(entity)
+				if entity == nil {
+					continue
+				}
+				force := a.CalculateDrag(*entity)
+				moment := a.calculateAerodynamicMoment(*entity)
 				resultChan <- force
+				momentChan <- moment
 			}
 		}()
 	}
@@ -124,23 +130,51 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 	go func() {
 		wg.Wait()
 		close(resultChan)
+		close(momentChan)
 	}()
 
 	i := 0
 	for force := range resultChan {
 		entity := a.entities[i]
-		acc := force.DivideScalar(entity.Mass.Value)
+		if entity == nil || entity.Orientation == nil {
+			i++
+			<-momentChan // Consume the moment to keep channels in sync
+			continue
+		}
+
+		var globalForce types.Vector3
+		if entity.Orientation.Quat != (types.Quaternion{}) {
+			// Transform force to global coordinates using current orientation
+			globalForce = *entity.Orientation.Quat.RotateVector(&force)
+		} else {
+			globalForce = force // Use untransformed force if no valid orientation
+		}
+
+		acc := globalForce.DivideScalar(entity.Mass.Value)
+
 		entity.Acceleration.Vec.X += float64(acc.X)
 		entity.Acceleration.Vec.Y += float64(acc.Y)
 		entity.Acceleration.Vec.Z += float64(acc.Z)
+
+		// Apply angular accelerations from moments
+		moment := <-momentChan
+		if entity.AngularAcceleration != nil {
+			inertia := calculateInertia(entity)
+			angAcc := moment.DivideScalar(inertia)
+
+			entity.AngularAcceleration.X = float64(angAcc.X)
+			entity.AngularAcceleration.Y = float64(angAcc.Y)
+			entity.AngularAcceleration.Z = float64(angAcc.Z)
+		}
+
 		i++
 	}
 	return nil
 }
 
 // Add adds entities to the system
-func (a *AerodynamicSystem) Add(as *PhysicsEntity) {
-	a.entities = append(a.entities, PhysicsEntity{as.Entity, as.Position, as.Velocity, as.Acceleration, as.Mass, as.Motor, as.Bodytube, as.Nosecone, as.Finset, as.Parachute})
+func (a *AerodynamicSystem) Add(as *states.PhysicsState) {
+	a.entities = append(a.entities, as) // Store pointer directly
 }
 
 // Priority returns the system priority
@@ -158,7 +192,7 @@ func (a *AerodynamicSystem) GetSpeedOfSound(altitude float64) float64 {
 }
 
 // calculateDragCoeff calculates the drag coefficient based on Mach number
-func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity PhysicsEntity) float64 {
+func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity states.PhysicsState) float64 {
 	// More accurate drag coefficient calculation
 	baseCd := 0.2 // Subsonic base drag
 
@@ -194,4 +228,50 @@ func getAtmosphericDensity(altitude float64) float64 {
 	}
 	// Add stratosphere calculations if needed
 	return rho0 * math.Exp(-g*altitude/(R*T0))
+}
+
+// calculateAerodynamicMoment calculates the aerodynamic moments on the entity
+func (a *AerodynamicSystem) calculateAerodynamicMoment(entity states.PhysicsState) types.Vector3 {
+	// Get atmospheric data
+	atmData := a.getAtmosphericData(entity.Position.Vec.Y)
+
+	// Calculate velocity magnitude
+	velocity := math.Sqrt(entity.Velocity.Vec.X*entity.Velocity.Vec.X +
+		entity.Velocity.Vec.Y*entity.Velocity.Vec.Y +
+		entity.Velocity.Vec.Z*entity.Velocity.Vec.Z)
+
+	if velocity < 0.01 {
+		return types.Vector3{} // No moment at very low speeds
+	}
+
+	// Calculate angle of attack
+	alpha := math.Atan2(entity.Velocity.Vec.Y, entity.Velocity.Vec.X)
+
+	// Calculate moment coefficient (simplified)
+	cm := -0.1 * math.Sin(2*alpha) // Basic stability moment
+
+	// Calculate reference area and length
+	area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
+	length := entity.Bodytube.Length
+
+	// Calculate moment magnitude
+	momentMag := 0.5 * atmData.density * velocity * velocity * area * length * cm
+
+	// Return moment vector (primarily around pitch axis)
+	return types.Vector3{
+		X: 0,
+		Y: momentMag,
+		Z: 0,
+	}
+}
+
+// calculateInertia returns a simplified moment of inertia value
+func calculateInertia(entity *states.PhysicsState) float64 {
+	// Simple approximation using cylinder formula
+	radius := entity.Bodytube.Radius
+	length := entity.Bodytube.Length
+	mass := entity.Mass.Value
+
+	// I = (1/12) * m * (3r² + l²) for a cylinder
+	return (1.0 / 12.0) * mass * (3*radius*radius + length*length)
 }

@@ -5,61 +5,82 @@ import (
 	"time"
 
 	"github.com/EngoEngine/ecs"
+	"github.com/bxrne/launchrail/pkg/components"
+	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
-	"github.com/stretchr/testify/assert"
+	"github.com/bxrne/launchrail/pkg/thrustcurves"
+	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/zerodha/logf"
 )
 
-// TEST: GIVEN a new LogParasiteSystem WHEN initialized THEN it should be created with correct defaults
-func TestNewLogParasiteSystem(t *testing.T) {
-	world := &ecs.World{}
+func createTestMotor() (*components.Motor, *thrustcurves.MotorData) {
+	// Create simple thrust curve data
+	thrustData := [][]float64{
+		{0.0, 10.0}, // Initial thrust
+		{1.0, 10.0}, // Constant thrust for 1 second
+		{2.0, 0.0},  // Burnout
+	}
+
+	motorData := &thrustcurves.MotorData{
+		Thrust:    thrustData,
+		TotalMass: 10.0, // Initial mass
+		BurnTime:  2.0,  // 2 second burn
+		AvgThrust: 10.0, // Average thrust
+	}
+
 	logger := logf.New(logf.Opts{})
+	motor, err := components.NewMotor(ecs.NewBasic(), motorData, logger)
 
-	system := systems.NewLogParasiteSystem(world, &logger)
+	if err != nil {
+		panic(err)
+	}
 
-	assert.NotNil(t, system)
+	return motor, motorData
 }
 
-// TEST: GIVEN a running LogParasiteSystem WHEN data is sent THEN it should process the data
-func TestLogParasiteSystem_ProcessData(t *testing.T) {
+func TestLogParasiteSystem(t *testing.T) {
 	world := &ecs.World{}
 	logger := logf.New(logf.Opts{})
 	system := systems.NewLogParasiteSystem(world, &logger)
 
-	dataChan := make(chan systems.RocketState)
+	// Test initialization
+	if system == nil {
+		t.Fatal("Failed to create LogParasiteSystem")
+	}
+
+	// Test system priority
+	if system.Priority() != 1 {
+		t.Errorf("Expected priority 1, got %d", system.Priority())
+	}
+
+	// Test data processing
+	dataChan := make(chan *states.PhysicsState)
 	system.Start(dataChan)
+	defer system.Stop()
 
-	testState := systems.RocketState{
+	// Create mock components
+	motor, _ := createTestMotor()
+
+	parachute := components.NewParachute(ecs.NewBasic(), 10.0, 5.0, 4, components.ParachuteTriggerApogee)
+
+	// Send test data with all required components
+	testState := &states.PhysicsState{
 		Time:         1.0,
-		Altitude:     100.0,
-		Velocity:     50.0,
-		Acceleration: 9.81,
-		Thrust:       100.0,
-		MotorState:   "burning",
+		Position:     &types.Position{Vec: types.Vector3{X: 0, Y: 10, Z: 0}},
+		Velocity:     &types.Velocity{Vec: types.Vector3{X: 0, Y: 20, Z: 0}},
+		Acceleration: &types.Acceleration{Vec: types.Vector3{X: 0, Y: -9.81, Z: 0}},
+		Orientation:  &types.Orientation{Quat: types.Quaternion{X: 0, Y: 0, Z: 0, W: 1}},
+		Motor:        motor,
+		Parachute:    parachute,
 	}
 
-	go func() {
-		dataChan <- testState
-		time.Sleep(100 * time.Millisecond)
-		system.Stop()
-	}()
-
-	// Wait for goroutine to complete
-	time.Sleep(200 * time.Millisecond)
-}
-
-// TEST: GIVEN a LogParasiteSystem WHEN an entity is added THEN it should be stored in the system
-func TestLogParasiteSystem_Add(t *testing.T) {
-	world := &ecs.World{}
-	logger := logf.New(logf.Opts{})
-	system := systems.NewLogParasiteSystem(world, &logger)
-	e := ecs.NewBasic()
-
-	entity := systems.PhysicsEntity{
-		Entity: &e,
+	// Send data with timeout to avoid blocking
+	select {
+	case dataChan <- testState:
+	case <-time.After(time.Second):
+		t.Error("Timeout sending test data")
 	}
 
-	system.Add(&entity)
-
-	assert.NoError(t, nil)
+	// Test adding entities
+	system.Add(testState)
 }

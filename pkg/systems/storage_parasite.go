@@ -5,14 +5,15 @@ import (
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/pkg/states"
 )
 
 // StorageParasiteSystem logs rocket state data to storage
 type StorageParasiteSystem struct {
 	world     *ecs.World
 	storage   *storage.Storage
-	entities  []PhysicsEntity
-	dataChan  chan RocketState
+	entities  []*states.PhysicsState // Change to pointer slice
+	dataChan  chan *states.PhysicsState
 	done      chan struct{}
 	storeType storage.StorageType
 }
@@ -22,28 +23,19 @@ func NewStorageParasiteSystem(world *ecs.World, storage *storage.Storage, storeT
 	return &StorageParasiteSystem{
 		world:     world,
 		storage:   storage,
-		entities:  make([]PhysicsEntity, 0),
+		entities:  make([]*states.PhysicsState, 0),
 		done:      make(chan struct{}),
 		storeType: storeType,
 	}
 }
 
 // Start the StorageParasiteSystem
-func (s *StorageParasiteSystem) Start(dataChan chan RocketState) error {
+func (s *StorageParasiteSystem) Start(dataChan chan *states.PhysicsState) error {
 	s.dataChan = dataChan
 
-	// Initialize headers based on store type
-	switch s.storeType {
-	case storage.MOTION:
-		err := s.storage.Init([]string{"Time", "Altitude", "Velocity", "Acceleration", "Thrust"})
-		if err != nil {
-			return fmt.Errorf("error initializing storage: %v", err)
-		}
-	case storage.EVENTS:
-		err := s.storage.Init([]string{"time", "motor_status", "parachute_status"})
-		if err != nil {
-			return fmt.Errorf("error initializing storage: %v", err)
-		}
+	err := s.storage.Init()
+	if err != nil {
+		return err
 	}
 
 	go s.processData()
@@ -61,31 +53,54 @@ func (s *StorageParasiteSystem) processData() {
 	for {
 		select {
 		case state := <-s.dataChan:
-			if s.storeType == storage.MOTION {
+			switch s.storeType {
+			case storage.MOTION:
 				record := []string{
 					fmt.Sprintf("%.6f", state.Time),
-					fmt.Sprintf("%.6f", state.Altitude),
-					fmt.Sprintf("%.6f", state.Velocity),
-					fmt.Sprintf("%.6f", state.Acceleration),
-					fmt.Sprintf("%.6f", state.Thrust),
+					fmt.Sprintf("%.6f", state.Position.Vec.Y),
+					fmt.Sprintf("%.6f", state.Velocity.Vec.Y),
+					fmt.Sprintf("%.6f", state.Acceleration.Vec.Y),
+					fmt.Sprintf("%.6f", state.Motor.GetThrust()),
 				}
 				if err := s.storage.Write(record); err != nil {
 					fmt.Printf("Error writing motion record: %v\n", err)
 				}
-			} else if s.storeType == storage.EVENTS {
+			case storage.EVENTS:
 				parachuteStatus := "NOT_DEPLOYED"
-				if state.ParachuteDeployed {
+				if state.Parachute.IsDeployed() {
 					parachuteStatus = "DEPLOYED"
 				}
 
 				record := []string{
 					fmt.Sprintf("%.6f", state.Time),
-					state.MotorState,
+					state.Motor.GetState(),
 					parachuteStatus,
 				}
 				if err := s.storage.Write(record); err != nil {
 					fmt.Printf("Error writing event record: %v\n", err)
 				}
+
+			case storage.DYNAMICS:
+				record := []string{
+					fmt.Sprintf("%.6f", state.Time),
+					fmt.Sprintf("%.6f", state.Position.Vec.X),
+					fmt.Sprintf("%.6f", state.Position.Vec.Y),
+					fmt.Sprintf("%.6f", state.Position.Vec.Z),
+					fmt.Sprintf("%.6f", state.Velocity.Vec.X),
+					fmt.Sprintf("%.6f", state.Velocity.Vec.Y),
+					fmt.Sprintf("%.6f", state.Velocity.Vec.Z),
+					fmt.Sprintf("%.6f", state.Acceleration.Vec.X),
+					fmt.Sprintf("%.6f", state.Acceleration.Vec.Y),
+					fmt.Sprintf("%.6f", state.Acceleration.Vec.Z),
+					fmt.Sprintf("%.6f", state.Orientation.Quat.X),
+					fmt.Sprintf("%.6f", state.Orientation.Quat.Y),
+					fmt.Sprintf("%.6f", state.Orientation.Quat.Z),
+					fmt.Sprintf("%.6f", state.Orientation.Quat.W),
+				}
+				if err := s.storage.Write(record); err != nil {
+					fmt.Printf("Error writing dynamics record: %v\n", err)
+				}
+
 			}
 		case <-s.done:
 			return
@@ -105,6 +120,6 @@ func (s *StorageParasiteSystem) Update(dt float64) error {
 }
 
 // Add adds entities to the system
-func (s *StorageParasiteSystem) Add(pe *PhysicsEntity) {
-	s.entities = append(s.entities, PhysicsEntity{pe.Entity, pe.Position, pe.Velocity, pe.Acceleration, pe.Mass, pe.Motor, pe.Bodytube, pe.Nosecone, pe.Finset, pe.Parachute})
+func (s *StorageParasiteSystem) Add(pe *states.PhysicsState) {
+	s.entities = append(s.entities, pe) // Store pointer directly
 }
