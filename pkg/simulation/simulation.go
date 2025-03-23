@@ -117,16 +117,19 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 
 	// Create a single PhysicsEntity to reuse for all systems
 	sysEntity := &states.PhysicsState{
-		Entity:       s.rocket.BasicEntity,
-		Position:     s.rocket.Position,
-		Velocity:     s.rocket.Velocity,
-		Acceleration: s.rocket.Acceleration,
-		Mass:         s.rocket.Mass,
-		Motor:        motor,
-		Bodytube:     s.rocket.GetComponent("bodytube").(*components.Bodytube),
-		Nosecone:     s.rocket.GetComponent("nosecone").(*components.Nosecone),
-		Finset:       s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
-		Parachute:    s.rocket.GetComponent("parachute").(*components.Parachute),
+		Entity:              s.rocket.BasicEntity,
+		Position:            s.rocket.Position,
+		Velocity:            s.rocket.Velocity,
+		Acceleration:        s.rocket.Acceleration,
+		AngularVelocity:     s.rocket.AngularVelocity,
+		AngularAcceleration: s.rocket.AngularAcceleration,
+		Orientation:         s.rocket.Orientation,
+		Mass:                s.rocket.Mass,
+		Motor:               motor,
+		Bodytube:            s.rocket.GetComponent("bodytube").(*components.Bodytube),
+		Nosecone:            s.rocket.GetComponent("nosecone").(*components.Nosecone),
+		Finset:              s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
+		Parachute:           s.rocket.GetComponent("parachute").(*components.Parachute),
 	}
 
 	// Add to all systems
@@ -184,22 +187,20 @@ func (s *Simulation) updateSystems() error {
 
 	// Re-use existing state rather than creating new one
 	state := &states.PhysicsState{
-		Time:         s.currentTime,
-		Entity:       s.rocket.BasicEntity,
-		Position:     s.rocket.Position,
-		Velocity:     s.rocket.Velocity,
-		Acceleration: s.rocket.Acceleration,
-		Mass:         s.rocket.Mass,
-		Motor:        s.rocket.GetComponent("motor").(*components.Motor),
-		Bodytube:     s.rocket.GetComponent("bodytube").(*components.Bodytube),
-		Nosecone:     s.rocket.GetComponent("nosecone").(*components.Nosecone),
-		Finset:       s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
-		Parachute:    s.rocket.GetComponent("parachute").(*components.Parachute),
-	}
-
-	// Update motor first
-	if err := state.Motor.Update(s.config.Simulation.Step); err != nil {
-		return err
+		Time:                s.currentTime,
+		Entity:              s.rocket.BasicEntity,
+		Position:            s.rocket.Position,
+		Orientation:         s.rocket.Orientation,
+		AngularVelocity:     s.rocket.AngularVelocity,
+		AngularAcceleration: s.rocket.AngularAcceleration,
+		Velocity:            s.rocket.Velocity,
+		Acceleration:        s.rocket.Acceleration,
+		Mass:                s.rocket.Mass,
+		Motor:               s.rocket.GetComponent("motor").(*components.Motor),
+		Bodytube:            s.rocket.GetComponent("bodytube").(*components.Bodytube),
+		Nosecone:            s.rocket.GetComponent("nosecone").(*components.Nosecone),
+		Finset:              s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
+		Parachute:           s.rocket.GetComponent("parachute").(*components.Parachute),
 	}
 
 	// Execute plugins before systems
@@ -207,6 +208,11 @@ func (s *Simulation) updateSystems() error {
 		if err := plugin.BeforeSimStep(state); err != nil {
 			return fmt.Errorf("plugin %s BeforeSimStep error: %w", plugin.Name(), err)
 		}
+	}
+
+	// Update motor first
+	if err := state.Motor.Update(s.config.Simulation.Step); err != nil {
+		return err
 	}
 
 	// Execute systems in order and propagate state changes
@@ -230,15 +236,6 @@ func (s *Simulation) updateSystems() error {
 			return fmt.Errorf("plugin %s AfterSimStep error: %w", plugin.Name(), err)
 		}
 	}
-
-	// Log after all updates to show final state
-	s.logger.Debug("state_update",
-		"time", state.Time,
-		"pos_y", state.Position.Vec.Y,
-		"vel_y", state.Velocity.Vec.Y,
-		"acc_y", state.Acceleration.Vec.Y,
-		"thrust", state.Motor.GetThrust(),
-		"motor_state", state.Motor.GetState())
 
 	// Send state to parasites for recording
 	select {
