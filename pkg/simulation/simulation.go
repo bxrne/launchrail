@@ -2,7 +2,6 @@ package simulation
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
@@ -25,6 +24,7 @@ type Simulation struct {
 	logParasiteSystem *systems.LogParasiteSystem
 	motionParasite    *systems.StorageParasiteSystem
 	eventsParasite    *systems.StorageParasiteSystem
+	dynamicsParasite  *systems.StorageParasiteSystem
 	rulesSystem       *systems.RulesSystem
 	rocket            *entities.RocketEntity
 	config            *config.Config
@@ -77,6 +77,7 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 	sim.logParasiteSystem = systems.NewLogParasiteSystem(world, log)
 	sim.motionParasite = systems.NewStorageParasiteSystem(world, stores.Motion, storage.MOTION)
 	sim.eventsParasite = systems.NewStorageParasiteSystem(world, stores.Events, storage.EVENTS)
+	sim.dynamicsParasite = systems.NewStorageParasiteSystem(world, stores.Dynamics, storage.DYNAMICS)
 
 	// Start parasites (only once)
 	sim.logParasiteSystem.Start(sim.stateChan)
@@ -90,6 +91,11 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 		return nil, err
 	}
 
+	err = sim.dynamicsParasite.Start(sim.stateChan)
+	if err != nil {
+		return nil, err
+	}
+
 	// Add systems to the slice - Note: we should NOT add the event parasite here
 	// as it's meant to be independent
 	sim.systems = []systems.System{
@@ -99,6 +105,7 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 		sim.launchRailSystem,
 		sim.logParasiteSystem,
 		sim.motionParasite,
+		sim.dynamicsParasite,
 	}
 
 	return sim, nil
@@ -139,6 +146,8 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	s.launchRailSystem.Add(sysEntity)
 	s.logParasiteSystem.Add(sysEntity)
 	s.motionParasite.Add(sysEntity)
+	s.dynamicsParasite.Add(sysEntity)
+	s.eventsParasite.Add(sysEntity)
 
 	return nil
 }
@@ -148,6 +157,8 @@ func (s *Simulation) Run() error {
 	defer func() {
 		s.logParasiteSystem.Stop()
 		s.motionParasite.Stop()
+		s.eventsParasite.Stop()
+		s.dynamicsParasite.Stop()
 	}()
 
 	// Validate simulation parameters
@@ -242,25 +253,6 @@ func (s *Simulation) updateSystems() error {
 	case s.stateChan <- state:
 	default:
 		s.logger.Warn("state channel full, dropping frame")
-	}
-
-	return nil
-}
-
-// Add validation function
-func (s *Simulation) validateState(state *states.PhysicsState) error {
-	if state.Position == nil || state.Velocity == nil ||
-		state.Acceleration == nil || state.Mass == nil {
-		return fmt.Errorf("invalid state: missing required components")
-	}
-
-	if state.Mass.Value <= 0 {
-		return fmt.Errorf("invalid state: mass must be positive")
-	}
-
-	if math.IsNaN(state.Position.Vec.Y) || math.IsNaN(state.Velocity.Vec.Y) ||
-		math.IsNaN(state.Acceleration.Vec.Y) {
-		return fmt.Errorf("invalid state: NaN values detected")
 	}
 
 	return nil
