@@ -33,7 +33,10 @@ func NewStorageParasiteSystem(world *ecs.World, storage *storage.Storage, storeT
 func (s *StorageParasiteSystem) Start(dataChan chan *states.PhysicsState) error {
 	s.dataChan = dataChan
 
-	s.storage.Init()
+	err := s.storage.Init()
+	if err != nil {
+		return err
+	}
 
 	go s.processData()
 
