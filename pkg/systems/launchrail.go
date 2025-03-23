@@ -109,3 +109,18 @@ func (s *LaunchRailSystem) Update(dt float64) error {
 func (s *LaunchRailSystem) Priority() int {
 	return 1 // Run before physics system
 }
+
+// GetRail returns the launch rail configuration
+func (s *LaunchRailSystem) GetRail() LaunchRail {
+	return s.rail
+}
+
+// GetEntities returns the tracked entities
+func (s *LaunchRailSystem) GetEntities() []*states.PhysicsState {
+	return s.entities
+}
+
+// IsOnRail returns whether the system is still constraining to the rail
+func (s *LaunchRailSystem) IsOnRail() bool {
+	return s.onRail
+}
