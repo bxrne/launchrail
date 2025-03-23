@@ -115,3 +115,30 @@ func (q *Quaternion) Integrate(omega Vector3, dt float64) *Quaternion {
 	q.X, q.Y, q.Z, q.W = newQ.X, newQ.Y, newQ.Z, newQ.W
 	return q
 }
+
+// Conjugate returns the conjugate of the quaternion
+func (q *Quaternion) Conjugate() *Quaternion {
+	return &Quaternion{
+		X: -q.X,
+		Y: -q.Y,
+		Z: -q.Z,
+		W: q.W,
+	}
+}
+
+// RotateVector rotates a vector by the quaternion
+func (q *Quaternion) RotateVector(v *Vector3) *Vector3 {
+	// Rotate vector by quaternion
+	quat := q.Conjugate()
+	quat = quat.Multiply(&Quaternion{
+		W: 0,
+		X: v.X,
+		Y: v.Y,
+		Z: v.Z,
+	}).Multiply(q)
+	return &Vector3{
+		X: quat.X,
+		Y: quat.Y,
+		Z: quat.Z,
+	}
+}

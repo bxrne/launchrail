@@ -18,3 +18,20 @@ func (o *Orientation) Integrate(angularVelocity Vector3, dt float64) {
 		Z: angularVelocity.Z * dt,
 	}).Add(&o.Quat).Normalize()
 }
+
+// RotateVector rotates a vector by the orientation
+func (o *Orientation) RotateVector(v Vector3) Vector3 {
+	// Rotate vector by quaternion
+	quat := o.Quat.Conjugate()
+	quat = quat.Multiply(&Quaternion{
+		W: 0,
+		X: v.X,
+		Y: v.Y,
+		Z: v.Z,
+	}).Multiply(&o.Quat)
+	return Vector3{
+		X: quat.X,
+		Y: quat.Y,
+		Z: quat.Z,
+	}
+}

@@ -45,7 +45,10 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 			},
 			Orientation: &types.Orientation{
 				BasicEntity: basic,
+				Quat:        *types.IdentityQuaternion(), // Initialize with identity quaternion
 			},
+			AngularAcceleration: &types.Vector3{}, // Initialize angular acceleration
+			AngularVelocity:     &types.Vector3{}, // Initialize angular velocity
 		},
 		Mass: &types.Mass{
 			BasicEntity: basic,
