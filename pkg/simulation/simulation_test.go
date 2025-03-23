@@ -26,14 +26,19 @@ func setupTestStorage(t *testing.T) (*storage.Stores, func()) {
 	eventsStore, err := storage.NewStorage(testDir, "events", storage.EVENTS)
 	require.NoError(t, err)
 
+	dynamicsStore, err := storage.NewStorage(testDir, "dynamics", storage.DYNAMICS)
+	require.NoError(t, err)
+
 	stores := &storage.Stores{
-		Motion: motionStore,
-		Events: eventsStore,
+		Motion:   motionStore,
+		Events:   eventsStore,
+		Dynamics: dynamicsStore,
 	}
 
 	cleanup := func() {
 		motionStore.Close()
 		eventsStore.Close()
+		dynamicsStore.Close()
 		os.RemoveAll(testDir)
 	}
 
