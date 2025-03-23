@@ -163,15 +163,15 @@ func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce 
 	if math.IsNaN(newAcceleration) || math.IsInf(newAcceleration, 0) {
 		return
 	}
-	entity.Acceleration.Vec.Y = newAcceleration
 
-	// Semi-implicit Euler integration with validation
+	// Update translational state
+	entity.Acceleration.Vec.Y = newAcceleration
 	newVelocity := entity.Velocity.Vec.Y + entity.Acceleration.Vec.Y*dt
+	newPosition := entity.Position.Vec.Y + newVelocity*dt
 	if math.IsNaN(newVelocity) || math.IsInf(newVelocity, 0) {
 		return
 	}
 
-	newPosition := entity.Position.Vec.Y + newVelocity*dt
 	if math.IsNaN(newPosition) || math.IsInf(newPosition, 0) {
 		return
 	}
@@ -184,6 +184,17 @@ func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce 
 
 	entity.Velocity.Vec.Y = newVelocity
 	entity.Position.Vec.Y = newPosition
+
+	// Update rotation (6DOF)
+	if entity.Orientation != nil && entity.AngularVelocity != nil && entity.AngularAcceleration != nil {
+		// Simple angular integration
+		entity.AngularVelocity.X += entity.AngularAcceleration.X * dt
+		entity.AngularVelocity.Y += entity.AngularAcceleration.Y * dt
+		entity.AngularVelocity.Z += entity.AngularAcceleration.Z * dt
+
+		// Integrate orientation quaternion
+		entity.Orientation.Integrate(*entity.AngularVelocity, dt)
+	}
 }
 
 func (s *PhysicsSystem) applyForce(entity *states.PhysicsState, force types.Vector3, dt float64) {

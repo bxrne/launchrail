@@ -80,18 +80,19 @@ func (s *StorageParasiteSystem) processData() {
 			case storage.DYNAMICS:
 				record := []string{
 					fmt.Sprintf("%.6f", state.Time),
-					"0", // TODO: Add dynamics data
-					"0", // TODO: Add dynamics data
-					"0", // TODO: Add dynamics data
-					"0", // TODO: Add dynamics data
-					"0", // TODO: Add dynamics data
-					"0", // TODO: Add dynamics data
-					"0", // TODO: Add dynamics data
-					"0", // TODO: Add dynamics data
-					"0", // TODO: Add dynamics data
-					"0", // TODO: Add dynamics data
-					"0", // TODO: Add dynamics data
-					"0", // TODO: Add dynamics data
+					fmt.Sprintf("%.6f", state.Position.Vec.X),
+					fmt.Sprintf("%.6f", state.Position.Vec.Y),
+					fmt.Sprintf("%.6f", state.Position.Vec.Z),
+					fmt.Sprintf("%.6f", state.Velocity.Vec.X),
+					fmt.Sprintf("%.6f", state.Velocity.Vec.Y),
+					fmt.Sprintf("%.6f", state.Velocity.Vec.Z),
+					fmt.Sprintf("%.6f", state.Acceleration.Vec.X),
+					fmt.Sprintf("%.6f", state.Acceleration.Vec.Y),
+					fmt.Sprintf("%.6f", state.Acceleration.Vec.Z),
+					fmt.Sprintf("%.6f", state.Orientation.Quat.X),
+					fmt.Sprintf("%.6f", state.Orientation.Quat.Y),
+					fmt.Sprintf("%.6f", state.Orientation.Quat.Z),
+					fmt.Sprintf("%.6f", state.Orientation.Quat.W),
 				}
 				if err := s.storage.Write(record); err != nil {
 					fmt.Printf("Error writing dynamics record: %v\n", err)

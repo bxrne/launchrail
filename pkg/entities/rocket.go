@@ -44,8 +44,7 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 				Vec:         types.Vector3{X: 0, Y: -9.81, Z: 0}, // Initialize with gravity
 			},
 			Orientation: &types.Orientation{
-				BasicEntity:     basic,
-				AngularVelocity: types.Vector3{X: 0, Y: 0, Z: 0},
+				BasicEntity: basic,
 			},
 		},
 		Mass: &types.Mass{
