@@ -41,6 +41,14 @@ func (s *LogParasiteSystem) processData() {
 	for {
 		select {
 		case state := <-s.dataChan:
+			// Skip logging if essential components are nil
+			if state == nil || state.Position == nil || state.Velocity == nil ||
+				state.Acceleration == nil || state.Orientation == nil ||
+				state.Motor == nil || state.Parachute == nil {
+				s.logger.Error("invalid_state", "error", "missing required components")
+				continue
+			}
+
 			s.logger.Debug("rocket_state",
 				"time", state.Time,
 				"altitude", state.Position.Vec.Y,
