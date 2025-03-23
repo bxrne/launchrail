@@ -67,6 +67,10 @@ func (s *PhysicsSystem) Update(dt float64) error {
 	}
 
 	for _, entity := range s.entities {
+		if err := s.validateEntity(entity); err != nil {
+			return err
+		}
+
 		// Update motor state first
 		if entity.Motor != nil {
 			if err := entity.Motor.Update(dt); err != nil {
@@ -79,15 +83,21 @@ func (s *PhysicsSystem) Update(dt float64) error {
 
 		// Update state
 		s.updateEntityState(entity, netForce, dt)
-
-		// Validate new state
-		if math.IsNaN(entity.Position.Vec.Y) ||
-			math.IsNaN(entity.Velocity.Vec.Y) ||
-			math.IsNaN(entity.Acceleration.Vec.Y) {
-			return fmt.Errorf("NaN values in state update")
-		}
 	}
 
+	return nil
+}
+
+func (s *PhysicsSystem) validateEntity(entity *states.PhysicsState) error {
+	if entity == nil {
+		return fmt.Errorf("nil entity")
+	}
+	if entity.Position == nil || entity.Velocity == nil || entity.Acceleration == nil {
+		return fmt.Errorf("entity missing required vectors")
+	}
+	if entity.Mass == nil {
+		return fmt.Errorf("entity missing mass")
+	}
 	return nil
 }
 
