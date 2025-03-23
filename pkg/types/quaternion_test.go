@@ -112,3 +112,38 @@ func TestNormalize(t *testing.T) {
 		t.Errorf("Normalize: got %+v, expected %+v", normalized, expected)
 	}
 }
+
+func TestConjugate(t *testing.T) {
+	q := types.NewQuaternion(1, 2, 3, 4)
+	conjugate := q.Conjugate()
+	expected := &types.Quaternion{X: -1, Y: -2, Z: -3, W: 4}
+	if !quaternionsEqual(conjugate, expected) {
+		t.Errorf("Conjugate: got %+v, expected %+v", conjugate, expected)
+	}
+}
+
+func TestRotateVector(t *testing.T) {
+	// Test a known rotation:
+	// For q = (0,0,0,1) and v = (1,0,0),
+	// the expected result is (1,0,0)
+	q := types.IdentityQuaternion()
+	v := &types.Vector3{X: 1, Y: 0, Z: 0}
+	result := q.RotateVector(v)
+	if v.X != result.X || v.Y != result.Y || v.Z != result.Z {
+		t.Errorf("RotateVector: got %+v, expected %+v", result, v)
+	}
+}
+
+func TestIntegrate(t *testing.T) {
+	// Test a known integration:
+	// For q = (0,0,0,1) and w = (0,0,0),
+	// the expected result is (0,0,0,1)
+	q := types.IdentityQuaternion()
+	w := types.Vector3{X: 0, Y: 0, Z: 0}
+	dt := 1.0
+	result := q.Integrate(w, dt)
+	expected := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 1}
+	if !quaternionsEqual(result, expected) {
+		t.Errorf("Integrate: got %+v, expected %+v", result, expected)
+	}
+}

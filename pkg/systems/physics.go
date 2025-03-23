@@ -192,7 +192,7 @@ func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce 
 		entity.AngularVelocity.Z += entity.AngularAcceleration.Z * dt
 
 		// Integrate orientation quaternion
-		entity.Orientation.Integrate(*entity.AngularVelocity, dt)
+		entity.Orientation.Quat.Integrate(*entity.AngularVelocity, dt)
 	}
 }
 
