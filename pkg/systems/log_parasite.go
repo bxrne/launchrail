@@ -46,8 +46,10 @@ func (s *LogParasiteSystem) processData() {
 				"altitude", state.Position.Vec.Y,
 				"velocity", state.Velocity.Vec.Y,
 				"acceleration", state.Acceleration.Vec.Y,
+				"orientation", state.Orientation.Quat,
 				"thrust", state.Motor.GetThrust(),
 				"motor_state", state.Motor.GetState(),
+				"parachute_deployed", state.Parachute.Deployed,
 			)
 		case <-s.done:
 			return

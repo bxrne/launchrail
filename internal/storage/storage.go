@@ -130,11 +130,11 @@ func (s *Storage) Write(data []string) error {
 	if err := s.writer.Write(data); err != nil {
 		return fmt.Errorf("failed to write data: %v", err)
 	}
-	s.writer.Flush()
 
 	if err := s.writer.Error(); err != nil {
 		return fmt.Errorf("failed to flush data: %v", err)
 	}
+	s.writer.Flush()
 
 	return nil
 }
