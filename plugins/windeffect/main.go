@@ -29,8 +29,9 @@ func (p *WindEffectPlugin) Version() string {
 }
 
 func (p *WindEffectPlugin) BeforeSimStep(state *states.PhysicsState) error {
-	// Apply wind effect based on altitude
-	_ = p.windSpeed * math.Sin(state.Time)
+
+	f := p.windSpeed * math.Sin(state.Time)
+	state.Velocity.Vec.X += f
 	return nil
 }
 
