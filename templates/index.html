@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Launchrail</title>
     <link href="https://unpkg.com/@primer/css@^20.2.4/dist/primer.css" rel="stylesheet" />
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
 </head>
 
 <body class="bg-gray-light p-4">
@@ -56,10 +56,10 @@
                       temperature_lapse_rate: 0.0065
            </textarea>
         </div>
-        <button type="submit" class="btn btn-primary mt-3">Start Simulation</button>
+        <button type="submit" class="btn btn-primary mt-3">Start</button>
     </form>
 
-    <div class="Box mt-4 p-3 border border-gray bg-white">
+    <div id="response" class="Box mt-4 p-3 border border-gray bg-white">
         Response will appear here...
     </div>
 </body>
