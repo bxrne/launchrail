@@ -70,48 +70,83 @@ type Simulation struct {
 	GroundTolerance float64 `mapstructure:"ground_tolerance"` // Add ground tolerance
 }
 
-// Config represents the overall application configuration.
-type Config struct {
-	App        App        `mapstructure:"app"`
-	Logging    Logging    `mapstructure:"logging"`
+// Engine represents the engine configuration (simulation specific).
+type Engine struct {
 	External   External   `mapstructure:"external"`
 	Options    Options    `mapstructure:"options"`
 	Simulation Simulation `mapstructure:"simulation"`
-	Plugins    Plugins    `mapstructure:"plugins"`
+}
+
+// Setup represents the setup configuration.
+type Setup struct {
+	App     App     `mapstructure:"app"`
+	Logging Logging `mapstructure:"logging"`
+	Plugins Plugins `mapstructure:"plugins"`
+}
+
+// Server represents the server configuration.
+type Server struct {
+	Port int `mapstructure:"port"`
+}
+
+// Config represents the overall application configuration.
+type Config struct {
+	Setup  Setup  `mapstructure:"setup"`
+	Server Server `mapstructure:"server"`
+	Engine Engine `mapstructure:"engine"`
 }
 
 // String returns the configuration as a map of strings, useful for testing.
 func (c *Config) String() map[string]string {
 	marshalled := make(map[string]string)
-	marshalled["app.name"] = c.App.Name
-	marshalled["app.version"] = c.App.Version
-	marshalled["logging.level"] = c.Logging.Level
-	marshalled["app.base_dir"] = c.App.BaseDir
-	marshalled["external.openrocket_version"] = c.External.OpenRocketVersion
-	marshalled["options.motor_designation"] = c.Options.MotorDesignation
-	marshalled["options.openrocket_file"] = c.Options.OpenRocketFile
-	marshalled["options.launchrail.length"] = fmt.Sprintf("%.2f", c.Options.Launchrail.Length)
-	marshalled["options.launchrail.angle"] = fmt.Sprintf("%.2f", c.Options.Launchrail.Angle)
-	marshalled["options.launchrail.orientation"] = fmt.Sprintf("%.2f", c.Options.Launchrail.Orientation)
-	marshalled["options.launchsite.latitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Latitude)
-	marshalled["options.launchsite.longitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Longitude)
-	marshalled["options.launchsite.altitude"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Altitude)
-	marshalled["options.launchsite.atmosphere.isa_configuration.specific_gas_constant"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SpecificGasConstant)
-	marshalled["options.launchsite.atmosphere.isa_configuration.gravitational_accel"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel)
-	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_density"] = fmt.Sprintf("%.3f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelDensity)
-	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_temperature"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelTemperature)
-	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_pressure"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelPressure)
-	marshalled["options.launchsite.atmosphere.isa_configuration.ratio_specific_heats"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.RatioSpecificHeats)
-	marshalled["options.launchsite.atmosphere.isa_configuration.temperature_lapse_rate"] = fmt.Sprintf("%.2f", c.Options.Launchsite.Atmosphere.ISAConfiguration.TemperatureLapseRate)
-	marshalled["simulation.step"] = fmt.Sprintf("%.2f", c.Simulation.Step)
-	marshalled["simulation.max_time"] = fmt.Sprintf("%.2f", c.Simulation.MaxTime)
-	marshalled["simulation.ground_tolerance"] = fmt.Sprintf("%.2f", c.Simulation.GroundTolerance)
 
-	if len(c.Plugins.Paths) > 0 {
-		marshalled["plugins.paths"] = c.Plugins.Paths[0]
+	// Setup Config
+	marshalled["app.name"] = c.Setup.App.Name
+	marshalled["app.version"] = c.Setup.App.Version
+	marshalled["app.base_dir"] = c.Setup.App.BaseDir
+	marshalled["logging.level"] = c.Setup.Logging.Level
+
+	// Engine -> External
+	marshalled["external.openrocket_version"] = c.Engine.External.OpenRocketVersion
+
+	// Engine -> Options
+	marshalled["options.motor_designation"] = c.Engine.Options.MotorDesignation
+	marshalled["options.openrocket_file"] = c.Engine.Options.OpenRocketFile
+
+	// Launchrail
+	marshalled["options.launchrail.length"] = fmt.Sprintf("%.2f", c.Engine.Options.Launchrail.Length)
+	marshalled["options.launchrail.angle"] = fmt.Sprintf("%.2f", c.Engine.Options.Launchrail.Angle)
+	marshalled["options.launchrail.orientation"] = fmt.Sprintf("%.2f", c.Engine.Options.Launchrail.Orientation)
+
+	// Launchsite
+	marshalled["options.launchsite.latitude"] = fmt.Sprintf("%.4f", c.Engine.Options.Launchsite.Latitude)
+	marshalled["options.launchsite.longitude"] = fmt.Sprintf("%.4f", c.Engine.Options.Launchsite.Longitude)
+	marshalled["options.launchsite.altitude"] = fmt.Sprintf("%.2f", c.Engine.Options.Launchsite.Altitude)
+
+	// Atmosphere
+	isa := c.Engine.Options.Launchsite.Atmosphere.ISAConfiguration
+	marshalled["options.launchsite.atmosphere.isa_configuration.specific_gas_constant"] = fmt.Sprintf("%.3f", isa.SpecificGasConstant)
+	marshalled["options.launchsite.atmosphere.isa_configuration.gravitational_accel"] = fmt.Sprintf("%.3f", isa.GravitationalAccel)
+	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_density"] = fmt.Sprintf("%.3f", isa.SeaLevelDensity)
+	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_temperature"] = fmt.Sprintf("%.2f", isa.SeaLevelTemperature)
+	marshalled["options.launchsite.atmosphere.isa_configuration.sea_level_pressure"] = fmt.Sprintf("%.2f", isa.SeaLevelPressure)
+	marshalled["options.launchsite.atmosphere.isa_configuration.ratio_specific_heats"] = fmt.Sprintf("%.2f", isa.RatioSpecificHeats)
+	marshalled["options.launchsite.atmosphere.isa_configuration.temperature_lapse_rate"] = fmt.Sprintf("%.2f", isa.TemperatureLapseRate)
+
+	// Simulation
+	marshalled["simulation.step"] = fmt.Sprintf("%.4f", c.Engine.Simulation.Step)
+	marshalled["simulation.max_time"] = fmt.Sprintf("%.2f", c.Engine.Simulation.MaxTime)
+	marshalled["simulation.ground_tolerance"] = fmt.Sprintf("%.2f", c.Engine.Simulation.GroundTolerance)
+
+	// Plugins - Store full list as comma-separated values
+	if len(c.Setup.Plugins.Paths) > 0 {
+		marshalled["plugins.paths"] = fmt.Sprintf("%v", c.Setup.Plugins.Paths)
 	} else {
 		marshalled["plugins.paths"] = ""
 	}
+
+	// Server Port
+	marshalled["server.port"] = fmt.Sprintf("%d", c.Server.Port)
 
 	return marshalled
 }

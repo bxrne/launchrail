@@ -23,7 +23,7 @@ func (o *OpenrocketDocument) Bytes() []byte {
 }
 
 // Validate checks if the OpenrocketDocument is valid for this program
-func (o *OpenrocketDocument) Validate(cfg *config.Config) error {
+func (o *OpenrocketDocument) Validate(cfg *config.Engine) error {
 	// Check if the OpenRocket version matches the expected version
 	if fmt.Sprintf("OpenRocket %s", cfg.External.OpenRocketVersion) != o.Creator {
 		return fmt.Errorf("OpenRocket version mismatch: expected %s, got %s", cfg.External.OpenRocketVersion, o.Creator)
