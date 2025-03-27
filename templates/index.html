@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launchrail</title>
+    <link href="https://unpkg.com/@primer/css@^20.2.4/dist/primer.css" rel="stylesheet" />
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+</head>
+
+<body class="bg-gray-light p-4">
+    <h1 class="h1 text-center p-4">Launchrail Simulation</h1>
+    <form class="Box p-4" hx-post="/run" hx-target="#response" hx-swap="innerHTML">
+        <div class="form-group">
+            <label for="config" class="f4">Configuration (YAML):</label>
+            <textarea id="config" name="config" class="form-control mt-2" required rows="12">
+              app:
+                name: "launchrail-dev"
+                version: "0.0.1"
+                base_dir: ".launchrail"
+
+              logging:
+                level: "debug"
+
+              simulation:
+                step: 0.001
+                max_time: 300.0
+                ground_tolerance: 0.06
+
+              plugins:
+                paths:
+                  - "./plugins/windeffect.so"
+
+              external:
+                openrocket_version: "23.09"
+
+              options:
+                motor_designation: "269H110-14A"
+                openrocket_file: "./testdata/openrocket/l1.ork"
+                launchrail:
+                  length: 2.21
+                  angle: 5.0
+                  orientation: 0.01
+                launchsite:
+                  latitude: 37.7749
+                  longitude: -122.4194
+                  altitude: 1.0
+                  atmosphere:
+                    isa_configuration:
+                      specific_gas_constant: 287.05
+                      gravitational_accel: 9.81
+                      sea_level_density: 1.225
+                      sea_level_temperature: 288.15
+                      sea_level_pressure: 101325.0
+                      ratio_specific_heats: 1.4
+                      temperature_lapse_rate: 0.0065
+           </textarea>
+        </div>
+        <button type="submit" class="btn btn-primary mt-3">Start</button>
+    </form>
+
+    <div id="response" class="Box mt-4 p-3 border border-gray bg-white">
+        Response will appear here...
+    </div>
+</body>
+</html>
