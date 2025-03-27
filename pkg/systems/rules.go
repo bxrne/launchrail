@@ -18,7 +18,7 @@ const (
 // RulesSystem enforces rules of flight
 type RulesSystem struct {
 	world     *ecs.World
-	config    *config.Config
+	config    *config.Engine
 	entities  []*states.PhysicsState
 	hasApogee bool
 	hasLanded bool // Add this field
@@ -36,7 +36,7 @@ func (s *RulesSystem) GetLastEvent() Event {
 }
 
 // NewRulesSystem creates a new RulesSystem
-func NewRulesSystem(world *ecs.World, config *config.Config) *RulesSystem {
+func NewRulesSystem(world *ecs.World, config *config.Engine) *RulesSystem {
 	return &RulesSystem{
 		world:     world,
 		config:    config,

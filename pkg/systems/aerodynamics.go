@@ -34,7 +34,7 @@ func (a *AerodynamicSystem) GetAirDensity(altitude float64) float64 {
 }
 
 // NewAerodynamicSystem creates a new AerodynamicSystem
-func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Config) *AerodynamicSystem {
+func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Engine) *AerodynamicSystem {
 	return &AerodynamicSystem{
 		world:    world,
 		entities: make([]*states.PhysicsState, 0),

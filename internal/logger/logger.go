@@ -21,7 +21,7 @@ var (
 
 // GetLogger returns the singleton instance of the logger.
 func GetLogger(cfg *config.Config) *logf.Logger {
-	switch cfg.Logging.Level {
+	switch cfg.Setup.Logging.Level {
 	case "debug":
 		opts.Level = logf.DebugLevel
 	case "info":
