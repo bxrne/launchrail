@@ -24,42 +24,42 @@ func runSim(cfg *config.Config) {
 	}
 }
 
+func configFromCtx(c *gin.Context) (*config.Config, error) {
+	yamlData, err := c.GetRawData()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read request body: %w", err)
+	}
+
+	v := viper.New()
+	v.SetConfigType("yaml")
+
+	if err := v.ReadConfig(bytes.NewBuffer(yamlData)); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
+	var simConfig config.Config
+	if err := v.Unmarshal(&simConfig); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	if err := simConfig.Validate(); err != nil {
+		return nil, fmt.Errorf("failed to validate config: %w", err)
+	}
+
+	return &simConfig, nil
+}
+
 func main() {
 	r := gin.Default()
 
 	r.POST("/run", func(c *gin.Context) {
-		// Read raw YAML body
-		yamlData, err := c.GetRawData()
+		simConfig, err := configFromCtx(c)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to read request body: %v", err)})
-			return
-		}
-
-		// Create new Viper instance for this request
-		v := viper.New()
-		v.SetConfigType("yaml")
-
-		// Load YAML from request body
-		if err := v.ReadConfig(bytes.NewBuffer(yamlData)); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to parse YAML: %v", err)})
-			return
-		}
-
-		// Create new config instance
-		var simConfig config.Config
-		if err := v.Unmarshal(&simConfig); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to unmarshal config: %v", err)})
-			return
-		}
-
-		// Validate configuration
-		if err := simConfig.Validate(); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		// Run simulation
-		go runSim(&simConfig)
+		go runSim(simConfig)
 
 		c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
 	})
