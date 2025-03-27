@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaunchRail Simulation</title>
+
+    <!-- Include HTMX -->
+    <script src="https://unpkg.com/htmx.org"></script>
+    <!-- Optional: Add some simple styling -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 400px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        #response {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Launchrail Simulation</h1>
+    <form hx-post="/run" hx-target="#response" hx-swap="innerHTML">
+        <label for="config">Simulation Configuration (YAML):</label><br>
+        <textarea id="config" name="config" required>
+app:
+  name: "launchrail-dev"
+  version: "0.0.1"
+  base_dir: ".launchrail"
+
+logging:
+  level: "debug"
+
+simulation:
+  step: 0.001
+  max_time: 300.0
+  ground_tolerance: 0.06
+
+plugins:
+  paths:
+    - "./plugins/windeffect.so"
+
+external:
+  openrocket_version: "23.09"
+
+options:
+  motor_designation: "269H110-14A"
+  openrocket_file: "./testdata/openrocket/l1.ork"
+  launchrail:
+    length: 2.21
+    angle: 5.0
+    orientation: 0.01
+  launchsite:
+    latitude: 37.7749
+    longitude: -122.4194
+    altitude: 1.0
+    atmosphere:
+      isa_configuration:
+        specific_gas_constant: 287.05
+        gravitational_accel: 9.81
+        sea_level_density: 1.225
+        sea_level_temperature: 288.15
+        sea_level_pressure: 101325.0
+        ratio_specific_heats: 1.4
+        temperature_lapse_rate: 0.0065
+        </textarea>
+        <br>
+        <button type="submit">Start Simulation</button>
+    </form>
+
+    <div id="response">Response will appear here...</div>
+</body>
+</html>
+`

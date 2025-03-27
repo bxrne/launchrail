@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// runSim starts the simulation with the given configuration
 func runSim(cfg *config.Config) {
 	log := logger.GetLogger(cfg)
 
@@ -24,16 +25,17 @@ func runSim(cfg *config.Config) {
 	}
 }
 
+// configFromCtx reads the request body and parses it into a config.Config and validates it
 func configFromCtx(c *gin.Context) (*config.Config, error) {
-	yamlData, err := c.GetRawData()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read request body: %w", err)
+	yamlData := c.PostForm("config")
+	if yamlData == "" {
+		return nil, fmt.Errorf("config cannot be empty")
 	}
 
 	v := viper.New()
 	v.SetConfigType("yaml")
 
-	if err := v.ReadConfig(bytes.NewBuffer(yamlData)); err != nil {
+	if err := v.ReadConfig(bytes.NewBufferString(yamlData)); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
@@ -52,6 +54,12 @@ func configFromCtx(c *gin.Context) (*config.Config, error) {
 func main() {
 	r := gin.Default()
 
+	// Landing page (pun intended)
+	r.GET("/", func(c *gin.Context) {
+		c.File("templates/index.html")
+	})
+
+	// Start sim
 	r.POST("/run", func(c *gin.Context) {
 		simConfig, err := configFromCtx(c)
 		if err != nil {
@@ -65,6 +73,6 @@ func main() {
 	})
 
 	if err := r.Run(":8080"); err != nil {
-		panic(err)
+		fmt.Printf("Failed to start server: %v\n", err)
 	}
 }
