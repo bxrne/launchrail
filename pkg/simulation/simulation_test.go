@@ -48,9 +48,11 @@ func setupTestStorage(t *testing.T) (*storage.Stores, func()) {
 // TEST: GIVEN nothing WHEN NewSimulation is called THEN a new Simulation is returned
 func TestNewSimulation(t *testing.T) {
 	cfg := &config.Config{
-		Simulation: config.Simulation{
-			Step:    0.001,
-			MaxTime: 300.0,
+		Engine: config.Engine{
+			Simulation: config.Simulation{
+				Step:    0.001,
+				MaxTime: 300.0,
+			},
 		},
 	}
 	log := logf.New(logf.Opts{})
@@ -66,9 +68,11 @@ func TestNewSimulation(t *testing.T) {
 // TEST: GIVEN a Simulation when LoadRocket is called THEN a new Rocket is returned
 func TestLoadRocket(t *testing.T) {
 	cfg := &config.Config{
-		Simulation: config.Simulation{
-			Step:    0.001,
-			MaxTime: 300.0,
+		Engine: config.Engine{
+			Simulation: config.Simulation{
+				Step:    0.001,
+				MaxTime: 300.0,
+			},
 		},
 	}
 	log := logf.New(logf.Opts{})
@@ -101,9 +105,11 @@ func TestLoadRocket(t *testing.T) {
 // TEST: GIVEN a Simulation WHEN Run is called THEN the simulation runs
 func TestRun(t *testing.T) {
 	cfg := &config.Config{
-		Simulation: config.Simulation{
-			Step:    0.001,
-			MaxTime: 1.0, // Short duration for test
+		Engine: config.Engine{
+			Simulation: config.Simulation{
+				Step:    0.001,
+				MaxTime: 1.0, // Short duration for test
+			},
 		},
 	}
 	log := logf.New(logf.Opts{})

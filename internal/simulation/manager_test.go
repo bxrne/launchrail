@@ -33,15 +33,19 @@ func TestManager_Initialize(t *testing.T) {
 			name: "successful initialization",
 			setupConfig: func() *config.Config {
 				return &config.Config{
-					App: config.App{
-						BaseDir: tempDir,
+					Setup: config.Setup{
+						App: config.App{
+							BaseDir: tempDir,
+						},
 					},
-					Options: config.Options{
-						MotorDesignation: "269H110-14A",
-						OpenRocketFile:   "../../testdata/openrocket/l1.ork",
-					},
-					External: config.External{
-						OpenRocketVersion: "23.09",
+					Engine: config.Engine{
+						Options: config.Options{
+							MotorDesignation: "269H110-14A",
+							OpenRocketFile:   "../../testdata/openrocket/l1.ork",
+						},
+						External: config.External{
+							OpenRocketVersion: "23.09",
+						},
 					},
 				}
 			},
@@ -52,12 +56,16 @@ func TestManager_Initialize(t *testing.T) {
 			name: "invalid motor designation",
 			setupConfig: func() *config.Config {
 				return &config.Config{
-					App: config.App{
-						BaseDir: tempDir,
+					Setup: config.Setup{
+						App: config.App{
+							BaseDir: tempDir,
+						},
 					},
-					Options: config.Options{
-						MotorDesignation: "invalid-motor",
-						OpenRocketFile:   "../../testdata/openrocket/l1.ork",
+					Engine: config.Engine{
+						Options: config.Options{
+							MotorDesignation: "invalid-motor",
+							OpenRocketFile:   "../../testdata/openrocket/l1.ork",
+						},
 					},
 				}
 			},
@@ -68,12 +76,16 @@ func TestManager_Initialize(t *testing.T) {
 			name: "invalid OpenRocket file",
 			setupConfig: func() *config.Config {
 				return &config.Config{
-					App: config.App{
-						BaseDir: tempDir,
+					Setup: config.Setup{
+						App: config.App{
+							BaseDir: tempDir,
+						},
 					},
-					Options: config.Options{
-						MotorDesignation: "269H110-14A",
-						OpenRocketFile:   "nonexistent.ork",
+					Engine: config.Engine{
+						Options: config.Options{
+							MotorDesignation: "269H110-14A",
+							OpenRocketFile:   "nonexistent.ork",
+						},
 					},
 				}
 			},
@@ -113,19 +125,23 @@ func TestManager_Run(t *testing.T) {
 			name: "successful run",
 			setupManager: func() *simulation.Manager {
 				cfg := &config.Config{
-					App: config.App{
-						BaseDir: tempDir,
+					Setup: config.Setup{
+						App: config.App{
+							BaseDir: tempDir,
+						},
 					},
-					Simulation: config.Simulation{
-						Step:    0.01,
-						MaxTime: 10,
-					},
-					Options: config.Options{
-						MotorDesignation: "269H110-14A",
-						OpenRocketFile:   "../../testdata/openrocket/l1.ork",
-					},
-					External: config.External{
-						OpenRocketVersion: "23.09",
+					Engine: config.Engine{
+						Simulation: config.Simulation{
+							Step:    0.01,
+							MaxTime: 10,
+						},
+						Options: config.Options{
+							MotorDesignation: "269H110-14A",
+							OpenRocketFile:   "../../testdata/openrocket/l1.ork",
+						},
+						External: config.External{
+							OpenRocketVersion: "23.09",
+						},
 					},
 				}
 				manager := simulation.NewManager(cfg, &log)
@@ -164,15 +180,19 @@ func TestManager_Close(t *testing.T) {
 	f.Close()
 
 	cfg := &config.Config{
-		App: config.App{
-			BaseDir: tempDir,
+		Setup: config.Setup{
+			App: config.App{
+				BaseDir: tempDir,
+			},
 		},
-		Options: config.Options{
-			MotorDesignation: "269H110-14A",
-			OpenRocketFile:   "../../testdata/openrocket/l1.ork",
-		},
-		External: config.External{
-			OpenRocketVersion: "23.09",
+		Engine: config.Engine{
+			Options: config.Options{
+				MotorDesignation: "269H110-14A",
+				OpenRocketFile:   "../../testdata/openrocket/l1.ork",
+			},
+			External: config.External{
+				OpenRocketVersion: "23.09",
+			},
 		},
 	}
 
