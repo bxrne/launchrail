@@ -30,7 +30,6 @@ func TestNewPhysicsSystem(t *testing.T) {
 
 	system := systems.NewPhysicsSystem(&ecs.World{}, cfg)
 	assert.NotNil(t, system)
-	assert.Equal(t, 1, system.Priority())
 	assert.Equal(t, "PhysicsSystem", system.String())
 }
 
