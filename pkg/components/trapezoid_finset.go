@@ -44,14 +44,6 @@ func NewTrapezoidFinsetFromORK(basic ecs.BasicEntity, ork *openrocket.RocketDocu
 	}
 }
 
-// calculateFinMass calculates mass based on material density and dimensions
-func CalculateFinMass(fin *openrocket.TrapezoidFinset) float64 {
-	area := (fin.RootChord + fin.TipChord) * fin.Height / 2
-	volume := area * fin.Thickness
-	density := fin.Material.Density
-	return volume * density
-}
-
 // GetPlanformArea returns the planform area of the finset
 func (f *TrapezoidFinset) GetPlanformArea() float64 {
 	return (f.RootChord + f.TipChord) * f.Span / 2
