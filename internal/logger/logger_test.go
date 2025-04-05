@@ -9,8 +9,10 @@ import (
 
 // Barebones config for testing
 var cfg = &config.Config{
-	Logging: config.Logging{
-		Level: "info",
+	Setup: config.Setup{
+		Logging: config.Logging{
+			Level: "info",
+		},
 	},
 }
 

@@ -46,7 +46,7 @@ func (s *PhysicsSystem) Remove(basic ecs.BasicEntity) {
 }
 
 // NewPhysicsSystem creates a new PhysicsSystem
-func NewPhysicsSystem(world *ecs.World, cfg *config.Config) *PhysicsSystem {
+func NewPhysicsSystem(world *ecs.World, cfg *config.Engine) *PhysicsSystem {
 	workers := 4
 	return &PhysicsSystem{
 		world:           world,

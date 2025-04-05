@@ -39,14 +39,14 @@ func NewManager(cfg *config.Config, log *logf.Logger) *Manager {
 
 func (m *Manager) Initialize() error {
 	// Load motor data
-	motorData, err := thrustcurves.Load(m.cfg.Options.MotorDesignation, http_client.NewHTTPClient())
+	motorData, err := thrustcurves.Load(m.cfg.Engine.Options.MotorDesignation, http_client.NewHTTPClient())
 	if err != nil {
 		return err
 	}
 	m.log.Debug("Motor data loaded", "Designation", motorData.Designation)
 
 	// Load OpenRocket data
-	orkData, err := openrocket.Load(m.cfg.Options.OpenRocketFile, m.cfg.External.OpenRocketVersion)
+	orkData, err := openrocket.Load(m.cfg.Engine.Options.OpenRocketFile, m.cfg.Engine.External.OpenRocketVersion)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (m *Manager) Initialize() error {
 
 func (m *Manager) initializeStorages() error {
 	// Initialize motion storage
-	motionStorage, err := storage.NewStorage(m.cfg.App.BaseDir, m.simHash, storage.MOTION)
+	motionStorage, err := storage.NewStorage(m.cfg.Setup.App.BaseDir, m.simHash, storage.MOTION)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (m *Manager) initializeStorages() error {
 	}
 
 	// Initialize events storage
-	eventsStorage, err := storage.NewStorage(m.cfg.App.BaseDir, m.simHash, storage.EVENTS)
+	eventsStorage, err := storage.NewStorage(m.cfg.Setup.App.BaseDir, m.simHash, storage.EVENTS)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (m *Manager) initializeStorages() error {
 		return err
 	}
 
-	dynamicsStorage, err := storage.NewStorage(m.cfg.App.BaseDir, m.simHash, storage.DYNAMICS)
+	dynamicsStorage, err := storage.NewStorage(m.cfg.Setup.App.BaseDir, m.simHash, storage.DYNAMICS)
 	if err != nil {
 		return err
 	}

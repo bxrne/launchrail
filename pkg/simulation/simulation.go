@@ -52,25 +52,25 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 		pluginManager: plugin.NewManager(*log),
 	}
 
-	for _, pluginPath := range cfg.Plugins.Paths {
+	for _, pluginPath := range cfg.Setup.Plugins.Paths {
 		if err := sim.pluginManager.LoadPlugin(pluginPath); err != nil {
 			return nil, err
 		}
 	}
 
 	// Initialize systems with optimized worker counts
-	sim.physicsSystem = systems.NewPhysicsSystem(world, cfg)
-	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, 4, cfg)
-	rules := systems.NewRulesSystem(world, cfg)
+	sim.physicsSystem = systems.NewPhysicsSystem(world, &cfg.Engine)
+	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, 4, &cfg.Engine)
+	rules := systems.NewRulesSystem(world, &cfg.Engine)
 
 	sim.rulesSystem = rules
 
 	// Initialize launch rail system with config values
 	sim.launchRailSystem = systems.NewLaunchRailSystem(
 		world,
-		cfg.Options.Launchrail.Length,
-		cfg.Options.Launchrail.Angle,
-		cfg.Options.Launchrail.Orientation,
+		cfg.Engine.Options.Launchrail.Length,
+		cfg.Engine.Options.Launchrail.Angle,
+		cfg.Engine.Options.Launchrail.Orientation,
 	)
 
 	// Initialize parasite systems with specific store types
@@ -162,7 +162,7 @@ func (s *Simulation) Run() error {
 	}()
 
 	// Validate simulation parameters
-	if s.config.Simulation.Step <= 0 || s.config.Simulation.Step > 0.01 {
+	if s.config.Engine.Simulation.Step <= 0 || s.config.Engine.Simulation.Step > 0.01 {
 		return fmt.Errorf("invalid simulation step: must be between 0 and 0.01")
 	}
 
@@ -177,10 +177,10 @@ func (s *Simulation) Run() error {
 			break
 		}
 
-		s.currentTime += s.config.Simulation.Step
+		s.currentTime += s.config.Engine.Simulation.Step
 
 		// Also add a maximum time check to prevent infinite loops
-		if s.currentTime >= s.config.Simulation.MaxTime {
+		if s.currentTime >= s.config.Engine.Simulation.MaxTime {
 			s.logger.Info("Reached maximum simulation time")
 			break
 		}
@@ -222,13 +222,13 @@ func (s *Simulation) updateSystems() error {
 	}
 
 	// Update motor first
-	if err := state.Motor.Update(s.config.Simulation.Step); err != nil {
+	if err := state.Motor.Update(s.config.Engine.Simulation.Step); err != nil {
 		return err
 	}
 
 	// Execute systems in order and propagate state changes
 	for _, system := range s.systems {
-		if err := system.Update(s.config.Simulation.Step); err != nil {
+		if err := system.Update(s.config.Engine.Simulation.Step); err != nil {
 			return fmt.Errorf("system %T update error: %w", system, err)
 		}
 

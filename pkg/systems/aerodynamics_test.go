@@ -14,7 +14,7 @@ import (
 
 // TEST: GIVEN a new aerodynamic system WHEN getting air density at sea level THEN returns correct value
 func TestAerodynamicSystem_GetAirDensity_SeaLevel(t *testing.T) {
-	cfg := &config.Config{
+	cfg := &config.Engine{
 		Options: config.Options{
 			Launchsite: config.Launchsite{
 				Atmosphere: config.Atmosphere{
@@ -36,7 +36,7 @@ func TestAerodynamicSystem_GetAirDensity_SeaLevel(t *testing.T) {
 
 // TEST: GIVEN a moving rocket WHEN calculating drag THEN returns correct drag force
 func TestAerodynamicSystem_CalculateDrag(t *testing.T) {
-	cfg := &config.Config{
+	cfg := &config.Engine{
 		Options: config.Options{
 			Launchsite: config.Launchsite{
 				Atmosphere: config.Atmosphere{
@@ -68,7 +68,7 @@ func TestAerodynamicSystem_CalculateDrag(t *testing.T) {
 
 // TEST: GIVEN a rocket at different altitudes WHEN getting speed of sound THEN returns correct values
 func TestAerodynamicSystem_GetSpeedOfSound(t *testing.T) {
-	cfg := &config.Config{
+	cfg := &config.Engine{
 		Options: config.Options{
 			Launchsite: config.Launchsite{
 				Atmosphere: config.Atmosphere{
@@ -94,7 +94,7 @@ func TestAerodynamicSystem_GetSpeedOfSound(t *testing.T) {
 // TEST: GIVEN a system with multiple entities WHEN updating THEN processes all entities
 func TestAerodynamicSystem_Update(t *testing.T) {
 	world := ecs.World{}
-	cfg := &config.Config{
+	cfg := &config.Engine{
 		Options: config.Options{
 			Launchsite: config.Launchsite{
 				Atmosphere: config.Atmosphere{

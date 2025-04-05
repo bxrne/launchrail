@@ -13,7 +13,7 @@ import (
 
 // TEST: GIVEN a new physics system WHEN initialized THEN has correct default values
 func TestNewPhysicsSystem(t *testing.T) {
-	cfg := &config.Config{
+	cfg := &config.Engine{
 		Options: config.Options{
 			Launchsite: config.Launchsite{
 				Atmosphere: config.Atmosphere{
@@ -36,7 +36,7 @@ func TestNewPhysicsSystem(t *testing.T) {
 
 // TEST: GIVEN an entity with invalid mass WHEN calculating net force THEN returns zero
 func TestCalculateNetForce_InvalidMass(t *testing.T) {
-	cfg := &config.Config{
+	cfg := &config.Engine{
 		Options: config.Options{
 			Launchsite: config.Launchsite{
 				Atmosphere: config.Atmosphere{
@@ -64,7 +64,7 @@ func TestCalculateNetForce_InvalidMass(t *testing.T) {
 
 // TEST: GIVEN an entity with rotation WHEN updating THEN updates angular state
 func TestUpdate_AngularMotion(t *testing.T) {
-	cfg := &config.Config{
+	cfg := &config.Engine{
 		Options: config.Options{
 			Launchsite: config.Launchsite{
 				Atmosphere: config.Atmosphere{
@@ -95,14 +95,14 @@ func TestUpdate_AngularMotion(t *testing.T) {
 
 // TEST: GIVEN an entity with invalid timestep WHEN updating THEN returns error
 func TestUpdate_InvalidTimestep(t *testing.T) {
-	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Config{})
+	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Engine{})
 	err := system.Update(0)
 	assert.Error(t, err)
 }
 
 // TEST: GIVEN a system with invalid entity WHEN updating THEN returns error
 func TestUpdate_InvalidEntity(t *testing.T) {
-	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Config{})
+	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Engine{})
 	entity := &states.PhysicsState{
 		// Missing required fields
 	}
@@ -115,7 +115,7 @@ func TestUpdate_InvalidEntity(t *testing.T) {
 
 // TEST: GIVEN a system with entity WHEN removing entity THEN entity is removed
 func TestRemoveEntity(t *testing.T) {
-	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Config{})
+	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Engine{})
 	entity := &states.PhysicsState{
 		Entity: &ecs.BasicEntity{},
 		Mass:   &types.Mass{Value: 1.0},

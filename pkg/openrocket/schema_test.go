@@ -150,7 +150,7 @@ func TestSchemaOpenrocketDocumentValidate(t *testing.T) {
 		},
 	}
 
-	cfg := &config.Config{
+	cfg := &config.Engine{
 		External: config.External{
 			OpenRocketVersion: "15.03",
 		},
@@ -169,7 +169,7 @@ func TestSchemaOpenrocketDocumentValidateError(t *testing.T) {
 		Rocket:  openrocket.RocketDocument{},
 	}
 
-	cfg := &config.Config{
+	cfg := &config.Engine{
 		External: config.External{
 			OpenRocketVersion: "15.03",
 		},
