@@ -7,35 +7,64 @@
     <link href="https://unpkg.com/@primer/css@^20.2.4/dist/primer.css" rel="stylesheet" />
     <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
 </head>
-<body class="bg-gray-100">
-    <div class="container mx-auto px-4 py-8">
-        <h1 class="text-2xl font-bold mb-6">Simulation Records</h1>
+<body class="bg-gray-light">
+    <!-- Navigation Bar -->
+    <div class="Header">
+        <div class="Header-item">
+            <a href="/" class="Header-link f4 d-flex flex-items-center">
+                <svg class="octicon mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+                    <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm4.879-2.773 4.264 2.559a.25.25 0 0 1 0 .428l-4.264 2.559A.25.25 0 0 1 6 10.559V5.442a.25.25 0 0 1 .379-.215Z"></path>
+                </svg>
+                <span class="text-bold">Launchrail</span>
+            </a>
+        </div>
+        <div class="Header-item">
+            <a href="/" class="Header-link">Home</a>
+        </div>
+        <div class="Header-item">
+            <a href="/data" class="Header-link">Simulation Records</a>
+        </div>
+    </div>
+
+    <div class="container-lg p-4">
+        <h1 class="h1 text-center color-fg-accent p-4">Simulation Records</h1>
         
-        <div class="grid grid-cols-1 gap-4">
+        <div class="Box color-shadow-medium mb-4">
             {{ range .Records }}
-            <div class="bg-white p-4 rounded-lg shadow">
-                <h2 class="text-xl font-semibold">{{ .Name }}</h2>
-                <p class="text-gray-600">{{ .Timestamp.Format "2006-01-02 15:04:05" }}</p>
-                <div class="mt-4 space-x-2">
+            <div class="Box-row d-flex flex-column">
+                <h3 class="h3 color-fg-accent">{{ .Name }}</h3>
+                <p class="color-fg-muted">{{ .Timestamp.Format "2006-01-02 15:04:05" }}</p>
+                <div class="d-flex flex-wrap mt-2">
                     <button 
-                        class="px-4 py-2 bg-blue-500 text-white rounded"
+                        class="btn btn-primary mr-2 mb-2"
                         hx-get="/data/{{ .Hash }}/motion"
                         hx-target="#data-view"
                         hx-push-url="true">
+                        <svg class="octicon mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+                            <path d="M8 15a.5.5 0 0 1-.5-.5v-7a.5.5 0 0 1 1 0v7a.5.5 0 0 1-.5.5Zm-3-9a.5.5 0 0 1-.5-.5v-3a.5.5 0 0 1 1 0v3a.5.5 0 0 1-.5.5ZM4 9a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 1 0v1a.5.5 0 0 1-.5.5Zm3-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 1 0v1a.5.5 0 0 1-.5.5Zm5 3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 1 0v1a.5.5 0 0 1-.5.5Z"></path>
+                        </svg>
                         Motion
                     </button>
                     <button 
-                        class="px-4 py-2 bg-green-500 text-white rounded"
+                        class="btn btn-success mr-2 mb-2"
                         hx-get="/data/{{ .Hash }}/events"
                         hx-target="#data-view"
                         hx-push-url="true">
+                        <svg class="octicon mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+                            <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm0-1.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13ZM7 6h2v5H7z"></path>
+                            <path d="M7 3h2v2H7z"></path>
+                        </svg>
                         Events
                     </button>
                     <button 
-                        class="px-4 py-2 bg-purple-500 text-white rounded"
+                        class="btn btn-outline mr-2 mb-2"
                         hx-get="/data/{{ .Hash }}/dynamics"
                         hx-target="#data-view"
                         hx-push-url="true">
+                        <svg class="octicon mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+                            <path d="M11.84 6.545a.75.75 0 0 0-1.238-.07l-1.84 2.898-.919-1.225a.75.75 0 0 0-1.2.9l1.5 2c.067.089.161.15.266.177a.75.75 0 0 0 .75-.198l2.5-3.942a.75.75 0 0 0-.319-1.04Z"></path>
+                            <path d="m11.935 8.483 2.535 1.83a2 2 0 0 1 .185 3.034 2.5 2.5 0 0 1-3.648-3.284L6.5 8.13V7s2.5.5 4 1.5a.5.5 0 0 0 .5 0L16 6.5v2.75a.75.75 0 0 1-1.5 0V8.87l-2.565 1.614ZM4 19a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm-2-4a2 2 0 1 0 4 0 2 2 0 0 0-4 0Z"></path>
+                        </svg>
                         Dynamics
                     </button>
                 </div>
@@ -43,10 +72,15 @@
             {{ end }}
         </div>
 
-        <div id="data-view" class="mt-8">
-            <!-- Data will be loaded here -->
+        <div id="data-view" class="Box color-shadow-medium p-2">
+            <div class="blankslate">
+                <svg class="octicon blankslate-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="24" height="24">
+                    <path d="M2 2.75C2 1.784 2.784 1 3.75 1h8.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 12.25 15h-8.5A1.75 1.75 0 0 1 2 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM5 6.25a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 5 6.25Zm0 4a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 5 10.25Z"></path>
+                </svg>
+                <h3 class="blankslate-heading">Select a data view</h3>
+                <p>Click one of the buttons above to view simulation data</p>
+            </div>
         </div>
     </div>
 </body>
-</html>
 </html>

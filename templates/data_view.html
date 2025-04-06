@@ -1,19 +1,26 @@
-<div class="bg-white p-6 rounded-lg shadow">
-    <h2 class="text-xl font-bold mb-4">{{ .Title }}</h2>
-    <div class="overflow-x-auto">
-        <table class="min-w-full">
+<div class="Box p-3 color-shadow-medium">
+    <div class="Box-header">
+        <h2 class="Box-title d-flex flex-items-center">
+            <svg class="octicon mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+                <path d="M3.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25H9.5a.25.25 0 0 1-.25-.25v-4.5a.25.25 0 0 0-.25-.25Zm5.75.75v3.5h3.5l-3.5-3.5Z"></path>
+            </svg>
+            {{ .Title }}
+        </h2>
+    </div>
+    <div class="Box-body overflow-auto">
+        <table class="table-fixed width-full">
             <thead>
-                <tr>
+                <tr class="color-bg-subtle">
                     {{ range .Headers }}
-                    <th class="px-4 py-2 bg-gray-100">{{ . }}</th>
+                    <th class="p-2">{{ . }}</th>
                     {{ end }}
                 </tr>
             </thead>
             <tbody>
                 {{ range .Data }}
-                <tr>
+                <tr class="border-top">
                     {{ range . }}
-                    <td class="border px-4 py-2">{{ . }}</td>
+                    <td class="p-2">{{ . }}</td>
                     {{ end }}
                 </tr>
                 {{ end }}
