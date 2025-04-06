@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/bxrne/launchrail/internal/config"
@@ -53,13 +54,20 @@ func configFromCtx(c *gin.Context) (*config.Config, error) {
 
 func main() {
 	r := gin.Default()
+	r.LoadHTMLGlob("templates/*html")
 
+	dataHandler, err := NewDataHandler(".launchrail")
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Data routes
+	r.GET("/data", dataHandler.ListRecords)
+	r.GET("/data/:hash/:type", dataHandler.GetRecordData)
 	// Landing page (pun intended)
 	r.GET("/", func(c *gin.Context) {
 		c.File("templates/index.html")
 	})
 
-	// Start sim
 	r.POST("/run", func(c *gin.Context) {
 		simConfig, err := configFromCtx(c)
 		if err != nil {

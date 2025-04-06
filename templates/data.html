@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launchrail</title>
+    <link href="https://unpkg.com/@primer/css@^20.2.4/dist/primer.css" rel="stylesheet" />
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-2xl font-bold mb-6">Simulation Records</h1>
+        
+        <div class="grid grid-cols-1 gap-4">
+            {{ range .Records }}
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h2 class="text-xl font-semibold">{{ .Name }}</h2>
+                <p class="text-gray-600">{{ .Timestamp.Format "2006-01-02 15:04:05" }}</p>
+                <div class="mt-4 space-x-2">
+                    <button 
+                        class="px-4 py-2 bg-blue-500 text-white rounded"
+                        hx-get="/data/{{ .Hash }}/motion"
+                        hx-target="#data-view"
+                        hx-push-url="true">
+                        Motion
+                    </button>
+                    <button 
+                        class="px-4 py-2 bg-green-500 text-white rounded"
+                        hx-get="/data/{{ .Hash }}/events"
+                        hx-target="#data-view"
+                        hx-push-url="true">
+                        Events
+                    </button>
+                    <button 
+                        class="px-4 py-2 bg-purple-500 text-white rounded"
+                        hx-get="/data/{{ .Hash }}/dynamics"
+                        hx-target="#data-view"
+                        hx-push-url="true">
+                        Dynamics
+                    </button>
+                </div>
+            </div>
+            {{ end }}
+        </div>
+
+        <div id="data-view" class="mt-8">
+            <!-- Data will be loaded here -->
+        </div>
+    </div>
+</body>
+</html>
+</html>

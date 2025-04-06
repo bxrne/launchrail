@@ -1,0 +1,23 @@
+<div class="bg-white p-6 rounded-lg shadow">
+    <h2 class="text-xl font-bold mb-4">{{ .Title }}</h2>
+    <div class="overflow-x-auto">
+        <table class="min-w-full">
+            <thead>
+                <tr>
+                    {{ range .Headers }}
+                    <th class="px-4 py-2 bg-gray-100">{{ . }}</th>
+                    {{ end }}
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Data }}
+                <tr>
+                    {{ range . }}
+                    <td class="border px-4 py-2">{{ . }}</td>
+                    {{ end }}
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>

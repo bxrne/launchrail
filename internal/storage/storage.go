@@ -164,3 +164,17 @@ func (s *Storage) Close() error {
 func (s *Storage) GetFilePath() string {
 	return s.filePath
 }
+
+// ReadAll reads all data from the storage file
+func (s *Storage) ReadAll() ([][]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Seek to beginning of file
+	if _, err := s.file.Seek(0, 0); err != nil {
+		return nil, fmt.Errorf("failed to seek to beginning: %v", err)
+	}
+
+	reader := csv.NewReader(s.file)
+	return reader.ReadAll()
+}
