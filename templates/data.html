@@ -29,8 +29,8 @@
         <div class="Box color-shadow-medium mb-4">
             {{ range .Records }}
             <div class="Box-row d-flex flex-column">
-                <h3 class="h3 color-fg-accent">{{ .Name }}</h3>
-                <p class="color-fg-muted">{{ .Timestamp.Format "2006-01-02 15:04:05" }}</p>
+                <h3 class="h3 color-fg-accent">{{ .Timestamp.Format "2006-01-02 15:04:05" }}</h3>
+                <p class="color-fg-muted">SHA256: {{ .Name }}</p>
                 <div class="d-flex flex-wrap mt-2">
                     <button 
                         class="btn btn-primary mr-2 mb-2"
