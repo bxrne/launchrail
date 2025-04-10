@@ -9,20 +9,33 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/simulation"
+	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/gin-gonic/gin"
 )
 
 // runSim starts the simulation with the given configuration
-func runSim(cfg *config.Config) {
+func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
 	log := logger.GetLogger(cfg)
 
+	// Create a new record for the simulation
+	record, err := recordManager.CreateRecord()
+	if err != nil {
+		return fmt.Errorf("failed to create record: %w", err)
+	}
+	defer record.Close()
+
+	// Initialize the simulation manager
 	simManager := simulation.NewManager(cfg, log)
 	if err := simManager.Initialize(); err != nil {
-		log.Fatal("Failed to initialize simulation", "error", err)
+		return fmt.Errorf("failed to initialize simulation: %w", err)
 	}
+
+	// Run the simulation
 	if err := simManager.Run(); err != nil {
-		log.Error("Simulation failed", "error", err)
+		return fmt.Errorf("simulation failed: %w", err)
 	}
+
+	return nil
 }
 
 // configFromCtx reads the request body and parses it into a config.Config and validates it
@@ -152,7 +165,10 @@ func main() {
 			return
 		}
 
-		runSim(simConfig)
+		if err := runSim(simConfig, dataHandler.records); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
 		c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
 	})
