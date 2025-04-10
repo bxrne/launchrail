@@ -120,7 +120,7 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 	return record, nil
 }
 
-// ListRecords returns all available records
+// Update the ListRecords function to use the last modified time of each simulation hash folder for the Timestamp field.
 func (rm *RecordManager) ListRecords() ([]*Record, error) {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
@@ -136,10 +136,19 @@ func (rm *RecordManager) ListRecords() ([]*Record, error) {
 			continue
 		}
 
+		recordPath := filepath.Join(rm.baseDir, entry.Name())
+		info, err := os.Stat(recordPath)
+		if err != nil {
+			continue // Skip invalid records
+		}
+
 		record, err := NewRecord(rm.baseDir, entry.Name())
 		if err != nil {
 			continue // Skip invalid records
 		}
+
+		// Update the Timestamp field with the last modified time of the folder
+		record.Timestamp = info.ModTime()
 		records = append(records, record)
 	}
 
