@@ -167,11 +167,42 @@ func main() {
 			})
 			return
 		}
+		defer record.Close()
 
-		motionData, _ := record.Motion.ReadAll()
-		dynamicsData, _ := record.Dynamics.ReadAll()
-		eventsData, _ := record.Events.ReadAll()
+		// Ensure storage objects are not nil
+		if record.Motion == nil || record.Events == nil || record.Dynamics == nil {
+			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
+				"error": "Record storage is not properly initialized",
+			})
+			return
+		}
 
+		// Read data from storage
+		motionData, err := record.Motion.ReadAll()
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
+				"error": "Failed to read motion data: " + err.Error(),
+			})
+			return
+		}
+
+		dynamicsData, err := record.Dynamics.ReadAll()
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
+				"error": "Failed to read dynamics data: " + err.Error(),
+			})
+			return
+		}
+
+		eventsData, err := record.Events.ReadAll()
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
+				"error": "Failed to read events data: " + err.Error(),
+			})
+			return
+		}
+
+		// Render the explorer page
 		c.HTML(http.StatusOK, "explorer.html", gin.H{
 			"MotionHeaders":   motionData[0],
 			"MotionData":      motionData[1:],

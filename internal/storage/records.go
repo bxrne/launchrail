@@ -164,9 +164,31 @@ func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 		return nil, fmt.Errorf("record not found")
 	}
 
-	// Load the record without creating a new one
+	// Initialize storage services for the record
+	motionStore, err := NewStorage(rm.baseDir, hash, MOTION)
+	if err != nil {
+		return nil, err
+	}
+
+	eventsStore, err := NewStorage(rm.baseDir, hash, EVENTS)
+	if err != nil {
+		motionStore.Close()
+		return nil, err
+	}
+
+	dynamicsStore, err := NewStorage(rm.baseDir, hash, DYNAMICS)
+	if err != nil {
+		motionStore.Close()
+		eventsStore.Close()
+		return nil, err
+	}
+
 	return &Record{
-		Hash: hash,
-		Name: hash,
+		Hash:      hash,
+		Name:      hash,
+		Timestamp: time.Now(),
+		Motion:    motionStore,
+		Events:    eventsStore,
+		Dynamics:  dynamicsStore,
 	}, nil
 }
