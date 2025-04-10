@@ -152,7 +152,7 @@ func main() {
 			return
 		}
 
-		go runSim(simConfig)
+		runSim(simConfig)
 
 		c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
 	})

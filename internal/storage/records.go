@@ -40,7 +40,7 @@ func NewRecord(baseDir string, hash string) (*Record, error) {
 
 	return &Record{
 		Hash:      hash,
-		Name:      hash, // Default to hash
+		Name:      hash,
 		Timestamp: time.Now(),
 		Motion:    motionStore,
 		Events:    eventsStore,
