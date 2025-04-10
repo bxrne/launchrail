@@ -1,16 +1,15 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/gin-gonic/gin"
-	"github.com/spf13/viper"
 )
 
 // runSim starts the simulation with the given configuration
@@ -28,28 +27,106 @@ func runSim(cfg *config.Config) {
 
 // configFromCtx reads the request body and parses it into a config.Config and validates it
 func configFromCtx(c *gin.Context) (*config.Config, error) {
-	yamlData := c.PostForm("config")
-	if yamlData == "" {
-		return nil, fmt.Errorf("config cannot be empty")
+	// Extracting form values
+	motorDesignation := c.PostForm("motor-designation")
+	openRocketFile := c.PostForm("openrocket-file")
+	launchrailLength := c.PostForm("launchrail-length")
+	launchrailAngle := c.PostForm("launchrail-angle")
+	launchrailOrientation := c.PostForm("launchrail-orientation")
+	latitude := c.PostForm("latitude")
+	longitude := c.PostForm("longitude")
+	altitude := c.PostForm("altitude")
+	openRocketVersion := c.PostForm("openrocket-version")
+	simulationStep := c.PostForm("simulation-step")
+	maxTime := c.PostForm("max-time")
+	groundTolerance := c.PostForm("ground-tolerance")
+	specificGasConstant := c.PostForm("specific-gas-constant")
+	gravitationalAccel := c.PostForm("gravitational-accel")
+	seaLevelDensity := c.PostForm("sea-level-density")
+	seaLevelTemperature := c.PostForm("sea-level-temperature")
+	seaLevelPressure := c.PostForm("sea-level-pressure")
+	ratioSpecificHeats := c.PostForm("ratio-specific-heats")
+	temperatureLapseRate := c.PostForm("temperature-lapse-rate")
+	pluginPaths := c.PostForm("plugin-paths")
+
+	// Validate required fields
+	if motorDesignation == "" || openRocketFile == "" || launchrailLength == "" ||
+		launchrailAngle == "" || launchrailOrientation == "" || latitude == "" ||
+		longitude == "" || altitude == "" || openRocketVersion == "" ||
+		simulationStep == "" || maxTime == "" || groundTolerance == "" ||
+		specificGasConstant == "" || gravitationalAccel == "" || seaLevelDensity == "" ||
+		seaLevelTemperature == "" || seaLevelPressure == "" || ratioSpecificHeats == "" ||
+		temperatureLapseRate == "" || pluginPaths == "" {
+		return nil, fmt.Errorf("all fields are required")
 	}
 
-	v := viper.New()
-	v.SetConfigType("yaml")
-
-	if err := v.ReadConfig(bytes.NewBufferString(yamlData)); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	// Create the config.Config struct
+	simConfig := config.Config{
+		Setup: config.Setup{
+			App: config.App{
+				Name:    "Launchrail",
+				Version: "1.0",
+				BaseDir: "./",
+			},
+			Logging: config.Logging{
+				Level: "info",
+			},
+			Plugins: config.Plugins{
+				Paths: []string{pluginPaths},
+			},
+		},
+		Server: config.Server{
+			Port: 8080, // Set your desired port
+		},
+		Engine: config.Engine{
+			External: config.External{
+				OpenRocketVersion: openRocketVersion,
+			},
+			Options: config.Options{
+				MotorDesignation: motorDesignation,
+				OpenRocketFile:   openRocketFile,
+				Launchrail: config.Launchrail{
+					Length:      parseFloat(launchrailLength),
+					Angle:       parseFloat(launchrailAngle),
+					Orientation: parseFloat(launchrailOrientation),
+				},
+				Launchsite: config.Launchsite{
+					Latitude:  parseFloat(latitude),
+					Longitude: parseFloat(longitude),
+					Altitude:  parseFloat(altitude),
+					Atmosphere: config.Atmosphere{
+						ISAConfiguration: config.ISAConfiguration{
+							SpecificGasConstant:  parseFloat(specificGasConstant),
+							GravitationalAccel:   parseFloat(gravitationalAccel),
+							SeaLevelDensity:      parseFloat(seaLevelDensity),
+							SeaLevelTemperature:  parseFloat(seaLevelTemperature),
+							SeaLevelPressure:     parseFloat(seaLevelPressure),
+							RatioSpecificHeats:   parseFloat(ratioSpecificHeats),
+							TemperatureLapseRate: parseFloat(temperatureLapseRate),
+						},
+					},
+				},
+			},
+			Simulation: config.Simulation{
+				Step:            parseFloat(simulationStep),
+				MaxTime:         parseFloat(maxTime),
+				GroundTolerance: parseFloat(groundTolerance),
+			},
+		},
 	}
 
-	var simConfig config.Config
-	if err := v.Unmarshal(&simConfig); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
-	}
-
+	// Validate the configuration
 	if err := simConfig.Validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate config: %w", err)
 	}
 
 	return &simConfig, nil
+}
+
+// Helper function to parse float values from strings
+func parseFloat(value string) float64 {
+	result, _ := strconv.ParseFloat(value, 64)
+	return result
 }
 
 func main() {
