@@ -177,11 +177,6 @@ func (a *AerodynamicSystem) Add(as *states.PhysicsState) {
 	a.entities = append(a.entities, as) // Store pointer directly
 }
 
-// Priority returns the system priority
-func (a *AerodynamicSystem) Priority() int {
-	return 2
-}
-
 // calculateSoundSpeed calculates the speed of sound at a given temperature
 func (a *AerodynamicSystem) GetSpeedOfSound(altitude float64) float64 {
 	temperature := a.getTemperature(altitude)

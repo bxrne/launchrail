@@ -65,11 +65,6 @@ func (s *LogParasiteSystem) processData() {
 	}
 }
 
-// Priority returns the system priority
-func (s *LogParasiteSystem) Priority() int {
-	return 1
-}
-
 // Update the LogParasiteSystem
 func (s *LogParasiteSystem) Update(dt float64) error {
 	// No need to track time here - data comes from simulation state

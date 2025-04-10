@@ -201,11 +201,6 @@ func (s *PhysicsSystem) Add(pe *states.PhysicsState) {
 	s.entities = append(s.entities, pe) // Store pointer directly
 }
 
-// Priority returns the system priority
-func (s *PhysicsSystem) Priority() int {
-	return 1 // Runs after forces are applied
-}
-
 // String returns the system name
 func (s *PhysicsSystem) String() string {
 	return "PhysicsSystem"

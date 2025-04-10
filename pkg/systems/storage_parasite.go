@@ -108,11 +108,6 @@ func (s *StorageParasiteSystem) processData() {
 	}
 }
 
-// Priority returns the system priority
-func (s *StorageParasiteSystem) Priority() int {
-	return 1
-}
-
 // Update the StorageParasiteSystem
 func (s *StorageParasiteSystem) Update(dt float64) error {
 	// No need to track time here - data comes from simulation state
