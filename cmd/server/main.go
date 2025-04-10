@@ -177,8 +177,8 @@ func main() {
 			return
 		}
 
-		// Read data from storage
-		motionData, err := record.Motion.ReadAll()
+		// Read headers and data from storage
+		motionHeaders, motionData, err := record.Motion.ReadHeadersAndData()
 		if err != nil {
 			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
 				"error": "Failed to read motion data: " + err.Error(),
@@ -186,7 +186,7 @@ func main() {
 			return
 		}
 
-		dynamicsData, err := record.Dynamics.ReadAll()
+		dynamicsHeaders, dynamicsData, err := record.Dynamics.ReadHeadersAndData()
 		if err != nil {
 			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
 				"error": "Failed to read dynamics data: " + err.Error(),
@@ -194,7 +194,7 @@ func main() {
 			return
 		}
 
-		eventsData, err := record.Events.ReadAll()
+		eventsHeaders, eventsData, err := record.Events.ReadHeadersAndData()
 		if err != nil {
 			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
 				"error": "Failed to read events data: " + err.Error(),
@@ -204,12 +204,12 @@ func main() {
 
 		// Render the explorer page
 		c.HTML(http.StatusOK, "explorer.html", gin.H{
-			"MotionHeaders":   motionData[0],
-			"MotionData":      motionData[1:],
-			"DynamicsHeaders": dynamicsData[0],
-			"DynamicsData":    dynamicsData[1:],
-			"EventsHeaders":   eventsData[0],
-			"EventsData":      eventsData[1:],
+			"MotionHeaders":   motionHeaders,
+			"MotionData":      motionData,
+			"DynamicsHeaders": dynamicsHeaders,
+			"DynamicsData":    dynamicsData,
+			"EventsHeaders":   eventsHeaders,
+			"EventsData":      eventsData,
 		})
 	})
 

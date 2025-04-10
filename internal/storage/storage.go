@@ -170,11 +170,35 @@ func (s *Storage) ReadAll() ([][]string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// Seek to beginning of file
+	// Seek to the beginning of the file
 	if _, err := s.file.Seek(0, 0); err != nil {
 		return nil, fmt.Errorf("failed to seek to beginning: %v", err)
 	}
 
 	reader := csv.NewReader(s.file)
-	return reader.ReadAll()
+	allData, err := reader.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CSV data: %v", err)
+	}
+
+	// Ensure there is at least one row (headers)
+	if len(allData) == 0 {
+		return nil, fmt.Errorf("no data found in storage")
+	}
+
+	return allData, nil
+}
+
+// ReadHeadersAndData reads the headers and data separately from the storage file
+func (s *Storage) ReadHeadersAndData() ([]string, [][]string, error) {
+	allData, err := s.ReadAll()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Separate headers and data
+	headers := allData[0]
+	data := allData[1:] // Skip the first row (headers)
+
+	return headers, data, nil
 }
