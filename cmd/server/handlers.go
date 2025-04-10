@@ -33,11 +33,6 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 		})
 		return
 	}
-	defer func() {
-		for _, r := range records {
-			r.Close()
-		}
-	}()
 
 	c.HTML(http.StatusOK, "data.html", gin.H{
 		"Records": records,
@@ -79,35 +74,14 @@ func (h *DataHandler) GetRecordData(c *gin.Context) {
 	data, err := store.ReadAll()
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
-			"error": err.Error(),
+			"error": "Failed to read data: " + err.Error(),
 		})
 		return
 	}
 
-	var headers []string
-	var rows [][]string
-	if len(data) > 0 {
-		headers = data[0]
-		rows = data[1:]
-	}
-
-	// Check if this is an HTMX request
-	if c.GetHeader("HX-Request") == "true" {
-		c.HTML(http.StatusOK, "data_view.html", gin.H{
-			"Title":   title,
-			"Headers": headers,
-			"Data":    rows,
-		})
-		return
-	}
-
-	// Full page render if not HTMX
-	c.HTML(http.StatusOK, "data.html", gin.H{
-		"Records": []*storage.Record{record},
-		"ViewData": ViewData{
-			Title:   title,
-			Headers: headers,
-			Data:    rows,
-		},
+	c.HTML(http.StatusOK, "data_plot.html", gin.H{
+		"Title":   title,
+		"Headers": data[0],
+		"Data":    data[1:],
 	})
 }

@@ -120,7 +120,7 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 	return record, nil
 }
 
-// Update the ListRecords function to use the last modified time of each simulation hash folder for the Timestamp field.
+// ListRecords lists all existing records in the base directory with their last modified time.
 func (rm *RecordManager) ListRecords() ([]*Record, error) {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
@@ -142,23 +142,31 @@ func (rm *RecordManager) ListRecords() ([]*Record, error) {
 			continue // Skip invalid records
 		}
 
-		record, err := NewRecord(rm.baseDir, entry.Name())
-		if err != nil {
-			continue // Skip invalid records
+		// Load the record without creating a new one
+		record := &Record{
+			Hash:      entry.Name(),
+			Name:      entry.Name(),
+			Timestamp: info.ModTime(),
 		}
-
-		// Update the Timestamp field with the last modified time of the folder
-		record.Timestamp = info.ModTime()
 		records = append(records, record)
 	}
 
 	return records, nil
 }
 
-// GetRecord retrieves a specific record by hash
+// GetRecord retrieves an existing record by hash without creating a new one.
 func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 
-	return NewRecord(rm.baseDir, hash)
+	recordPath := filepath.Join(rm.baseDir, hash)
+	if _, err := os.Stat(recordPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("record not found")
+	}
+
+	// Load the record without creating a new one
+	return &Record{
+		Hash: hash,
+		Name: hash,
+	}, nil
 }
