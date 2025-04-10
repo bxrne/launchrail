@@ -8,7 +8,6 @@
     <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
 </head>
 <body class="bg-gray-light">
-    <!-- Navigation Bar -->
     <div class="Header">
         <div class="Header-item">
             <a href="/" class="Header-link f4 d-flex flex-items-center">
@@ -21,8 +20,7 @@
         <div class="Header-item">
             <a href="/data" class="Header-link">Records</a>
         </div>
-    </div>
-
+        </div>
     <div class="container-lg p-4">
         <h1 class="h1 text-center color-fg-accent p-4">Simulation Records</h1>
         
@@ -32,27 +30,7 @@
                 <h3 class="h3 color-fg-accent">{{ .Timestamp.Format "2006-01-02 15:04:05" }}</h3>
                 <p class="color-fg-muted">SHA256: {{ .Name }}</p>
                 <div class="d-flex flex-wrap mt-2">
-                    <button 
-                        class="btn btn-primary mr-2 mb-2"
-                        hx-get="/data/{{ .Hash }}/motion"
-                        hx-target="#data-view"
-                        hx-push-url="true">
-                        Motion
-                    </button>
-                    <button 
-                        class="btn btn-danger mr-2 mb-2"
-                        hx-get="/data/{{ .Hash }}/events"
-                        hx-target="#data-view"
-                        hx-push-url="true">
-                        Events
-                    </button>
-                    <button 
-                        class="btn btn-outline mr-2 mb-2"
-                        hx-get="/data/{{ .Hash }}/dynamics"
-                        hx-target="#data-view"
-                        hx-push-url="true">
-                        Dynamics
-                    </button>
+                    <a href="/explore/{{ .Hash }}" class="btn btn-primary mr-2 mb-2">Explore</a>
                 </div>
             </div>
             {{ end }}

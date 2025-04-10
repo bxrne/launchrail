@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launchrail</title>
+    <link href="https://unpkg.com/@primer/css@^20.2.4/dist/primer.css" rel="stylesheet" />
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+</head>
+<body class="bg-gray-light">
+    <div class="Header">
+        <div class="Header-item">
+            <a href="/" class="Header-link f4 d-flex flex-items-center">
+                <span class="text-bold">Launchrail</span>
+            </a>
+        </div>
+        <div class="Header-item">
+            <a href="/" class="Header-link">New</a>
+        </div>
+        <div class="Header-item">
+            <a href="/data" class="Header-link">Records</a>
+        </div>
+        </div>
+    <div class="container-lg p-4">
+        <h1 class="h1 text-center color-fg-accent p-4">Simulation Explorer</h1>
+        <div>
+            <h2>Motion Records</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        {{ range .MotionHeaders }}
+                        <th>{{ . }}</th>
+                        {{ end }}
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .MotionData }}
+                    <tr>
+                        {{ range . }}
+                        <td>{{ . }}</td>
+                        {{ end }}
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <h2>Dynamics Records</h2>
+            <table class="table">
+                <!-- Similar structure as above -->
+            </table>
+        </div>
+        <div>
+            <h2>Events Records</h2>
+            <table class="table">
+                <!-- Similar structure as above -->
+            </table>
+        </div>
+    </div>
+</body>
+</html>

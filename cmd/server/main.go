@@ -158,6 +158,30 @@ func main() {
 		c.File("templates/index.html")
 	})
 
+	r.GET("/explore/:hash", func(c *gin.Context) {
+		hash := c.Param("hash")
+		record, err := dataHandler.records.GetRecord(hash)
+		if err != nil {
+			c.HTML(http.StatusNotFound, "partials/error.html", gin.H{
+				"error": "Record not found",
+			})
+			return
+		}
+
+		motionData, _ := record.Motion.ReadAll()
+		dynamicsData, _ := record.Dynamics.ReadAll()
+		eventsData, _ := record.Events.ReadAll()
+
+		c.HTML(http.StatusOK, "explorer.html", gin.H{
+			"MotionHeaders":   motionData[0],
+			"MotionData":      motionData[1:],
+			"DynamicsHeaders": dynamicsData[0],
+			"DynamicsData":    dynamicsData[1:],
+			"EventsHeaders":   eventsData[0],
+			"EventsData":      eventsData[1:],
+		})
+	})
+
 	r.POST("/run", func(c *gin.Context) {
 		simConfig, err := configFromCtx(c)
 		if err != nil {
