@@ -30,7 +30,7 @@
             <div class="form-group">
                 <div class="flex-items-center mb-2">
                     <label for="plugin-paths" class="f4 color-fg-accent">Plugin Paths:</label>
-                    <input type="text" id="plugin-paths" name="plugin-paths" class="form-control input-block width-full color-bg-subtle" required value="./plugins/windeffect.so">
+                    <input type="text" id="plugin-paths" name="plugin-paths" class="form-control input-block width-full color-bg-subtle" value="./plugins/windeffect.so">
                 </div>
                 <div class="flex-items-center mb-2">
                     <label for="simulation-step" class="f4 color-fg-accent">Simulation Step:</label>
@@ -56,58 +56,73 @@
                     <label for="openrocket-file" class="f4 color-fg-accent">OpenRocket File:</label>
                     <input type="text" id="openrocket-file" name="openrocket-file" class="form-control input-block width-full color-bg-subtle" required value="./testdata/openrocket/l1.ork">
                 </div>
-                <div class="flex-items-center mb-2">
-                    <label for="launchrail-length" class="f4 color-fg-accent">Launchrail Length:</label>
-                    <input type="text" id="launchrail-length" name="launchrail-length" class="form-control input-block width-full color-bg-subtle" required value="2.21">
-                </div>
-                <div class="flex-items-center mb-2">
-                    <label for="launchrail-angle" class="f4 color-fg-accent">Launchrail Angle:</label>
-                    <input type="text" id="launchrail-angle" name="launchrail-angle" class="form-control input-block width-full color-bg-subtle" required value="5.0">
-                </div>
-                <div class="flex-items-center mb-2">
-                    <label for="launchrail-orientation" class="f4 color-fg-accent">Launchrail Orientation:</label>
-                    <input type="text" id="launchrail-orientation" name="launchrail-orientation" class="form-control input-block width-full color-bg-subtle" required value="0.01">
-                </div>
-                <div class="flex-items-center mb-2">
-                    <label for="latitude" class="f4 color-fg-accent">Latitude:</label>
-                    <input type="text" id="latitude" name="latitude" class="form-control input-block width-full color-bg-subtle" required value="37.7749">
-                </div>
-                <div class="flex-items-center mb-2">
-                    <label for="longitude" class="f4 color-fg-accent">Longitude:</label>
-                    <input type="text" id="longitude" name="longitude" class="form-control input-block width-full color-bg-subtle" required value="-122.4194">
-                </div>
-                <div class="flex-items-center mb-2">
-                    <label for="altitude" class="f4 color-fg-accent">Altitude:</label>
-                    <input type="text" id="altitude" name="altitude" class="form-control input-block width-full color-bg-subtle" required value="1.0">
-                </div>
-                <div class="flex-items-center mb-2">
-                    <label for="specific-gas-constant" class="f4 color-fg-accent">Specific Gas Constant:</label>
-                    <input type="text" id="specific-gas-constant" name="specific-gas-constant" class="form-control input-block width-full color-bg-subtle" required value="287.05">
-                </div>
-                <div class="flex-items-center mb-2">
-                    <label for="gravitational-accel" class="f4 color-fg-accent">Gravitational Acceleration:</label>
-                    <input type="text" id="gravitational-accel" name="gravitational-accel" class="form-control input-block width-full color-bg-subtle" required value="9.81">
-                </div>
-                <div class="flex-items-center mb-2">
-                    <label for="sea-level-density" class="f4 color-fg-accent">Sea Level Density:</label>
-                    <input type="text" id="sea-level-density" name="sea-level-density" class="form-control input-block width-full color-bg-subtle" required value="1.225">
-                </div>
-                <div class="flex-items-center mb-2">
-                    <label for="sea-level-temperature" class="f4 color-fg-accent">Sea Level Temperature:</label>
-                    <input type="text" id="sea-level-temperature" name="sea-level-temperature" class="form-control input-block width-full color-bg-subtle" required value="288.15">
-                </div>
-                <div class="flex-items-center mb-2">
-                    <label for="sea-level-pressure" class="f4 color-fg-accent">Sea Level Pressure:</label>
-                    <input type="text" id="sea-level-pressure" name="sea-level-pressure" class="form-control input-block width-full color-bg-subtle" required value="101325.0">
-                </div>
-                <div class="flex-items-center mb-2">
-                    <label for="ratio-specific-heats" class="f4 color-fg-accent">Ratio of Specific Heats:</label>
-                    <input type="text" id="ratio-specific-heats" name="ratio-specific-heats" class="form-control input-block width-full color-bg-subtle" required value="1.4">
-                </div>
-                <div class="flex-items-center mb-2">
-                    <label for="temperature-lapse-rate" class="f4 color-fg-accent">Temperature Lapse Rate:</label>
-                    <input type="text" id="temperature-lapse-rate" name="temperature-lapse-rate" class="form-control input-block width-full color-bg-subtle" required value="0.0065">
-                </div>
+
+                <!-- Launchrail Section -->
+                <details class="mb-3">
+                    <summary class="f4 color-fg-accent">Launchrail Configuration</summary>
+                    <div class="flex-items-center mb-2">
+                        <label for="launchrail-length" class="f4 color-fg-accent">Launchrail Length:</label>
+                        <input type="text" id="launchrail-length" name="launchrail-length" class="form-control input-block width-full color-bg-subtle" required value="2.21">
+                    </div>
+                    <div class="flex-items-center mb-2">
+                        <label for="launchrail-angle" class="f4 color-fg-accent">Launchrail Angle:</label>
+                        <input type="text" id="launchrail-angle" name="launchrail-angle" class="form-control input-block width-full color-bg-subtle" required value="5.0">
+                    </div>
+                    <div class="flex-items-center mb-2">
+                        <label for="launchrail-orientation" class="f4 color-fg-accent">Launchrail Orientation:</label>
+                        <input type="text" id="launchrail-orientation" name="launchrail-orientation" class="form-control input-block width-full color-bg-subtle" required value="0.01">
+                    </div>
+                </details>
+
+                <!-- Location Section -->
+                <details class="mb-3">
+                    <summary class="f4 color-fg-accent">Location Configuration</summary>
+                    <div class="flex-items-center mb-2">
+                        <label for="latitude" class="f4 color-fg-accent">Latitude:</label>
+                        <input type="text" id="latitude" name="latitude" class="form-control input-block width-full color-bg-subtle" required value="37.7749">
+                    </div>
+                    <div class="flex-items-center mb-2">
+                        <label for="longitude" class="f4 color-fg-accent">Longitude:</label>
+                        <input type="text" id="longitude" name="longitude" class="form-control input-block width-full color-bg-subtle" required value="-122.4194">
+                    </div>
+                    <div class="flex-items-center mb-2">
+                        <label for="altitude" class="f4 color-fg-accent">Altitude:</label>
+                        <input type="text" id="altitude" name="altitude" class="form-control input-block width-full color-bg-subtle" required value="1.0">
+                    </div>
+                </details>
+
+                <!-- Constants Section -->
+                <details class="mb-3">
+                    <summary class="f4 color-fg-accent">Constants Configuration</summary>
+                    <div class="flex-items-center mb-2">
+                        <label for="specific-gas-constant" class="f4 color-fg-accent">Specific Gas Constant:</label>
+                        <input type="text" id="specific-gas-constant" name="specific-gas-constant" class="form-control input-block width-full color-bg-subtle" required value="287.05">
+                    </div>
+                    <div class="flex-items-center mb-2">
+                        <label for="gravitational-accel" class="f4 color-fg-accent">Gravitational Acceleration:</label>
+                        <input type="text" id="gravitational-accel" name="gravitational-accel" class="form-control input-block width-full color-bg-subtle" required value="9.81">
+                    </div>
+                    <div class="flex-items-center mb-2">
+                        <label for="sea-level-density" class="f4 color-fg-accent">Sea Level Density:</label>
+                        <input type="text" id="sea-level-density" name="sea-level-density" class="form-control input-block width-full color-bg-subtle" required value="1.225">
+                    </div>
+                    <div class="flex-items-center mb-2">
+                        <label for="sea-level-temperature" class="f4 color-fg-accent">Sea Level Temperature:</label>
+                        <input type="text" id="sea-level-temperature" name="sea-level-temperature" class="form-control input-block width-full color-bg-subtle" required value="288.15">
+                    </div>
+                    <div class="flex-items-center mb-2">
+                        <label for="sea-level-pressure" class="f4 color-fg-accent">Sea Level Pressure:</label>
+                        <input type="text" id="sea-level-pressure" name="sea-level-pressure" class="form-control input-block width-full color-bg-subtle" required value="101325.0">
+                    </div>
+                    <div class="flex-items-center mb-2">
+                        <label for="ratio-specific-heats" class="f4 color-fg-accent">Ratio of Specific Heats:</label>
+                        <input type="text" id="ratio-specific-heats" name="ratio-specific-heats" class="form-control input-block width-full color-bg-subtle" required value="1.4">
+                    </div>
+                    <div class="flex-items-center mb-2">
+                        <label for="temperature-lapse-rate" class="f4 color-fg-accent">Temperature Lapse Rate:</label>
+                        <input type="text" id="temperature-lapse-rate" name="temperature-lapse-rate" class="form-control input-block width-full color-bg-subtle" required value="0.0065">
+                    </div>
+                </details>
             </div>
             <button type="submit" class="btn btn-primary mt-3">
                 Start Simulation
