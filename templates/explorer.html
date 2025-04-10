@@ -5,7 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Launchrail</title>
     <link href="https://unpkg.com/@primer/css@^20.2.4/dist/primer.css" rel="stylesheet" />
-    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+    <style>
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .tabs {
+            margin-bottom: 1rem;
+        }
+        .tab {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border: 1px solid transparent;
+            border-radius: 0.25rem;
+            margin-right: 0.5rem;
+        }
+        .tab.active {
+            background-color: #f6f8fa;
+            border-color: #d1d5da;
+        }
+    </style>
 </head>
 <body class="bg-gray-light">
     <div class="Header">
@@ -20,10 +41,15 @@
         <div class="Header-item">
             <a href="/data" class="Header-link">Records</a>
         </div>
-        </div>
+    </div>
     <div class="container-lg p-4">
         <h1 class="h1 text-center color-fg-accent p-4">Simulation Explorer</h1>
-        <div>
+        <div class="tabs">
+            <div class="tab active" data-target="motion">Motion Records</div>
+            <div class="tab" data-target="dynamics">Dynamics Records</div>
+            <div class="tab" data-target="events">Events Records</div>
+        </div>
+        <div class="tab-content active" id="motion">
             <h2>Motion Records</h2>
             <table class="table">
                 <thead>
@@ -44,18 +70,62 @@
                 </tbody>
             </table>
         </div>
-        <div>
+        <div class="tab-content" id="dynamics">
             <h2>Dynamics Records</h2>
             <table class="table">
-                <!-- Similar structure as above -->
+                <thead>
+                    <tr>
+                        {{ range .DynamicsHeaders }}
+                        <th>{{ . }}</th>
+                        {{ end }}
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .DynamicsData }}
+                    <tr>
+                        {{ range . }}
+                        <td>{{ . }}</td>
+                        {{ end }}
+                    </tr>
+                    {{ end }}
+                </tbody>
             </table>
         </div>
-        <div>
+        <div class="tab-content" id="events">
             <h2>Events Records</h2>
             <table class="table">
-                <!-- Similar structure as above -->
+                <thead>
+                    <tr>
+                        {{ range .EventsHeaders }}
+                        <th>{{ . }}</th>
+                        {{ end }}
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .EventsData }}
+                    <tr>
+                        {{ range . }}
+                        <td>{{ . }}</td>
+                        {{ end }}
+                    </tr>
+                    {{ end }}
+                </tbody>
             </table>
         </div>
     </div>
+    <script>
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs and contents
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+
+                // Add active class to the clicked tab and corresponding content
+                tab.classList.add('active');
+                const target = tab.getAttribute('data-target');
+                document.getElementById(target).classList.add('active');
+            });
+        });
+    </script>
 </body>
 </html>
