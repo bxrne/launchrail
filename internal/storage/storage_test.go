@@ -146,3 +146,56 @@ func TestWriteInvalidData(t *testing.T) {
 	require.Error(t, err)
 	assert.EqualError(t, err, "data length (3) does not match headers length (5)")
 }
+
+func TestReadAll(t *testing.T) {
+	baseDir, dir, cleanup := setupTest(t)
+	defer cleanup()
+
+	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	require.NoError(t, err)
+	require.NoError(t, s.Init())
+
+	data := []string{"1", "2", "3", "4", "5"}
+	require.NoError(t, s.Write(data))
+	require.NoError(t, s.Close())
+
+	s2, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	require.NoError(t, err)
+	defer s2.Close()
+
+	rows, err := s2.ReadAll()
+	require.NoError(t, err)
+	require.Len(t, rows, 2) // headers + data row
+}
+
+func TestReadHeadersAndData(t *testing.T) {
+	baseDir, dir, cleanup := setupTest(t)
+	defer cleanup()
+
+	s, err := storage.NewStorage(baseDir, dir, storage.EVENTS)
+	require.NoError(t, err)
+	require.NoError(t, s.Init())
+
+	data := []string{"val1", "val2", "val3"}
+	require.NoError(t, s.Write(data))
+	require.NoError(t, s.Close())
+
+	s2, err := storage.NewStorage(baseDir, dir, storage.EVENTS)
+	require.NoError(t, err)
+	defer s2.Close()
+
+	headers, rows, err := s2.ReadHeadersAndData()
+	require.NoError(t, err)
+	require.Len(t, headers, len(storage.StorageHeaders[storage.EVENTS]))
+	require.Len(t, rows, 1)
+}
+
+func TestGetFilePath(t *testing.T) {
+	baseDir, dir, cleanup := setupTest(t)
+	defer cleanup()
+
+	s, err := storage.NewStorage(baseDir, dir, storage.DYNAMICS)
+	require.NoError(t, err)
+	assert.Contains(t, s.GetFilePath(), "DYNAMICS.csv")
+	require.NoError(t, s.Close())
+}
