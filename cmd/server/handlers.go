@@ -1,20 +1,18 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
 )
 
 type DataHandler struct {
 	records *storage.RecordManager
-}
-
-type ViewData struct {
-	Title   string
-	Headers []string
-	Data    [][]string
 }
 
 func NewDataHandler(baseDir string) (*DataHandler, error) {
@@ -25,18 +23,32 @@ func NewDataHandler(baseDir string) (*DataHandler, error) {
 	return &DataHandler{records: rm}, nil
 }
 
+// Helper function to render templ components
+func renderTempl(c *gin.Context, component templ.Component) {
+	err := component.Render(c.Request.Context(), c.Writer)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+}
+
 func (h *DataHandler) ListRecords(c *gin.Context) {
 	records, err := h.records.ListRecords()
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
-			"error": err.Error(),
-		})
+		renderTempl(c, pages.ErrorPage(err.Error()))
 		return
 	}
 
-	c.HTML(http.StatusOK, "data.html", gin.H{
-		"Records": records,
-	})
+	// Convert storage.Record to pages.SimulationRecord
+	simRecords := make([]pages.SimulationRecord, len(records))
+	for i, record := range records {
+		simRecords[i] = pages.SimulationRecord{
+			Name:      record.Name,
+			Hash:      record.Hash,
+			Timestamp: time.Now(), // You might want to store this in your Record struct
+		}
+	}
+
+	renderTempl(c, pages.Data(pages.DataProps{Records: simRecords}))
 }
 
 func (h *DataHandler) GetRecordData(c *gin.Context) {
@@ -45,9 +57,7 @@ func (h *DataHandler) GetRecordData(c *gin.Context) {
 
 	record, err := h.records.GetRecord(hash)
 	if err != nil {
-		c.HTML(http.StatusNotFound, "error.html", gin.H{
-			"error": "Record not found",
-		})
+		renderTempl(c, pages.ErrorPage("Record not found"))
 		return
 	}
 	defer record.Close()
@@ -65,23 +75,19 @@ func (h *DataHandler) GetRecordData(c *gin.Context) {
 		store = record.Dynamics
 		title = "Dynamics Data"
 	default:
-		c.HTML(http.StatusBadRequest, "error.html", gin.H{
-			"error": "Invalid data type",
-		})
+		renderTempl(c, pages.ErrorPage("Invalid data type"))
 		return
 	}
 
-	data, err := store.ReadAll()
+	headers, data, err := store.ReadHeadersAndData()
+	fmt.Println(headers, data, title)
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
-			"error": "Failed to read data: " + err.Error(),
-		})
+		renderTempl(c, pages.ErrorPage("Failed to read data"))
+
 		return
 	}
 
-	c.HTML(http.StatusOK, "data_plot.html", gin.H{
-		"Title":   title,
-		"Headers": data[0],
-		"Data":    data[1:],
-	})
+	// For now, redirect to the explore page which will show the data
+	// You might want to create a specific templ component for data plots later
+	c.Redirect(http.StatusFound, fmt.Sprintf("/explore/%s", hash))
 }

@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
-	"html/template"
 	"net/http"
 	"strconv"
 
+	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
 )
 
@@ -136,6 +137,14 @@ func parseFloat(value string) float64 {
 	return result
 }
 
+// Helper function to render templ components in Gin
+func render(c *gin.Context, component templ.Component) {
+	err := component.Render(c.Request.Context(), c.Writer)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+}
+
 func main() {
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -147,12 +156,6 @@ func main() {
 	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
 
 	r := gin.Default()
-
-	// Load all html files in templates directory and partials in partials suvdir
-	tmpl := template.New("")
-	tmpl = template.Must(tmpl.ParseGlob("templates/*.html"))
-	tmpl = template.Must(tmpl.ParseGlob("templates/partials/*.html"))
-	r.SetHTMLTemplate(tmpl)
 	r.SetTrustedProxies(nil)
 
 	dataHandler, err := NewDataHandler(".launchrail")
@@ -162,22 +165,17 @@ func main() {
 
 	// Serve static files
 	r.Static("/static", "./static")
-	r.StaticFile("/favicon.ico", "./static/favicon.ico")     // TODO: Add favicon.ico
-	r.StaticFile("/robots.txt", "./static/robots.txt")       // TODO: Add robots.txt
-	r.StaticFile("/manifest.json", "./static/manifest.json") // TODO: Add manifest.json
+	r.StaticFile("/favicon.ico", "./static/favicon.ico")
+	r.StaticFile("/robots.txt", "./static/robots.txt")
+	r.StaticFile("/manifest.json", "./static/manifest.json")
 
 	// Data routes
-	r.GET("/data", func(c *gin.Context) {
-		log.Info("Listing records")
-		dataHandler.ListRecords(c)
-	})
-	r.GET("/data/:hash/:type", func(c *gin.Context) {
-		log.Info("Getting record data")
-		dataHandler.GetRecordData(c)
-	})
-	// Landing page (pun intended)
+	r.GET("/data", dataHandler.ListRecords)
+	r.GET("/data/:hash/:type", dataHandler.GetRecordData)
+
+	// Landing page
 	r.GET("/", func(c *gin.Context) {
-		c.File("templates/index.html")
+		render(c, pages.Index())
 	})
 
 	r.GET("/explore/:hash", func(c *gin.Context) {
@@ -185,55 +183,47 @@ func main() {
 		record, err := dataHandler.records.GetRecord(hash)
 		if err != nil {
 			log.Error("Failed to get record", "Error", err)
-			c.HTML(http.StatusNotFound, "partials/error.html", gin.H{
-				"error": "Record not found",
-			})
+			render(c, pages.ErrorPage("Record not found"))
 			return
 		}
 		defer record.Close()
 
 		// Ensure storage objects are not nil
 		if record.Motion == nil || record.Events == nil || record.Dynamics == nil {
-			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
-				"error": "Record storage is not properly initialized",
-			})
+			render(c, pages.ErrorPage("Record storage is not properly initialized"))
 			return
 		}
 
 		// Read headers and data from storage
 		motionHeaders, motionData, err := record.Motion.ReadHeadersAndData()
 		if err != nil {
-			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
-				"error": "Failed to read motion data: " + err.Error(),
-			})
+			render(c, pages.ErrorPage("Failed to read motion data: "+err.Error()))
 			return
 		}
 
 		dynamicsHeaders, dynamicsData, err := record.Dynamics.ReadHeadersAndData()
 		if err != nil {
-			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
-				"error": "Failed to read dynamics data: " + err.Error(),
-			})
+			render(c, pages.ErrorPage("Failed to read dynamics data: "+err.Error()))
 			return
 		}
 
 		eventsHeaders, eventsData, err := record.Events.ReadHeadersAndData()
 		if err != nil {
-			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
-				"error": "Failed to read events data: " + err.Error(),
-			})
+			render(c, pages.ErrorPage("Failed to read events data: "+err.Error()))
 			return
 		}
 
-		// Render the explorer page
-		c.HTML(http.StatusOK, "explorer.html", gin.H{
-			"MotionHeaders":   motionHeaders,
-			"MotionData":      motionData,
-			"DynamicsHeaders": dynamicsHeaders,
-			"DynamicsData":    dynamicsData,
-			"EventsHeaders":   eventsHeaders,
-			"EventsData":      eventsData,
-		})
+		// Render the explorer page with templ
+		data := pages.ExplorerData{
+			MotionHeaders:   motionHeaders,
+			MotionData:      motionData,
+			DynamicsHeaders: dynamicsHeaders,
+			DynamicsData:    dynamicsData,
+			EventsHeaders:   eventsHeaders,
+			EventsData:      eventsData,
+		}
+
+		render(c, pages.Explorer(data))
 	})
 
 	r.POST("/run", func(c *gin.Context) {
