@@ -146,7 +146,8 @@ func main() {
 	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
 
 	r := gin.Default()
-	r.LoadHTMLGlob("templates/*html")
+	r.LoadHTMLGlob("templates/**/*.html")
+	r.LoadHTMLGlob("templates/*.html")
 
 	dataHandler, err := NewDataHandler(".launchrail")
 	if err != nil {
