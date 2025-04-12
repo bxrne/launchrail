@@ -58,65 +58,75 @@ func (s *StorageParasiteSystem) processData() {
 			}
 			switch s.storeType {
 			case storage.MOTION:
-				if state.Motor == nil || state.Position == nil || state.Velocity == nil || state.Acceleration == nil {
-					continue
-				}
-				record := []string{
-					fmt.Sprintf("%.6f", state.Time),
-					fmt.Sprintf("%.6f", state.Position.Vec.Y),
-					fmt.Sprintf("%.6f", state.Velocity.Vec.Y),
-					fmt.Sprintf("%.6f", state.Acceleration.Vec.Y),
-					fmt.Sprintf("%.6f", state.Motor.GetThrust()),
-				}
-				if err := s.storage.Write(record); err != nil {
-					fmt.Printf("Error writing motion record: %v\n", err)
-				}
+				s.handleMotion(state)
 			case storage.EVENTS:
-				if state.Motor == nil || state.Parachute == nil {
-					continue
-				}
-				parachuteStatus := "NOT_DEPLOYED"
-				if state.Parachute.IsDeployed() {
-					parachuteStatus = "DEPLOYED"
-				}
-
-				record := []string{
-					fmt.Sprintf("%.6f", state.Time),
-					state.Motor.GetState(),
-					parachuteStatus,
-				}
-				if err := s.storage.Write(record); err != nil {
-					fmt.Printf("Error writing event record: %v\n", err)
-				}
-
+				s.handleEvents(state)
 			case storage.DYNAMICS:
-				if state.Position == nil || state.Velocity == nil || state.Acceleration == nil || state.Orientation == nil {
-					continue
-				}
-				record := []string{
-					fmt.Sprintf("%.6f", state.Time),
-					fmt.Sprintf("%.6f", state.Position.Vec.X),
-					fmt.Sprintf("%.6f", state.Position.Vec.Y),
-					fmt.Sprintf("%.6f", state.Position.Vec.Z),
-					fmt.Sprintf("%.6f", state.Velocity.Vec.X),
-					fmt.Sprintf("%.6f", state.Velocity.Vec.Y),
-					fmt.Sprintf("%.6f", state.Velocity.Vec.Z),
-					fmt.Sprintf("%.6f", state.Acceleration.Vec.X),
-					fmt.Sprintf("%.6f", state.Acceleration.Vec.Y),
-					fmt.Sprintf("%.6f", state.Acceleration.Vec.Z),
-					fmt.Sprintf("%.6f", state.Orientation.Quat.X),
-					fmt.Sprintf("%.6f", state.Orientation.Quat.Y),
-					fmt.Sprintf("%.6f", state.Orientation.Quat.Z),
-					fmt.Sprintf("%.6f", state.Orientation.Quat.W),
-				}
-				if err := s.storage.Write(record); err != nil {
-					fmt.Printf("Error writing dynamics record: %v\n", err)
-				}
-
+				s.handleDynamics(state)
 			}
 		case <-s.done:
 			return
 		}
+	}
+}
+
+func (s *StorageParasiteSystem) handleMotion(state *states.PhysicsState) {
+	if state.Motor == nil || state.Position == nil || state.Velocity == nil || state.Acceleration == nil {
+		return
+	}
+	record := []string{
+		fmt.Sprintf("%.6f", state.Time),
+		fmt.Sprintf("%.6f", state.Position.Vec.Y),
+		fmt.Sprintf("%.6f", state.Velocity.Vec.Y),
+		fmt.Sprintf("%.6f", state.Acceleration.Vec.Y),
+		fmt.Sprintf("%.6f", state.Motor.GetThrust()),
+	}
+	if err := s.storage.Write(record); err != nil {
+		fmt.Printf("Error writing motion record: %v\n", err)
+	}
+}
+
+func (s *StorageParasiteSystem) handleEvents(state *states.PhysicsState) {
+	if state.Motor == nil || state.Parachute == nil {
+		return
+	}
+	parachuteStatus := "NOT_DEPLOYED"
+	if state.Parachute.IsDeployed() {
+		parachuteStatus = "DEPLOYED"
+	}
+
+	record := []string{
+		fmt.Sprintf("%.6f", state.Time),
+		state.Motor.GetState(),
+		parachuteStatus,
+	}
+	if err := s.storage.Write(record); err != nil {
+		fmt.Printf("Error writing event record: %v\n", err)
+	}
+}
+
+func (s *StorageParasiteSystem) handleDynamics(state *states.PhysicsState) {
+	if state.Position == nil || state.Velocity == nil || state.Acceleration == nil || state.Orientation == nil {
+		return
+	}
+	record := []string{
+		fmt.Sprintf("%.6f", state.Time),
+		fmt.Sprintf("%.6f", state.Position.Vec.X),
+		fmt.Sprintf("%.6f", state.Position.Vec.Y),
+		fmt.Sprintf("%.6f", state.Position.Vec.Z),
+		fmt.Sprintf("%.6f", state.Velocity.Vec.X),
+		fmt.Sprintf("%.6f", state.Velocity.Vec.Y),
+		fmt.Sprintf("%.6f", state.Velocity.Vec.Z),
+		fmt.Sprintf("%.6f", state.Acceleration.Vec.X),
+		fmt.Sprintf("%.6f", state.Acceleration.Vec.Y),
+		fmt.Sprintf("%.6f", state.Acceleration.Vec.Z),
+		fmt.Sprintf("%.6f", state.Orientation.Quat.X),
+		fmt.Sprintf("%.6f", state.Orientation.Quat.Y),
+		fmt.Sprintf("%.6f", state.Orientation.Quat.Z),
+		fmt.Sprintf("%.6f", state.Orientation.Quat.W),
+	}
+	if err := s.storage.Write(record); err != nil {
+		fmt.Printf("Error writing dynamics record: %v\n", err)
 	}
 }
 
