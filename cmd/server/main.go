@@ -20,19 +20,21 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
 	// Create a new record for the simulation
 	record, err := recordManager.CreateRecord()
 	if err != nil {
-		return fmt.Errorf("failed to create record: %w", err)
+		log.Fatal("Failed to create record", "Error", err)
 	}
 	defer record.Close()
 
 	// Initialize the simulation manager
 	simManager := simulation.NewManager(cfg, log)
+	defer simManager.Close()
+
 	if err := simManager.Initialize(); err != nil {
-		return fmt.Errorf("failed to initialize simulation: %w", err)
+		log.Fatal("Failed to initialize simulation", "Error", err)
 	}
 
 	// Run the simulation
 	if err := simManager.Run(); err != nil {
-		return fmt.Errorf("simulation failed: %w", err)
+		log.Fatal("Simulation failed", "Error", err)
 	}
 
 	return nil
