@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TEST: GIVEN a record manager WHEN we create and close a record THEN no error is returned
 func TestNewRecordAndClose(t *testing.T) {
 	rm, err := storage.NewRecordManager(t.TempDir())
 	require.NoError(t, err)
@@ -16,6 +17,7 @@ func TestNewRecordAndClose(t *testing.T) {
 	require.NoError(t, rec.Close())
 }
 
+// TEST: GIVEN a record manager WHEN multiple records exist THEN they are listed
 func TestRecordManagerListRecords(t *testing.T) {
 	rm, err := storage.NewRecordManager(t.TempDir())
 	require.NoError(t, err)
@@ -28,6 +30,7 @@ func TestRecordManagerListRecords(t *testing.T) {
 	require.NotEmpty(t, records)
 }
 
+// TEST: GIVEN a record manager WHEN we retrieve a record by hash THEN the record is returned
 func TestRecordManagerGetRecord(t *testing.T) {
 	rm, err := storage.NewRecordManager(t.TempDir())
 	require.NoError(t, err)
