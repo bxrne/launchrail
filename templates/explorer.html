@@ -3,236 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Launchrail</title>
+    <title>Launchrail - Simulation Explorer</title>
     <link href="https://unpkg.com/@primer/css@^20.2.4/dist/primer.css" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min"></script>
-    <style>
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        .tabs {
-            margin-bottom: 1rem;
-        }
-        .tab {
-            cursor: pointer;
-            padding: 0.5rem 1rem;
-            border: 1px solid transparent;
-            border-radius: 0.25rem;
-            margin-right: 0.5rem;
-        }
-        .tab.active {
-            background-color: #f6f8fa;
-            border-color: #d1d5da;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/main.css">
 </head>
 <body class="bg-gray-light">
-    <div class="Header">
-        <div class="Header-item">
-            <a href="/" class="Header-link f4 d-flex flex-items-center">
-                <span class="text-bold">Launchrail</span>
-            </a>
-        </div>
-        <div class="Header-item">
-            <a href="/" class="Header-link">New</a>
-        </div>
-        <div class="Header-item">
-            <a href="/data" class="Header-link">Records</a>
-        </div>
-    </div>
+    <!-- Navbar partial will be included here -->
+    {{ template "partials/navbar.html" . }}
+
     <div class="container-lg p-4">
         <h1 class="h1 text-center color-fg-accent p-4">Simulation Explorer</h1>
-        <div class="tabs">
-            <div class="tab active" data-target="motion">Motion Records</div>
-            <div class="tab" data-target="dynamics">Dynamics Records</div>
-            <div class="tab" data-target="events">Events Records</div>
-            <div class="tab" data-target="plots">Create Plots</div>
-        </div>
-        <div class="tab-content active" id="motion">
-            <h2>Motion Records</h2>
-            <table class="table">
-                <thead>
-                    <tr>
-                        {{ range .MotionHeaders }}
-                        <th>{{ . }}</th>
-                        {{ end }}
-                    </tr>
-                </thead>
-                <tbody>
-                    {{ range .MotionData }}
-                    <tr>
-                        {{ range . }}
-                        <td>{{ . }}</td>
-                        {{ end }}
-                    </tr>
-                    {{ end }}
-                </tbody>
-            </table>
-        </div>
-        <div class="tab-content" id="dynamics">
-            <h2>Dynamics Records</h2>
-            <table class="table">
-                <thead>
-                    <tr>
-                        {{ range .DynamicsHeaders }}
-                        <th>{{ . }}</th>
-                        {{ end }}
-                    </tr>
-                </thead>
-                <tbody>
-                    {{ range .DynamicsData }}
-                    <tr>
-                        {{ range . }}
-                        <td>{{ . }}</td>
-                        {{ end }}
-                    </tr>
-                    {{ end }}
-                </tbody>
-            </table>
-        </div>
-        <div class="tab-content" id="events">
-            <h2>Events Records</h2>
-            <table class="table">
-                <thead>
-                    <tr>
-                        {{ range .EventsHeaders }}
-                        <th>{{ . }}</th>
-                        {{ end }}
-                    </tr>
-                </thead>
-                <tbody>
-                    {{ range .EventsData }}
-                    <tr>
-                        {{ range . }}
-                        <td>{{ . }}</td>
-                        {{ end }}
-                    </tr>
-                    {{ end }}
-                </tbody>
-            </table>
-        </div>
-        <div class="tab-content" id="plots">
-            <h2>Create Plots</h2>
-            <form id="plot-form">
-                <div class="form-group">
-                    <label for="data-source" class="f4 color-fg-accent">Data Source:</label>
-                    <select id="data-source" class="form-control input-block width-full color-bg-subtle">
-                        <option value="motion">Motion</option>
-                        <option value="dynamics">Dynamics</option>
-                        <option value="events">Events</option>
-                    </select>
+        
+        <div class="Box color-shadow-medium mb-4">
+            <div class="Box-header">
+                <div class="Box-title-and-description">
+                    <div class="d-flex flex-items-center">
+                        <div id="tab-container" class="d-flex">
+                            <button class="btn-link py-2 px-3 f4 border-bottom color-border-accent-emphasis color-fg-accent tab active" data-target="motion">Motion</button>
+                            <button class="btn-link py-2 px-3 f4 tab" data-target="dynamics">Dynamics</button>
+                            <button class="btn-link py-2 px-3 f4 tab" data-target="events">Events</button>
+                            <button class="btn-link py-2 px-3 f4 tab" data-target="plots">Plots</button>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="x-axis" class="f4 color-fg-accent">X-Axis:</label>
-                    <select id="x-axis" class="form-control input-block width-full color-bg-subtle"></select>
+            </div>
+            
+            <div class="tab-content active p-3" id="motion">
+                <h2 class="mb-3">Motion Records</h2>
+                <div class="Box overflow-auto">
+                    <table class="table width-full">
+                        <thead>
+                            <tr>
+                                {{ range .MotionHeaders }}
+                                <th>{{ . }}</th>
+                                {{ end }}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{ range .MotionData }}
+                            <tr>
+                                {{ range . }}
+                                <td>{{ . }}</td>
+                                {{ end }}
+                            </tr>
+                            {{ end }}
+                        </tbody>
+                    </table>
                 </div>
-                <div class="form-group">
-                    <label for="y-axis" class="f4 color-fg-accent">Y-Axis:</label>
-                    <select id="y-axis" class="form-control input-block width-full color-bg-subtle"></select>
+            </div>
+            
+            <div class="tab-content p-3" id="dynamics">
+                <h2 class="mb-3">Dynamics Records</h2>
+                <div class="Box overflow-auto">
+                    <table class="table width-full">
+                        <thead>
+                            <tr>
+                                {{ range .DynamicsHeaders }}
+                                <th>{{ . }}</th>
+                                {{ end }}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{ range .DynamicsData }}
+                            <tr>
+                                {{ range . }}
+                                <td>{{ . }}</td>
+                                {{ end }}
+                            </tr>
+                            {{ end }}
+                        </tbody>
+                    </table>
                 </div>
-                <div class="form-group">
-                    <label for="z-axis" class="f4 color-fg-accent">Z-Axis (Optional for 3D):</label>
-                    <select id="z-axis" class="form-control input-block width-full color-bg-subtle"></select>
+            </div>
+            
+            <div class="tab-content p-3" id="events">
+                <h2 class="mb-3">Events Records</h2>
+                <div class="Box overflow-auto">
+                    <table class="table width-full">
+                        <thead>
+                            <tr>
+                                {{ range .EventsHeaders }}
+                                <th>{{ . }}</th>
+                                {{ end }}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{ range .EventsData }}
+                            <tr>
+                                {{ range . }}
+                                <td>{{ . }}</td>
+                                {{ end }}
+                            </tr>
+                            {{ end }}
+                        </tbody>
+                    </table>
                 </div>
-                <button type="button" id="plot-button" class="btn btn-primary mt-3">Generate Plot</button>
-            </form>
-            <div id="plot-container" class="mt-4"></div>
+            </div>
+            
+            <div class="tab-content p-3" id="plots">
+                <h2 class="mb-3">Create Plots</h2>
+                <form id="plot-form" class="Box p-3">
+                    <div class="form-group mb-3">
+                        <label for="data-source" class="d-block mb-2 f4 color-fg-accent">Data Source:</label>
+                        <select id="data-source" class="form-select width-full">
+                            <option value="motion">Motion</option>
+                            <option value="dynamics">Dynamics</option>
+                            <option value="events">Events</option>
+                        </select>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="x-axis" class="d-block mb-2 f4 color-fg-accent">X-Axis:</label>
+                        <select id="x-axis" class="form-select width-full"></select>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="y-axis" class="d-block mb-2 f4 color-fg-accent">Y-Axis:</label>
+                        <select id="y-axis" class="form-select width-full"></select>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="z-axis" class="d-block mb-2 f4 color-fg-accent">Z-Axis (Optional for 3D):</label>
+                        <select id="z-axis" class="form-select width-full">
+                            <option value="">None (2D Plot)</option>
+                        </select>
+                    </div>
+                    <button type="button" id="plot-button" class="btn btn-primary">Generate Plot</button>
+                </form>
+                <div id="plot-container" class="mt-4 Box p-3"></div>
+            </div>
         </div>
     </div>
-    <script type="application/json" id="headers-data">
-        {
-            "motion": {{ .MotionHeaders | js }},
-            "dynamics": {{ .DynamicsHeaders | js }},
-            "events": {{ .EventsHeaders | js }}
-        }
-    </script>
-    <script type="application/json" id="table-data">
-        {
-            "motion": {{ .MotionData | js }},
-            "dynamics": {{ .DynamicsData | js }},
-            "events": {{ .EventsData | js }}
-        }
-    </script>
-    <script>
-        const headers = JSON.parse(document.getElementById('headers-data').textContent);
-        const data = JSON.parse(document.getElementById('table-data').textContent);
 
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                // Remove active class from all tabs and contents
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+    <!-- Footer -->
+   
+    {{ template "partials/footer.html" . }}
 
-                // Add active class to the clicked tab and corresponding content
-                tab.classList.add('active');
-                const target = tab.getAttribute('data-target');
-                document.getElementById(target).classList.add('active');
-            });
-        });
-
-        const dataSourceSelect = document.getElementById('data-source');
-        const xAxisSelect = document.getElementById('x-axis');
-        const yAxisSelect = document.getElementById('y-axis');
-        const zAxisSelect = document.getElementById('z-axis');
-        const plotButton = document.getElementById('plot-button');
-        const plotContainer = document.getElementById('plot-container');
-
-        function populateColumns(source) {
-            const columns = headers[source];
-            [xAxisSelect, yAxisSelect, zAxisSelect].forEach(select => {
-                select.innerHTML = '';
-                columns.forEach(col => {
-                    const option = document.createElement('option');
-                    option.value = col;
-                    option.textContent = col;
-                    select.appendChild(option);
-                });
-            });
-        }
-
-        dataSourceSelect.addEventListener('change', () => {
-            populateColumns(dataSourceSelect.value);
-        });
-
-        plotButton.addEventListener('click', () => {
-            const source = dataSourceSelect.value;
-            const xAxis = xAxisSelect.value;
-            const yAxis = yAxisSelect.value;
-            const zAxis = zAxisSelect.value;
-
-            const xIndex = headers[source].indexOf(xAxis);
-            const yIndex = headers[source].indexOf(yAxis);
-            const zIndex = headers[source].indexOf(zAxis);
-
-            const xData = data[source].map(row => parseFloat(row[xIndex]));
-            const yData = data[source].map(row => parseFloat(row[yIndex]));
-            const zData = zAxis ? data[source].map(row => parseFloat(row[zIndex])) : null;
-
-            const plotData = zAxis
-                ? [{
-                    x: xData,
-                    y: yData,
-                    z: zData,
-                    type: 'scatter3d',
-                    mode: 'markers',
-                    marker: { size: 5 }
-                }]
-                : [{
-                    x: xData,
-                    y: yData,
-                    type: 'scatter',
-                    mode: 'lines+markers',
-                    marker: { size: 5 }
-                }];
-
-            Plotly.newPlot(plotContainer, plotData);
-        });
-
-        // Initialize with motion data
-        populateColumns('motion');
-    </script>
+    <!-- Include the explorer.js script -->
+    <script src="/static/scripts/explorer.js"></script>
 </body>
 </html>

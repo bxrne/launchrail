@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 	"strconv"
 
@@ -146,13 +147,24 @@ func main() {
 	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
 
 	r := gin.Default()
-	r.LoadHTMLGlob("templates/**/*.html")
-	r.LoadHTMLGlob("templates/*.html")
+
+	// Load all html files in templates directory and partials in partials suvdir
+	tmpl := template.New("")
+	tmpl = template.Must(tmpl.ParseGlob("templates/*.html"))
+	tmpl = template.Must(tmpl.ParseGlob("templates/partials/*.html"))
+	r.SetHTMLTemplate(tmpl)
+	r.SetTrustedProxies(nil)
 
 	dataHandler, err := NewDataHandler(".launchrail")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+
+	// Serve static files
+	r.Static("/static", "./static")
+	r.StaticFile("/favicon.ico", "./static/favicon.ico")     // TODO: Add favicon.ico
+	r.StaticFile("/robots.txt", "./static/robots.txt")       // TODO: Add robots.txt
+	r.StaticFile("/manifest.json", "./static/manifest.json") // TODO: Add manifest.json
 
 	// Data routes
 	r.GET("/data", func(c *gin.Context) {
@@ -243,4 +255,6 @@ func main() {
 	if err := r.Run(portStr); err != nil {
 		fmt.Printf("Failed to start server: %v\n", err)
 	}
+
+	log.Info("Server started", "Port", portStr)
 }
