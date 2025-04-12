@@ -11,7 +11,7 @@ import (
 // StorageParasiteSystem logs rocket state data to storage
 type StorageParasiteSystem struct {
 	world     *ecs.World
-	storage   *storage.Storage
+	storage   storage.StorageInterface
 	entities  []*states.PhysicsState // Change to pointer slice
 	dataChan  chan *states.PhysicsState
 	done      chan struct{}
@@ -19,10 +19,10 @@ type StorageParasiteSystem struct {
 }
 
 // NewStorageParasiteSystem creates a new StorageParasiteSystem
-func NewStorageParasiteSystem(world *ecs.World, storage *storage.Storage, storeType storage.StorageType) *StorageParasiteSystem {
+func NewStorageParasiteSystem(world *ecs.World, store storage.StorageInterface, storeType storage.StorageType) *StorageParasiteSystem {
 	return &StorageParasiteSystem{
 		world:     world,
-		storage:   storage,
+		storage:   store,
 		entities:  make([]*states.PhysicsState, 0),
 		done:      make(chan struct{}),
 		storeType: storeType,
@@ -53,8 +53,14 @@ func (s *StorageParasiteSystem) processData() {
 	for {
 		select {
 		case state := <-s.dataChan:
+			if state == nil {
+				continue
+			}
 			switch s.storeType {
 			case storage.MOTION:
+				if state.Motor == nil || state.Position == nil || state.Velocity == nil || state.Acceleration == nil {
+					continue
+				}
 				record := []string{
 					fmt.Sprintf("%.6f", state.Time),
 					fmt.Sprintf("%.6f", state.Position.Vec.Y),
@@ -66,6 +72,9 @@ func (s *StorageParasiteSystem) processData() {
 					fmt.Printf("Error writing motion record: %v\n", err)
 				}
 			case storage.EVENTS:
+				if state.Motor == nil || state.Parachute == nil {
+					continue
+				}
 				parachuteStatus := "NOT_DEPLOYED"
 				if state.Parachute.IsDeployed() {
 					parachuteStatus = "DEPLOYED"
@@ -81,6 +90,9 @@ func (s *StorageParasiteSystem) processData() {
 				}
 
 			case storage.DYNAMICS:
+				if state.Position == nil || state.Velocity == nil || state.Acceleration == nil || state.Orientation == nil {
+					continue
+				}
 				record := []string{
 					fmt.Sprintf("%.6f", state.Time),
 					fmt.Sprintf("%.6f", state.Position.Vec.X),

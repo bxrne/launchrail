@@ -202,3 +202,9 @@ func (s *Storage) ReadHeadersAndData() ([]string, [][]string, error) {
 
 	return headers, data, nil
 }
+
+type StorageInterface interface {
+	Init() error
+	Write([]string) error
+	Close() error
+}
