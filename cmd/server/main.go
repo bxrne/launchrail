@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -41,7 +40,7 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
 }
 
 // configFromCtx reads the request body and parses it into a config.Config and validates it
-func configFromCtx(c *gin.Context) (*config.Config, error) {
+func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, error) {
 	// Extracting form values
 	motorDesignation := c.PostForm("motor-designation")
 	openRocketFile := c.PostForm("openrocket-file")
@@ -78,21 +77,13 @@ func configFromCtx(c *gin.Context) (*config.Config, error) {
 	// Create the config.Config struct
 	simConfig := config.Config{
 		Setup: config.Setup{
-			App: config.App{
-				Name:    "Launchrail",
-				Version: "1.0",
-				BaseDir: "./",
-			},
-			Logging: config.Logging{
-				Level: "info",
-			},
+			App:     currentCfg.Setup.App,
+			Logging: currentCfg.Setup.Logging,
 			Plugins: config.Plugins{
 				Paths: []string{pluginPaths},
 			},
 		},
-		Server: config.Server{
-			Port: 8080, // Set your desired port
-		},
+		Server: currentCfg.Server,
 		Engine: config.Engine{
 			External: config.External{
 				OpenRocketVersion: openRocketVersion,
@@ -145,16 +136,32 @@ func parseFloat(value string) float64 {
 }
 
 func main() {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		fmt.Printf("Failed to load config: %v\n", err)
+		return
+	}
+	// Initialize GetLogger
+	log := logger.GetLogger(cfg.Setup.Logging.Level)
+	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
+
 	r := gin.Default()
 	r.LoadHTMLGlob("templates/*html")
 
 	dataHandler, err := NewDataHandler(".launchrail")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
+
 	// Data routes
-	r.GET("/data", dataHandler.ListRecords)
-	r.GET("/data/:hash/:type", dataHandler.GetRecordData)
+	r.GET("/data", func(c *gin.Context) {
+		log.Info("Listing records")
+		dataHandler.ListRecords(c)
+	})
+	r.GET("/data/:hash/:type", func(c *gin.Context) {
+		log.Info("Getting record data")
+		dataHandler.GetRecordData(c)
+	})
 	// Landing page (pun intended)
 	r.GET("/", func(c *gin.Context) {
 		c.File("templates/index.html")
@@ -164,6 +171,7 @@ func main() {
 		hash := c.Param("hash")
 		record, err := dataHandler.records.GetRecord(hash)
 		if err != nil {
+			log.Error("Failed to get record", "Error", err)
 			c.HTML(http.StatusNotFound, "partials/error.html", gin.H{
 				"error": "Record not found",
 			})
@@ -216,7 +224,7 @@ func main() {
 	})
 
 	r.POST("/run", func(c *gin.Context) {
-		simConfig, err := configFromCtx(c)
+		simConfig, err := configFromCtx(c, cfg)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -230,7 +238,8 @@ func main() {
 		c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
 	})
 
-	if err := r.Run(":8080"); err != nil {
+	portStr := fmt.Sprintf(":%d", cfg.Server.Port)
+	if err := r.Run(portStr); err != nil {
 		fmt.Printf("Failed to start server: %v\n", err)
 	}
 }
