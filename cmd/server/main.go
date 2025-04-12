@@ -15,7 +15,7 @@ import (
 
 // runSim starts the simulation with the given configuration
 func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
-	log := logger.GetLogger(cfg)
+	log := logger.GetLogger(cfg.Setup.Logging.Level)
 
 	// Create a new record for the simulation
 	record, err := recordManager.CreateRecord()
