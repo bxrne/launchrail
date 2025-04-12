@@ -77,14 +77,12 @@ func (s *RulesSystem) processRules(entity *states.PhysicsState) Event {
 
 	// Check for landing after apogee using ground tolerance
 	groundTolerance := s.config.Simulation.GroundTolerance
-	if s.hasApogee && entity.Position.Vec.Y <= groundTolerance && !s.hasLanded {
-		if entity.Position.Vec.Y <= 0 {
-			entity.Position.Vec.Y = 0
-			entity.Velocity.Vec.Y = 0
-			entity.Acceleration.Vec.Y = 0
-			s.hasLanded = true
-			return Land
-		}
+	if s.hasApogee && !s.hasLanded && entity.Position.Vec.Y <= groundTolerance {
+		entity.Position.Vec.Y = 0
+		entity.Velocity.Vec.Y = 0
+		entity.Acceleration.Vec.Y = 0
+		s.hasLanded = true
+		return Land
 	}
 
 	return None
