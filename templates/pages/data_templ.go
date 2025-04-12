@@ -14,9 +14,9 @@ import (
 )
 
 type SimulationRecord struct {
-	Name      string
-	Hash      string
-	Timestamp time.Time
+	Name         string
+	Hash         string
+	LastModified time.Time
 }
 
 type DataProps struct {
@@ -67,9 +67,9 @@ func Data(props DataProps) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var3 string
-					templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(record.Timestamp.Format("2006-01-02 15:04:05"))
+					templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(record.LastModified.Format("2006-01-02 15:04:05"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 29, Col: 91}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 29, Col: 94}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 					if templ_7745c5c3_Err != nil {
@@ -102,9 +102,9 @@ func Data(props DataProps) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var6 string
-					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs("/record/" + record.Hash)
+					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs("/data/" + record.Hash)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 34, Col: 79}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 34, Col: 77}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {

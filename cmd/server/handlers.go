@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/storage"
@@ -42,15 +41,28 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 	simRecords := make([]pages.SimulationRecord, len(records))
 	for i, record := range records {
 		simRecords[i] = pages.SimulationRecord{
-			Name:      record.Name,
-			Hash:      record.Hash,
-			Timestamp: time.Now(), // You might want to store this in your Record struct
+			Name:         record.Name,
+			Hash:         record.Hash,
+			LastModified: record.LastModified,
 		}
 	}
 
 	renderTempl(c, pages.Data(pages.DataProps{Records: simRecords}))
 }
 
+// DeleteRecord handles the request to delete a specific record
+func (h *DataHandler) DeleteRecord(c *gin.Context) {
+	hash := c.Param("hash")
+	err := h.records.DeleteRecord(hash)
+	if err != nil {
+		renderTempl(c, pages.ErrorPage("Failed to delete record"))
+		return
+	}
+
+	c.Redirect(http.StatusFound, "/data")
+}
+
+// GetRecordData handles the request to get data from a specific record
 func (h *DataHandler) GetRecordData(c *gin.Context) {
 	hash := c.Param("hash")
 	dataType := c.Param("type")

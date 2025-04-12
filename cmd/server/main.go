@@ -172,6 +172,7 @@ func main() {
 	// Data routes
 	r.GET("/data", dataHandler.ListRecords)
 	r.GET("/data/:hash/:type", dataHandler.GetRecordData)
+	r.DELETE("/data/:hash", dataHandler.DeleteRecord)
 
 	// Landing page
 	r.GET("/", func(c *gin.Context) {

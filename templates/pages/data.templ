@@ -8,7 +8,7 @@ import (
 type SimulationRecord struct {
 	Name      string
 	Hash      string
-	Timestamp time.Time
+	LastModified time.Time
 }
 
 type DataProps struct {
@@ -26,12 +26,12 @@ templ Data(props DataProps) {
 				for _, record := range props.Records {
 					<div class="Box-row d-flex flex-column flex-md-row flex-justify-between flex-items-start flex-md-items-center py-3">
 						<div class="d-flex flex-column">
-							<h3 class="h3 color-fg-accent mb-1">{ record.Timestamp.Format("2006-01-02 15:04:05") }</h3>          
+							<h3 class="h3 color-fg-accent mb-1">{ record.LastModified.Format("2006-01-02 15:04:05") }</h3>          
 							<p class="color-fg-muted mb-2">SHA256: { record.Name }</p>
 						</div>
 						<div class="d-flex flex-wrap mt-2 mt-md-0">
 							<a href={ templ.SafeURL("/explore/" + record.Hash) } class="btn btn-primary mr-2 mb-2">Explore Data</a>
-							<button class="btn btn-danger mb-2" hx-delete={ "/record/" + record.Hash } hx-confirm="Are you sure you want to delete this record?">Delete</button>
+							<button class="btn btn-danger mb-2" hx-delete={ "/data/" + record.Hash } hx-confirm="Are you sure you want to delete this record?">Delete</button>
 						</div>
 					</div>
 				}
