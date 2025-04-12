@@ -24,6 +24,7 @@ func setupTest(t *testing.T) (string, string, func()) {
 	return baseDir, dir, cleanup
 }
 
+// TEST: GIVEN a base dir WHEN creating MOTION storage THEN no error is returned
 func TestNewStorageMotion(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
@@ -43,6 +44,7 @@ func TestNewStorageMotion(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TEST: GIVEN a base dir WHEN creating EVENTS storage THEN no error is returned
 func TestNewStorageEvents(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
@@ -62,6 +64,7 @@ func TestNewStorageEvents(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TEST: GIVEN a storage WHEN calling Init THEN the CSV file is created with headers
 func TestInit(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
@@ -92,6 +95,7 @@ func TestInit(t *testing.T) {
 	assert.Equal(t, storage.StorageHeaders[storage.MOTION], readHeaders)
 }
 
+// TEST: GIVEN a storage WHEN writing valid data THEN data is appended
 func TestWrite(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
@@ -128,6 +132,7 @@ func TestWrite(t *testing.T) {
 	assert.Equal(t, data, readData)
 }
 
+// TEST: GIVEN a storage WHEN writing invalid data THEN an error is returned
 func TestWriteInvalidData(t *testing.T) {
 	baseDir, dir, cleanup := setupTest(t)
 	defer cleanup()
@@ -145,4 +150,60 @@ func TestWriteInvalidData(t *testing.T) {
 	err = s.Write(data)
 	require.Error(t, err)
 	assert.EqualError(t, err, "data length (3) does not match headers length (5)")
+}
+
+// TEST: GIVEN a storage with data WHEN calling ReadAll THEN data is returned
+func TestReadAll(t *testing.T) {
+	baseDir, dir, cleanup := setupTest(t)
+	defer cleanup()
+
+	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	require.NoError(t, err)
+	require.NoError(t, s.Init())
+
+	data := []string{"1", "2", "3", "4", "5"}
+	require.NoError(t, s.Write(data))
+	require.NoError(t, s.Close())
+
+	s2, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	require.NoError(t, err)
+	defer s2.Close()
+
+	rows, err := s2.ReadAll()
+	require.NoError(t, err)
+	require.Len(t, rows, 2) // headers + data row
+}
+
+// TEST: GIVEN a storage with data WHEN calling ReadHeadersAndData THEN headers and rows are returned
+func TestReadHeadersAndData(t *testing.T) {
+	baseDir, dir, cleanup := setupTest(t)
+	defer cleanup()
+
+	s, err := storage.NewStorage(baseDir, dir, storage.EVENTS)
+	require.NoError(t, err)
+	require.NoError(t, s.Init())
+
+	data := []string{"val1", "val2", "val3"}
+	require.NoError(t, s.Write(data))
+	require.NoError(t, s.Close())
+
+	s2, err := storage.NewStorage(baseDir, dir, storage.EVENTS)
+	require.NoError(t, err)
+	defer s2.Close()
+
+	headers, rows, err := s2.ReadHeadersAndData()
+	require.NoError(t, err)
+	require.Len(t, headers, len(storage.StorageHeaders[storage.EVENTS]))
+	require.Len(t, rows, 1)
+}
+
+// TEST: GIVEN a storage WHEN calling GetFilePath THEN the correct path is returned
+func TestGetFilePath(t *testing.T) {
+	baseDir, dir, cleanup := setupTest(t)
+	defer cleanup()
+
+	s, err := storage.NewStorage(baseDir, dir, storage.DYNAMICS)
+	require.NoError(t, err)
+	assert.Contains(t, s.GetFilePath(), "DYNAMICS.csv")
+	require.NoError(t, s.Close())
 }
