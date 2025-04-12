@@ -5,6 +5,7 @@ import (
 )
 
 type ExplorerData struct {
+	Hash				 string
 	MotionHeaders   []string
 	MotionData      [][]string
 	DynamicsHeaders []string
@@ -21,8 +22,7 @@ templ Explorer(data ExplorerData) {
 			"/static/scripts/explorer.js",
 		},
 	}) {
-		<h1 class="h1 text-center color-fg-accent p-4">Simulation Explorer</h1>
-		
+		<h3 class="h3 text-center  p-4">Explore:</br><span class="color-fg-muted p-4 text-center">{ data.Hash }</span></h3>
 		<div class="Box color-shadow-medium mb-4">
 			<div class="Box-header">
 				<div class="Box-title-and-description">

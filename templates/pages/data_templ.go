@@ -56,7 +56,7 @@ func Data(props DataProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<h1 class=\"h1 text-center color-fg-accent p-4\">Simulation Records</h1><div class=\"Box color-shadow-medium mb-4\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<h1 class=\"h3 text-center p-4\">Records</h1><div class=\"Box color-shadow-medium mb-4\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -216,6 +216,7 @@ func main() {
 
 		// Render the explorer page with templ
 		data := pages.ExplorerData{
+			Hash:            hash,
 			MotionHeaders:   motionHeaders,
 			MotionData:      motionData,
 			DynamicsHeaders: dynamicsHeaders,
