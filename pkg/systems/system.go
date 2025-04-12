@@ -9,6 +9,4 @@ type System interface {
 
 	// Add adds entities to the system
 	Add(pe *states.PhysicsState)
-	// Priority returns the system priority for execution order
-	Priority() int
 }

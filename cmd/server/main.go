@@ -1,49 +1,134 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
+	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/simulation"
+	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/gin-gonic/gin"
-	"github.com/spf13/viper"
 )
 
 // runSim starts the simulation with the given configuration
-func runSim(cfg *config.Config) {
-	log := logger.GetLogger(cfg)
+func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
+	log := logger.GetLogger(cfg.Setup.Logging.Level)
 
+	// Create a new record for the simulation
+	record, err := recordManager.CreateRecord()
+	if err != nil {
+		return fmt.Errorf("failed to create record: %w", err)
+	}
+	defer record.Close()
+
+	// Initialize the simulation manager
 	simManager := simulation.NewManager(cfg, log)
 	if err := simManager.Initialize(); err != nil {
-		log.Fatal("Failed to initialize simulation", "error", err)
+		return fmt.Errorf("failed to initialize simulation: %w", err)
 	}
+
+	// Run the simulation
 	if err := simManager.Run(); err != nil {
-		log.Error("Simulation failed", "error", err)
+		return fmt.Errorf("simulation failed: %w", err)
 	}
+
+	return nil
 }
 
 // configFromCtx reads the request body and parses it into a config.Config and validates it
 func configFromCtx(c *gin.Context) (*config.Config, error) {
-	yamlData := c.PostForm("config")
-	if yamlData == "" {
-		return nil, fmt.Errorf("config cannot be empty")
+	// Extracting form values
+	motorDesignation := c.PostForm("motor-designation")
+	openRocketFile := c.PostForm("openrocket-file")
+	launchrailLength := c.PostForm("launchrail-length")
+	launchrailAngle := c.PostForm("launchrail-angle")
+	launchrailOrientation := c.PostForm("launchrail-orientation")
+	latitude := c.PostForm("latitude")
+	longitude := c.PostForm("longitude")
+	altitude := c.PostForm("altitude")
+	openRocketVersion := c.PostForm("openrocket-version")
+	simulationStep := c.PostForm("simulation-step")
+	maxTime := c.PostForm("max-time")
+	groundTolerance := c.PostForm("ground-tolerance")
+	specificGasConstant := c.PostForm("specific-gas-constant")
+	gravitationalAccel := c.PostForm("gravitational-accel")
+	seaLevelDensity := c.PostForm("sea-level-density")
+	seaLevelTemperature := c.PostForm("sea-level-temperature")
+	seaLevelPressure := c.PostForm("sea-level-pressure")
+	ratioSpecificHeats := c.PostForm("ratio-specific-heats")
+	temperatureLapseRate := c.PostForm("temperature-lapse-rate")
+	pluginPaths := c.PostForm("plugin-paths")
+
+	// Validate required fields
+	if motorDesignation == "" || openRocketFile == "" || launchrailLength == "" ||
+		launchrailAngle == "" || launchrailOrientation == "" || latitude == "" ||
+		longitude == "" || altitude == "" || openRocketVersion == "" ||
+		simulationStep == "" || maxTime == "" || groundTolerance == "" ||
+		specificGasConstant == "" || gravitationalAccel == "" || seaLevelDensity == "" ||
+		seaLevelTemperature == "" || seaLevelPressure == "" || ratioSpecificHeats == "" ||
+		temperatureLapseRate == "" || pluginPaths == "" {
+		return nil, fmt.Errorf("all fields are required")
 	}
 
-	v := viper.New()
-	v.SetConfigType("yaml")
-
-	if err := v.ReadConfig(bytes.NewBufferString(yamlData)); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	// Create the config.Config struct
+	simConfig := config.Config{
+		Setup: config.Setup{
+			App: config.App{
+				Name:    "Launchrail",
+				Version: "1.0",
+				BaseDir: "./",
+			},
+			Logging: config.Logging{
+				Level: "info",
+			},
+			Plugins: config.Plugins{
+				Paths: []string{pluginPaths},
+			},
+		},
+		Server: config.Server{
+			Port: 8080, // Set your desired port
+		},
+		Engine: config.Engine{
+			External: config.External{
+				OpenRocketVersion: openRocketVersion,
+			},
+			Options: config.Options{
+				MotorDesignation: motorDesignation,
+				OpenRocketFile:   openRocketFile,
+				Launchrail: config.Launchrail{
+					Length:      parseFloat(launchrailLength),
+					Angle:       parseFloat(launchrailAngle),
+					Orientation: parseFloat(launchrailOrientation),
+				},
+				Launchsite: config.Launchsite{
+					Latitude:  parseFloat(latitude),
+					Longitude: parseFloat(longitude),
+					Altitude:  parseFloat(altitude),
+					Atmosphere: config.Atmosphere{
+						ISAConfiguration: config.ISAConfiguration{
+							SpecificGasConstant:  parseFloat(specificGasConstant),
+							GravitationalAccel:   parseFloat(gravitationalAccel),
+							SeaLevelDensity:      parseFloat(seaLevelDensity),
+							SeaLevelTemperature:  parseFloat(seaLevelTemperature),
+							SeaLevelPressure:     parseFloat(seaLevelPressure),
+							RatioSpecificHeats:   parseFloat(ratioSpecificHeats),
+							TemperatureLapseRate: parseFloat(temperatureLapseRate),
+						},
+					},
+				},
+			},
+			Simulation: config.Simulation{
+				Step:            parseFloat(simulationStep),
+				MaxTime:         parseFloat(maxTime),
+				GroundTolerance: parseFloat(groundTolerance),
+			},
+		},
 	}
 
-	var simConfig config.Config
-	if err := v.Unmarshal(&simConfig); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
-	}
-
+	// Validate the configuration
 	if err := simConfig.Validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate config: %w", err)
 	}
@@ -51,15 +136,83 @@ func configFromCtx(c *gin.Context) (*config.Config, error) {
 	return &simConfig, nil
 }
 
+// Helper function to parse float values from strings
+func parseFloat(value string) float64 {
+	result, _ := strconv.ParseFloat(value, 64)
+	return result
+}
+
 func main() {
 	r := gin.Default()
+	r.LoadHTMLGlob("templates/*html")
 
+	dataHandler, err := NewDataHandler(".launchrail")
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Data routes
+	r.GET("/data", dataHandler.ListRecords)
+	r.GET("/data/:hash/:type", dataHandler.GetRecordData)
 	// Landing page (pun intended)
 	r.GET("/", func(c *gin.Context) {
 		c.File("templates/index.html")
 	})
 
-	// Start sim
+	r.GET("/explore/:hash", func(c *gin.Context) {
+		hash := c.Param("hash")
+		record, err := dataHandler.records.GetRecord(hash)
+		if err != nil {
+			c.HTML(http.StatusNotFound, "partials/error.html", gin.H{
+				"error": "Record not found",
+			})
+			return
+		}
+		defer record.Close()
+
+		// Ensure storage objects are not nil
+		if record.Motion == nil || record.Events == nil || record.Dynamics == nil {
+			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
+				"error": "Record storage is not properly initialized",
+			})
+			return
+		}
+
+		// Read headers and data from storage
+		motionHeaders, motionData, err := record.Motion.ReadHeadersAndData()
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
+				"error": "Failed to read motion data: " + err.Error(),
+			})
+			return
+		}
+
+		dynamicsHeaders, dynamicsData, err := record.Dynamics.ReadHeadersAndData()
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
+				"error": "Failed to read dynamics data: " + err.Error(),
+			})
+			return
+		}
+
+		eventsHeaders, eventsData, err := record.Events.ReadHeadersAndData()
+		if err != nil {
+			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
+				"error": "Failed to read events data: " + err.Error(),
+			})
+			return
+		}
+
+		// Render the explorer page
+		c.HTML(http.StatusOK, "explorer.html", gin.H{
+			"MotionHeaders":   motionHeaders,
+			"MotionData":      motionData,
+			"DynamicsHeaders": dynamicsHeaders,
+			"DynamicsData":    dynamicsData,
+			"EventsHeaders":   eventsHeaders,
+			"EventsData":      eventsData,
+		})
+	})
+
 	r.POST("/run", func(c *gin.Context) {
 		simConfig, err := configFromCtx(c)
 		if err != nil {
@@ -67,7 +220,10 @@ func main() {
 			return
 		}
 
-		go runSim(simConfig)
+		if err := runSim(simConfig, dataHandler.records); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
 		c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
 	})

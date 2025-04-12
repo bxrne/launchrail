@@ -20,6 +20,7 @@ func quaternionsEqual(q1, q2 *types.Quaternion) bool {
 		almostEqual(q1.Z, q2.Z) && almostEqual(q1.W, q2.W)
 }
 
+// TEST: GIVEN a quaternion, WHEN NewQuaternion is called, THEN the quaternion should be created with the correct values.
 func TestNewQuaternion(t *testing.T) {
 	q := types.NewQuaternion(1, 2, 3, 4)
 	if !almostEqual(q.X, 1) || !almostEqual(q.Y, 2) ||
@@ -28,6 +29,7 @@ func TestNewQuaternion(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN a quaternion, WHEN IdentityQuaternion is called, THEN the quaternion should be the identity quaternion.
 func TestIdentityQuaternion(t *testing.T) {
 	q := types.IdentityQuaternion()
 	expected := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 1}
@@ -36,6 +38,7 @@ func TestIdentityQuaternion(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN two quaternions, WHEN Add is called, THEN the result should be the sum of the two quaternions.
 func TestAdd(t *testing.T) {
 	q1 := types.NewQuaternion(1, 2, 3, 4)
 	q2 := types.NewQuaternion(5, 6, 7, 8)
@@ -46,6 +49,7 @@ func TestAdd(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN two quaternions, WHEN Subtract is called, THEN the result should be the difference of the two quaternions.
 func TestSubtract(t *testing.T) {
 	q1 := types.NewQuaternion(5, 7, 9, 11)
 	q2 := types.NewQuaternion(1, 2, 3, 4)
@@ -56,6 +60,7 @@ func TestSubtract(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN a quaternion, WHEN Multiply is called with the identity quaternion, THEN the result should be the same quaternion.
 func TestMultiplyWithIdentity(t *testing.T) {
 	q := types.NewQuaternion(1, 2, 3, 4)
 	identity := types.IdentityQuaternion()
@@ -65,6 +70,7 @@ func TestMultiplyWithIdentity(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN two quaternions, WHEN Multiply is called, THEN the result should be the product of the two quaternions.
 func TestMultiply(t *testing.T) {
 	// Test a known multiplication:
 	// For q1 = (0,1,0,0) and q2 = (0,0,1,0),
@@ -78,6 +84,7 @@ func TestMultiply(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN a quaternion and a scalar, WHEN Scale is called, THEN the result should be the quaternion scaled by the scalar.
 func TestScale(t *testing.T) {
 	q := types.NewQuaternion(1, -2, 3, -4)
 	scalar := 2.0
@@ -88,6 +95,7 @@ func TestScale(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN a quaternion, WHEN Magnitude is called, THEN the result should be the magnitude of the quaternion.
 func TestMagnitude(t *testing.T) {
 	q := types.NewQuaternion(1, 2, 3, 4)
 	result := q.Magnitude()
@@ -97,6 +105,7 @@ func TestMagnitude(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN a quaternion, WHEN Normalize is called, THEN the result should be the normalized quaternion.
 func TestNormalize(t *testing.T) {
 	q := types.NewQuaternion(1, 2, 3, 4)
 	normalized := q.Normalize()
@@ -113,6 +122,16 @@ func TestNormalize(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN a quaternion with zero magnitude, WHEN Normalize is called, THEN the result should be the original quaternion.
+func TestNormalizeZeroMagnitude(t *testing.T) {
+	q := types.NewQuaternion(0, 0, 0, 0)
+	normalized := q.Normalize()
+	if !quaternionsEqual(normalized, q) {
+		t.Errorf("Normalize zero magnitude: got %+v, expected %+v", normalized, q)
+	}
+}
+
+// TEST: GIVEN a quaternion, WHEN Conjugate is called, THEN the result should be the conjugate of the quaternion.
 func TestConjugate(t *testing.T) {
 	q := types.NewQuaternion(1, 2, 3, 4)
 	conjugate := q.Conjugate()
@@ -122,6 +141,7 @@ func TestConjugate(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN a quaternion and a vector, WHEN RotateVector is called, THEN the result should be the vector rotated by the quaternion.
 func TestRotateVector(t *testing.T) {
 	// Test a known rotation:
 	// For q = (0,0,0,1) and v = (1,0,0),
@@ -134,6 +154,7 @@ func TestRotateVector(t *testing.T) {
 	}
 }
 
+// TEST: GIVEN a quaternion and a vector, WHEN Integrate is called, THEN the result should be the quaternion integrated with the vector.
 func TestIntegrate(t *testing.T) {
 	// Test a known integration:
 	// For q = (0,0,0,1) and w = (0,0,0),
@@ -143,6 +164,30 @@ func TestIntegrate(t *testing.T) {
 	dt := 1.0
 	result := q.Integrate(w, dt)
 	expected := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 1}
+	if !quaternionsEqual(result, expected) {
+		t.Errorf("Integrate: got %+v, expected %+v", result, expected)
+	}
+}
+
+// TEST: GIVEN a quaternion and a non-zero vector, WHEN Integrate is called, THEN the result should be the quaternion integrated with the vector.
+func TestIntegrateNonZero(t *testing.T) {
+	// Test integration with angular velocity around Z-axis
+	q := types.IdentityQuaternion()
+	w := types.Vector3{X: 0, Y: 0, Z: 1} // 1 rad/s around Z-axis
+	dt := 1.0
+	result := q.Integrate(w, dt)
+
+	// For rotation of 1 radian around Z-axis:
+	// θ/2 = 0.5 radians
+	// expected.W = cos(θ/2) ≈ 0.8775825618903728
+	// expected.Z = sin(θ/2) ≈ 0.479425538604203
+	expected := &types.Quaternion{
+		X: 0,
+		Y: 0,
+		Z: math.Sin(0.5), // sin(θ/2)
+		W: math.Cos(0.5), // cos(θ/2)
+	}
+
 	if !quaternionsEqual(result, expected) {
 		t.Errorf("Integrate: got %+v, expected %+v", result, expected)
 	}

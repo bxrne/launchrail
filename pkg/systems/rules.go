@@ -89,22 +89,3 @@ func (s *RulesSystem) processRules(entity *states.PhysicsState) Event {
 
 	return None
 }
-
-// Remove removes an entity from the rules system
-func (s *RulesSystem) Remove(basic ecs.BasicEntity) {
-	var del = -1
-	for i, e := range s.entities {
-		if e.Entity.ID() == basic.ID() {
-			del = i
-			break
-		}
-	}
-	if del >= 0 {
-		s.entities = append(s.entities[:del], s.entities[del+1:]...)
-	}
-}
-
-// Priority returns the system priority
-func (s *RulesSystem) Priority() int {
-	return 100 // Run after all other systems
-}

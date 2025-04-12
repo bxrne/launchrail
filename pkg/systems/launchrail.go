@@ -105,11 +105,6 @@ func (s *LaunchRailSystem) Update(dt float64) error {
 	return nil
 }
 
-// Priority returns the system priority
-func (s *LaunchRailSystem) Priority() int {
-	return 1 // Run before physics system
-}
-
 // GetRail returns the launch rail configuration
 func (s *LaunchRailSystem) GetRail() LaunchRail {
 	return s.rail

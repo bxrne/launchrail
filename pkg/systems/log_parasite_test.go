@@ -48,11 +48,6 @@ func TestLogParasiteSystem(t *testing.T) {
 		t.Fatal("Failed to create LogParasiteSystem")
 	}
 
-	// Test system priority
-	if system.Priority() != 1 {
-		t.Errorf("Expected priority 1, got %d", system.Priority())
-	}
-
 	// Test data processing
 	dataChan := make(chan *states.PhysicsState)
 	system.Start(dataChan)
