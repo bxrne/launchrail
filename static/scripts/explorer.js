@@ -132,7 +132,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const zData = zAxis ? sourceData.map(row => parseFloat(row[zIndex])) : null;
             
             const plotLayout = {
-                title: `${yAxis} vs ${xAxis}${zAxis ? ` vs ${zAxis}` : ''}`,
+                title: yAxis + ' vs ' + xAxis + (zAxis ? ' vs ' + zAxis : ''),
+
                 xaxis: { title: xAxis },
                 yaxis: { title: yAxis },
                 margin: { t: 60, r: 40, b: 60, l: 60 }
