@@ -5,8 +5,10 @@ import (
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
+	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,4 +24,62 @@ func TestAdd(t *testing.T) {
 	en := &states.PhysicsState{}
 
 	rs.Add(en)
+}
+
+// TEST: GIVEN an entity WHEN it reaches apogee THEN the event is detected
+func TestApogeeDetection(t *testing.T) {
+	cfg := &config.Engine{
+		Simulation: config.Simulation{
+			GroundTolerance: 0.1,
+		},
+	}
+	rs := systems.NewRulesSystem(&ecs.World{}, cfg)
+	entity := &states.PhysicsState{
+		Position:  &types.Position{Vec: types.Vector3{Y: 100}},
+		Velocity:  &types.Velocity{Vec: types.Vector3{Y: -1}},
+		Motor:     &components.Motor{}, // Initialize motor
+		Parachute: &components.Parachute{Trigger: "apogee", Deployed: false},
+	}
+
+	// Simulate motor burnout
+	entity.Motor.SetState("BURNOUT")
+
+	rs.Add(entity)
+	_ = rs.Update(0)
+	assert.Equal(t, systems.Apogee, rs.GetLastEvent())
+	assert.True(t, entity.Parachute.Deployed)
+}
+
+// TEST: GIVEN an entity WHEN it lands THEN the event is detected
+func TestLandingDetection(t *testing.T) {
+	cfg := &config.Engine{
+		Simulation: config.Simulation{
+			GroundTolerance: 0.1,
+		},
+	}
+	rs := systems.NewRulesSystem(&ecs.World{}, cfg)
+	entity := &states.PhysicsState{
+		Position:     &types.Position{Vec: types.Vector3{Y: 0.05}}, // Slightly above ground tolerance
+		Velocity:     &types.Velocity{Vec: types.Vector3{Y: -0.1}}, // Simulate downward velocity
+		Acceleration: &types.Acceleration{Vec: types.Vector3{}},    // Initialize acceleration
+		Motor:        &components.Motor{},                          // Initialize motor
+	}
+
+	// Simulate motor burnout
+	entity.Motor.SetState("BURNOUT")
+
+	rs.Add(entity)
+	_ = rs.Update(0) // Simulate apogee first
+	_ = rs.Update(0)
+	assert.Equal(t, systems.Land, rs.GetLastEvent())
+}
+
+// TEST: GIVEN an invalid entity WHEN processed THEN no event is triggered
+func TestInvalidEntityHandling(t *testing.T) {
+	rs := systems.NewRulesSystem(&ecs.World{}, &config.Engine{})
+	entity := &states.PhysicsState{}
+
+	rs.Add(entity)
+	_ = rs.Update(0)
+	assert.Equal(t, systems.None, rs.GetLastEvent())
 }
