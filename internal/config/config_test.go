@@ -251,7 +251,6 @@ func TestGetConfig_ValidConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to backup config: %v", err)
 	}
-	defer restoreConfigYaml(hadConfig)
 
 	// Create a test config file
 	err = createConfigYaml()
@@ -269,9 +268,14 @@ func TestGetConfig_ValidConfig(t *testing.T) {
 		t.Errorf("GetConfig() returned nil config")
 	}
 
-	// Verify a few values from the config
-	if cfg.Setup.App.Name != "TestApp" {
-		t.Errorf("GetConfig() returned config with incorrect app name: %s", cfg.Setup.App.Name)
+	err = cfg.Validate()
+	if err != nil {
+		t.Errorf("Validate() should not return an error for valid config: %v", err)
+	}
+
+	err = restoreConfigYaml(hadConfig)
+	if err != nil {
+		t.Fatalf("Failed to restore config: %v", err)
 	}
 }
 
@@ -282,12 +286,17 @@ func TestGetConfig_InvalidConfigPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to backup config: %v", err)
 	}
-	defer restoreConfigYaml(hadConfig)
 
 	// Test GetConfig with non-existent file
 	_, err = config.GetConfig()
 	if err == nil {
 		t.Errorf("GetConfig() should return error for missing config file")
+	}
+
+	// Restore the original config if it existed
+	err = restoreConfigYaml(hadConfig)
+	if err != nil {
+		t.Fatalf("Failed to restore config: %v", err)
 	}
 }
 
@@ -298,20 +307,26 @@ func TestGetConfig_InvalidConfigFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to backup config: %v", err)
 	}
-	defer restoreConfigYaml(hadConfig)
 
 	// Create a invalid test config file
 	err = createInvalidConfigYaml()
 	if err != nil {
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
-	defer os.Remove("config.yaml")
 
 	// Test GetConfig
 	_, err = config.GetConfig()
 	if err == nil {
 		t.Errorf("GetConfig() should return error for invalid config format")
 	}
+
+	// Restore the original config if it existed
+	err = restoreConfigYaml(hadConfig)
+	if err != nil {
+		t.Fatalf("Failed to restore config: %v", err)
+	}
+
+	os.Remove("config.yaml")
 }
 
 // TABLE TEST: GIVEN configs with various invalid fields WHEN Validate is called THEN returns appropriate errors

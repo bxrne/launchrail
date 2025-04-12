@@ -44,8 +44,8 @@ func TestGetLoggerDifferentLevels(t *testing.T) {
 		log := logger.GetLogger(level)
 		if log == nil {
 			t.Errorf("Expected logger to be non-nil for level %s", level)
+			continue
 		}
-
 		if log.Level.String() != level {
 			t.Errorf("Expected logger level to be %s, got %s", level, log.Level.String())
 		}
