@@ -324,6 +324,21 @@ details summary {
   border-top: 1px solid #404040;
 }
 
+/* Pagination improvements */
+.pagination .Link--secondary {
+    min-width: 32px;
+    text-align: center;
+    border-radius: 4px;
+}
+
+.pagination .Link--secondary:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.pagination .color-fg-accent {
+    background-color: rgba(255, 140, 0, 0.2);
+}
+
 /* Navigation and footer specific links */
 .Box-header .Link--primary,
 .footer .Link--primary {

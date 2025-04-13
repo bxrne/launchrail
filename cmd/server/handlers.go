@@ -298,3 +298,53 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 		},
 	})
 }
+
+// New helper function
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func (h *DataHandler) GetTableRows(c *gin.Context) {
+	hash := c.Param("hash")
+	table := c.Query("table")
+	page := parseInt(c.Query("page"), 1)
+
+	record, err := h.records.GetRecord(hash)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
+	defer record.Close()
+
+	var store *storage.Storage
+	switch table {
+	case "motion":
+		store = record.Motion
+	case "dynamics":
+		store = record.Dynamics
+	case "events":
+		store = record.Events
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid table"})
+		return
+	}
+
+	// Get data and paginate
+	_, data, err := store.ReadHeadersAndData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read data"})
+		return
+	}
+
+	itemsPerPage := 10
+	startIndex := (page - 1) * itemsPerPage
+	endIndex := min(startIndex+itemsPerPage, len(data))
+
+	// Return only the table rows HTML
+	c.HTML(http.StatusOK, "table_rows.html", gin.H{
+		"rows": data[startIndex:endIndex],
+	})
+}

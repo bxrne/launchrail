@@ -88,12 +88,30 @@ templ Explorer(data ExplorerData, version string) {
 					</table>
 					if data.Pagination.TotalPages > 1 {
 						<div class="pagination d-flex flex-justify-center mt-3">
-							for i := 1; i <= data.Pagination.TotalPages; i++ {
-								<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }
-									hx-get={ fmt.Sprintf("/explore/%s?table=motion&page=%d", data.Hash, i) }
+							if data.Pagination.CurrentPage > 1 {
+								<a href="#" class="Link--secondary mx-1 px-2"
+									hx-get={ fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, data.Pagination.CurrentPage-1, "motion") }
 									hx-target="#motion-table"
-									hx-swap="outerHTML">
+									hx-swap="innerHTML">
+									←
+								</a>
+							}
+							
+							for i := max(1, data.Pagination.CurrentPage-2); i <= min(data.Pagination.TotalPages, data.Pagination.CurrentPage+2); i++ {
+								<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }
+									hx-get={ fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, i, "motion") }
+									hx-target="#motion-table"
+									hx-swap="innerHTML">
 									{ fmt.Sprint(i) }
+								</a>
+							}
+							
+							if data.Pagination.CurrentPage < data.Pagination.TotalPages {
+								<a href="#" class="Link--secondary mx-1 px-2"
+									hx-get={ fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, data.Pagination.CurrentPage+1, "motion") }
+									hx-target="#motion-table"
+									hx-swap="innerHTML">
+									→
 								</a>
 							}
 						</div>
@@ -138,12 +156,30 @@ templ Explorer(data ExplorerData, version string) {
 					</table>
 					if data.Pagination.TotalPages > 1 {
 						<div class="pagination d-flex flex-justify-center mt-3">
-							for i := 1; i <= data.Pagination.TotalPages; i++ {
-								<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }
-									hx-get={ fmt.Sprintf("/explore/%s?table=dynamics&page=%d", data.Hash, i) }
+							if data.Pagination.CurrentPage > 1 {
+								<a href="#" class="Link--secondary mx-1 px-2"
+									hx-get={ fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, data.Pagination.CurrentPage-1, "dynamics") }
 									hx-target="#dynamics-table"
-									hx-swap="outerHTML">
+									hx-swap="innerHTML">
+									←
+								</a>
+							}
+							
+							for i := max(1, data.Pagination.CurrentPage-2); i <= min(data.Pagination.TotalPages, data.Pagination.CurrentPage+2); i++ {
+								<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }
+									hx-get={ fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, i, "dynamics") }
+									hx-target="#dynamics-table"
+									hx-swap="innerHTML">
 									{ fmt.Sprint(i) }
+								</a>
+							}
+							
+							if data.Pagination.CurrentPage < data.Pagination.TotalPages {
+								<a href="#" class="Link--secondary mx-1 px-2"
+									hx-get={ fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, data.Pagination.CurrentPage+1, "dynamics") }
+									hx-target="#dynamics-table"
+									hx-swap="innerHTML">
+									→
 								</a>
 							}
 						</div>
@@ -188,12 +224,30 @@ templ Explorer(data ExplorerData, version string) {
 					</table>
 					if data.Pagination.TotalPages > 1 {
 						<div class="pagination d-flex flex-justify-center mt-3">
-							for i := 1; i <= data.Pagination.TotalPages; i++ {
-								<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }
-									hx-get={ fmt.Sprintf("/explore/%s?table=events&page=%d", data.Hash, i) }
+							if data.Pagination.CurrentPage > 1 {
+								<a href="#" class="Link--secondary mx-1 px-2"
+									hx-get={ fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, data.Pagination.CurrentPage-1, "events") }
 									hx-target="#events-table"
-									hx-swap="outerHTML">
+									hx-swap="innerHTML">
+									←
+								</a>
+							}
+							
+							for i := max(1, data.Pagination.CurrentPage-2); i <= min(data.Pagination.TotalPages, data.Pagination.CurrentPage+2); i++ {
+								<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }
+									hx-get={ fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, i, "events") }
+									hx-target="#events-table"
+									hx-swap="innerHTML">
 									{ fmt.Sprint(i) }
+								</a>
+							}
+							
+							if data.Pagination.CurrentPage < data.Pagination.TotalPages {
+								<a href="#" class="Link--secondary mx-1 px-2"
+									hx-get={ fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, data.Pagination.CurrentPage+1, "events") }
+									hx-target="#events-table"
+									hx-swap="innerHTML">
+									→
 								</a>
 							}
 						</div>
