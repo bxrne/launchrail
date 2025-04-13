@@ -136,36 +136,7 @@ document.addEventListener("DOMContentLoaded", function () {
           responsive: true,
           displayModeBar: true,
           modeBarButtonsToRemove: ["lasso2d", "select2d"],
-        })
-          .then(() => {
-            // Add new download button below the plot
-            const dlButton = document.createElement("button");
-            dlButton.textContent = "Download Plot";
-            dlButton.className = "btn btn-secondary";
-            dlButton.style.display = "block";
-            dlButton.style.margin = "1em auto 0 auto";
-            dlButton.addEventListener("click", () => {
-              const fileNameParts = [hash, xAxis, yAxis];
-              if (zAxis) {
-                fileNameParts.push(zAxis);
-              }
-              const finalFileName = fileNameParts.join("_") + ".png";
-              Plotly.downloadImage(plotContainer, {
-                format: "png",
-                filename: finalFileName,
-              });
-            });
-            plotContainer.appendChild(dlButton);
-          })
-          .catch((err) => {
-            console.error("Error generating plot:", err);
-            plotContainer.innerHTML = `
-              <div class="flash flash-error mb-3">
-                <p>Error generating plot: ${err.message}</p>
-              </div>`;
-          });
-        // Mark plot as up to date
-        isPlotUpToDate = true;
+        });
       })
       .catch((err) => {
         console.error("Error generating plot:", err);

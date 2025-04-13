@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/a-h/templ"
@@ -50,7 +52,7 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 		Page:         parseInt(c.Query("page"), 1),
 		Sort:         c.Query("sort"),
 		Filter:       c.Query("filter"),
-		ItemsPerPage: 10,
+		ItemsPerPage: 15, // Changed from 10 to 15
 	}
 
 	records, err := h.records.ListRecords()
@@ -283,7 +285,7 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 	})
 
 	// Apply pagination
-	itemsPerPage := 10
+	itemsPerPage := 15 // Changed from 10 to 15
 	totalPages := int(math.Ceil(float64(len(sortedData)) / float64(itemsPerPage)))
 	startIndex := (page - 1) * itemsPerPage
 	endIndex := min(startIndex+itemsPerPage, len(sortedData))
@@ -339,12 +341,163 @@ func (h *DataHandler) GetTableRows(c *gin.Context) {
 		return
 	}
 
-	itemsPerPage := 10
+	itemsPerPage := 15 // Changed from 10 to 15
 	startIndex := (page - 1) * itemsPerPage
 	endIndex := min(startIndex+itemsPerPage, len(data))
 
 	// Return only the table rows HTML
 	c.HTML(http.StatusOK, "table_rows.html", gin.H{
 		"rows": data[startIndex:endIndex],
+	})
+}
+
+func (h *DataHandler) handleTableRequest(c *gin.Context, hash string, table string) {
+	record, err := h.records.GetRecord(hash)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
+	defer record.Close()
+
+	var store *storage.Storage
+	switch table {
+	case "motion":
+		store = record.Motion
+	case "dynamics":
+		store = record.Dynamics
+	case "events":
+		store = record.Events
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid table"})
+		return
+	}
+
+	page := parseInt(c.Query("page"), 1)
+	sortCol := c.Query("sort")
+	sortDir := c.Query("dir")
+
+	headers, data, err := store.ReadHeadersAndData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read data"})
+		return
+	}
+
+	// Sort if requested
+	if sortCol != "" {
+		colIndex := -1
+		for i, h := range headers {
+			if h == sortCol {
+				colIndex = i
+				break
+			}
+		}
+		if colIndex >= 0 {
+			sort.Slice(data, func(i, j int) bool {
+				if sortDir == "asc" {
+					return data[i][colIndex] < data[j][colIndex]
+				}
+				return data[i][colIndex] > data[j][colIndex]
+			})
+		}
+	}
+
+	// Paginate
+	itemsPerPage := 15
+	totalPages := int(math.Ceil(float64(len(data)) / float64(itemsPerPage)))
+	startIndex := (page - 1) * itemsPerPage
+	endIndex := min(startIndex+itemsPerPage, len(data))
+
+	if startIndex >= len(data) {
+		startIndex = 0
+		endIndex = min(itemsPerPage, len(data))
+		page = 1
+	}
+
+	pagedData := data[startIndex:endIndex]
+
+	// For motion and dynamics, convert string data to float64
+	if table != "events" {
+		floatData := make([][]float64, len(pagedData))
+		for i, row := range pagedData {
+			floatData[i] = make([]float64, len(row))
+			for j, val := range row {
+				floatData[i][j], _ = strconv.ParseFloat(val, 64)
+			}
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"headers": headers,
+			"data":    floatData,
+			"pagination": gin.H{
+				"currentPage": page,
+				"totalPages":  totalPages,
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"headers": headers,
+		"data":    pagedData,
+		"pagination": gin.H{
+			"currentPage": page,
+			"totalPages":  totalPages,
+		},
+	})
+}
+
+// Use this standard handler for all table requests
+func (h *DataHandler) GetTableData(c *gin.Context) {
+	hash := c.Param("hash")
+	table := c.Query("table")
+	h.handleTableRequest(c, hash, table)
+}
+
+// ListRecordsAPI handles the API request to list simulation records
+func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
+	records, err := h.records.ListRecords()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Apply query parameters
+	page := parseInt(c.Query("page"), 1)
+	sort := c.Query("sort")
+	filter := c.Query("filter")
+	itemsPerPage := 15
+
+	// Apply filtering
+	if filter != "" {
+		filtered := make([]*storage.Record, 0)
+		for _, r := range records {
+			if strings.Contains(strings.ToLower(r.Hash), strings.ToLower(filter)) {
+				filtered = append(filtered, r)
+			}
+		}
+		records = filtered
+	}
+
+	// Apply sorting
+	sortOrder := c.Query("sort")
+	log.Println("Sort order:", sortOrder, sort)
+	// Calculate pagination
+	totalRecords := len(records)
+	totalPages := int(math.Ceil(float64(totalRecords) / float64(itemsPerPage)))
+	startIndex := (page - 1) * itemsPerPage
+	endIndex := min(startIndex+itemsPerPage, totalRecords)
+
+	if startIndex >= totalRecords {
+		startIndex = 0
+		endIndex = min(itemsPerPage, totalRecords)
+		page = 1
+	}
+
+	// Return paginated records
+	c.JSON(http.StatusOK, gin.H{
+		"records": records[startIndex:endIndex],
+		"pagination": gin.H{
+			"currentPage": page,
+			"totalPages":  totalPages,
+		},
 	})
 }

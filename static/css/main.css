@@ -27,10 +27,11 @@
   background-color: #f6f8fa;
 }
 
+/* Tab content container fixes */
 .tab-content {
   display: none;
-  max-height: 600px;
-  overflow-y: auto;
+  min-height: 400px;
+  overflow: visible;
 }
 
 .tab-content.active {
@@ -50,13 +51,25 @@
 
 /* Plot container */
 #plot-container {
-  min-height: 400px;
   position: relative;
   background-color: #2a2a2a !important;
-  max-width: 640px;
-  max-height: 480px;
   width: 100%;
-  height: auto;
+  max-width: 100%;
+  height: 800px !important;
+  min-height: 800px !important;
+  overflow: visible;
+  padding: 2rem;
+}
+
+/* Plot specific */
+.js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.plotly {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* Add fade-in animation for tab content */
@@ -232,9 +245,12 @@ details summary {
 .table-container {
   overflow-x: auto;
   width: 100%;
-  padding: 0 2rem;
-  max-width: 1200px;
+  padding: 1rem;
   margin: 0 auto;
+  min-height: 400px;
+  background: #2a2a2a;
+  border: 1px solid #404040;
+  border-radius: 6px;
   white-space: nowrap;
 }
 

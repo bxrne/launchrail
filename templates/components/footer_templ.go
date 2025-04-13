@@ -42,7 +42,7 @@ func Footer(version string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</span></div><div><a href=\"https://github.com/bxrne/launchrail\" class=\"Link--primary mr-3\">/github</a> <a href=\"https://github.com/bxrne/launchrail/issues/new\" class=\"Link--primary\">/issues</a></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</span></div><div><a href=\"/api\" class=\"Link--primary mr-3\">/api</a> <a href=\"https://github.com/bxrne/launchrail\" class=\"Link--primary mr-3\">/github</a> <a href=\"https://github.com/bxrne/launchrail/issues/new\" class=\"Link--primary\">/issues</a></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

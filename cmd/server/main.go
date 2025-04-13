@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
@@ -216,62 +217,50 @@ func main() {
 			return
 		}
 
-		// Read headers and data from storage
-		motionHeaders, motionData, err := record.Motion.ReadHeadersAndData()
+		// Read headers for all tables first
+		motionHeaders, _, err := record.Motion.ReadHeadersAndData()
 		if err != nil {
-			render(c, pages.ErrorPage("Failed to read motion data: "+err.Error()))
+			render(c, pages.ErrorPage("Failed to read motion headers: "+err.Error()))
 			return
 		}
 
-		dynamicsHeaders, dynamicsData, err := record.Dynamics.ReadHeadersAndData()
+		dynamicsHeaders, _, err := record.Dynamics.ReadHeadersAndData()
 		if err != nil {
-			render(c, pages.ErrorPage("Failed to read dynamics data: "+err.Error()))
+			render(c, pages.ErrorPage("Failed to read dynamics headers: "+err.Error()))
 			return
 		}
 
-		eventsHeaders, eventsData, err := record.Events.ReadHeadersAndData()
+		eventsHeaders, _, err := record.Events.ReadHeadersAndData()
 		if err != nil {
-			render(c, pages.ErrorPage("Failed to read events data: "+err.Error()))
+			render(c, pages.ErrorPage("Failed to read events headers: "+err.Error()))
 			return
-		}
-
-		// Turn motion data and dynamics data from [][]string to [][]float64
-		motionDataFloat := make([][]float64, len(motionData))
-		for i, row := range motionData {
-			motionDataFloat[i] = make([]float64, len(row))
-			for j, val := range row {
-				motionDataFloat[i][j], _ = strconv.ParseFloat(val, 64)
-			}
-
-		}
-
-		// Add pagination for dynamics data
-		dynamicsDataFloat := make([][]float64, len(dynamicsData))
-		for i, row := range dynamicsData {
-			dynamicsDataFloat[i] = make([]float64, len(row))
-			for j, val := range row {
-				dynamicsDataFloat[i][j], _ = strconv.ParseFloat(val, 64)
-			}
 		}
 
 		// Get current table and page
 		table := c.Query("table")
+		if table == "" {
+			table = "motion" // Default to motion table
+		}
 		page := parseInt(c.Query("page"), 1)
-		itemsPerPage := 10
+		itemsPerPage := 15
 
-		var currentData [][]float64
+		// Read and process the current table's data
+		var data [][]string
 		switch table {
 		case "motion":
-			currentData = motionDataFloat
+			_, data, err = record.Motion.ReadHeadersAndData()
 		case "dynamics":
-			currentData = dynamicsDataFloat
+			_, data, err = record.Dynamics.ReadHeadersAndData()
 		case "events":
-			currentData = nil // Handle events separately since it's string data
-		default:
-			currentData = motionDataFloat
+			_, data, err = record.Events.ReadHeadersAndData()
+		}
+		if err != nil {
+			render(c, pages.ErrorPage("Failed to read data: "+err.Error()))
+			return
 		}
 
-		totalRecords := len(currentData)
+		// Calculate pagination
+		totalRecords := len(data)
 		totalPages := int(math.Ceil(float64(totalRecords) / float64(itemsPerPage)))
 		startIndex := (page - 1) * itemsPerPage
 		endIndex := min(startIndex+itemsPerPage, totalRecords)
@@ -282,26 +271,50 @@ func main() {
 			page = 1
 		}
 
-		// Render the explorer page with templ
-		data := pages.ExplorerData{
+		// Get the page of data we want to display
+		pagedData := data[startIndex:endIndex]
+		var currentData interface{}
+
+		// Convert data if needed
+		if table != "events" {
+			floatData := make([][]float64, len(pagedData))
+			for i, row := range pagedData {
+				floatData[i] = make([]float64, len(row))
+				for j, val := range row {
+					floatData[i][j], _ = strconv.ParseFloat(val, 64)
+				}
+			}
+			currentData = floatData
+		} else {
+			currentData = pagedData
+		}
+
+		// Build the explorer data structure
+		explorerData := pages.ExplorerData{
 			Hash: hash,
-			Headers: pages.ExplorerHeaders{ // Updated from whatever it was before
+			Headers: pages.ExplorerHeaders{
 				Motion:   motionHeaders,
 				Dynamics: dynamicsHeaders,
 				Events:   eventsHeaders,
 			},
-			Data: pages.ExplorerDataContent{ // Updated from whatever it was before
-				Motion:   currentData[startIndex:endIndex], // Add pagination slice
-				Dynamics: dynamicsDataFloat,
-				Events:   eventsData,
-			},
-			Pagination: pages.Pagination{ // Add pagination info
+			Data: pages.ExplorerDataContent{},
+			Pagination: pages.Pagination{
 				CurrentPage: page,
 				TotalPages:  totalPages,
 			},
 		}
 
-		render(c, pages.Explorer(data, cfg.Setup.App.Version))
+		// Set the correct data based on table type
+		switch table {
+		case "motion":
+			explorerData.Data.Motion = currentData.([][]float64)
+		case "dynamics":
+			explorerData.Data.Dynamics = currentData.([][]float64)
+		case "events":
+			explorerData.Data.Events = currentData.([][]string)
+		}
+
+		render(c, pages.Explorer(explorerData, cfg.Setup.App.Version))
 	})
 
 	r.GET("/explore/:hash/json", dataHandler.GetExplorerData)
@@ -434,9 +447,58 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"plotData": plotData, "plotLayout": plotLayout})
 	})
 
+	r.GET("/api", func(c *gin.Context) {
+		// Serve Swagger UI with version prefix from config
+		c.HTML(http.StatusOK, "swagger.html", gin.H{
+			"Version": cfg.Setup.App.Version,
+			"ApiPath": fmt.Sprintf("/api/v%s", strings.Split(cfg.Setup.App.Version, ".")[0]),
+		})
+	})
+
+	// Serve OpenAPI spec
+	r.GET("/api/spec", func(c *gin.Context) {
+		c.File("api/openapi.yaml")
+	})
+
+	// Group API routes under versioned prefix
+	api := r.Group(fmt.Sprintf("/api/v%s", strings.Split(cfg.Setup.App.Version, ".")[0]))
+	{
+		api.POST("/run", handleSimRun)
+		api.GET("/data", dataHandler.ListRecordsAPI)
+		api.GET("/explore/:hash", dataHandler.GetExplorerData)
+	}
+
 	log.Info("Server started", "Port", cfg.Server.Port)
 	portStr := fmt.Sprintf(":%d", cfg.Server.Port)
 	if err := r.Run(portStr); err != nil {
 		fmt.Printf("Failed to start server: %v\n", err)
 	}
+}
+
+// handleSimRun handles API requests to start simulations
+func handleSimRun(c *gin.Context) {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to load config: %v", err)})
+		return
+	}
+
+	simConfig, err := configFromCtx(c, cfg)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	dataHandler, err := NewDataHandler(cfg)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := runSim(simConfig, dataHandler.records); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
 }

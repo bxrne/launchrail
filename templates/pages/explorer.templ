@@ -21,10 +21,11 @@ type ExplorerHeaders struct {
 
 // ExplorerData structure to hold the hash and data
 type ExplorerData struct {
-	Hash    string
-	Headers ExplorerHeaders    `json:"headers"`
-	Data    ExplorerDataContent `json:"data"`
-	Pagination Pagination     `json:"pagination"`  // Add this line
+	Hash       string
+	Table      string              `json:"table"`
+	Headers    ExplorerHeaders     `json:"headers"`
+	Data       ExplorerDataContent `json:"data"`
+	Pagination Pagination          `json:"pagination"`
 }
 
 templ Explorer(data ExplorerData, version string) {
@@ -40,19 +41,21 @@ templ Explorer(data ExplorerData, version string) {
 		<div class="Box color-shadow-medium mb-4">
 			<div class="Box-header">
 				<div class="Box-title-and-description">
-					<div class="d-flex flex-items-center">
+					<div class="d-flex flex-items-center flex-justify-center">
 						<div id="tab-container" class="d-flex">
-							<button class="btn-link py-2 px-3 f4 border-bottom color-border-accent-emphasis color-fg-accent tab active" data-target="motion">Motion</button>
-							<button class="btn-link py-2 px-3 f4 tab" data-target="dynamics">Dynamics</button>
-							<button class="btn-link py-2 px-3 f4 tab" data-target="events">Events</button>
-							<button class="btn-link py-2 px-3 f4 tab" data-target="plots">Plots</button>
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=motion", data.Hash)) } 
+								class={ "btn-link py-2 px-3 f4 tab", templ.KV("active border-bottom color-border-accent-emphasis color-fg-accent", data.Table == "motion") } data-target="motion">Motion</a>
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=dynamics", data.Hash)) }
+								class={ "btn-link py-2 px-3 f4 tab", templ.KV("active border-bottom color-border-accent-emphasis color-fg-accent", data.Table == "dynamics") } data-target="dynamics">Dynamics</a>
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=events", data.Hash)) }
+								class={ "btn-link py-2 px-3 f4 tab", templ.KV("active border-bottom color-border-accent-emphasis color-fg-accent", data.Table == "events") } data-target="events">Events</a>
+							<a href="#" class={ "btn-link py-2 px-3 f4 tab", templ.KV("active border-bottom color-border-accent-emphasis color-fg-accent", data.Table == "plots") } data-target="plots">Plots</a>
 						</div>
 					</div>
 				</div>
 			</div>
 			
 			<div class="tab-content active p-3" id="motion">
-				<h2 class="mb-3">Motion Records</h2>
 				<div class="Box table-container overflow-auto">
 					<table class="table width-full">
 						<thead>
@@ -90,28 +93,20 @@ templ Explorer(data ExplorerData, version string) {
 				if data.Pagination.TotalPages > 1 {
 					<div class="pagination d-flex flex-justify-center mt-3">
 						if data.Pagination.CurrentPage > 1 {
-							<a href="#" class="Link--secondary mx-1 px-2"
-								hx-get={ fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, data.Pagination.CurrentPage-1, "motion") }
-								hx-target="#motion-table"
-								hx-swap="innerHTML">
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=motion&page=%d", data.Hash, data.Pagination.CurrentPage-1)) } class="Link--secondary mx-1 px-2">
 								←
 							</a>
 						}
 						
 						for i := max(1, data.Pagination.CurrentPage-2); i <= min(data.Pagination.TotalPages, data.Pagination.CurrentPage+2); i++ {
-							<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }
-								hx-get={ fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, i, "motion") }
-								hx-target="#motion-table"
-								hx-swap="innerHTML">
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=motion&page=%d", data.Hash, i)) } 
+								class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }>
 								{ fmt.Sprint(i) }
 							</a>
 						}
 						
 						if data.Pagination.CurrentPage < data.Pagination.TotalPages {
-							<a href="#" class="Link--secondary mx-1 px-2"
-								hx-get={ fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, data.Pagination.CurrentPage+1, "motion") }
-								hx-target="#motion-table"
-								hx-swap="innerHTML">
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=motion&page=%d", data.Hash, data.Pagination.CurrentPage+1)) } class="Link--secondary mx-1 px-2">
 								→
 							</a>
 						}
@@ -120,8 +115,7 @@ templ Explorer(data ExplorerData, version string) {
 			</div>
 			
 			<div class="tab-content p-3" id="dynamics">
-				<h2 class="mb-3">Dynamics Records</h2>
-				<div class="Box table-container overflow-auto">
+				<div class="Box table-container overflow-auto" style="min-height: 400px;">
 					<table class="table width-full">
 						<thead>
 							<tr>
@@ -158,28 +152,20 @@ templ Explorer(data ExplorerData, version string) {
 				if data.Pagination.TotalPages > 1 {
 					<div class="pagination d-flex flex-justify-center mt-3">
 						if data.Pagination.CurrentPage > 1 {
-							<a href="#" class="Link--secondary mx-1 px-2"
-								hx-get={ fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, data.Pagination.CurrentPage-1, "dynamics") }
-								hx-target="#dynamics-table"
-								hx-swap="innerHTML">
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=dynamics&page=%d", data.Hash, data.Pagination.CurrentPage-1)) } class="Link--secondary mx-1 px-2">
 								←
 							</a>
 						}
 						
 						for i := max(1, data.Pagination.CurrentPage-2); i <= min(data.Pagination.TotalPages, data.Pagination.CurrentPage+2); i++ {
-							<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }
-								hx-get={ fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, i, "dynamics") }
-								hx-target="#dynamics-table"
-								hx-swap="innerHTML">
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=dynamics&page=%d", data.Hash, i)) }
+								class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }>
 								{ fmt.Sprint(i) }
 							</a>
 						}
 						
 						if data.Pagination.CurrentPage < data.Pagination.TotalPages {
-							<a href="#" class="Link--secondary mx-1 px-2"
-								hx-get={ fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, data.Pagination.CurrentPage+1, "dynamics") }
-								hx-target="#dynamics-table"
-								hx-swap="innerHTML">
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=dynamics&page=%d", data.Hash, data.Pagination.CurrentPage+1)) } class="Link--secondary mx-1 px-2">
 								→
 							</a>
 						}
@@ -188,8 +174,7 @@ templ Explorer(data ExplorerData, version string) {
 			</div>
 			
 			<div class="tab-content p-3" id="events">
-				<h2 class="mb-3">Events Records</h2>
-				<div class="Box table-container overflow-auto">
+				<div class="Box table-container overflow-auto" style="min-height: 400px;">
 					<table class="table width-full">
 						<thead>
 							<tr>
@@ -226,28 +211,20 @@ templ Explorer(data ExplorerData, version string) {
 				if data.Pagination.TotalPages > 1 {
 					<div class="pagination d-flex flex-justify-center mt-3">
 						if data.Pagination.CurrentPage > 1 {
-							<a href="#" class="Link--secondary mx-1 px-2"
-								hx-get={ fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, data.Pagination.CurrentPage-1, "events") }
-								hx-target="#events-table"
-								hx-swap="innerHTML">
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=events&page=%d", data.Hash, data.Pagination.CurrentPage-1)) } class="Link--secondary mx-1 px-2">
 								←
 							</a>
 						}
 						
 						for i := max(1, data.Pagination.CurrentPage-2); i <= min(data.Pagination.TotalPages, data.Pagination.CurrentPage+2); i++ {
-							<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }
-								hx-get={ fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, i, "events") }
-								hx-target="#events-table"
-								hx-swap="innerHTML">
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=events&page=%d", data.Hash, i)) }
+								class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }>
 								{ fmt.Sprint(i) }
 							</a>
 						}
 						
 						if data.Pagination.CurrentPage < data.Pagination.TotalPages {
-							<a href="#" class="Link--secondary mx-1 px-2"
-								hx-get={ fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, data.Pagination.CurrentPage+1, "events") }
-								hx-target="#events-table"
-								hx-swap="innerHTML">
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=events&page=%d", data.Hash, data.Pagination.CurrentPage+1)) } class="Link--secondary mx-1 px-2">
 								→
 							</a>
 						}
@@ -283,10 +260,7 @@ templ Explorer(data ExplorerData, version string) {
 					<input type="hidden" id="record-hash" value={ data.Hash } />
 					<button type="button" id="plot-button" class="btn btn-primary">Generate Plot</button>
 				</form>
-				<div id="plot-container" class="mt-4 Box p-3" style="max-width: 640px; max-height: 480px; width: 100%; height: auto;">
-					<div class="blankslate">
-						<h3 class="blankslate-heading">Select axes and generate plot...</h3>
-					</div>
+				<div id="plot-container" class="mt-4 Box p-3" style="width: 100%; max-width: 100%; height: 800px; min-height: 800px;">
 				</div>
 			</div>
 			<script id="headers-data" type="application/json">
