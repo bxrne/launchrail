@@ -26,7 +26,10 @@ func NewDataHandler(baseDir string) (*DataHandler, error) {
 func renderTempl(c *gin.Context, component templ.Component) {
 	err := component.Render(c.Request.Context(), c.Writer)
 	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		err_err := c.AbortWithError(http.StatusInternalServerError, err)
+		if err_err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to render template"})
+		}
 	}
 }
 

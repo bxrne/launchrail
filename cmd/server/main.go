@@ -141,7 +141,10 @@ func parseFloat(value string) float64 {
 func render(c *gin.Context, component templ.Component) {
 	err := component.Render(c.Request.Context(), c.Writer)
 	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		err_err := c.AbortWithError(http.StatusInternalServerError, err)
+		if err_err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to render template"})
+		}
 	}
 }
 
@@ -156,7 +159,10 @@ func main() {
 	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
 
 	r := gin.Default()
-	r.SetTrustedProxies(nil)
+	err = r.SetTrustedProxies(nil)
+	if err != nil {
+		log.Fatal("Failed to set trusted proxies", "Error", err)
+	}
 
 	dataHandler, err := NewDataHandler(".launchrail")
 	if err != nil {
