@@ -1,0 +1,102 @@
+/* Custom Swagger UI theme for Launchrail */
+:root {
+    --swagger-bg: #1a1a1a;
+    --swagger-fg: #ffffff;
+    --swagger-accent: #ff8c00;
+    --swagger-header-bg: #2a2a2a;
+    --swagger-border: #404040;
+}
+
+/* Base theme overrides */
+.swagger-ui {
+    color: var(--swagger-fg);
+    background: var(--swagger-bg);
+}
+
+/* Headers and text */
+.swagger-ui .info .title,
+.swagger-ui .info h1,
+.swagger-ui .info h2,
+.swagger-ui .info h3,
+.swagger-ui .info h4,
+.swagger-ui .info h5,
+.swagger-ui .opblock-tag {
+    color: var(--swagger-fg) !important;
+}
+
+/* Operation blocks */
+.swagger-ui .opblock {
+    background: var(--swagger-header-bg);
+    border-color: var(--swagger-border);
+}
+
+.swagger-ui .opblock .opblock-summary {
+    border-color: var(--swagger-border);
+}
+
+/* Method colors */
+.swagger-ui .opblock.opblock-get .opblock-summary {
+    border-color: #2a5a89;
+}
+
+.swagger-ui .opblock.opblock-post .opblock-summary {
+    border-color: #4b9256;
+}
+
+.swagger-ui .opblock.opblock-delete .opblock-summary {
+    border-color: #cc3333;
+}
+
+/* Schema sections */
+.swagger-ui .model-box {
+    background: var(--swagger-header-bg);
+    border-color: var(--swagger-border);
+}
+
+.swagger-ui section.models {
+    border-color: var(--swagger-border);
+}
+
+.swagger-ui section.models .model-container {
+    background: var(--swagger-header-bg);
+}
+
+/* Input fields */
+.swagger-ui input[type=text],
+.swagger-ui textarea {
+    background: var(--swagger-header-bg);
+    border-color: var(--swagger-border);
+    color: var(--swagger-fg);
+}
+
+/* Buttons */
+.swagger-ui .btn {
+    border-color: var(--swagger-border);
+}
+
+.swagger-ui .btn.execute {
+    background-color: var(--swagger-accent);
+    color: var(--swagger-fg);
+}
+
+/* Response section */
+.swagger-ui .responses-inner {
+    background: var(--swagger-header-bg);
+}
+
+.swagger-ui .response-col_status {
+    color: var(--swagger-fg);
+}
+
+/* Table styles */
+.swagger-ui table tbody tr td {
+    background: var(--swagger-header-bg);
+    color: var(--swagger-fg);
+    border-color: var(--swagger-border);
+}
+
+/* JSON/YAML example styling */
+.swagger-ui .microlight {
+    background: var(--swagger-header-bg) !important;
+    color: var(--swagger-fg) !important;
+}

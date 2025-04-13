@@ -12,7 +12,7 @@ import (
 	"github.com/bxrne/launchrail/templates/layouts"
 )
 
-func Index() templ.Component {
+func Index(version string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -52,7 +52,8 @@ func Index() templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Base(layouts.BaseProps{
-			Title:   "Rocket Simulation",
+			Title:   "Home",
+			Version: version,
 			Scripts: []string{"/static/scripts/simulation.js"},
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {

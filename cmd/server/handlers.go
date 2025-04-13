@@ -2,9 +2,14 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"net/http"
+	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/a-h/templ"
+	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
@@ -12,14 +17,15 @@ import (
 
 type DataHandler struct {
 	records *storage.RecordManager
+	Cfg     *config.Config
 }
 
-func NewDataHandler(baseDir string) (*DataHandler, error) {
-	rm, err := storage.NewRecordManager(baseDir)
+func NewDataHandler(cfg *config.Config) (*DataHandler, error) {
+	rm, err := storage.NewRecordManager(cfg.Setup.App.BaseDir)
 	if err != nil {
 		return nil, err
 	}
-	return &DataHandler{records: rm}, nil
+	return &DataHandler{records: rm, Cfg: cfg}, nil
 }
 
 // Helper function to render templ components
@@ -33,24 +39,80 @@ func renderTempl(c *gin.Context, component templ.Component) {
 	}
 }
 
+type ListParams struct {
+	Page         int
+	Sort         string
+	Filter       string
+	ItemsPerPage int
+}
+
 func (h *DataHandler) ListRecords(c *gin.Context) {
+	params := ListParams{
+		Page:         parseInt(c.Query("page"), 1),
+		Sort:         c.Query("sort"),
+		Filter:       c.Query("filter"),
+		ItemsPerPage: 15, // Changed from 10 to 15
+	}
+
 	records, err := h.records.ListRecords()
 	if err != nil {
 		renderTempl(c, pages.ErrorPage(err.Error()))
 		return
 	}
 
-	// Convert storage.Record to pages.SimulationRecord
-	simRecords := make([]pages.SimulationRecord, len(records))
-	for i, record := range records {
+	// Apply filtering
+	if params.Filter != "" {
+		filtered := make([]*storage.Record, 0)
+		for _, r := range records {
+			if strings.Contains(strings.ToLower(r.Hash), strings.ToLower(params.Filter)) {
+				filtered = append(filtered, r)
+			}
+		}
+		records = filtered
+	}
+
+	// Apply sorting
+	sort.Slice(records, func(i, j int) bool {
+		switch params.Sort {
+		case "time_asc":
+			return records[i].LastModified.Before(records[j].LastModified)
+		default: // time_desc
+			return records[i].LastModified.After(records[j].LastModified)
+		}
+	})
+
+	// Calculate pagination
+	totalRecords := len(records)
+	totalPages := int(math.Ceil(float64(totalRecords) / float64(params.ItemsPerPage)))
+	startIndex := (params.Page - 1) * params.ItemsPerPage
+	endIndex := min(startIndex+params.ItemsPerPage, totalRecords)
+
+	if startIndex >= totalRecords {
+		startIndex = 0
+		endIndex = min(params.ItemsPerPage, totalRecords)
+		params.Page = 1
+	}
+
+	pagedRecords := records[startIndex:endIndex]
+
+	// Convert to SimulationRecords
+	simRecords := make([]pages.SimulationRecord, len(pagedRecords))
+	for i, record := range pagedRecords {
 		simRecords[i] = pages.SimulationRecord{
-			Name:         record.Name,
 			Hash:         record.Hash,
 			LastModified: record.LastModified,
 		}
 	}
 
-	renderTempl(c, pages.Data(pages.DataProps{Records: simRecords}))
+	renderTempl(c, pages.Data(pages.DataProps{
+		Records: simRecords,
+		Pagination: pages.Pagination{
+			CurrentPage: params.Page,
+			TotalPages:  totalPages,
+		},
+	},
+		h.Cfg.Setup.App.Version,
+	))
 }
 
 // DeleteRecord handles the request to delete a specific record
@@ -62,7 +124,25 @@ func (h *DataHandler) DeleteRecord(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusFound, "/data")
+	// Get updated records list
+	records, err := h.records.ListRecords()
+	if err != nil {
+		renderTempl(c, pages.ErrorPage(err.Error()))
+		return
+	}
+
+	// Convert to SimulationRecord slice
+	simRecords := make([]pages.SimulationRecord, len(records))
+	for i, record := range records {
+		simRecords[i] = pages.SimulationRecord{
+			Name:         record.Name,
+			Hash:         record.Hash,
+			LastModified: record.LastModified,
+		}
+	}
+
+	// Render just the records list component
+	renderTempl(c, pages.Data(pages.DataProps{Records: simRecords}, h.Cfg.Setup.App.Version))
 }
 
 // GetRecordData handles the request to get data from a specific record
@@ -105,4 +185,340 @@ func (h *DataHandler) GetRecordData(c *gin.Context) {
 	// For now, redirect to the explore page which will show the data
 	// You might want to create a specific templ component for data plots later
 	c.Redirect(http.StatusFound, fmt.Sprintf("/explore/%s", hash))
+}
+
+// New endpoint to return JSON data for explorer
+func (h *DataHandler) GetExplorerData(c *gin.Context) {
+	hash := c.Param("hash")
+	record, err := h.records.GetRecord(hash)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
+	defer record.Close()
+
+	motionHeaders, motionData, err := record.Motion.ReadHeadersAndData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read motion data"})
+		return
+	}
+	dynamicsHeaders, dynamicsData, err := record.Dynamics.ReadHeadersAndData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read dynamics data"})
+		return
+	}
+	eventsHeaders, eventsData, err := record.Events.ReadHeadersAndData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read events data"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"headers": gin.H{
+			"motion":   motionHeaders,
+			"dynamics": dynamicsHeaders,
+			"events":   eventsHeaders,
+		},
+		"data": gin.H{
+			"motion":   motionData,
+			"dynamics": dynamicsData,
+			"events":   eventsData,
+		},
+	})
+}
+
+// Add this new method to DataHandler
+func (h *DataHandler) ExplorerSortData(c *gin.Context) {
+	hash := c.Param("hash")
+	table := c.Query("table")
+	column := c.Query("col")
+	direction := c.Query("dir")
+	page := parseInt(c.Query("page"), 1)
+
+	record, err := h.records.GetRecord(hash)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
+	defer record.Close()
+
+	// Get the correct storage based on table type
+	var storage *storage.Storage
+	switch table {
+	case "motion":
+		storage = record.Motion
+	case "dynamics":
+		storage = record.Dynamics
+	case "events":
+		storage = record.Events
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid table"})
+		return
+	}
+
+	headers, data, err := storage.ReadHeadersAndData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read data"})
+		return
+	}
+
+	// Sort the data
+	// Find column index
+	colIndex := -1
+	for i, h := range headers {
+		if h == column {
+			colIndex = i
+			break
+		}
+	}
+
+	// Convert and sort data
+	sortedData := make([][]string, len(data))
+	copy(sortedData, data)
+
+	sort.Slice(sortedData, func(i, j int) bool {
+		if direction == "asc" {
+			return sortedData[i][colIndex] < sortedData[j][colIndex]
+		}
+		return sortedData[i][colIndex] > sortedData[j][colIndex]
+	})
+
+	// Apply pagination
+	itemsPerPage := 15 // Changed from 10 to 15
+	totalPages := int(math.Ceil(float64(len(sortedData)) / float64(itemsPerPage)))
+	startIndex := (page - 1) * itemsPerPage
+	endIndex := min(startIndex+itemsPerPage, len(sortedData))
+	pagedData := sortedData[startIndex:endIndex]
+
+	// Return paginated and sorted data
+	c.JSON(http.StatusOK, gin.H{
+		"data": pagedData,
+		"pagination": gin.H{
+			"currentPage": page,
+			"totalPages":  totalPages,
+		},
+	})
+}
+
+func (h *DataHandler) GetTableRows(c *gin.Context) {
+	hash := c.Param("hash")
+	table := c.Query("table")
+	page := parseInt(c.Query("page"), 1)
+
+	record, err := h.records.GetRecord(hash)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
+	defer record.Close()
+
+	var store *storage.Storage
+	switch table {
+	case "motion":
+		store = record.Motion
+	case "dynamics":
+		store = record.Dynamics
+	case "events":
+		store = record.Events
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid table"})
+		return
+	}
+
+	// Get data and paginate
+	_, data, err := store.ReadHeadersAndData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read data"})
+		return
+	}
+
+	itemsPerPage := 15 // Changed from 10 to 15
+	startIndex := (page - 1) * itemsPerPage
+	endIndex := min(startIndex+itemsPerPage, len(data))
+
+	// Return only the table rows HTML
+	c.HTML(http.StatusOK, "table_rows.html", gin.H{
+		"rows": data[startIndex:endIndex],
+	})
+}
+
+func (h *DataHandler) handleTableRequest(c *gin.Context, hash string, table string) {
+	record, err := h.records.GetRecord(hash)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
+	defer record.Close()
+
+	var store *storage.Storage
+	switch table {
+	case "motion":
+		store = record.Motion
+	case "dynamics":
+		store = record.Dynamics
+	case "events":
+		store = record.Events
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid table"})
+		return
+	}
+
+	page := parseInt(c.Query("page"), 1)
+	sortCol := c.Query("sort")
+	sortDir := c.Query("dir")
+
+	headers, data, err := store.ReadHeadersAndData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read data"})
+		return
+	}
+
+	// Sort if requested
+	if sortCol != "" {
+		colIndex := -1
+		for i, h := range headers {
+			if h == sortCol {
+				colIndex = i
+				break
+			}
+		}
+		if colIndex >= 0 {
+			sort.Slice(data, func(i, j int) bool {
+				if sortDir == "asc" {
+					return data[i][colIndex] < data[j][colIndex]
+				}
+				return data[i][colIndex] > data[j][colIndex]
+			})
+		}
+	}
+
+	// Paginate the data
+	itemsPerPage := 15
+	totalPages := int(math.Ceil(float64(len(data)) / float64(itemsPerPage)))
+	startIndex := (page - 1) * itemsPerPage
+	endIndex := min(startIndex+itemsPerPage, len(data))
+
+	if startIndex >= len(data) {
+		startIndex = 0
+		endIndex = min(itemsPerPage, len(data))
+		page = 1
+	}
+
+	pagedData := data[startIndex:endIndex]
+
+	// For motion and dynamics, convert string data to float64
+	if table != "events" {
+		floatData := make([][]float64, len(pagedData))
+		for i, row := range pagedData {
+			floatData[i] = make([]float64, len(row))
+			for j, val := range row {
+				floatData[i][j], _ = strconv.ParseFloat(val, 64)
+			}
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"headers": headers,
+			"data":    floatData,
+			"pagination": gin.H{
+				"currentPage": page,
+				"totalPages":  totalPages,
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"headers": headers,
+		"data":    pagedData,
+		"pagination": gin.H{
+			"currentPage": page,
+			"totalPages":  totalPages,
+		},
+	})
+}
+
+// Use this standard handler for all table requests
+func (h *DataHandler) GetTableData(c *gin.Context) {
+	hash := c.Param("hash")
+	table := c.Query("table")
+	h.handleTableRequest(c, hash, table)
+}
+
+// sortRecords sorts records based on LastModified timestamp
+func sortRecords(records []*storage.Record, ascending bool) {
+	// Use bubble sort for simplicity - can be optimized if needed
+	n := len(records)
+	for i := 0; i < n-1; i++ {
+		for j := 0; j < n-i-1; j++ {
+			shouldSwap := false
+			if ascending {
+				shouldSwap = records[j].LastModified.After(records[j+1].LastModified)
+			} else {
+				shouldSwap = records[j].LastModified.Before(records[j+1].LastModified)
+			}
+			if shouldSwap {
+				records[j], records[j+1] = records[j+1], records[j]
+			}
+		}
+	}
+}
+
+// ListRecordsAPI godoc
+// @Summary List simulation records
+// @Description Returns a paginated list of simulation records
+// @Tags Data
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number"
+// @Param filter query string false "Filter by hash"
+// @Param sort query string false "Sort order (time_asc or time_desc)"
+// @Success 200 {object} RecordsResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/data [get]
+func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
+	records, err := h.records.ListRecords()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Apply query parameters
+	page := parseInt(c.Query("page"), 1)
+	filter := c.Query("filter")
+	itemsPerPage := 15
+
+	// Apply filtering
+	if filter != "" {
+		filtered := make([]*storage.Record, 0)
+		for _, r := range records {
+			if strings.Contains(strings.ToLower(r.Hash), strings.ToLower(filter)) {
+				filtered = append(filtered, r)
+			}
+		}
+		records = filtered
+	}
+
+	// Apply sorting
+	sortOrder := c.Query("sort")
+	sortRecords(records, sortOrder == "time_asc")
+
+	// Calculate pagination
+	totalRecords := len(records)
+	totalPages := int(math.Ceil(float64(totalRecords) / float64(itemsPerPage)))
+	startIndex := (page - 1) * itemsPerPage
+	endIndex := min(startIndex+itemsPerPage, totalRecords)
+
+	if startIndex >= totalRecords {
+		startIndex = 0
+		endIndex = min(itemsPerPage, totalRecords)
+		page = 1
+	}
+
+	// Return paginated records
+	c.JSON(http.StatusOK, gin.H{
+		"records": records[startIndex:endIndex],
+		"pagination": gin.H{
+			"currentPage": page,
+			"totalPages":  totalPages,
+		},
+	})
 }

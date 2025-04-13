@@ -1,112 +1,187 @@
 package pages
 
 import (
+	"fmt"
 	"github.com/bxrne/launchrail/templates/layouts"
 )
 
-type ExplorerData struct {
-	Hash				 string
-	MotionHeaders   []string
-	MotionData      [][]string
-	DynamicsHeaders []string
-	DynamicsData    [][]string
-	EventsHeaders   []string
-	EventsData      [][]string
+// ExplorerDataContent structure to hold the motion, dynamics, and events data 
+type ExplorerDataContent struct {
+	Motion   [][]float64 `json:"motion"`
+	Dynamics [][]float64 `json:"dynamics"`
+	Events   [][]string  `json:"events"`
 }
 
-templ Explorer(data ExplorerData) {
+// ExplorerHeaders for the motion, dynamics, and events data 
+type ExplorerHeaders struct {
+	Motion   []string `json:"motion"`
+	Dynamics []string `json:"dynamics"`
+	Events   []string `json:"events"`
+}
+
+// ExplorerData structure to hold the hash and data
+type ExplorerData struct {
+	Hash       string
+	Table      string              `json:"table"`
+	Headers    ExplorerHeaders     `json:"headers"`
+	Data       ExplorerDataContent `json:"data"`
+	Pagination Pagination          `json:"pagination"`
+}
+
+templ Explorer(data ExplorerData, version string) {
 	@layouts.Base(layouts.BaseProps{
 		Title:   "Simulation Explorer",
 		Scripts: []string{
 			"https://cdn.jsdelivr.net/npm/plotly.js-dist-min", 
 			"/static/scripts/explorer.js",
 		},
+		Version: version,
 	}) {
-		<h3 class="h3 text-center  p-4">Explore:</br><span class="color-fg-muted p-4 text-center">{ data.Hash }</span></h3>
+		<h3 class="h3 text-center p-4">Explore:</br><span class="color-fg-muted p-4 text-center">{ data.Hash }</span></h3>
 		<div class="Box color-shadow-medium mb-4">
 			<div class="Box-header">
 				<div class="Box-title-and-description">
-					<div class="d-flex flex-items-center">
+					<div class="d-flex flex-items-center flex-justify-center">
 						<div id="tab-container" class="d-flex">
-							<button class="btn-link py-2 px-3 f4 border-bottom color-border-accent-emphasis color-fg-accent tab active" data-target="motion">Motion</button>
-							<button class="btn-link py-2 px-3 f4 tab" data-target="dynamics">Dynamics</button>
-							<button class="btn-link py-2 px-3 f4 tab" data-target="events">Events</button>
-							<button class="btn-link py-2 px-3 f4 tab" data-target="plots">Plots</button>
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=motion", data.Hash)) } 
+								class={ "btn-link py-2 px-3 f4 tab", templ.KV("active border-bottom color-border-accent-emphasis color-fg-accent", data.Table == "motion") } data-target="motion">Motion</a>
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=dynamics", data.Hash)) }
+								class={ "btn-link py-2 px-3 f4 tab", templ.KV("active border-bottom color-border-accent-emphasis color-fg-accent", data.Table == "dynamics") } data-target="dynamics">Dynamics</a>
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=events", data.Hash)) }
+								class={ "btn-link py-2 px-3 f4 tab", templ.KV("active border-bottom color-border-accent-emphasis color-fg-accent", data.Table == "events") } data-target="events">Events</a>
+							<a href="#" class={ "btn-link py-2 px-3 f4 tab", templ.KV("active border-bottom color-border-accent-emphasis color-fg-accent", data.Table == "plots") } data-target="plots">Plots</a>
 						</div>
 					</div>
 				</div>
 			</div>
 			
-			<div class="tab-content active p-3" id="motion">
-				<h2 class="mb-3">Motion Records</h2>
-				<div class="Box overflow-auto">
+			<div class={ "tab-content p-3", templ.KV("active", data.Table == "motion") } id="motion">
+				<div class="Box table-container overflow-auto">
 					<table class="table width-full">
 						<thead>
 							<tr>
-								for _, header := range data.MotionHeaders {
-									<th>{ header }</th>
+								for _, header := range data.Headers.Motion {
+									<th>
+										<div class="d-flex flex-items-center">
+											{ header }
+										</div>
+									</th>
 								}
 							</tr>
 						</thead>
-						<tbody>
-							for _, row := range data.MotionData {
-								<tr>
-									for _, cell := range row {
-										<td>{ cell }</td>
-									}
-								</tr>
-							}
+						<tbody id="motion-table">
+							@ShowPaginatedRows(data.Data.Motion, data.Pagination)
 						</tbody>
 					</table>
 				</div>
+				if data.Pagination.TotalPages > 1 {
+					<div class="pagination d-flex flex-justify-center mt-3">
+						if data.Pagination.CurrentPage > 1 {
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=motion&page=%d", data.Hash, data.Pagination.CurrentPage-1)) } class="Link--secondary mx-1 px-2">
+								←
+							</a>
+						}
+						
+						for i := max(1, data.Pagination.CurrentPage-2); i <= min(data.Pagination.TotalPages, data.Pagination.CurrentPage+2); i++ {
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=motion&page=%d", data.Hash, i)) } 
+								class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }>
+								{ fmt.Sprint(i) }
+							</a>
+						}
+						
+						if data.Pagination.CurrentPage < data.Pagination.TotalPages {
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=motion&page=%d", data.Hash, data.Pagination.CurrentPage+1)) } class="Link--secondary mx-1 px-2">
+								→
+							</a>
+						}
+					</div>
+				}
 			</div>
 			
-			<div class="tab-content p-3" id="dynamics">
-				<h2 class="mb-3">Dynamics Records</h2>
-				<div class="Box overflow-auto">
+			<div class={ "tab-content p-3", templ.KV("active", data.Table == "dynamics") } id="dynamics">
+				<div class="Box table-container overflow-auto" style="min-height: 400px;">
 					<table class="table width-full">
 						<thead>
 							<tr>
-								for _, header := range data.DynamicsHeaders {
-									<th>{ header }</th>
+								for _, header := range data.Headers.Dynamics {
+									<th>
+										<div class="d-flex flex-items-center">
+											{ header }
+										</div>
+									</th>
 								}
 							</tr>
 						</thead>
-						<tbody>
-							for _, row := range data.DynamicsData {
-								<tr>
-									for _, cell := range row {
-										<td>{ cell }</td>
-									}
-								</tr>
-							}
+						<tbody id="dynamics-table">
+							@ShowPaginatedRows(data.Data.Dynamics, data.Pagination)
 						</tbody>
 					</table>
 				</div>
+				if data.Pagination.TotalPages > 1 {
+					<div class="pagination d-flex flex-justify-center mt-3">
+						if data.Pagination.CurrentPage > 1 {
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=dynamics&page=%d", data.Hash, data.Pagination.CurrentPage-1)) } class="Link--secondary mx-1 px-2">
+								←
+							</a>
+						}
+						
+						for i := max(1, data.Pagination.CurrentPage-2); i <= min(data.Pagination.TotalPages, data.Pagination.CurrentPage+2); i++ {
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=dynamics&page=%d", data.Hash, i)) }
+								class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }>
+								{ fmt.Sprint(i) }
+							</a>
+						}
+						
+						if data.Pagination.CurrentPage < data.Pagination.TotalPages {
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=dynamics&page=%d", data.Hash, data.Pagination.CurrentPage+1)) } class="Link--secondary mx-1 px-2">
+								→
+							</a>
+						}
+					</div>
+				}
 			</div>
 			
-			<div class="tab-content p-3" id="events">
-				<h2 class="mb-3">Events Records</h2>
-				<div class="Box overflow-auto">
+			<div class={ "tab-content p-3", templ.KV("active", data.Table == "events") } id="events">
+				<div class="Box table-container overflow-auto" style="min-height: 400px;">
 					<table class="table width-full">
 						<thead>
 							<tr>
-								for _, header := range data.EventsHeaders {
-									<th>{ header }</th>
+								for _, header := range data.Headers.Events {
+									<th>
+										<div class="d-flex flex-items-center">
+											{ header }
+										</div>
+									</th>
 								}
 							</tr>
 						</thead>
-						<tbody>
-							for _, row := range data.EventsData {
-								<tr>
-									for _, cell := range row {
-										<td>{ cell }</td>
-									}
-								</tr>
-							}
+						<tbody id="events-table">
+							@ShowPaginatedStringRows(data.Data.Events, data.Pagination)
 						</tbody>
 					</table>
 				</div>
+				if data.Pagination.TotalPages > 1 {
+					<div class="pagination d-flex flex-justify-center mt-3">
+						if data.Pagination.CurrentPage > 1 {
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=events&page=%d", data.Hash, data.Pagination.CurrentPage-1)) } class="Link--secondary mx-1 px-2">
+								←
+							</a>
+						}
+						
+						for i := max(1, data.Pagination.CurrentPage-2); i <= min(data.Pagination.TotalPages, data.Pagination.CurrentPage+2); i++ {
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=events&page=%d", data.Hash, i)) }
+								class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }>
+								{ fmt.Sprint(i) }
+							</a>
+						}
+						
+						if data.Pagination.CurrentPage < data.Pagination.TotalPages {
+							<a href={ templ.URL(fmt.Sprintf("/explore/%s?table=events&page=%d", data.Hash, data.Pagination.CurrentPage+1)) } class="Link--secondary mx-1 px-2">
+								→
+							</a>
+						}
+					</div>
+				}
 			</div>
 			
 			<div class="tab-content p-3" id="plots">
@@ -134,10 +209,48 @@ templ Explorer(data ExplorerData) {
 							<option value="">None (2D Plot)</option>
 						</select>
 					</div>
+					<input type="hidden" id="record-hash" value={ data.Hash } />
 					<button type="button" id="plot-button" class="btn btn-primary">Generate Plot</button>
 				</form>
-				<div id="plot-container" class="mt-4 Box p-3"></div>
+				<div id="plot-container" class="mt-4 Box p-3" style="width: 100%; max-width: 100%; height: 800px; min-height: 800px;">
+				</div>
 			</div>
+			<script id="headers-data" type="application/json">
+				{ var headersJSON, _ = json.Marshal(data.Headers) }
+				{ templ.Raw(string(headersJSON)) }
+			</script>
+			<script id="table-data" type="application/json">
+				{ var dataJSON, _ = json.Marshal(data.Data) }
+				{ templ.Raw(string(dataJSON)) }
+			</script>
 		</div>
 	}
+}
+
+templ ShowPaginatedRows(data [][]float64, pagination Pagination) {
+    for i := (pagination.CurrentPage - 1) * 15; i < min((pagination.CurrentPage-1)*15+15, len(data)); i++ {
+        <tr>
+            for _, cell := range data[i] {
+                <td>{ fmt.Sprintf("%.4f", cell) }</td>
+            }
+        </tr>
+    }
+}
+
+templ ShowPaginatedStringRows(data [][]string, pagination Pagination) {
+    for i := (pagination.CurrentPage - 1) * 15; i < min((pagination.CurrentPage-1)*15+15, len(data)); i++ {
+        <tr>
+            for _, cell := range data[i] {
+                <td>{ cell }</td>
+            }
+        </tr>
+    }
+}
+
+// Helper function to find minimum of two integers
+func min(a, b int) int {
+    if a < b {
+        return a
+    }
+    return b
 }

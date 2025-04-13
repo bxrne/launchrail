@@ -8,7 +8,7 @@ package components
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func Footer() templ.Component {
+func Footer(version string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -29,7 +29,20 @@ func Footer() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"container-lg mt-6 mb-4\"><div class=\"Box p-3 color-bg-subtle\"><div class=\"d-flex flex-items-center flex-justify-between\"><div><span class=\"color-fg-muted\">Launchrail v0.1.0</span></div><div><a href=\"https://github.com/bxrne/launchrail\" class=\"Link--primary mr-3\">GitHub</a> <a href=\"https://github.com/bxrne/launchrail/issues/new\" class=\"Link--primary\">Report an Issue</a></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"container-xl mt-6 mb-4\"><div class=\"Box p-3\" style=\"background-color: #2a2a2a;\"><div class=\"d-flex flex-items-center flex-justify-between\"><div><span class=\"color-fg-muted\">launchrail v")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var2 string
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(version)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/components/footer.templ`, Line: 8, Col: 70}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</span></div><div><a href=\"https://github.com/bxrne/launchrail\" class=\"Link--primary mr-3\">/github</a> <a href=\"https://github.com/bxrne/launchrail/issues/new\" class=\"Link--primary\">/issues</a></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
