@@ -256,7 +256,7 @@ func main() {
 		render(c, pages.Explorer(data))
 	})
 
-	r.GET("/explorer/:hash/json", dataHandler.GetExplorerData)
+	r.GET("/explore/:hash/json", dataHandler.GetExplorerData)
 
 	r.POST("/run", func(c *gin.Context) {
 		simConfig, err := configFromCtx(c, cfg)
@@ -318,12 +318,13 @@ func main() {
 		// Find field indices
 		xIndex, yIndex, zIndex := -1, -1, -1
 		for i, h := range headers {
-			switch h {
-			case xAxis:
+			if h == xAxis {
 				xIndex = i
-			case yAxis:
+			}
+			if h == yAxis {
 				yIndex = i
-			case zAxis:
+			}
+			if h == zAxis {
 				zIndex = i
 			}
 		}

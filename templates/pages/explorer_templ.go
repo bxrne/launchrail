@@ -248,7 +248,20 @@ func Explorer(data ExplorerData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</tbody></table></div></div><div class=\"tab-content p-3\" id=\"plots\"><h2 class=\"mb-3\">Create Plots</h2><form id=\"plot-form\" class=\"Box p-3\"><div class=\"form-group mb-3\"><label for=\"data-source\" class=\"d-block mb-2 f4 color-fg-accent\">Data Source:</label> <select id=\"data-source\" class=\"form-select width-full\"><option value=\"motion\">Motion</option> <option value=\"dynamics\">Dynamics</option> <option value=\"events\">Events</option></select></div><div class=\"form-group mb-3\"><label for=\"x-axis\" class=\"d-block mb-2 f4 color-fg-accent\">X-Axis:</label> <select id=\"x-axis\" class=\"form-select width-full\"></select></div><div class=\"form-group mb-3\"><label for=\"y-axis\" class=\"d-block mb-2 f4 color-fg-accent\">Y-Axis:</label> <select id=\"y-axis\" class=\"form-select width-full\"></select></div><div class=\"form-group mb-3\"><label for=\"z-axis\" class=\"d-block mb-2 f4 color-fg-accent\">Z-Axis (Optional for 3D):</label> <select id=\"z-axis\" class=\"form-select width-full\"><option value=\"\">None (2D Plot)</option></select></div><input type=\"hidden\" id=\"record-hash\" value=\"{ data.Hash }\"> <button type=\"button\" id=\"plot-button\" class=\"btn btn-primary\">Generate Plot</button></form><div id=\"plot-container\" class=\"mt-4 Box p-3\"></div></div><script id=\"headers-data\" type=\"application/json\">\n\t\t\t\t{ var headersJSON, _ = json.Marshal(data.Headers) }\n\t\t\t\t{ templ.Raw(string(headersJSON)) }\n\t\t\t</script><script id=\"table-data\" type=\"application/json\">\n\t\t\t\t{ var dataJSON, _ = json.Marshal(data.Data) }\n\t\t\t\t{ templ.Raw(string(dataJSON)) }\n\t\t\t</script></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</tbody></table></div></div><div class=\"tab-content p-3\" id=\"plots\"><h2 class=\"mb-3\">Create Plots</h2><form id=\"plot-form\" class=\"Box p-3\"><div class=\"form-group mb-3\"><label for=\"data-source\" class=\"d-block mb-2 f4 color-fg-accent\">Data Source:</label> <select id=\"data-source\" class=\"form-select width-full\"><option value=\"motion\">Motion</option> <option value=\"dynamics\">Dynamics</option> <option value=\"events\">Events</option></select></div><div class=\"form-group mb-3\"><label for=\"x-axis\" class=\"d-block mb-2 f4 color-fg-accent\">X-Axis:</label> <select id=\"x-axis\" class=\"form-select width-full\"></select></div><div class=\"form-group mb-3\"><label for=\"y-axis\" class=\"d-block mb-2 f4 color-fg-accent\">Y-Axis:</label> <select id=\"y-axis\" class=\"form-select width-full\"></select></div><div class=\"form-group mb-3\"><label for=\"z-axis\" class=\"d-block mb-2 f4 color-fg-accent\">Z-Axis (Optional for 3D):</label> <select id=\"z-axis\" class=\"form-select width-full\"><option value=\"\">None (2D Plot)</option></select></div><input type=\"hidden\" id=\"record-hash\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var10 string
+			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(data.Hash)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 149, Col: 60}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\"> <button type=\"button\" id=\"plot-button\" class=\"btn btn-primary\">Generate Plot</button></form><div id=\"plot-container\" class=\"mt-4 Box p-3\"></div></div><script id=\"headers-data\" type=\"application/json\">\n\t\t\t\t{ var headersJSON, _ = json.Marshal(data.Headers) }\n\t\t\t\t{ templ.Raw(string(headersJSON)) }\n\t\t\t</script><script id=\"table-data\" type=\"application/json\">\n\t\t\t\t{ var dataJSON, _ = json.Marshal(data.Data) }\n\t\t\t\t{ templ.Raw(string(dataJSON)) }\n\t\t\t</script></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

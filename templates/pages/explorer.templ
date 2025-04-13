@@ -146,7 +146,7 @@ templ Explorer(data ExplorerData) {
 							<option value="">None (2D Plot)</option>
 						</select>
 					</div>
-					<input type="hidden" id="record-hash" value="{ data.Hash }" />
+					<input type="hidden" id="record-hash" value={ data.Hash } />
 					<button type="button" id="plot-button" class="btn btn-primary">Generate Plot</button>
 				</form>
 				<div id="plot-container" class="mt-4 Box p-3"></div>

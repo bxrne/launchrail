@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Fetch JSON data instead of parsing from script tags
   const hash = window.location.pathname.split("/").pop();
-  fetch(`/explorer/${hash}/json`)
+  fetch(`/explore/${hash}/json`)
     .then((res) => res.json())
     .then((jsonData) => {
       headers = jsonData.headers || {};
