@@ -191,6 +191,14 @@ func main() {
 	// Serve static files
 	r.Static("/static", "./static")
 
+	// Serve Swagger UI
+	r.Static("/docs", "./swagger-ui")
+
+	// Ensure `/api/spec` is registered only once
+	r.GET("/api/spec", func(c *gin.Context) {
+		c.File("./swagger-ui/openapi.yaml") // Ensure the file exists at this path
+	})
+
 	// Data routes
 	r.GET("/data", dataHandler.ListRecords)
 	r.GET("/data/:hash/:type", dataHandler.GetRecordData)
@@ -388,16 +396,10 @@ func main() {
 	})
 
 	r.GET("/api", func(c *gin.Context) {
-		// Serve Swagger UI with version prefix from config
-		c.HTML(http.StatusOK, "swagger.html", gin.H{
-			"Version": cfg.Setup.App.Version,
-			"ApiPath": fmt.Sprintf("/api/v%s", strings.Split(cfg.Setup.App.Version, ".")[0]),
+		c.JSON(http.StatusOK, gin.H{
+			"version": cfg.Setup.App.Version,
+			"apiPath": fmt.Sprintf("/api/v%s", strings.Split(cfg.Setup.App.Version, ".")[0]),
 		})
-	})
-
-	// Serve OpenAPI spec
-	r.GET("/api/spec", func(c *gin.Context) {
-		c.File("api/openapi.yaml")
 	})
 
 	// Group API routes under versioned prefix

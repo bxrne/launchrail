@@ -61,21 +61,11 @@ templ Explorer(data ExplorerData, version string) {
 						<thead>
 							<tr>
 								for _, header := range data.Headers.Motion {
-										<th>
-											<div class="d-flex flex-items-center">
-												{ header }
-												<div class="d-flex flex-column ml-1">
-													<button class="btn-octicon p-0" 
-														hx-get={ fmt.Sprintf("/explore/%s/sort?table=motion&col=%s&dir=asc", data.Hash, header) }
-														hx-target="#motion-table"
-														hx-swap="outerHTML">▲</button>
-													<button class="btn-octicon p-0"
-														hx-get={ fmt.Sprintf("/explore/%s/sort?table=motion&col=%s&dir=desc", data.Hash, header) }
-														hx-target="#motion-table"
-														hx-swap="outerHTML">▼</button>
-												</div>
-											</div>
-										</th>
+									<th>
+										<div class="d-flex flex-items-center">
+											{ header }
+										</div>
+									</th>
 								}
 							</tr>
 						</thead>
@@ -120,21 +110,11 @@ templ Explorer(data ExplorerData, version string) {
 						<thead>
 							<tr>
 								for _, header := range data.Headers.Dynamics {
-										<th>
-											<div class="d-flex flex-items-center">
-												{ header }
-												<div class="d-flex flex-column ml-1">
-													<button class="btn-octicon p-0" 
-														hx-get={ fmt.Sprintf("/explore/%s/sort?table=dynamics&col=%s&dir=asc", data.Hash, header) }
-														hx-target="#dynamics-table"
-														hx-swap="outerHTML">▲</button>
-													<button class="btn-octicon p-0"
-														hx-get={ fmt.Sprintf("/explore/%s/sort?table=dynamics&col=%s&dir=desc", data.Hash, header) }
-														hx-target="#dynamics-table"
-														hx-swap="outerHTML">▼</button>
-												</div>
-											</div>
-										</th>
+									<th>
+										<div class="d-flex flex-items-center">
+											{ header }
+										</div>
+									</th>
 								}
 							</tr>
 						</thead>
@@ -179,21 +159,11 @@ templ Explorer(data ExplorerData, version string) {
 						<thead>
 							<tr>
 								for _, header := range data.Headers.Events {
-										<th>
-											<div class="d-flex flex-items-center">
-												{ header }
-												<div class="d-flex flex-column ml-1">
-													<button class="btn-octicon p-0" 
-														hx-get={ fmt.Sprintf("/explore/%s/sort?table=events&col=%s&dir=asc", data.Hash, header) }
-														hx-target="#events-table"
-														hx-swap="outerHTML">▲</button>
-													<button class="btn-octicon p-0"
-														hx-get={ fmt.Sprintf("/explore/%s/sort?table=events&col=%s&dir=desc", data.Hash, header) }
-														hx-target="#events-table"
-														hx-swap="outerHTML">▼</button>
-												</div>
-											</div>
-										</th>
+									<th>
+										<div class="d-flex flex-items-center">
+											{ header }
+										</div>
+									</th>
 								}
 							</tr>
 						</thead>
