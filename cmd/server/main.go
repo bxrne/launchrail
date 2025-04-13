@@ -249,10 +249,9 @@ func main() {
 		c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
 	})
 
+	log.Info("Server started", "Port", cfg.Server.Port)
 	portStr := fmt.Sprintf(":%d", cfg.Server.Port)
 	if err := r.Run(portStr); err != nil {
 		fmt.Printf("Failed to start server: %v\n", err)
 	}
-
-	log.Info("Server started", "Port", portStr)
 }
