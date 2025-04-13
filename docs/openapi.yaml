@@ -23,25 +23,163 @@ paths:
   /api/v1/run:
     post:
       summary: Run a new simulation
-      description: Starts a new rocket flight simulation with the provided parameters
-      tags: [Simulation]
+      description: Start a new rocket simulation with the provided configuration
+      operationId: runSimulation
       requestBody:
         required: true
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/SimulationConfig'
+              type: object
+              required:
+                - plugin-paths
+                - simulation-step
+                - max-time
+                - ground-tolerance
+                - openrocket-version
+                - motor-designation
+                - openrocket-file
+                - launchrail-length
+                - launchrail-angle
+                - launchrail-orientation
+                - latitude
+                - longitude
+                - altitude
+                - specific-gas-constant
+                - gravitational-accel
+                - sea-level-density
+                - sea-level-temperature
+                - sea-level-pressure
+                - ratio-specific-heats
+                - temperature-lapse-rate
+              properties:
+                plugin-paths:
+                  type: string
+                  description: Path to plugin files
+                  example: "./plugins/windeffect.so"
+                simulation-step:
+                  type: number
+                  format: float
+                  description: Time step for simulation calculations
+                  example: 0.001
+                max-time:
+                  type: number
+                  format: float
+                  description: Maximum simulation time in seconds
+                  example: 300.0
+                ground-tolerance:
+                  type: number
+                  format: float
+                  description: Ground impact detection tolerance
+                  example: 0.06
+                openrocket-version:
+                  type: string
+                  description: OpenRocket version
+                  example: "23.09"
+                motor-designation:
+                  type: string
+                  description: Motor designation code
+                  example: "269H110-14A"
+                openrocket-file:
+                  type: string
+                  description: Path to OpenRocket file
+                  example: "./testdata/openrocket/l1.ork"
+                launchrail-length:
+                  type: number
+                  format: float
+                  description: Length of launch rail in meters
+                  example: 2.21
+                launchrail-angle:
+                  type: number
+                  format: float
+                  description: Launch rail angle in degrees
+                  example: 5.0
+                launchrail-orientation:
+                  type: number
+                  format: float
+                  description: Launch rail orientation in degrees
+                  example: 0.01
+                latitude:
+                  type: number
+                  format: float
+                  description: Launch site latitude
+                  example: 37.7749
+                longitude:
+                  type: number
+                  format: float
+                  description: Launch site longitude
+                  example: -122.4194
+                altitude:
+                  type: number
+                  format: float
+                  description: Launch site altitude in meters
+                  example: 1.0
+                specific-gas-constant:
+                  type: number
+                  format: float
+                  description: Specific gas constant for atmosphere model
+                  example: 287.05
+                gravitational-accel:
+                  type: number
+                  format: float
+                  description: Gravitational acceleration in m/s²
+                  example: 9.81
+                sea-level-density:
+                  type: number
+                  format: float
+                  description: Air density at sea level in kg/m³
+                  example: 1.225
+                sea-level-temperature:
+                  type: number
+                  format: float
+                  description: Temperature at sea level in Kelvin
+                  example: 288.15
+                sea-level-pressure:
+                  type: number
+                  format: float
+                  description: Atmospheric pressure at sea level in Pa
+                  example: 101325.0
+                ratio-specific-heats:
+                  type: number
+                  format: float
+                  description: Ratio of specific heats for atmosphere
+                  example: 1.4
+                temperature-lapse-rate:
+                  type: number
+                  format: float
+                  description: Temperature lapse rate in K/m
+                  example: 0.0065
       responses:
         202:
           description: Simulation started successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Simulation started"
         400:
-          $ref: '#/components/responses/BadRequest'
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid simulation parameters"
         500:
-          $ref: '#/components/responses/InternalError'
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Internal server error"
 
   /api/v1/data:
     get:
