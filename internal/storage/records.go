@@ -10,12 +10,13 @@ import (
 )
 
 type Record struct {
-	Hash      string    `json:"hash"`
-	Name      string    `json:"name"`
-	Timestamp time.Time `json:"timestamp"`
-	Motion    *Storage  `json:"-"`
-	Events    *Storage  `json:"-"`
-	Dynamics  *Storage  `json:"-"`
+	Name         string
+	Hash         string
+	LastModified time.Time
+	Path         string
+	Motion       *Storage
+	Events       *Storage
+	Dynamics     *Storage
 }
 
 // NewRecord creates a new simulation record with associated storage services
@@ -39,12 +40,12 @@ func NewRecord(baseDir string, hash string) (*Record, error) {
 	}
 
 	return &Record{
-		Hash:      hash,
-		Name:      hash,
-		Timestamp: time.Now(),
-		Motion:    motionStore,
-		Events:    eventsStore,
-		Dynamics:  dynamicsStore,
+		Hash:         hash,
+		Name:         hash,
+		LastModified: time.Now(),
+		Motion:       motionStore,
+		Events:       eventsStore,
+		Dynamics:     dynamicsStore,
 	}, nil
 }
 
@@ -120,6 +121,19 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 	return record, nil
 }
 
+// DeleteRecord deletes a record by Hash
+func (rm *RecordManager) DeleteRecord(hash string) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	recordPath := filepath.Join(rm.baseDir, hash)
+	if err := os.RemoveAll(recordPath); err != nil {
+		return fmt.Errorf("failed to delete record: %v", err)
+	}
+
+	return nil
+}
+
 // ListRecords lists all existing records in the base directory with their last modified time.
 func (rm *RecordManager) ListRecords() ([]*Record, error) {
 	rm.mu.RLock()
@@ -144,9 +158,9 @@ func (rm *RecordManager) ListRecords() ([]*Record, error) {
 
 		// Load the record without creating a new one
 		record := &Record{
-			Hash:      entry.Name(),
-			Name:      entry.Name(),
-			Timestamp: info.ModTime(),
+			Hash:         entry.Name(),
+			Name:         entry.Name(),
+			LastModified: info.ModTime(),
 		}
 		records = append(records, record)
 	}
@@ -183,12 +197,21 @@ func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 		return nil, err
 	}
 
+	// Get last modified time
+	info, err := os.Stat(recordPath)
+	if err != nil {
+		motionStore.Close()
+		eventsStore.Close()
+		dynamicsStore.Close()
+		return nil, err
+	}
+
 	return &Record{
-		Hash:      hash,
-		Name:      hash,
-		Timestamp: time.Now(),
-		Motion:    motionStore,
-		Events:    eventsStore,
-		Dynamics:  dynamicsStore,
+		Hash:         hash,
+		Name:         hash,
+		LastModified: info.ModTime(),
+		Motion:       motionStore,
+		Events:       eventsStore,
+		Dynamics:     dynamicsStore,
 	}, nil
 }

@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
+	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,26 +21,28 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
 	// Create a new record for the simulation
 	record, err := recordManager.CreateRecord()
 	if err != nil {
-		return fmt.Errorf("failed to create record: %w", err)
+		log.Fatal("Failed to create record", "Error", err)
 	}
 	defer record.Close()
 
 	// Initialize the simulation manager
 	simManager := simulation.NewManager(cfg, log)
+	defer simManager.Close()
+
 	if err := simManager.Initialize(); err != nil {
-		return fmt.Errorf("failed to initialize simulation: %w", err)
+		log.Fatal("Failed to initialize simulation", "Error", err)
 	}
 
 	// Run the simulation
 	if err := simManager.Run(); err != nil {
-		return fmt.Errorf("simulation failed: %w", err)
+		log.Fatal("Simulation failed", "Error", err)
 	}
 
 	return nil
 }
 
 // configFromCtx reads the request body and parses it into a config.Config and validates it
-func configFromCtx(c *gin.Context) (*config.Config, error) {
+func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, error) {
 	// Extracting form values
 	motorDesignation := c.PostForm("motor-designation")
 	openRocketFile := c.PostForm("openrocket-file")
@@ -76,21 +79,13 @@ func configFromCtx(c *gin.Context) (*config.Config, error) {
 	// Create the config.Config struct
 	simConfig := config.Config{
 		Setup: config.Setup{
-			App: config.App{
-				Name:    "Launchrail",
-				Version: "1.0",
-				BaseDir: "./",
-			},
-			Logging: config.Logging{
-				Level: "info",
-			},
+			App:     currentCfg.Setup.App,
+			Logging: currentCfg.Setup.Logging,
 			Plugins: config.Plugins{
 				Paths: []string{pluginPaths},
 			},
 		},
-		Server: config.Server{
-			Port: 8080, // Set your desired port
-		},
+		Server: currentCfg.Server,
 		Engine: config.Engine{
 			External: config.External{
 				OpenRocketVersion: openRocketVersion,
@@ -142,79 +137,105 @@ func parseFloat(value string) float64 {
 	return result
 }
 
+// Helper function to render templ components in Gin
+func render(c *gin.Context, component templ.Component) {
+	err := component.Render(c.Request.Context(), c.Writer)
+	if err != nil {
+		err_err := c.AbortWithError(http.StatusInternalServerError, err)
+		if err_err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to render template"})
+		}
+	}
+}
+
 func main() {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		fmt.Printf("Failed to load config: %v\n", err)
+		return
+	}
+	// Initialize GetLogger
+	log := logger.GetLogger(cfg.Setup.Logging.Level)
+	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
+
 	r := gin.Default()
-	r.LoadHTMLGlob("templates/*html")
+	err = r.SetTrustedProxies(nil)
+	if err != nil {
+		log.Fatal("Failed to set trusted proxies", "Error", err)
+	}
 
 	dataHandler, err := NewDataHandler(".launchrail")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
+
+	// Serve static files
+	r.Static("/static", "./static")
+	r.StaticFile("/favicon.ico", "./static/favicon.ico")
+	r.StaticFile("/robots.txt", "./static/robots.txt")
+	r.StaticFile("/manifest.json", "./static/manifest.json")
+
 	// Data routes
 	r.GET("/data", dataHandler.ListRecords)
 	r.GET("/data/:hash/:type", dataHandler.GetRecordData)
-	// Landing page (pun intended)
+	r.DELETE("/data/:hash", dataHandler.DeleteRecord)
+
+	// Landing page
 	r.GET("/", func(c *gin.Context) {
-		c.File("templates/index.html")
+		render(c, pages.Index())
 	})
 
 	r.GET("/explore/:hash", func(c *gin.Context) {
 		hash := c.Param("hash")
 		record, err := dataHandler.records.GetRecord(hash)
 		if err != nil {
-			c.HTML(http.StatusNotFound, "partials/error.html", gin.H{
-				"error": "Record not found",
-			})
+			log.Error("Failed to get record", "Error", err)
+			render(c, pages.ErrorPage("Record not found"))
 			return
 		}
 		defer record.Close()
 
 		// Ensure storage objects are not nil
 		if record.Motion == nil || record.Events == nil || record.Dynamics == nil {
-			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
-				"error": "Record storage is not properly initialized",
-			})
+			render(c, pages.ErrorPage("Record storage is not properly initialized"))
 			return
 		}
 
 		// Read headers and data from storage
 		motionHeaders, motionData, err := record.Motion.ReadHeadersAndData()
 		if err != nil {
-			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
-				"error": "Failed to read motion data: " + err.Error(),
-			})
+			render(c, pages.ErrorPage("Failed to read motion data: "+err.Error()))
 			return
 		}
 
 		dynamicsHeaders, dynamicsData, err := record.Dynamics.ReadHeadersAndData()
 		if err != nil {
-			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
-				"error": "Failed to read dynamics data: " + err.Error(),
-			})
+			render(c, pages.ErrorPage("Failed to read dynamics data: "+err.Error()))
 			return
 		}
 
 		eventsHeaders, eventsData, err := record.Events.ReadHeadersAndData()
 		if err != nil {
-			c.HTML(http.StatusInternalServerError, "partials/error.html", gin.H{
-				"error": "Failed to read events data: " + err.Error(),
-			})
+			render(c, pages.ErrorPage("Failed to read events data: "+err.Error()))
 			return
 		}
 
-		// Render the explorer page
-		c.HTML(http.StatusOK, "explorer.html", gin.H{
-			"MotionHeaders":   motionHeaders,
-			"MotionData":      motionData,
-			"DynamicsHeaders": dynamicsHeaders,
-			"DynamicsData":    dynamicsData,
-			"EventsHeaders":   eventsHeaders,
-			"EventsData":      eventsData,
-		})
+		// Render the explorer page with templ
+		data := pages.ExplorerData{
+			Hash:            hash,
+			MotionHeaders:   motionHeaders,
+			MotionData:      motionData,
+			DynamicsHeaders: dynamicsHeaders,
+			DynamicsData:    dynamicsData,
+			EventsHeaders:   eventsHeaders,
+			EventsData:      eventsData,
+		}
+
+		render(c, pages.Explorer(data))
 	})
 
 	r.POST("/run", func(c *gin.Context) {
-		simConfig, err := configFromCtx(c)
+		simConfig, err := configFromCtx(c, cfg)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -228,7 +249,9 @@ func main() {
 		c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
 	})
 
-	if err := r.Run(":8080"); err != nil {
+	log.Info("Server started", "Port", cfg.Server.Port)
+	portStr := fmt.Sprintf(":%d", cfg.Server.Port)
+	if err := r.Run(portStr); err != nil {
 		fmt.Printf("Failed to start server: %v\n", err)
 	}
 }

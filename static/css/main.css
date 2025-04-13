@@ -1,0 +1,132 @@
+/* main.css - Common styles for the Launchrail application */
+
+/* Custom container padding for mobile */
+@media (max-width: 768px) {
+  .container-lg {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+}
+
+/* Tab styling */
+.tab {
+  position: relative;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.tab.active {
+  border-bottom-color: #0366d6;
+  font-weight: 600;
+}
+
+.tab:hover:not(.active) {
+  border-bottom-color: #959da5;
+  background-color: #f6f8fa;
+}
+
+.tab-content {
+  display: none;
+}
+
+/* Form styling */
+.form-group label {
+  font-weight: 500;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: #0366d6;
+  box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.3);
+}
+
+/* Plot container */
+#plot-container {
+  min-height: 400px;
+  position: relative;
+}
+
+/* Add fade-in animation for tab content */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.tab-content.active {
+  display: block;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Table improvements */
+.table {
+  font-size: 0.9rem;
+}
+
+.table th {
+  background-color: #f6f8fa;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Improved nested boxes */
+details .Box {
+  border-left: 3px solid #0366d6;
+}
+
+/* Footer styling */
+.footer {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+  border-top: 1px solid #e1e4e8;
+}
+
+/* Toast improvements */
+.Toast {
+  margin-bottom: 0;
+}
+
+/* Custom scrollbar for tables */
+.overflow-auto::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.overflow-auto::-webkit-scrollbar-track {
+  background: #f6f8fa;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb {
+  background-color: #d1d5da;
+  border-radius: 4px;
+}
+
+/* General app improvements */
+.color-fg-accent {
+  color: #0366d6 !important;
+}
+
+h1.color-fg-accent, h2.color-fg-accent {
+  font-weight: 600;
+}
+
+/* Make form sections more distinct */
+details {
+  background-color: #f6f8fa;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+details summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Improved button hover states */
+.btn-primary:hover {
+  background-color: #005cc5;
+}
+
+.btn-danger:hover {
+  background-color: #cb2431;
+}

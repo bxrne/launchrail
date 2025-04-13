@@ -42,3 +42,18 @@ func TestRecordManagerGetRecord(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, gotRec.Close())
 }
+
+// TEST: GIVEN a record manager WHEN we delete a record THEN the record is removed
+func TestRecordManagerDeleteRecord(t *testing.T) {
+	rm, err := storage.NewRecordManager(t.TempDir())
+	require.NoError(t, err)
+
+	rec, err := rm.CreateRecord()
+	require.NoError(t, err)
+
+	err = rm.DeleteRecord(rec.Hash)
+	require.NoError(t, err)
+
+	_, err = rm.GetRecord(rec.Hash)
+	require.Error(t, err)
+}
