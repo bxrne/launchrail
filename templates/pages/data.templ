@@ -54,8 +54,8 @@ templ Data(props DataProps, version string) {
 							<thead>
 								<tr>
 									<th>Name</th>
-									<th>Time</th>
-									<th>Actions</th>
+										<th class="text-left">Time</th>
+									<th class="text-left">Actions</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -67,13 +67,13 @@ templ Data(props DataProps, version string) {
 											<span class="hash-tooltip octicon octicon-question" data-hash={ record.Hash }>?</span>
 										</td>
 										<td>
-											<a href={ templ.URL("/explore/" + record.Hash) } class="btn btn-sm">View</a>
-											<button class="btn btn-sm btn-danger" 
-													hx-delete={ "/data/" + record.Hash }
-													hx-target="#records-list"
-													hx-swap="outerHTML">
+											<a href={ templ.URL("/explore/" + record.Hash) } class="Link mr-3 color-fg-accent">View</a>
+											<a href="#" class="Link color-fg-danger" 
+												hx-delete={ "/data/" + record.Hash }
+												hx-target="#records-list"
+												hx-swap="innerHTML">
 												Delete
-											</button>
+											</a>
 										</td>
 									</tr>
 								}
@@ -82,14 +82,12 @@ templ Data(props DataProps, version string) {
 						if props.Pagination.TotalPages > 1 {
 							<div class="pagination d-flex flex-justify-center mt-3">
 								for i := 1; i <= props.Pagination.TotalPages; i++ {
-									<button class={ "btn btn-sm mx-1", templ.KV("btn-primary", i == props.Pagination.CurrentPage) }
-										name="page"
-										value={ fmt.Sprint(i) }
+									<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == props.Pagination.CurrentPage) }
 										hx-get="/data"
 										hx-target="#records-list"
-										hx-include="[name='filter'], [name='sort']">
+										hx-swap="innerHTML">
 										{ fmt.Sprint(i) }
-									</button>
+									</a>
 								}
 							</div>
 						}

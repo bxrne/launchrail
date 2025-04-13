@@ -68,7 +68,7 @@ func Data(props DataProps, version string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if len(props.Records) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"table-container\"><div class=\"Box p-3 mb-3 d-flex flex-items-center\"><input type=\"text\" class=\"form-control flex-auto mr-3\" placeholder=\"Filter records...\" id=\"table-filter\" hx-trigger=\"keyup changed delay:500ms\" hx-get=\"/data\" hx-target=\"#records-list\" hx-include=\"[name=&#39;sort&#39;], [name=&#39;page&#39;]\" name=\"filter\"> <select class=\"form-select mr-3\" name=\"sort\" hx-get=\"/data\" hx-target=\"#records-list\" hx-include=\"[name=&#39;filter&#39;], [name=&#39;page&#39;]\"><option value=\"time_desc\">Newest First</option> <option value=\"time_asc\">Oldest First</option></select></div><table class=\"table width-full\"><thead><tr><th>Name</th><th>Time</th><th>Actions</th></tr></thead> <tbody>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"table-container\"><div class=\"Box p-3 mb-3 d-flex flex-items-center\"><input type=\"text\" class=\"form-control flex-auto mr-3\" placeholder=\"Filter records...\" id=\"table-filter\" hx-trigger=\"keyup changed delay:500ms\" hx-get=\"/data\" hx-target=\"#records-list\" hx-include=\"[name=&#39;sort&#39;], [name=&#39;page&#39;]\" name=\"filter\"> <select class=\"form-select mr-3\" name=\"sort\" hx-get=\"/data\" hx-target=\"#records-list\" hx-include=\"[name=&#39;filter&#39;], [name=&#39;page&#39;]\"><option value=\"time_desc\">Newest First</option> <option value=\"time_asc\">Oldest First</option></select></div><table class=\"table width-full\"><thead><tr><th>Name</th><th class=\"text-left\">Time</th><th class=\"text-left\">Actions</th></tr></thead> <tbody>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -121,20 +121,20 @@ func Data(props DataProps, version string) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"btn btn-sm\">View</a> <button class=\"btn btn-sm btn-danger\" hx-delete=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"Link mr-3 color-fg-accent\">View</a> <a href=\"#\" class=\"Link color-fg-danger\" hx-delete=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs("/data/" + record.Hash)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 72, Col: 47}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 72, Col: 46}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" hx-target=\"#records-list\" hx-swap=\"outerHTML\">Delete</button></td></tr>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" hx-target=\"#records-list\" hx-swap=\"innerHTML\">Delete</a></td></tr>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -149,12 +149,12 @@ func Data(props DataProps, version string) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					for i := 1; i <= props.Pagination.TotalPages; i++ {
-						var templ_7745c5c3_Var8 = []any{"btn btn-sm mx-1", templ.KV("btn-primary", i == props.Pagination.CurrentPage)}
+						var templ_7745c5c3_Var8 = []any{"Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == props.Pagination.CurrentPage)}
 						templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var8...)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<button class=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<a href=\"#\" class=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -167,53 +167,40 @@ func Data(props DataProps, version string) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" name=\"page\" value=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" hx-get=\"/data\" hx-target=\"#records-list\" hx-swap=\"innerHTML\">")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 						var templ_7745c5c3_Var10 string
 						templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(i))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 87, Col: 31}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 89, Col: 25}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" hx-get=\"/data\" hx-target=\"#records-list\" hx-include=\"[name=&#39;filter&#39;], [name=&#39;sort&#39;]\">")
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						var templ_7745c5c3_Var11 string
-						templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(i))
-						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 91, Col: 25}
-						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</button>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</a>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"p-3\">No records found.</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"p-3\">No records found.</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

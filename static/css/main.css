@@ -251,3 +251,37 @@ details summary {
   white-space: normal;
   z-index: 1000;
 }
+
+/* Link styling */
+.Link {
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.Link:hover {
+  text-decoration: underline;
+}
+
+.color-fg-danger {
+  color: #cb2431 !important;
+}
+
+.color-fg-danger:hover {
+  color: #a0191f !important;
+}
+
+/* Remove border radius from tab buttons */
+.tab, .tab:hover, .tab.active {
+  border-radius: 0 !important;
+}
+
+/* Style pagination links */
+.Link--secondary {
+  color: #6a737d;
+  text-decoration: none;
+}
+
+.Link--secondary:hover {
+  color: #ff8c00;
+  text-decoration: none;
+}
