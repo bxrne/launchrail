@@ -171,9 +171,6 @@ func main() {
 
 	// Serve static files
 	r.Static("/static", "./static")
-	r.StaticFile("/favicon.ico", "./static/favicon.ico")
-	r.StaticFile("/robots.txt", "./static/robots.txt")
-	r.StaticFile("/manifest.json", "./static/manifest.json")
 
 	// Data routes
 	r.GET("/data", dataHandler.ListRecords)
@@ -207,28 +204,53 @@ func main() {
 			render(c, pages.ErrorPage("Failed to read motion data: "+err.Error()))
 			return
 		}
+		log.Info("Motion data read successfully", "Headers", motionHeaders)
 
 		dynamicsHeaders, dynamicsData, err := record.Dynamics.ReadHeadersAndData()
 		if err != nil {
 			render(c, pages.ErrorPage("Failed to read dynamics data: "+err.Error()))
 			return
 		}
+		log.Info("Dynamics data read successfully", "Headers", dynamicsHeaders)
 
 		eventsHeaders, eventsData, err := record.Events.ReadHeadersAndData()
 		if err != nil {
 			render(c, pages.ErrorPage("Failed to read events data: "+err.Error()))
 			return
 		}
+		log.Info("Events data read successfully", "Headers", eventsHeaders)
+
+		// Turn motion data and dynamics data from [][]string to [][]float64
+		motionDataFloat := make([][]float64, len(motionData))
+		for i, row := range motionData {
+			motionDataFloat[i] = make([]float64, len(row))
+			for j, val := range row {
+				motionDataFloat[i][j], _ = strconv.ParseFloat(val, 64)
+			}
+
+		}
+
+		dynamicsDataFloat := make([][]float64, len(dynamicsData))
+		for i, row := range dynamicsData {
+			dynamicsDataFloat[i] = make([]float64, len(row))
+			for j, val := range row {
+				dynamicsDataFloat[i][j], _ = strconv.ParseFloat(val, 64)
+			}
+		}
 
 		// Render the explorer page with templ
 		data := pages.ExplorerData{
-			Hash:            hash,
-			MotionHeaders:   motionHeaders,
-			MotionData:      motionData,
-			DynamicsHeaders: dynamicsHeaders,
-			DynamicsData:    dynamicsData,
-			EventsHeaders:   eventsHeaders,
-			EventsData:      eventsData,
+			Hash: hash,
+			Headers: pages.ExplorerHeaders{ // Updated from whatever it was before
+				Motion:   motionHeaders,
+				Dynamics: dynamicsHeaders,
+				Events:   eventsHeaders,
+			},
+			Data: pages.ExplorerDataContent{ // Updated from whatever it was before
+				Motion:   motionDataFloat,
+				Dynamics: dynamicsDataFloat,
+				Events:   eventsData,
+			},
 		}
 
 		render(c, pages.Explorer(data))

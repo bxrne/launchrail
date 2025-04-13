@@ -1,17 +1,29 @@
 package pages
 
 import (
+	"fmt"
 	"github.com/bxrne/launchrail/templates/layouts"
 )
 
+// ExplorerDataContent structure to hold the motion, dynamics, and events data 
+type ExplorerDataContent struct {
+	Motion   [][]float64 `json:"motion"`
+	Dynamics [][]float64 `json:"dynamics"`
+	Events   [][]string  `json:"events"`
+}
+
+// ExplorerHeaders for the motion, dynamics, and events data 
+type ExplorerHeaders struct {
+	Motion   []string `json:"motion"`
+	Dynamics []string `json:"dynamics"`
+	Events   []string `json:"events"`
+}
+
+// ExplorerData structure to hold the hash and data
 type ExplorerData struct {
-	Hash				 string
-	MotionHeaders   []string
-	MotionData      [][]string
-	DynamicsHeaders []string
-	DynamicsData    [][]string
-	EventsHeaders   []string
-	EventsData      [][]string
+	Hash    string
+	Headers ExplorerHeaders    `json:"headers"`
+	Data    ExplorerDataContent `json:"data"`
 }
 
 templ Explorer(data ExplorerData) {
@@ -22,7 +34,7 @@ templ Explorer(data ExplorerData) {
 			"/static/scripts/explorer.js",
 		},
 	}) {
-		<h3 class="h3 text-center  p-4">Explore:</br><span class="color-fg-muted p-4 text-center">{ data.Hash }</span></h3>
+		<h3 class="h3 text-center p-4">Explore:</br><span class="color-fg-muted p-4 text-center">{ data.Hash }</span></h3>
 		<div class="Box color-shadow-medium mb-4">
 			<div class="Box-header">
 				<div class="Box-title-and-description">
@@ -43,16 +55,16 @@ templ Explorer(data ExplorerData) {
 					<table class="table width-full">
 						<thead>
 							<tr>
-								for _, header := range data.MotionHeaders {
+								for _, header := range data.Headers.Motion {
 									<th>{ header }</th>
 								}
 							</tr>
 						</thead>
 						<tbody>
-							for _, row := range data.MotionData {
+							for _, row := range data.Data.Motion {
 								<tr>
 									for _, cell := range row {
-										<td>{ cell }</td>
+										<td>{ fmt.Sprintf("%.4f", cell) }</td>
 									}
 								</tr>
 							}
@@ -67,16 +79,16 @@ templ Explorer(data ExplorerData) {
 					<table class="table width-full">
 						<thead>
 							<tr>
-								for _, header := range data.DynamicsHeaders {
+								for _, header := range data.Headers.Dynamics {
 									<th>{ header }</th>
 								}
 							</tr>
 						</thead>
 						<tbody>
-							for _, row := range data.DynamicsData {
+							for _, row := range data.Data.Dynamics {
 								<tr>
 									for _, cell := range row {
-										<td>{ cell }</td>
+										<td>{ fmt.Sprintf("%.4f", cell) }</td>
 									}
 								</tr>
 							}
@@ -91,13 +103,13 @@ templ Explorer(data ExplorerData) {
 					<table class="table width-full">
 						<thead>
 							<tr>
-								for _, header := range data.EventsHeaders {
+								for _, header := range data.Headers.Events {
 									<th>{ header }</th>
 								}
 							</tr>
 						</thead>
 						<tbody>
-							for _, row := range data.EventsData {
+							for _, row := range data.Data.Events {
 								<tr>
 									for _, cell := range row {
 										<td>{ cell }</td>
@@ -138,6 +150,20 @@ templ Explorer(data ExplorerData) {
 				</form>
 				<div id="plot-container" class="mt-4 Box p-3"></div>
 			</div>
+			<script id="headers-data" type="application/json">
+				{
+					if jsonData, err := json.Marshal(data.Headers); err == nil {
+						templ.Raw(string(jsonData))
+					}
+				}
+			</script>
+			<script id="table-data" type="application/json">
+				{
+					if jsonData, err := json.Marshal(data.Data); err == nil {
+						templ.Raw(string(jsonData))
+					}
+				}
+			</script>
 		</div>
 	}
 }
