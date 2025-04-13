@@ -139,9 +139,14 @@ document.addEventListener("DOMContentLoaded", function () {
             dlButton.style.display = "block";
             dlButton.style.margin = "1em auto 0 auto";
             dlButton.addEventListener("click", () => {
+              const fileNameParts = [hash, xAxis, yAxis];
+              if (zAxis) {
+                fileNameParts.push(zAxis);
+              }
+              const finalFileName = fileNameParts.join("_") + ".png";
               Plotly.downloadImage(plotContainer, {
                 format: "png",
-                filename: "plot_export",
+                filename: finalFileName,
               });
             });
             plotContainer.appendChild(dlButton);

@@ -13,6 +13,8 @@
   position: relative;
   transition: all 0.2s ease;
   border-bottom: 2px solid transparent;
+  border: none;
+  background-color: transparent;
 }
 
 .tab.active {
@@ -43,6 +45,7 @@
 #plot-container {
   min-height: 400px;
   position: relative;
+  background-color: #2a2a2a !important;
 }
 
 /* Add fade-in animation for tab content */
@@ -62,7 +65,7 @@
 }
 
 .table th {
-  background-color: #f6f8fa;
+  background-color: #333333 !important;
   position: sticky;
   top: 0;
   z-index: 1;
@@ -79,6 +82,11 @@ details .Box {
   padding-top: 2rem;
   padding-bottom: 2rem;
   border-top: 1px solid #e1e4e8;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background-color: #111111;
+  color: #ffffff;
 }
 
 /* Toast improvements */
@@ -103,7 +111,7 @@ details .Box {
 
 /* General app improvements */
 .color-fg-accent {
-  color: #0366d6 !important;
+  color: #ff8c00 !important;
 }
 
 h1.color-fg-accent, h2.color-fg-accent {
@@ -129,4 +137,73 @@ details summary {
 
 .btn-danger:hover {
   background-color: #cb2431;
+}
+
+html, body {
+  background-color: #1a1a1a;
+  color: #ffffff;
+  font-family: "Fira Code", monospace;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-brand {
+  font-size: 1.25rem;
+}
+
+/* Dark theme overrides */
+.Box {
+  background-color: #2a2a2a !important;
+  border-color: #404040 !important;
+}
+
+.Box-header {
+  background-color: #2a2a2a !important;
+  border-color: #404040 !important;
+}
+
+.color-bg-subtle {
+  background-color: #2a2a2a !important;
+}
+
+/* Form controls dark theme */
+.form-select, .form-control {
+  background-color: #2a2a2a !important;
+  border-color: #404040 !important;
+  color: #ffffff !important;
+}
+
+.form-select option {
+  background-color: #2a2a2a;
+  color: #ffffff;
+}
+
+/* Navbar and links */
+.H1 {
+  color: #ff8c00 !important;
+  font-size: 1.5rem;
+}
+
+.Link--primary {
+  color: #ffffff !important;
+}
+
+/* Details/summary dark theme */
+details {
+  background-color: #2a2a2a !important;
+}
+
+details summary {
+  color: #ffffff;
+}
+
+/* Tab hover fix */
+.tab:hover:not(.active) {
+  background-color: #333333 !important;
+  border-bottom-color: #404040;
+}
+
+/* Footer text */
+.color-fg-muted {
+  color: #ffffff !important;
 }
