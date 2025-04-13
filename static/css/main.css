@@ -1,7 +1,7 @@
 /* main.css - Common styles for the Launchrail application */
 
 /* Custom container padding for mobile */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .container-lg {
     padding-left: 1rem !important;
     padding-right: 1rem !important;
