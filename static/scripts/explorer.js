@@ -38,25 +38,28 @@ document.addEventListener("DOMContentLoaded", function () {
   const plotButton = document.getElementById("plot-button");
   const plotContainer = document.getElementById("plot-container");
 
-  // Parse the data from the script tags
-  let headers = {};
-  let data = {};
+  // Fetch JSON data instead of parsing from script tags
+  const hash = window.location.pathname.split("/").pop();
+  fetch(`/explorer/${hash}/json`)
+    .then((res) => res.json())
+    .then((jsonData) => {
+      headers = jsonData.headers || {};
+      data = jsonData.data || {};
+      // Proceed with populateColumns, etc.
+      if (dataSourceSelect && headers.motion) {
+        populateColumns("motion");
 
-  try {
-    const headersScript = document.getElementById("headers-data");
-    const dataScript = document.getElementById("table-data");
+        // Set up event listeners
+        dataSourceSelect.addEventListener("change", () => {
+          populateColumns(dataSourceSelect.value);
+        });
 
-    if (headersScript && dataScript) {
-      headers = JSON.parse(headersScript.textContent);
-      data = JSON.parse(dataScript.textContent);
-    } else {
-      console.error("Data scripts not found");
-      return;
-    }
-  } catch (e) {
-    console.error("Error parsing data:", e, data, headers);
-    return;
-  }
+        plotButton.addEventListener("click", generatePlot);
+      }
+    })
+    .catch((err) => {
+      console.error("Error fetching explorer data:", err);
+    });
 
   // Function to populate column selectors with options
   function populateColumnSelect(select, columns, includeEmpty = false) {
@@ -97,20 +100,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  // Initialize the form with data from the motion source
-  if (dataSourceSelect && headers.motion) {
-    populateColumns("motion");
-
-    // Set up event listeners
-    dataSourceSelect.addEventListener("change", () => {
-      populateColumns(dataSourceSelect.value);
-    });
-
-    plotButton.addEventListener("click", generatePlot);
-  }
-
   // Function to generate plot
   function generatePlot() {
+    const hash = document.getElementById("record-hash")?.value || "";
     const source = dataSourceSelect.value;
     const xAxis = xAxisSelect.value;
     const yAxis = yAxisSelect.value;
@@ -121,94 +113,40 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    try {
-      const sourceData = data[source];
-      const sourceHeaders = headers[source];
-
-      if (!Array.isArray(sourceData) || !Array.isArray(sourceHeaders)) {
-        console.error("Invalid data structure");
-        return;
-      }
-
-      const xIndex = sourceHeaders.indexOf(xAxis);
-      const yIndex = sourceHeaders.indexOf(yAxis);
-      const zIndex = zAxis ? sourceHeaders.indexOf(zAxis) : -1;
-
-      if (xIndex === -1 || yIndex === -1 || (zAxis && zIndex === -1)) {
-        console.error("Could not find selected axes in headers");
-        return;
-      }
-
-      const xData = sourceData.map((row) => parseFloat(row[xIndex]));
-      const yData = sourceData.map((row) => parseFloat(row[yIndex]));
-      const zData = zAxis
-        ? sourceData.map((row) => parseFloat(row[zIndex]))
-        : null;
-
-      const plotLayout = {
-        title: yAxis + " vs " + xAxis + (zAxis ? " vs " + zAxis : ""),
-
-        xaxis: { title: xAxis },
-        yaxis: { title: yAxis },
-        margin: { t: 60, r: 40, b: 60, l: 60 },
-      };
-
-      const plotData = zAxis
-        ? [
-            {
-              x: xData,
-              y: yData,
-              z: zData,
-              type: "scatter3d",
-              mode: "markers",
-              marker: {
-                size: 5,
-                color: xData,
-                colorscale: "Viridis",
-              },
-              name: `${yAxis} vs ${xAxis} vs ${zAxis}`,
-            },
-          ]
-        : [
-            {
-              x: xData,
-              y: yData,
-              type: "scatter",
-              mode: "lines+markers",
-              marker: {
-                size: 5,
-                color: "#0366d6",
-              },
-              line: {
-                color: "#0366d6",
-              },
-              name: `${yAxis} vs ${xAxis}`,
-            },
-          ];
-
-      // Create the plot
-      Plotly.newPlot(plotContainer, plotData, plotLayout, {
-        responsive: true,
-        displayModeBar: true,
-        modeBarButtonsToRemove: ["lasso2d", "select2d"],
+    fetch("/plot", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ hash, source, xAxis, yAxis, zAxis }),
+    })
+      .then((resp) => resp.json())
+      .then((res) => {
+        if (res.error) {
+          throw new Error(res.error);
+        }
+        Plotly.newPlot(plotContainer, res.plotData, res.plotLayout, {
+          responsive: true,
+          displayModeBar: true,
+          modeBarButtonsToRemove: ["lasso2d", "select2d"],
+        });
+      })
+      .catch((err) => {
+        console.error("Error generating plot:", err);
+        plotContainer.innerHTML = `
+          <div class="flash flash-error mb-3">
+            <p>Error generating plot: ${err.message}</p>
+          </div>`;
       });
-
-      // Add a title to the plot container
-      const plotTitle = document.createElement("h3");
-      plotTitle.className = "mb-3 color-fg-accent";
-      plotTitle.textContent = "Plot Results";
-
-      // Only add the title if it doesn't exist already
-      if (!document.querySelector("#plot-container h3")) {
-        plotContainer.insertAdjacentElement("afterbegin", plotTitle);
-      }
-    } catch (e) {
-      console.error("Error generating plot:", e);
-      plotContainer.innerHTML = `
-                <div class="flash flash-error mb-3">
-                    <p>Error generating plot: ${e.message}</p>
-                </div>
-            `;
-    }
   }
+
+  // Simple function to export the current plot as an image
+  const exportButton = document.createElement("button");
+  exportButton.textContent = "Export Plot";
+  exportButton.className = "btn btn-secondary ml-2";
+  exportButton.addEventListener("click", () => {
+    Plotly.downloadImage(plotContainer, {
+      format: "png",
+      filename: "plot_export",
+    });
+  });
+  document.getElementById("plot-form").appendChild(exportButton);
 });

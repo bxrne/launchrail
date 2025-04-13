@@ -106,3 +106,43 @@ func (h *DataHandler) GetRecordData(c *gin.Context) {
 	// You might want to create a specific templ component for data plots later
 	c.Redirect(http.StatusFound, fmt.Sprintf("/explore/%s", hash))
 }
+
+// New endpoint to return JSON data for explorer
+func (h *DataHandler) GetExplorerData(c *gin.Context) {
+	hash := c.Param("hash")
+	record, err := h.records.GetRecord(hash)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
+	defer record.Close()
+
+	motionHeaders, motionData, err := record.Motion.ReadHeadersAndData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read motion data"})
+		return
+	}
+	dynamicsHeaders, dynamicsData, err := record.Dynamics.ReadHeadersAndData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read dynamics data"})
+		return
+	}
+	eventsHeaders, eventsData, err := record.Events.ReadHeadersAndData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read events data"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"headers": gin.H{
+			"Motion":   motionHeaders,
+			"Dynamics": dynamicsHeaders,
+			"Events":   eventsHeaders,
+		},
+		"data": gin.H{
+			"Motion":   motionData,
+			"Dynamics": dynamicsData,
+			"Events":   eventsData,
+		},
+	})
+}

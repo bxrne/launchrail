@@ -256,6 +256,8 @@ func main() {
 		render(c, pages.Explorer(data))
 	})
 
+	r.GET("/explorer/:hash/json", dataHandler.GetExplorerData)
+
 	r.POST("/run", func(c *gin.Context) {
 		simConfig, err := configFromCtx(c, cfg)
 		if err != nil {
@@ -269,6 +271,118 @@ func main() {
 		}
 
 		c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
+	})
+
+	r.POST("/plot", func(c *gin.Context) {
+		hash := c.PostForm("hash")
+		source := c.PostForm("source")
+		xAxis := c.PostForm("xAxis")
+		yAxis := c.PostForm("yAxis")
+		zAxis := c.PostForm("zAxis")
+
+		record, err := dataHandler.records.GetRecord(hash)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found"})
+			return
+		}
+		defer record.Close()
+
+		// Get the correct headers/data
+		var headers []string
+		var rows [][]string
+		switch source {
+		case "motion":
+			headers, rows, err = record.Motion.ReadHeadersAndData()
+		case "dynamics":
+			headers, rows, err = record.Dynamics.ReadHeadersAndData()
+		case "events":
+			headers, rows, err = record.Events.ReadHeadersAndData()
+		}
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read data"})
+			return
+		}
+
+		// Convert rows to float64 array unless events
+		var floatData [][]float64
+		if source != "events" {
+			floatData = make([][]float64, len(rows))
+			for i, row := range rows {
+				floatData[i] = make([]float64, len(row))
+				for j, val := range row {
+					floatData[i][j], _ = strconv.ParseFloat(val, 64)
+				}
+			}
+		}
+
+		// Find field indices
+		xIndex, yIndex, zIndex := -1, -1, -1
+		for i, h := range headers {
+			switch h {
+			case xAxis:
+				xIndex = i
+			case yAxis:
+				yIndex = i
+			case zAxis:
+				zIndex = i
+			}
+		}
+
+		if xIndex < 0 || yIndex < 0 || (zAxis != "" && zIndex < 0) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid axes"})
+			return
+		}
+
+		// Build the response data as if we were going to feed Plotly
+		// Return rows as strings if events, otherwise as floats
+		var xData, yData, zData []interface{}
+		if source == "events" {
+			for _, row := range rows {
+				xData = append(xData, row[xIndex])
+				yData = append(yData, row[yIndex])
+				if zIndex >= 0 {
+					zData = append(zData, row[zIndex])
+				}
+			}
+		} else {
+			for _, row := range floatData {
+				xData = append(xData, row[xIndex])
+				yData = append(yData, row[yIndex])
+				if zIndex >= 0 {
+					zData = append(zData, row[zIndex])
+				}
+			}
+		}
+
+		plotLayout := map[string]interface{}{
+			"title": fmt.Sprintf("%s vs %s%s", yAxis, xAxis, func() string {
+				if zAxis != "" {
+					return " vs " + zAxis
+				}
+				return ""
+			}()),
+			"xaxis": map[string]string{"title": xAxis},
+			"yaxis": map[string]string{"title": yAxis},
+		}
+
+		plotData := []map[string]interface{}{
+			{
+				"x": xData,
+				"y": yData,
+				"type": func() string {
+					if zAxis != "" {
+						return "scatter3d"
+					}
+					return "scatter"
+				}(),
+				"mode": "markers",
+			},
+		}
+		if zAxis != "" {
+			plotData[0]["z"] = zData
+		}
+
+		c.JSON(http.StatusOK, gin.H{"plotData": plotData, "plotLayout": plotLayout})
 	})
 
 	log.Info("Server started", "Port", cfg.Server.Port)
