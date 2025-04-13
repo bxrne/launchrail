@@ -43,7 +43,7 @@ func API(version string) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"swagger-ui\"></div><script>\n            window.onload = () => {\n                window.ui = SwaggerUIBundle({\n                    url: '/api/spec',\n                    dom_id: '#swagger-ui',\n                    deepLinking: true,\n                    presets: [\n                        SwaggerUIBundle.presets.apis,\n                        SwaggerUIStandalonePreset\n                    ],\n                    plugins: [\n                        SwaggerUIBundle.plugins.DownloadUrl\n                    ],\n                });\n            };\n        </script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"swagger-ui\"><div id=\"swagger-ui\"></div></div><script>\n            window.onload = () => {\n                window.ui = SwaggerUIBundle({\n                    url: '/docs/openapi',\n                    dom_id: '#swagger-ui',\n                    deepLinking: true,\n                    presets: [\n                        SwaggerUIBundle.presets.apis,\n                        SwaggerUIStandalonePreset\n                    ],\n                    plugins: [\n                        SwaggerUIBundle.plugins.DownloadUrl\n                    ],\n                    layout: \"BaseLayout\",\n                    supportedSubmitMethods: [\"get\", \"post\", \"delete\"],\n                    defaultModelsExpandDepth: 3,\n                    defaultModelExpandDepth: 3,\n                    displayRequestDuration: true,\n                });\n            };\n        </script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -53,8 +53,8 @@ func API(version string) templ.Component {
 			Title:   "API Documentation",
 			Version: version,
 			Scripts: []string{
-				"https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js",
-				"https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js",
+				"/docs/swagger/swagger-ui-bundle.js",
+				"/docs/swagger/swagger-ui-standalone-preset.js",
 			},
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {

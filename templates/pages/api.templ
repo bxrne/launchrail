@@ -7,15 +7,17 @@ templ API(version string) {
         Title: "API Documentation",
         Version: version,
         Scripts: []string{
-            "https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js",
-            "https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js",
+            "/docs/swagger/swagger-ui-bundle.js",
+            "/docs/swagger/swagger-ui-standalone-preset.js",
         },
     }) {
-        <div id="swagger-ui"></div>
+        <div class="swagger-ui">
+            <div id="swagger-ui"></div>
+        </div>
         <script>
             window.onload = () => {
                 window.ui = SwaggerUIBundle({
-                    url: '/api/spec',
+                    url: '/docs/openapi',
                     dom_id: '#swagger-ui',
                     deepLinking: true,
                     presets: [
@@ -25,6 +27,11 @@ templ API(version string) {
                     plugins: [
                         SwaggerUIBundle.plugins.DownloadUrl
                     ],
+                    layout: "BaseLayout",
+                    supportedSubmitMethods: ["get", "post", "delete"],
+                    defaultModelsExpandDepth: 3,
+                    defaultModelExpandDepth: 3,
+                    displayRequestDuration: true,
                 });
             };
         </script>

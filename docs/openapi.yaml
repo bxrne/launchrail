@@ -1,0 +1,169 @@
+openapi: 3.0.3
+info:
+  title: Launchrail API
+  description: |
+    API for rocket flight simulation and analysis platform.
+    Provides endpoints for running simulations and accessing simulation data.
+  version: ${VERSION}  # This will be replaced during build
+  contact:
+    name: Adam Byrne
+    url: https://github.com/bxrne/launchrail
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Simulation
+    description: Simulation control endpoints
+  - name: Data
+    description: Data access and management endpoints
+
+paths:
+  /api/v1/run:
+    post:
+      summary: Run a new simulation
+      description: Starts a new rocket flight simulation with the provided parameters
+      tags: [Simulation]
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SimulationConfig'
+      responses:
+        202:
+          description: Simulation started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        500:
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/data:
+    get:
+      summary: List simulation records
+      description: Returns a paginated list of all simulation records
+      tags: [Data]
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: filter
+          in: query
+          description: Filter records by hash
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort order for records
+          schema:
+            type: string
+            enum: [time_asc, time_desc]
+            default: time_desc
+      responses:
+        200:
+          description: List of simulation records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  records:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Record'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        500:
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    SimulationConfig:
+      type: object
+      required:
+        - plugin-paths
+        - simulation-step
+        - max-time
+        - ground-tolerance
+        - motor-designation
+        - openrocket-file
+      properties:
+        plugin-paths:
+          type: string
+          example: "./plugins/windeffect.so"
+        simulation-step:
+          type: number
+          format: float
+          example: 0.001
+        max-time:
+          type: number
+          format: float
+          example: 300.0
+        ground-tolerance:
+          type: number
+          format: float
+          example: 0.06
+        motor-designation:
+          type: string
+          example: "269H110-14A"
+        openrocket-file:
+          type: string
+          example: "./testdata/openrocket/l1.ork"
+
+    Record:
+      type: object
+      properties:
+        hash:
+          type: string
+          description: Unique identifier for the simulation record
+        lastModified:
+          type: string
+          format: date-time
+          description: Last modification timestamp
+
+    Pagination:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+          minimum: 1
+        totalPages:
+          type: integer
+          minimum: 1
+
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Simulation started"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

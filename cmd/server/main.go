@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -191,17 +192,42 @@ func main() {
 	// Serve static files
 	r.Static("/static", "./static")
 
-	// Serve Swagger UI
-	r.Static("/docs", "./swagger-ui")
+	// Documentation & API spec routes
+	docs := r.Group("/docs")
+	{
+		// Serve Swagger UI files
+		docs.Static("/swagger", "./docs/swagger-ui")
 
-	// Ensure `/api/spec` is registered only once
-	r.GET("/api/docs", func(c *gin.Context) {
-		render(c, pages.API(cfg.Setup.App.Version))
-	})
+		// Serve the API documentation page
+		docs.GET("", func(c *gin.Context) {
+			render(c, pages.API(cfg.Setup.App.Version))
+		})
 
-	r.GET("/api/spec", func(c *gin.Context) {
-		c.File("./swagger-ui/openapi.yaml")
-	})
+		// Serve OpenAPI spec
+		docs.GET("/openapi", func(c *gin.Context) {
+			specFile := "./docs/openapi.yaml"
+			spec, err := os.ReadFile(specFile)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read OpenAPI spec"})
+				return
+			}
+			// Replace version placeholder
+			specStr := strings.ReplaceAll(string(spec), "${VERSION}", cfg.Setup.App.Version)
+			c.Data(http.StatusOK, "application/yaml", []byte(specStr))
+		})
+	}
+
+	// API endpoints group with version from config
+	apiVersion := fmt.Sprintf("/api/v%s", strings.Split(cfg.Setup.App.Version, ".")[0])
+	api := r.Group(apiVersion)
+	{
+		api.POST("/run", handleSimRun)
+		api.GET("/data", dataHandler.ListRecordsAPI)
+		api.GET("/explore/:hash", dataHandler.GetExplorerData)
+		api.GET("/spec", func(c *gin.Context) {
+			c.Redirect(http.StatusMovedPermanently, "/swagger/spec")
+		})
+	}
 
 	// Data routes
 	r.GET("/data", dataHandler.ListRecords)
@@ -405,14 +431,6 @@ func main() {
 			"apiPath": fmt.Sprintf("/api/v%s", strings.Split(cfg.Setup.App.Version, ".")[0]),
 		})
 	})
-
-	// Group API routes under versioned prefix
-	api := r.Group(fmt.Sprintf("/api/v%s", strings.Split(cfg.Setup.App.Version, ".")[0]))
-	{
-		api.POST("/run", handleSimRun)
-		api.GET("/data", dataHandler.ListRecordsAPI)
-		api.GET("/explore/:hash", dataHandler.GetExplorerData)
-	}
 
 	log.Info("Server started", "Port", cfg.Server.Port)
 	portStr := fmt.Sprintf(":%d", cfg.Server.Port)

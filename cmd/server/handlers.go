@@ -300,14 +300,6 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 	})
 }
 
-// New helper function
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 func (h *DataHandler) GetTableRows(c *gin.Context) {
 	hash := c.Param("hash")
 	table := c.Query("table")
@@ -470,7 +462,18 @@ func sortRecords(records []*storage.Record, ascending bool) {
 	}
 }
 
-// ListRecordsAPI handles the API request to list simulation records
+// ListRecordsAPI godoc
+// @Summary List simulation records
+// @Description Returns a paginated list of simulation records
+// @Tags Data
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number"
+// @Param filter query string false "Filter by hash"
+// @Param sort query string false "Sort order (time_asc or time_desc)"
+// @Success 200 {object} RecordsResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/data [get]
 func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 	records, err := h.records.ListRecords()
 	if err != nil {
