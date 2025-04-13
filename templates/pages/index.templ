@@ -4,9 +4,10 @@ import (
 	"github.com/bxrne/launchrail/templates/layouts"
 )
 
-templ Index() {
+templ Index(version string) {
 	@layouts.Base(layouts.BaseProps{
-		Title:   "Rocket Simulation",
+		Title:   "Home",
+		Version: version,
 		Scripts: []string{"/static/scripts/simulation.js"},
 	}) {
 		<h1 class="h3 text-center p-4">New Simulation</h1>

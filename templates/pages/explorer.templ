@@ -26,13 +26,14 @@ type ExplorerData struct {
 	Data    ExplorerDataContent `json:"data"`
 }
 
-templ Explorer(data ExplorerData) {
+templ Explorer(data ExplorerData, version string) {
 	@layouts.Base(layouts.BaseProps{
 		Title:   "Simulation Explorer",
 		Scripts: []string{
 			"https://cdn.jsdelivr.net/npm/plotly.js-dist-min", 
 			"/static/scripts/explorer.js",
 		},
+		Version: version,
 	}) {
 		<h3 class="h3 text-center p-4">Explore:</br><span class="color-fg-muted p-4 text-center">{ data.Hash }</span></h3>
 		<div class="Box color-shadow-medium mb-4">
@@ -51,7 +52,7 @@ templ Explorer(data ExplorerData) {
 			
 			<div class="tab-content active p-3" id="motion">
 				<h2 class="mb-3">Motion Records</h2>
-				<div class="Box overflow-auto">
+				<div class="Box table-container">
 					<table class="table width-full">
 						<thead>
 							<tr>
@@ -75,7 +76,7 @@ templ Explorer(data ExplorerData) {
 			
 			<div class="tab-content p-3" id="dynamics">
 				<h2 class="mb-3">Dynamics Records</h2>
-				<div class="Box overflow-auto">
+				<div class="Box table-container">
 					<table class="table width-full">
 						<thead>
 							<tr>
@@ -99,7 +100,7 @@ templ Explorer(data ExplorerData) {
 			
 			<div class="tab-content p-3" id="events">
 				<h2 class="mb-3">Events Records</h2>
-				<div class="Box overflow-auto">
+				<div class="Box table-container">
 					<table class="table width-full">
 						<thead>
 							<tr>

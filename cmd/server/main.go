@@ -164,7 +164,7 @@ func main() {
 		log.Fatal("Failed to set trusted proxies", "Error", err)
 	}
 
-	dataHandler, err := NewDataHandler(".launchrail")
+	dataHandler, err := NewDataHandler(cfg)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -179,7 +179,7 @@ func main() {
 
 	// Landing page
 	r.GET("/", func(c *gin.Context) {
-		render(c, pages.Index())
+		render(c, pages.Index(cfg.Setup.App.Version))
 	})
 
 	r.GET("/explore/:hash", func(c *gin.Context) {
@@ -253,7 +253,7 @@ func main() {
 			},
 		}
 
-		render(c, pages.Explorer(data))
+		render(c, pages.Explorer(data, cfg.Setup.App.Version))
 	})
 
 	r.GET("/explore/:hash/json", dataHandler.GetExplorerData)

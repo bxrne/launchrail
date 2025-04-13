@@ -126,7 +126,13 @@ document.addEventListener("DOMContentLoaded", function () {
         if (res.error) {
           throw new Error(res.error);
         }
-        Plotly.newPlot(plotContainer, res.plotData, res.plotLayout, {
+        Plotly.newPlot(plotContainer, res.plotData, {
+          ...res.plotLayout,
+          template: 'plotly_dark',
+          paper_bgcolor: '#2a2a2a',
+          plot_bgcolor: '#2a2a2a',
+          font: { color: '#ffffff' }
+        }, {
           responsive: true,
           displayModeBar: true,
           modeBarButtonsToRemove: ["lasso2d", "select2d"],

@@ -2,6 +2,7 @@ package pages
 
 import (
 	"time"
+	"fmt"
 	"github.com/bxrne/launchrail/templates/layouts"
 )
 
@@ -11,39 +12,92 @@ type SimulationRecord struct {
 	LastModified time.Time
 }
 
-type DataProps struct {
-	Records []SimulationRecord
+type Pagination struct {
+    CurrentPage int
+    TotalPages  int
 }
 
-templ Data(props DataProps) {
+type DataProps struct {
+    Records    []SimulationRecord
+    Pagination Pagination
+}
+
+templ Data(props DataProps, version string) {
 	@layouts.Base(layouts.BaseProps{
 		Title: "Simulation Records",
 	}) {
-		<h1 class="h3 text-center p-4">Records</h1>
-		
-		<div class="Box color-shadow-medium mb-4">
-			if len(props.Records) > 0 {
-				for _, record := range props.Records {
-					<div class="Box-row d-flex flex-column flex-md-row flex-justify-between flex-items-start flex-md-items-center py-3">
-						<div class="d-flex flex-column">
-							<h3 class="h3 color-fg-accent mb-1">{ record.LastModified.Format("2006-01-02 15:04:05") }</h3>          
-							<p class="color-fg-muted mb-2">SHA256: { record.Name }</p>
+		<div class="container-xl">
+			<h1 class="h3 text-center p-4">Simulation Records</h1>
+			<div class="Box color-shadow-medium" id="records-list" hx-swap="innerHTML">
+				if len(props.Records) > 0 {
+					<div class="table-container">
+						<div class="Box p-3 mb-3 d-flex flex-items-center">
+							<input type="text" 
+								class="form-control flex-auto mr-3"
+								placeholder="Filter records..."
+								id="table-filter"
+								hx-trigger="keyup changed delay:500ms"
+								hx-get="/data"
+								hx-target="#records-list"
+								hx-include="[name='sort'], [name='page']"
+								name="filter" />
+							<select class="form-select mr-3" 
+								name="sort"
+								hx-get="/data"
+								hx-target="#records-list"
+								hx-include="[name='filter'], [name='page']">
+								<option value="time_desc">Newest First</option>
+								<option value="time_asc">Oldest First</option>
+							</select>
 						</div>
-						<div class="d-flex flex-wrap mt-2 mt-md-0">
-							<a href={ templ.SafeURL("/explore/" + record.Hash) } class="btn btn-primary mr-2 mb-2">Explore Data</a>
-							<button class="btn btn-danger mb-2" hx-delete={ "/data/" + record.Hash } hx-confirm="Are you sure you want to delete this record?">Delete</button>
-						</div>
+						<table class="table width-full">
+							<thead>
+								<tr>
+									<th>Name</th>
+									<th>Time</th>
+									<th>Actions</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, record := range props.Records {
+									<tr>
+										<td>{ record.Name }</td>
+										<td>
+											{ record.LastModified.Format("2006-01-02 15:04:05") }
+											<span class="hash-tooltip octicon octicon-question" data-hash={ record.Hash }>?</span>
+										</td>
+										<td>
+											<a href={ templ.URL("/explore/" + record.Hash) } class="btn btn-sm">View</a>
+											<button class="btn btn-sm btn-danger" 
+													hx-delete={ "/data/" + record.Hash }
+													hx-target="#records-list"
+													hx-swap="outerHTML">
+												Delete
+											</button>
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+						if props.Pagination.TotalPages > 1 {
+							<div class="pagination d-flex flex-justify-center mt-3">
+								for i := 1; i <= props.Pagination.TotalPages; i++ {
+									<button class={ "btn btn-sm mx-1", templ.KV("btn-primary", i == props.Pagination.CurrentPage) }
+										name="page"
+										value={ fmt.Sprint(i) }
+										hx-get="/data"
+										hx-target="#records-list"
+										hx-include="[name='filter'], [name='sort']">
+										{ fmt.Sprint(i) }
+									</button>
+								}
+							</div>
+						}
 					</div>
+				} else {
+					<div class="p-3">No records found.</div>
 				}
-			} else {
-				<div class="Box-row text-center p-4">
-					<div class="blankslate">
-						<h3 class="blankslate-heading">No simulation records found</h3>
-						<p class="blankslate-description">Run a simulation to get started</p>
-						<a href="/" class="btn btn-primary">Create New Simulation</a>
-					</div>
-				</div>
-			}
+			</div>
 		</div>
 	}
 }

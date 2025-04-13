@@ -6,6 +6,7 @@ type BaseProps struct {
 	Title       string
 	Description string
 	Scripts     []string
+	Version     string // Add version field
 }
 
 templ Base(props BaseProps) {
@@ -29,7 +30,7 @@ templ Base(props BaseProps) {
 			<div class="container-xl p-4">
 				{ children... }
 			</div>
-			@components.Footer()
+			@components.Footer(props.Version)
 		</body>
 	</html>
 }

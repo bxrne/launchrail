@@ -34,7 +34,7 @@ type ExplorerData struct {
 	Data    ExplorerDataContent `json:"data"`
 }
 
-func Explorer(data ExplorerData) templ.Component {
+func Explorer(data ExplorerData, version string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -74,13 +74,13 @@ func Explorer(data ExplorerData) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(data.Hash)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 37, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 38, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</span></h3><div class=\"Box color-shadow-medium mb-4\"><div class=\"Box-header\"><div class=\"Box-title-and-description\"><div class=\"d-flex flex-items-center\"><div id=\"tab-container\" class=\"d-flex\"><button class=\"btn-link py-2 px-3 f4 border-bottom color-border-accent-emphasis color-fg-accent tab active\" data-target=\"motion\">Motion</button> <button class=\"btn-link py-2 px-3 f4 tab\" data-target=\"dynamics\">Dynamics</button> <button class=\"btn-link py-2 px-3 f4 tab\" data-target=\"events\">Events</button> <button class=\"btn-link py-2 px-3 f4 tab\" data-target=\"plots\">Plots</button></div></div></div></div><div class=\"tab-content active p-3\" id=\"motion\"><h2 class=\"mb-3\">Motion Records</h2><div class=\"Box overflow-auto\"><table class=\"table width-full\"><thead><tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</span></h3><div class=\"Box color-shadow-medium mb-4\"><div class=\"Box-header\"><div class=\"Box-title-and-description\"><div class=\"d-flex flex-items-center\"><div id=\"tab-container\" class=\"d-flex\"><button class=\"btn-link py-2 px-3 f4 border-bottom color-border-accent-emphasis color-fg-accent tab active\" data-target=\"motion\">Motion</button> <button class=\"btn-link py-2 px-3 f4 tab\" data-target=\"dynamics\">Dynamics</button> <button class=\"btn-link py-2 px-3 f4 tab\" data-target=\"events\">Events</button> <button class=\"btn-link py-2 px-3 f4 tab\" data-target=\"plots\">Plots</button></div></div></div></div><div class=\"tab-content active p-3\" id=\"motion\"><h2 class=\"mb-3\">Motion Records</h2><div class=\"Box table-container\"><table class=\"table width-full\"><thead><tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -92,7 +92,7 @@ func Explorer(data ExplorerData) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(header)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 59, Col: 21}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 60, Col: 21}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -120,7 +120,7 @@ func Explorer(data ExplorerData) templ.Component {
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.4f", cell))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 67, Col: 41}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 68, Col: 41}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
@@ -136,7 +136,7 @@ func Explorer(data ExplorerData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</tbody></table></div></div><div class=\"tab-content p-3\" id=\"dynamics\"><h2 class=\"mb-3\">Dynamics Records</h2><div class=\"Box overflow-auto\"><table class=\"table width-full\"><thead><tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</tbody></table></div></div><div class=\"tab-content p-3\" id=\"dynamics\"><h2 class=\"mb-3\">Dynamics Records</h2><div class=\"Box table-container\"><table class=\"table width-full\"><thead><tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -148,7 +148,7 @@ func Explorer(data ExplorerData) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(header)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 83, Col: 21}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 84, Col: 21}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -176,7 +176,7 @@ func Explorer(data ExplorerData) templ.Component {
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.4f", cell))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 91, Col: 41}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 92, Col: 41}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 					if templ_7745c5c3_Err != nil {
@@ -192,7 +192,7 @@ func Explorer(data ExplorerData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</tbody></table></div></div><div class=\"tab-content p-3\" id=\"events\"><h2 class=\"mb-3\">Events Records</h2><div class=\"Box overflow-auto\"><table class=\"table width-full\"><thead><tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</tbody></table></div></div><div class=\"tab-content p-3\" id=\"events\"><h2 class=\"mb-3\">Events Records</h2><div class=\"Box table-container\"><table class=\"table width-full\"><thead><tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -204,7 +204,7 @@ func Explorer(data ExplorerData) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(header)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 107, Col: 21}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 108, Col: 21}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -232,7 +232,7 @@ func Explorer(data ExplorerData) templ.Component {
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(cell)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 115, Col: 20}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 116, Col: 20}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {
@@ -255,7 +255,7 @@ func Explorer(data ExplorerData) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(data.Hash)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 149, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 150, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -273,6 +273,7 @@ func Explorer(data ExplorerData) templ.Component {
 				"https://cdn.jsdelivr.net/npm/plotly.js-dist-min",
 				"/static/scripts/explorer.js",
 			},
+			Version: version,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

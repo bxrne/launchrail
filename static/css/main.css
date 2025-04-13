@@ -207,3 +207,47 @@ details summary {
 .color-fg-muted {
   color: #ffffff !important;
 }
+
+/* Tab styling overrides */
+.tab {
+  border: none !important;
+  background: none !important;
+}
+
+.tab:hover, .tab.active {
+  background: none !important;
+  border: none !important;
+  border-bottom: 2px solid #ff8c00 !important;
+}
+
+/* Table improvements */
+.table-container {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.table {
+  min-width: 100%;
+  white-space: nowrap;
+}
+
+/* Tooltip styling */
+.hash-tooltip {
+  cursor: help;
+  color: #ff8c00;
+  margin-left: 0.5rem;
+}
+
+.hash-tooltip:hover::after {
+  content: attr(data-hash);
+  position: absolute;
+  background: #2a2a2a;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #404040;
+  font-size: 0.8rem;
+  max-width: 300px;
+  word-wrap: break-word;
+  white-space: normal;
+  z-index: 1000;
+}
