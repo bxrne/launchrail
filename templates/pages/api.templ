@@ -1,0 +1,32 @@
+package pages 
+
+import "github.com/bxrne/launchrail/templates/layouts"
+
+templ API(version string) {
+    @layouts.Base(layouts.BaseProps{
+        Title: "API Documentation",
+        Version: version,
+        Scripts: []string{
+            "https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js",
+            "https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js",
+        },
+    }) {
+        <div id="swagger-ui"></div>
+        <script>
+            window.onload = () => {
+                window.ui = SwaggerUIBundle({
+                    url: '/api/spec',
+                    dom_id: '#swagger-ui',
+                    deepLinking: true,
+                    presets: [
+                        SwaggerUIBundle.presets.apis,
+                        SwaggerUIStandalonePreset
+                    ],
+                    plugins: [
+                        SwaggerUIBundle.plugins.DownloadUrl
+                    ],
+                });
+            };
+        </script>
+    }
+}

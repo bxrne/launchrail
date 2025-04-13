@@ -70,13 +70,7 @@ templ Explorer(data ExplorerData, version string) {
 							</tr>
 						</thead>
 						<tbody id="motion-table">
-							for _, row := range data.Data.Motion {
-								<tr>
-									for _, cell := range row {
-										<td>{ fmt.Sprintf("%.4f", cell) }</td>
-									}
-								</tr>
-							}
+							@ShowPaginatedRows(data.Data.Motion, data.Pagination)
 						</tbody>
 					</table>
 				</div>
@@ -119,13 +113,7 @@ templ Explorer(data ExplorerData, version string) {
 							</tr>
 						</thead>
 						<tbody id="dynamics-table">
-							for _, row := range data.Data.Dynamics {
-								<tr>
-									for _, cell := range row {
-										<td>{ fmt.Sprintf("%.4f", cell) }</td>
-									}
-								</tr>
-							}
+							@ShowPaginatedRows(data.Data.Dynamics, data.Pagination)
 						</tbody>
 					</table>
 				</div>
@@ -168,13 +156,7 @@ templ Explorer(data ExplorerData, version string) {
 							</tr>
 						</thead>
 						<tbody id="events-table">
-							for _, row := range data.Data.Events {
-								<tr>
-									for _, cell := range row {
-										<td>{ cell }</td>
-									}
-								</tr>
-							}
+							@ShowPaginatedStringRows(data.Data.Events, data.Pagination)
 						</tbody>
 					</table>
 				</div>
@@ -243,4 +225,32 @@ templ Explorer(data ExplorerData, version string) {
 			</script>
 		</div>
 	}
+}
+
+templ ShowPaginatedRows(data [][]float64, pagination Pagination) {
+    for i := (pagination.CurrentPage - 1) * 15; i < min((pagination.CurrentPage-1)*15+15, len(data)); i++ {
+        <tr>
+            for _, cell := range data[i] {
+                <td>{ fmt.Sprintf("%.4f", cell) }</td>
+            }
+        </tr>
+    }
+}
+
+templ ShowPaginatedStringRows(data [][]string, pagination Pagination) {
+    for i := (pagination.CurrentPage - 1) * 15; i < min((pagination.CurrentPage-1)*15+15, len(data)); i++ {
+        <tr>
+            for _, cell := range data[i] {
+                <td>{ cell }</td>
+            }
+        </tr>
+    }
+}
+
+// Helper function to find minimum of two integers
+func min(a, b int) int {
+    if a < b {
+        return a
+    }
+    return b
 }

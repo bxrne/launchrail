@@ -195,8 +195,12 @@ func main() {
 	r.Static("/docs", "./swagger-ui")
 
 	// Ensure `/api/spec` is registered only once
+	r.GET("/api/docs", func(c *gin.Context) {
+		render(c, pages.API(cfg.Setup.App.Version))
+	})
+
 	r.GET("/api/spec", func(c *gin.Context) {
-		c.File("./swagger-ui/openapi.yaml") // Ensure the file exists at this path
+		c.File("./swagger-ui/openapi.yaml")
 	})
 
 	// Data routes

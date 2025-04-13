@@ -400,7 +400,7 @@ func (h *DataHandler) handleTableRequest(c *gin.Context, hash string, table stri
 		}
 	}
 
-	// Paginate
+	// Paginate the data
 	itemsPerPage := 15
 	totalPages := int(math.Ceil(float64(len(data)) / float64(itemsPerPage)))
 	startIndex := (page - 1) * itemsPerPage
