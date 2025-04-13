@@ -53,6 +53,10 @@
   min-height: 400px;
   position: relative;
   background-color: #2a2a2a !important;
+  max-width: 640px;
+  max-height: 480px;
+  width: 100%;
+  height: auto;
 }
 
 /* Add fade-in animation for tab content */
@@ -231,6 +235,7 @@ details summary {
   padding: 0 2rem;
   max-width: 1200px;
   margin: 0 auto;
+  white-space: nowrap;
 }
 
 .table {

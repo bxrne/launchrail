@@ -222,21 +222,18 @@ func main() {
 			render(c, pages.ErrorPage("Failed to read motion data: "+err.Error()))
 			return
 		}
-		log.Info("Motion data read successfully", "Headers", motionHeaders)
 
 		dynamicsHeaders, dynamicsData, err := record.Dynamics.ReadHeadersAndData()
 		if err != nil {
 			render(c, pages.ErrorPage("Failed to read dynamics data: "+err.Error()))
 			return
 		}
-		log.Info("Dynamics data read successfully", "Headers", dynamicsHeaders)
 
 		eventsHeaders, eventsData, err := record.Events.ReadHeadersAndData()
 		if err != nil {
 			render(c, pages.ErrorPage("Failed to read events data: "+err.Error()))
 			return
 		}
-		log.Info("Events data read successfully", "Headers", eventsHeaders)
 
 		// Turn motion data and dynamics data from [][]string to [][]float64
 		motionDataFloat := make([][]float64, len(motionData))
