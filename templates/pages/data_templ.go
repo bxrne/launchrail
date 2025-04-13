@@ -63,12 +63,12 @@ func Data(props DataProps, version string) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"container-xl\"><h1 class=\"h3 text-center p-4\">Simulation Records</h1><div class=\"Box color-shadow-medium\" id=\"records-list\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"container-xl\"><h1 class=\"h3 text-center p-4\">Simulation Records</h1><div class=\"Box color-shadow-medium p-4\" id=\"records-list\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if len(props.Records) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"table-container\"><div class=\"Box p-3 mb-3 d-flex flex-items-center\"><input type=\"text\" class=\"form-control flex-auto mr-3\" placeholder=\"Filter records...\" id=\"table-filter\" hx-trigger=\"keyup changed delay:500ms\" hx-get=\"/data\" hx-target=\"#records-list\" hx-include=\"[name=&#39;sort&#39;], [name=&#39;page&#39;]\" name=\"filter\"> <select class=\"form-select mr-3\" name=\"sort\" hx-get=\"/data\" hx-target=\"#records-list\" hx-include=\"[name=&#39;filter&#39;], [name=&#39;page&#39;]\"><option value=\"time_desc\">Newest First</option> <option value=\"time_asc\">Oldest First</option></select></div><table class=\"table width-full\"><thead><tr><th class=\"text-left\">Time</th><th class=\"text-left\">Actions</th></tr></thead> <tbody>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"table-container\"><div class=\"d-flex flex-items-center mb-3\"><input type=\"text\" class=\"form-control flex-auto mr-3\" placeholder=\"Filter records...\" id=\"table-filter\" hx-trigger=\"keyup changed delay:500ms\" hx-get=\"/data\" hx-target=\"#records-list\" hx-include=\"[name=&#39;sort&#39;], [name=&#39;page&#39;]\" name=\"filter\"> <select class=\"form-select mr-3\" name=\"sort\" hx-get=\"/data\" hx-target=\"#records-list\" hx-include=\"[name=&#39;filter&#39;], [name=&#39;page&#39;]\"><option value=\"time_desc\">Newest First</option> <option value=\"time_asc\">Oldest First</option></select></div><table class=\"table width-full\"><thead><tr><th class=\"text-left\">Time</th><th class=\"text-left\">Actions</th></tr></thead> <tbody>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

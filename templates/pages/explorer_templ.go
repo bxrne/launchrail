@@ -178,7 +178,7 @@ func Explorer(data ExplorerData, version string) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var8 string
-					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, data.Pagination.CurrentPage-1, "motion"))
+					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, data.Pagination.CurrentPage-1, "motion"))
 					if templ_7745c5c3_Err != nil {
 						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 93, Col: 113}
 					}
@@ -215,7 +215,7 @@ func Explorer(data ExplorerData, version string) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var11 string
-					templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, i, "motion"))
+					templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, i, "motion"))
 					if templ_7745c5c3_Err != nil {
 						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 102, Col: 85}
 					}
@@ -247,7 +247,7 @@ func Explorer(data ExplorerData, version string) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var13 string
-					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, data.Pagination.CurrentPage+1, "motion"))
+					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, data.Pagination.CurrentPage+1, "motion"))
 					if templ_7745c5c3_Err != nil {
 						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 111, Col: 113}
 					}
@@ -362,7 +362,7 @@ func Explorer(data ExplorerData, version string) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var18 string
-					templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, data.Pagination.CurrentPage-1, "dynamics"))
+					templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, data.Pagination.CurrentPage-1, "dynamics"))
 					if templ_7745c5c3_Err != nil {
 						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 161, Col: 115}
 					}
@@ -399,7 +399,7 @@ func Explorer(data ExplorerData, version string) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var21 string
-					templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, i, "dynamics"))
+					templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, i, "dynamics"))
 					if templ_7745c5c3_Err != nil {
 						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 170, Col: 87}
 					}
@@ -431,7 +431,7 @@ func Explorer(data ExplorerData, version string) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var23 string
-					templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, data.Pagination.CurrentPage+1, "dynamics"))
+					templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, data.Pagination.CurrentPage+1, "dynamics"))
 					if templ_7745c5c3_Err != nil {
 						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 179, Col: 115}
 					}
@@ -546,7 +546,7 @@ func Explorer(data ExplorerData, version string) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var28 string
-					templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, data.Pagination.CurrentPage-1, "events"))
+					templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, data.Pagination.CurrentPage-1, "events"))
 					if templ_7745c5c3_Err != nil {
 						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 229, Col: 113}
 					}
@@ -583,7 +583,7 @@ func Explorer(data ExplorerData, version string) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var31 string
-					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, i, "events"))
+					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, i, "events"))
 					if templ_7745c5c3_Err != nil {
 						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 238, Col: 85}
 					}
@@ -615,7 +615,7 @@ func Explorer(data ExplorerData, version string) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var33 string
-					templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s/page/%d?table=%s", data.Hash, data.Pagination.CurrentPage+1, "events"))
+					templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/explore/%s?page=%d&table=%s", data.Hash, data.Pagination.CurrentPage+1, "events"))
 					if templ_7745c5c3_Err != nil {
 						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/explorer.templ`, Line: 247, Col: 113}
 					}
