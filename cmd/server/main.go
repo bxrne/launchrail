@@ -203,115 +203,55 @@ func main() {
 
 	r.GET("/explore/:hash", func(c *gin.Context) {
 		hash := c.Param("hash")
+		table := c.Query("table")
+		if table == "" {
+			table = "motion" // Default to motion table
+		}
+
 		record, err := dataHandler.records.GetRecord(hash)
 		if err != nil {
-			log.Error("Failed to get record", "Error", err)
 			render(c, pages.ErrorPage("Record not found"))
 			return
 		}
 		defer record.Close()
 
-		// Ensure storage objects are not nil
-		if record.Motion == nil || record.Events == nil || record.Dynamics == nil {
-			render(c, pages.ErrorPage("Record storage is not properly initialized"))
-			return
-		}
-
-		// Read headers for all tables first
-		motionHeaders, _, err := record.Motion.ReadHeadersAndData()
+		// Load all headers first
+		motionHeaders, motionData, err := record.Motion.ReadHeadersAndData()
 		if err != nil {
-			render(c, pages.ErrorPage("Failed to read motion headers: "+err.Error()))
+			render(c, pages.ErrorPage("Failed to read motion data"))
 			return
 		}
 
-		dynamicsHeaders, _, err := record.Dynamics.ReadHeadersAndData()
+		dynamicsHeaders, dynamicsData, err := record.Dynamics.ReadHeadersAndData()
 		if err != nil {
-			render(c, pages.ErrorPage("Failed to read dynamics headers: "+err.Error()))
+			render(c, pages.ErrorPage("Failed to read dynamics data"))
 			return
 		}
 
-		eventsHeaders, _, err := record.Events.ReadHeadersAndData()
+		eventsHeaders, eventsData, err := record.Events.ReadHeadersAndData()
 		if err != nil {
-			render(c, pages.ErrorPage("Failed to read events headers: "+err.Error()))
+			render(c, pages.ErrorPage("Failed to read events data"))
 			return
 		}
 
-		// Get current table and page
-		table := c.Query("table")
-		if table == "" {
-			table = "motion" // Default to motion table
-		}
-		page := parseInt(c.Query("page"), 1)
-		itemsPerPage := 15
-
-		// Read and process the current table's data
-		var data [][]string
-		switch table {
-		case "motion":
-			_, data, err = record.Motion.ReadHeadersAndData()
-		case "dynamics":
-			_, data, err = record.Dynamics.ReadHeadersAndData()
-		case "events":
-			_, data, err = record.Events.ReadHeadersAndData()
-		}
-		if err != nil {
-			render(c, pages.ErrorPage("Failed to read data: "+err.Error()))
-			return
-		}
-
-		// Calculate pagination
-		totalRecords := len(data)
-		totalPages := int(math.Ceil(float64(totalRecords) / float64(itemsPerPage)))
-		startIndex := (page - 1) * itemsPerPage
-		endIndex := min(startIndex+itemsPerPage, totalRecords)
-
-		if startIndex >= totalRecords {
-			startIndex = 0
-			endIndex = min(itemsPerPage, totalRecords)
-			page = 1
-		}
-
-		// Get the page of data we want to display
-		pagedData := data[startIndex:endIndex]
-		var currentData interface{}
-
-		// Convert data if needed
-		if table != "events" {
-			floatData := make([][]float64, len(pagedData))
-			for i, row := range pagedData {
-				floatData[i] = make([]float64, len(row))
-				for j, val := range row {
-					floatData[i][j], _ = strconv.ParseFloat(val, 64)
-				}
-			}
-			currentData = floatData
-		} else {
-			currentData = pagedData
-		}
-
-		// Build the explorer data structure
+		// Create explorer data structure
 		explorerData := pages.ExplorerData{
-			Hash: hash,
+			Hash:  hash,
+			Table: table,
 			Headers: pages.ExplorerHeaders{
 				Motion:   motionHeaders,
 				Dynamics: dynamicsHeaders,
 				Events:   eventsHeaders,
 			},
-			Data: pages.ExplorerDataContent{},
-			Pagination: pages.Pagination{
-				CurrentPage: page,
-				TotalPages:  totalPages,
+			Data: pages.ExplorerDataContent{
+				Motion:   convertToFloat64(motionData),
+				Dynamics: convertToFloat64(dynamicsData),
+				Events:   eventsData,
 			},
-		}
-
-		// Set the correct data based on table type
-		switch table {
-		case "motion":
-			explorerData.Data.Motion = currentData.([][]float64)
-		case "dynamics":
-			explorerData.Data.Dynamics = currentData.([][]float64)
-		case "events":
-			explorerData.Data.Events = currentData.([][]string)
+			Pagination: pages.Pagination{
+				CurrentPage: parseInt(c.Query("page"), 1),
+				TotalPages:  calculateTotalPages(len(motionData), 15),
+			},
 		}
 
 		render(c, pages.Explorer(explorerData, cfg.Setup.App.Version))
@@ -501,4 +441,19 @@ func handleSimRun(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
+}
+
+func convertToFloat64(data [][]string) [][]float64 {
+	result := make([][]float64, len(data))
+	for i, row := range data {
+		result[i] = make([]float64, len(row))
+		for j, val := range row {
+			result[i][j], _ = strconv.ParseFloat(val, 64)
+		}
+	}
+	return result
+}
+
+func calculateTotalPages(total int, perPage int) int {
+	return int(math.Ceil(float64(total) / float64(perPage)))
 }

@@ -55,7 +55,7 @@ templ Explorer(data ExplorerData, version string) {
 				</div>
 			</div>
 			
-			<div class="tab-content active p-3" id="motion">
+			<div class={ "tab-content p-3", templ.KV("active", data.Table == "motion") } id="motion">
 				<div class="Box table-container overflow-auto">
 					<table class="table width-full">
 						<thead>
@@ -114,7 +114,7 @@ templ Explorer(data ExplorerData, version string) {
 				}
 			</div>
 			
-			<div class="tab-content p-3" id="dynamics">
+			<div class={ "tab-content p-3", templ.KV("active", data.Table == "dynamics") } id="dynamics">
 				<div class="Box table-container overflow-auto" style="min-height: 400px;">
 					<table class="table width-full">
 						<thead>
@@ -173,7 +173,7 @@ templ Explorer(data ExplorerData, version string) {
 				}
 			</div>
 			
-			<div class="tab-content p-3" id="events">
+			<div class={ "tab-content p-3", templ.KV("active", data.Table == "events") } id="events">
 				<div class="Box table-container overflow-auto" style="min-height: 400px;">
 					<table class="table width-full">
 						<thead>

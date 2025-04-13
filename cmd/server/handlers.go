@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"sort"
@@ -452,6 +451,25 @@ func (h *DataHandler) GetTableData(c *gin.Context) {
 	h.handleTableRequest(c, hash, table)
 }
 
+// sortRecords sorts records based on LastModified timestamp
+func sortRecords(records []*storage.Record, ascending bool) {
+	// Use bubble sort for simplicity - can be optimized if needed
+	n := len(records)
+	for i := 0; i < n-1; i++ {
+		for j := 0; j < n-i-1; j++ {
+			shouldSwap := false
+			if ascending {
+				shouldSwap = records[j].LastModified.After(records[j+1].LastModified)
+			} else {
+				shouldSwap = records[j].LastModified.Before(records[j+1].LastModified)
+			}
+			if shouldSwap {
+				records[j], records[j+1] = records[j+1], records[j]
+			}
+		}
+	}
+}
+
 // ListRecordsAPI handles the API request to list simulation records
 func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 	records, err := h.records.ListRecords()
@@ -462,7 +480,6 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 
 	// Apply query parameters
 	page := parseInt(c.Query("page"), 1)
-	sort := c.Query("sort")
 	filter := c.Query("filter")
 	itemsPerPage := 15
 
@@ -479,7 +496,8 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 
 	// Apply sorting
 	sortOrder := c.Query("sort")
-	log.Println("Sort order:", sortOrder, sort)
+	sortRecords(records, sortOrder == "time_asc")
+
 	// Calculate pagination
 	totalRecords := len(records)
 	totalPages := int(math.Ceil(float64(totalRecords) / float64(itemsPerPage)))
