@@ -5,7 +5,6 @@ import (
 	"math"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/a-h/templ"
@@ -44,17 +43,6 @@ type ListParams struct {
 	Sort         string
 	Filter       string
 	ItemsPerPage int
-}
-
-func parseInt(s string, defaultValue int) int {
-	if s == "" {
-		return defaultValue
-	}
-	val, err := strconv.Atoi(s)
-	if err != nil {
-		return defaultValue
-	}
-	return val
 }
 
 func (h *DataHandler) ListRecords(c *gin.Context) {
@@ -234,6 +222,79 @@ func (h *DataHandler) GetExplorerData(c *gin.Context) {
 			"motion":   motionData,
 			"dynamics": dynamicsData,
 			"events":   eventsData,
+		},
+	})
+}
+
+// Add this new method to DataHandler
+func (h *DataHandler) ExplorerSortData(c *gin.Context) {
+	hash := c.Param("hash")
+	table := c.Query("table")
+	column := c.Query("col")
+	direction := c.Query("dir")
+	page := parseInt(c.Query("page"), 1)
+
+	record, err := h.records.GetRecord(hash)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
+	defer record.Close()
+
+	// Get the correct storage based on table type
+	var storage *storage.Storage
+	switch table {
+	case "motion":
+		storage = record.Motion
+	case "dynamics":
+		storage = record.Dynamics
+	case "events":
+		storage = record.Events
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid table"})
+		return
+	}
+
+	headers, data, err := storage.ReadHeadersAndData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read data"})
+		return
+	}
+
+	// Sort the data
+	// Find column index
+	colIndex := -1
+	for i, h := range headers {
+		if h == column {
+			colIndex = i
+			break
+		}
+	}
+
+	// Convert and sort data
+	sortedData := make([][]string, len(data))
+	copy(sortedData, data)
+
+	sort.Slice(sortedData, func(i, j int) bool {
+		if direction == "asc" {
+			return sortedData[i][colIndex] < sortedData[j][colIndex]
+		}
+		return sortedData[i][colIndex] > sortedData[j][colIndex]
+	})
+
+	// Apply pagination
+	itemsPerPage := 10
+	totalPages := int(math.Ceil(float64(len(sortedData)) / float64(itemsPerPage)))
+	startIndex := (page - 1) * itemsPerPage
+	endIndex := min(startIndex+itemsPerPage, len(sortedData))
+	pagedData := sortedData[startIndex:endIndex]
+
+	// Return paginated and sorted data
+	c.JSON(http.StatusOK, gin.H{
+		"data": pagedData,
+		"pagination": gin.H{
+			"currentPage": page,
+			"totalPages":  totalPages,
 		},
 	})
 }

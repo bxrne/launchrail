@@ -24,6 +24,7 @@ type ExplorerData struct {
 	Hash    string
 	Headers ExplorerHeaders    `json:"headers"`
 	Data    ExplorerDataContent `json:"data"`
+	Pagination Pagination     `json:"pagination"`  // Add this line
 }
 
 templ Explorer(data ExplorerData, version string) {
@@ -57,11 +58,25 @@ templ Explorer(data ExplorerData, version string) {
 						<thead>
 							<tr>
 								for _, header := range data.Headers.Motion {
-									<th>{ header }</th>
+										<th>
+											<div class="d-flex flex-items-center">
+												{ header }
+												<div class="d-flex flex-column ml-1">
+													<button class="btn-octicon p-0" 
+														hx-get={ fmt.Sprintf("/explore/%s/sort?table=motion&col=%s&dir=asc", data.Hash, header) }
+														hx-target="#motion-table"
+														hx-swap="outerHTML">▲</button>
+													<button class="btn-octicon p-0"
+														hx-get={ fmt.Sprintf("/explore/%s/sort?table=motion&col=%s&dir=desc", data.Hash, header) }
+														hx-target="#motion-table"
+														hx-swap="outerHTML">▼</button>
+												</div>
+											</div>
+										</th>
 								}
 							</tr>
 						</thead>
-						<tbody>
+						<tbody id="motion-table">
 							for _, row := range data.Data.Motion {
 								<tr>
 									for _, cell := range row {
@@ -71,6 +86,18 @@ templ Explorer(data ExplorerData, version string) {
 							}
 						</tbody>
 					</table>
+					if data.Pagination.TotalPages > 1 {
+						<div class="pagination d-flex flex-justify-center mt-3">
+							for i := 1; i <= data.Pagination.TotalPages; i++ {
+								<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }
+									hx-get={ fmt.Sprintf("/explore/%s?table=motion&page=%d", data.Hash, i) }
+									hx-target="#motion-table"
+									hx-swap="outerHTML">
+									{ fmt.Sprint(i) }
+								</a>
+							}
+						</div>
+					}
 				</div>
 			</div>
 			
@@ -81,11 +108,25 @@ templ Explorer(data ExplorerData, version string) {
 						<thead>
 							<tr>
 								for _, header := range data.Headers.Dynamics {
-									<th>{ header }</th>
+										<th>
+											<div class="d-flex flex-items-center">
+												{ header }
+												<div class="d-flex flex-column ml-1">
+													<button class="btn-octicon p-0" 
+														hx-get={ fmt.Sprintf("/explore/%s/sort?table=dynamics&col=%s&dir=asc", data.Hash, header) }
+														hx-target="#dynamics-table"
+														hx-swap="outerHTML">▲</button>
+													<button class="btn-octicon p-0"
+														hx-get={ fmt.Sprintf("/explore/%s/sort?table=dynamics&col=%s&dir=desc", data.Hash, header) }
+														hx-target="#dynamics-table"
+														hx-swap="outerHTML">▼</button>
+												</div>
+											</div>
+										</th>
 								}
 							</tr>
 						</thead>
-						<tbody>
+						<tbody id="dynamics-table">
 							for _, row := range data.Data.Dynamics {
 								<tr>
 									for _, cell := range row {
@@ -95,6 +136,18 @@ templ Explorer(data ExplorerData, version string) {
 							}
 						</tbody>
 					</table>
+					if data.Pagination.TotalPages > 1 {
+						<div class="pagination d-flex flex-justify-center mt-3">
+							for i := 1; i <= data.Pagination.TotalPages; i++ {
+								<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }
+									hx-get={ fmt.Sprintf("/explore/%s?table=dynamics&page=%d", data.Hash, i) }
+									hx-target="#dynamics-table"
+									hx-swap="outerHTML">
+									{ fmt.Sprint(i) }
+								</a>
+							}
+						</div>
+					}
 				</div>
 			</div>
 			
@@ -105,11 +158,25 @@ templ Explorer(data ExplorerData, version string) {
 						<thead>
 							<tr>
 								for _, header := range data.Headers.Events {
-									<th>{ header }</th>
+										<th>
+											<div class="d-flex flex-items-center">
+												{ header }
+												<div class="d-flex flex-column ml-1">
+													<button class="btn-octicon p-0" 
+														hx-get={ fmt.Sprintf("/explore/%s/sort?table=events&col=%s&dir=asc", data.Hash, header) }
+														hx-target="#events-table"
+														hx-swap="outerHTML">▲</button>
+													<button class="btn-octicon p-0"
+														hx-get={ fmt.Sprintf("/explore/%s/sort?table=events&col=%s&dir=desc", data.Hash, header) }
+														hx-target="#events-table"
+														hx-swap="outerHTML">▼</button>
+												</div>
+											</div>
+										</th>
 								}
 							</tr>
 						</thead>
-						<tbody>
+						<tbody id="events-table">
 							for _, row := range data.Data.Events {
 								<tr>
 									for _, cell := range row {
@@ -119,6 +186,18 @@ templ Explorer(data ExplorerData, version string) {
 							}
 						</tbody>
 					</table>
+					if data.Pagination.TotalPages > 1 {
+						<div class="pagination d-flex flex-justify-center mt-3">
+							for i := 1; i <= data.Pagination.TotalPages; i++ {
+								<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == data.Pagination.CurrentPage) }
+									hx-get={ fmt.Sprintf("/explore/%s?table=events&page=%d", data.Hash, i) }
+									hx-target="#events-table"
+									hx-swap="outerHTML">
+									{ fmt.Sprint(i) }
+								</a>
+							}
+						</div>
+					}
 				</div>
 			</div>
 			
@@ -150,7 +229,11 @@ templ Explorer(data ExplorerData, version string) {
 					<input type="hidden" id="record-hash" value={ data.Hash } />
 					<button type="button" id="plot-button" class="btn btn-primary">Generate Plot</button>
 				</form>
-				<div id="plot-container" class="mt-4 Box p-3"></div>
+				<div id="plot-container" class="mt-4 Box p-3">
+					<div class="blankslate">
+						<h3 class="blankslate-heading">Select axes and generate plot...</h3>
+					</div>
+				</div>
 			</div>
 			<script id="headers-data" type="application/json">
 				{ var headersJSON, _ = json.Marshal(data.Headers) }

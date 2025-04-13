@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 
@@ -137,6 +138,23 @@ func parseFloat(value string) float64 {
 	return result
 }
 
+// Helper function to parse int values from strings
+func parseInt(value string, defaultValue int) int {
+	result, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultValue
+	}
+	return result
+}
+
+// Helper function to find the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // Helper function to render templ components in Gin
 func render(c *gin.Context, component templ.Component) {
 	err := component.Render(c.Request.Context(), c.Writer)
@@ -230,12 +248,41 @@ func main() {
 
 		}
 
+		// Add pagination for dynamics data
 		dynamicsDataFloat := make([][]float64, len(dynamicsData))
 		for i, row := range dynamicsData {
 			dynamicsDataFloat[i] = make([]float64, len(row))
 			for j, val := range row {
 				dynamicsDataFloat[i][j], _ = strconv.ParseFloat(val, 64)
 			}
+		}
+
+		// Get current table and page
+		table := c.Query("table")
+		page := parseInt(c.Query("page"), 1)
+		itemsPerPage := 10
+
+		var currentData [][]float64
+		switch table {
+		case "motion":
+			currentData = motionDataFloat
+		case "dynamics":
+			currentData = dynamicsDataFloat
+		case "events":
+			currentData = nil // Handle events separately since it's string data
+		default:
+			currentData = motionDataFloat
+		}
+
+		totalRecords := len(currentData)
+		totalPages := int(math.Ceil(float64(totalRecords) / float64(itemsPerPage)))
+		startIndex := (page - 1) * itemsPerPage
+		endIndex := min(startIndex+itemsPerPage, totalRecords)
+
+		if startIndex >= totalRecords {
+			startIndex = 0
+			endIndex = min(itemsPerPage, totalRecords)
+			page = 1
 		}
 
 		// Render the explorer page with templ
@@ -247,9 +294,13 @@ func main() {
 				Events:   eventsHeaders,
 			},
 			Data: pages.ExplorerDataContent{ // Updated from whatever it was before
-				Motion:   motionDataFloat,
+				Motion:   currentData[startIndex:endIndex], // Add pagination slice
 				Dynamics: dynamicsDataFloat,
 				Events:   eventsData,
+			},
+			Pagination: pages.Pagination{ // Add pagination info
+				CurrentPage: page,
+				TotalPages:  totalPages,
 			},
 		}
 

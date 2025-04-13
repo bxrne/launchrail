@@ -28,7 +28,7 @@ templ Data(props DataProps, version string) {
 	}) {
 		<div class="container-xl">
 			<h1 class="h3 text-center p-4">Simulation Records</h1>
-			<div class="Box color-shadow-medium" id="records-list" hx-swap="innerHTML">
+			<div class="Box color-shadow-medium" id="records-list">
 				if len(props.Records) > 0 {
 					<div class="table-container">
 						<div class="Box p-3 mb-3 d-flex flex-items-center">
@@ -53,7 +53,6 @@ templ Data(props DataProps, version string) {
 						<table class="table width-full">
 							<thead>
 								<tr>
-									<th>Name</th>
 										<th class="text-left">Time</th>
 									<th class="text-left">Actions</th>
 								</tr>
@@ -61,7 +60,6 @@ templ Data(props DataProps, version string) {
 							<tbody>
 								for _, record := range props.Records {
 									<tr>
-										<td>{ record.Name }</td>
 										<td>
 											{ record.LastModified.Format("2006-01-02 15:04:05") }
 											<span class="hash-tooltip octicon octicon-question" data-hash={ record.Hash }>?</span>
@@ -85,7 +83,8 @@ templ Data(props DataProps, version string) {
 									<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == props.Pagination.CurrentPage) }
 										hx-get="/data"
 										hx-target="#records-list"
-										hx-swap="innerHTML">
+										hx-swap="outerHTML"
+										hx-include="[name='filter'], [name='sort']">
 										{ fmt.Sprint(i) }
 									</a>
 								}

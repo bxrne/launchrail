@@ -29,6 +29,13 @@
 
 .tab-content {
   display: none;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.tab-content.active {
+  display: block;
+  animation: fadeIn 0.3s ease-in-out;
 }
 
 /* Form styling */
@@ -54,14 +61,11 @@
   to { opacity: 1; }
 }
 
-.tab-content.active {
-  display: block;
-  animation: fadeIn 0.3s ease-in-out;
-}
-
 /* Table improvements */
 .table {
   font-size: 0.9rem;
+  margin-bottom: 0;
+  width: 100%;
 }
 
 .table th {
@@ -224,11 +228,17 @@ details summary {
 .table-container {
   overflow-x: auto;
   width: 100%;
+  padding: 0 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .table {
   min-width: 100%;
   white-space: nowrap;
+  margin: 0 auto;
+  max-width: 900px;
+  width: 100%;
 }
 
 /* Tooltip styling */
@@ -284,4 +294,91 @@ details summary {
 .Link--secondary:hover {
   color: #ff8c00;
   text-decoration: none;
+}
+
+/* Link styling improvements */
+.Link--primary, 
+.Link--secondary,
+.btn-link,
+.Link {
+  color: #ff8c00 !important;
+  transition: opacity 0.2s ease;
+}
+
+.Link--primary:hover, 
+.Link--secondary:hover,
+.btn-link:hover,
+.Link:hover {
+  opacity: 0.8;
+  color: #ff8c00 !important;
+  text-decoration: none;
+}
+
+/* Preserve pagination outside scroll area */
+.pagination {
+  position: sticky;
+  bottom: 0;
+  background: #2a2a2a;
+  padding: 1rem 0;
+  margin: 0;
+  border-top: 1px solid #404040;
+}
+
+/* Navigation and footer specific links */
+.Box-header .Link--primary,
+.footer .Link--primary {
+  color: rgba(255, 255, 255, 0.8) !important;
+  transition: color 0.2s ease;
+}
+
+.Box-header .Link--primary:hover,
+.footer .Link--primary:hover {
+  color: #ff8c00 !important;
+  text-decoration: none;
+}
+
+/* Inactive state for tabs and pagination */
+.tab:not(.active) {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.Link--secondary:not(.color-fg-accent) {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Delete link styling */
+.Link.color-fg-danger {
+  color: #ff4d4d !important;
+  transition: color 0.2s ease;
+}
+
+.Link.color-fg-danger:hover {
+  color: #ff6666 !important;
+  opacity: 1;
+}
+
+/* Navigation styling */
+.Box-header .Link--primary,
+.footer .Link--primary,
+.navbar .Link--primary {
+  color: rgba(255, 255, 255, 0.9) !important;
+  transition: color 0.2s ease;
+}
+
+.Box-header .Link--primary:hover,
+.footer .Link--primary:hover,
+.navbar .Link--primary:hover {
+  color: #ff8c00 !important;
+  text-decoration: none;
+}
+
+/* Empty plot state */
+.blankslate {
+  text-align: center;
+  padding: 2rem;
+}
+
+.blankslate-heading {
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: normal;
 }
