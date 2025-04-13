@@ -135,14 +135,14 @@ func (h *DataHandler) GetExplorerData(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"headers": gin.H{
-			"Motion":   motionHeaders,
-			"Dynamics": dynamicsHeaders,
-			"Events":   eventsHeaders,
+			"motion":   motionHeaders,
+			"dynamics": dynamicsHeaders,
+			"events":   eventsHeaders,
 		},
 		"data": gin.H{
-			"Motion":   motionData,
-			"Dynamics": dynamicsData,
-			"Events":   eventsData,
+			"motion":   motionData,
+			"dynamics": dynamicsData,
+			"events":   eventsData,
 		},
 	})
 }
