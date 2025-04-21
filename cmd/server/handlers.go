@@ -41,17 +41,13 @@ func renderTempl(c *gin.Context, component templ.Component) {
 
 type ListParams struct {
 	Page         int
-	Sort         string
-	Filter       string
 	ItemsPerPage int
 }
 
 func (h *DataHandler) ListRecords(c *gin.Context) {
 	params := ListParams{
 		Page:         parseInt(c.Query("page"), 1),
-		Sort:         c.Query("sort"),
-		Filter:       c.Query("filter"),
-		ItemsPerPage: 15, // Changed from 10 to 15
+		ItemsPerPage: 15,
 	}
 
 	records, err := h.records.ListRecords()
@@ -59,27 +55,6 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 		renderTempl(c, pages.ErrorPage(err.Error()))
 		return
 	}
-
-	// Apply filtering
-	if params.Filter != "" {
-		filtered := make([]*storage.Record, 0)
-		for _, r := range records {
-			if strings.Contains(strings.ToLower(r.Hash), strings.ToLower(params.Filter)) {
-				filtered = append(filtered, r)
-			}
-		}
-		records = filtered
-	}
-
-	// Apply sorting
-	sort.Slice(records, func(i, j int) bool {
-		switch params.Sort {
-		case "time_asc":
-			return records[i].LastModified.Before(records[j].LastModified)
-		default: // time_desc
-			return records[i].LastModified.After(records[j].LastModified)
-		}
-	})
 
 	// Calculate pagination
 	totalRecords := len(records)
@@ -110,9 +85,7 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 			CurrentPage: params.Page,
 			TotalPages:  totalPages,
 		},
-	},
-		h.Cfg.Setup.App.Version,
-	))
+	}, h.Cfg.Setup.App.Version))
 }
 
 // DeleteRecord handles the request to delete a specific record
@@ -126,23 +99,12 @@ func (h *DataHandler) DeleteRecord(c *gin.Context) {
 
 	// Get parameters to preserve
 	page := c.Query("page")
-	sort := c.Query("sort")
-	filter := c.Query("filter")
 
 	// Build redirect URL with parameters
-	redirectURL := "/data?"
+	redirectURL := "/data"
 	if page != "" {
-		redirectURL += "page=" + page + "&"
+		redirectURL += "?page=" + page
 	}
-	if sort != "" {
-		redirectURL += "sort=" + sort + "&"
-	}
-	if filter != "" {
-		redirectURL += "filter=" + filter
-	}
-
-	// Trim trailing &
-	redirectURL = strings.TrimSuffix(redirectURL, "&")
 
 	c.Redirect(http.StatusFound, redirectURL)
 }

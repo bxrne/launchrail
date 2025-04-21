@@ -31,27 +31,10 @@ templ Data(props DataProps, version string) {
 			<div class="Box color-shadow-medium p-4" id="records-list">
 				if len(props.Records) > 0 {
 					<div class="table-container">
-						<div class="d-flex flex-items-center mb-3">
-							<input type="text" 
-								class="form-control flex-auto mr-3"
-								placeholder="Filter records..."
-								id="table-filter"
-								hx-trigger="keyup changed delay:500ms"
-								hx-get="/data"
-								hx-include="[name='sort'], [name='page']"
-								name="filter" />
-							<select class="form-select mr-3" 
-								name="sort"
-								hx-get="/data"
-								hx-include="[name='filter'], [name='page']">
-								<option value="time_desc" selected>Newest First</option>
-								<option value="time_asc">Oldest First</option>
-							</select>
-						</div>
 						<table class="table width-full">
 							<thead>
 								<tr>
-										<th class="text-left">Time</th>
+									<th class="text-left">Time</th>
 									<th class="text-left">Actions</th>
 								</tr>
 							</thead>
