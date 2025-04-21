@@ -3,6 +3,7 @@ package systems
 import (
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/states"
 )
 
@@ -64,14 +65,8 @@ func (s *RulesSystem) processRules(entity *states.PhysicsState) Event {
 	}
 
 	// Check for apogee
-	if !s.hasApogee &&
-		entity.Motor.GetState() == "BURNOUT" &&
-		entity.Velocity.Vec.Y < 0 {
+	if !s.hasApogee && s.detectApogee(entity) {
 		s.hasApogee = true
-		// Deploy parachute if it exists and is triggered by apogee
-		if entity.Parachute != nil && entity.Parachute.Trigger == "apogee" {
-			entity.Parachute.Deploy()
-		}
 		return Apogee
 	}
 
@@ -86,4 +81,29 @@ func (s *RulesSystem) processRules(entity *states.PhysicsState) Event {
 	}
 
 	return None
+}
+
+func (s *RulesSystem) detectApogee(entity *states.PhysicsState) bool {
+	// Must be moving downward to be at apogee
+	if entity.Velocity.Vec.Y >= 0 {
+		return false
+	}
+
+	// Must be coasting (motor burned out)
+	if entity.Motor.FSM.Current() != components.StateIdle {
+		return false
+	}
+
+	// Must be above ground
+	if entity.Position.Vec.Y <= s.config.Simulation.GroundTolerance {
+		return false
+	}
+
+	// If we get here, we're at apogee
+	if entity.Parachute != nil && !entity.Parachute.IsDeployed() {
+		entity.Parachute.Deploy()
+		return true
+	}
+
+	return false
 }

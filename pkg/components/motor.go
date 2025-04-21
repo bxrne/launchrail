@@ -13,17 +13,6 @@ import (
 	"github.com/zerodha/logf"
 )
 
-// MotorState represents the current state of the motor
-type MotorState string
-
-// MotorState constants
-const (
-	MotorIgnited  MotorState = "IGNITED"
-	MotorBurning  MotorState = "BURNING"
-	MotorBurnout  MotorState = "BURNOUT"
-	MotorCoasting MotorState = "COASTING"
-)
-
 // Motor represents a rocket motor component
 type Motor struct {
 	ID          ecs.BasicEntity
@@ -36,9 +25,7 @@ type Motor struct {
 	elapsedTime float64
 	mu          sync.RWMutex
 	burnTime    float64
-	isCoasting  bool
 	logger      logf.Logger
-	state       MotorState
 }
 
 // NewMotor creates a new motor component from thrust curve data
@@ -56,11 +43,10 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 		thrust:      0,
 		FSM:         NewMotorFSM(),
 		burnTime:    md.BurnTime,
-		isCoasting:  false,
-		logger:      logger,       // Initialize logger
-		state:       MotorIgnited, // Initial state
+		logger:      logger,
 	}
 
+	m.logger.Info("Motor created", "ID", m.ID.ID(), "Mass", m.Mass, "BurnTime", m.burnTime)
 	// Initialize with first thrust point
 	m.thrust = m.Thrustcurve[0][1]
 	return m, nil
@@ -98,66 +84,58 @@ func (m *Motor) Update(dt float64) error {
 		return fmt.Errorf("invalid timestep")
 	}
 
-	// Update elapsed time first
-	m.elapsedTime += dt
+	// Calculate new elapsed time
+	newElapsedTime := m.elapsedTime + dt
 
-	// Check for burnout before updating thrust
+	// Clamp to burn time if we would exceed it
+	if newElapsedTime > m.burnTime {
+		dt = m.burnTime - m.elapsedTime
+		newElapsedTime = m.burnTime
+	}
+
+	m.elapsedTime = newElapsedTime
+
+	// Check for burnout
 	if m.elapsedTime >= m.burnTime {
 		return m.handleBurnout()
 	}
 
-	// Update thrust and mass if not coasting
+	// Update thrust and mass if not in idle state
 	m.updateThrustAndMass(dt)
 
-	// Only try to ignite if we're in the initial state
-	if m.state == MotorIgnited {
+	// Try to ignite if in idle state
+	if m.FSM.Current() == StateIdle {
 		ctx := context.Background()
 		if err := m.FSM.Event(ctx, "ignite"); err != nil {
 			return fmt.Errorf("failed to transition to burning state: %v", err)
 		}
-		m.state = MotorBurning
 	}
 
 	return nil
 }
 
 func (m *Motor) handleBurnout() error {
-	// Only transition to burnout if we're not already coasting
-	if !m.isCoasting {
-		m.isCoasting = true
+	// Only transition to burnout if we're burning
+	if m.FSM.Current() == StateBurning {
 		m.thrust = 0
-
-		// Only attempt state transition if we're not already in burnout
-		if m.state != MotorBurnout {
-			ctx := context.Background()
-			if err := m.FSM.Event(ctx, "burnout"); err != nil {
-				m.logger.Error("failed to transition to burnout state", "error", err)
-				// Continue execution even if FSM transition fails
-			}
-			m.state = MotorBurnout
+		ctx := context.Background()
+		if err := m.FSM.Event(ctx, "burnout"); err != nil {
+			m.logger.Error("failed to transition to idle state", "error", err)
 		}
 	}
 	return nil
 }
 
 func (m *Motor) updateThrustAndMass(dt float64) {
-	if !m.isCoasting {
+	if m.FSM.Current() == StateBurning {
 		// Get current thrust from interpolation
 		m.thrust = m.interpolateThrust(m.elapsedTime)
 
 		// Calculate mass loss based on thrust and time step
 		if m.Mass > 0 && m.thrust > 0 {
-			// Calculate mass loss proportional to average thrust
 			propellantMassFlow := m.Props.TotalMass / m.burnTime
 			massLoss := propellantMassFlow * dt
-
-			// Ensure mass doesn't go below zero
 			m.Mass = math.Max(0, m.Mass-massLoss)
-		}
-
-		// Update state if burning
-		if m.thrust > 0 {
-			m.state = MotorBurning
 		}
 	}
 }
@@ -167,7 +145,7 @@ func (m *Motor) GetThrust() float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if m.isCoasting || m.elapsedTime >= m.burnTime {
+	if m.FSM.Current() == StateIdle || m.elapsedTime >= m.burnTime {
 		return 0
 	}
 
@@ -183,14 +161,14 @@ func (m *Motor) GetThrust() float64 {
 func (m *Motor) IsCoasting() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.state == MotorCoasting || m.state == MotorBurnout
+	return m.FSM.Current() == StateIdle
 }
 
 // GetState returns the current state of the motor
 func (m *Motor) GetState() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return string(m.state)
+	return m.FSM.Current()
 }
 
 // Reset resets the motor state for potential reuse
@@ -199,18 +177,16 @@ func (m *Motor) Reset() {
 	defer m.mu.Unlock()
 
 	m.elapsedTime = 0
-	m.isCoasting = false
 	m.thrust = m.Thrustcurve[0][1]
 	m.Mass = m.Props.TotalMass
 	m.FSM = NewMotorFSM()
-	m.state = MotorIgnited // Reset state
 }
 
 // SetState (testing only) sets the motor state to a specific value
 func (m *Motor) SetState(state string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.state = MotorState(state)
+	m.FSM.SetState(state)
 }
 
 // GetMass returns the current mass of the motor
@@ -226,11 +202,8 @@ func (m *Motor) Type() string {
 }
 
 func (m *Motor) interpolateThrust(totalDt float64) float64 {
-	// Early exit conditions
-	if m.isCoasting || totalDt >= m.burnTime {
-		m.isCoasting = true
-		m.thrust = 0
-		m.state = MotorBurnout
+	// Don't interpolate if we're idle or beyond burn time
+	if m.FSM.Current() == StateIdle || totalDt >= m.burnTime {
 		return 0
 	}
 
@@ -239,14 +212,18 @@ func (m *Motor) interpolateThrust(totalDt float64) float64 {
 		t1, thrust1 := m.Thrustcurve[i][0], m.Thrustcurve[i][1]
 		t2, thrust2 := m.Thrustcurve[i+1][0], m.Thrustcurve[i+1][1]
 
-		if totalDt >= t1 && totalDt < t2 {
+		if totalDt >= t1 && totalDt <= t2 {
 			// Linear interpolation
 			ratio := (totalDt - t1) / (t2 - t1)
-			return thrust1 + ratio*(thrust2-thrust1)
+			return thrust1 + (ratio * (thrust2 - thrust1))
 		}
 	}
 
-	// If we're past the last point, return 0
+	// If we're at the last point, return the final thrust value
+	if totalDt == m.burnTime {
+		return m.Thrustcurve[len(m.Thrustcurve)-1][1]
+	}
+
 	return 0
 }
 
