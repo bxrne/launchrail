@@ -68,7 +68,7 @@ func Data(props DataProps, version string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if len(props.Records) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"table-container\"><div class=\"d-flex flex-items-center mb-3\"><input type=\"text\" class=\"form-control flex-auto mr-3\" placeholder=\"Filter records...\" id=\"table-filter\" hx-trigger=\"keyup changed delay:500ms\" hx-get=\"/data\" hx-target=\"#records-list\" hx-include=\"[name=&#39;sort&#39;], [name=&#39;page&#39;]\" name=\"filter\"> <select class=\"form-select mr-3\" name=\"sort\" hx-get=\"/data\" hx-target=\"#records-list\" hx-include=\"[name=&#39;filter&#39;], [name=&#39;page&#39;]\"><option value=\"time_desc\">Newest First</option> <option value=\"time_asc\">Oldest First</option></select></div><table class=\"table width-full\"><thead><tr><th class=\"text-left\">Time</th><th class=\"text-left\">Actions</th></tr></thead> <tbody>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"table-container\"><div class=\"d-flex flex-items-center mb-3\"><input type=\"text\" class=\"form-control flex-auto mr-3\" placeholder=\"Filter records...\" id=\"table-filter\" hx-trigger=\"keyup changed delay:500ms\" hx-get=\"/data\" hx-include=\"[name=&#39;sort&#39;], [name=&#39;page&#39;]\" name=\"filter\"> <select class=\"form-select mr-3\" name=\"sort\" hx-get=\"/data\" hx-include=\"[name=&#39;filter&#39;], [name=&#39;page&#39;]\"><option value=\"time_desc\" selected>Newest First</option> <option value=\"time_asc\">Oldest First</option></select></div><table class=\"table width-full\"><thead><tr><th class=\"text-left\">Time</th><th class=\"text-left\">Actions</th></tr></thead> <tbody>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -80,7 +80,7 @@ func Data(props DataProps, version string) templ.Component {
 					var templ_7745c5c3_Var3 string
 					templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(record.LastModified.Format("2006-01-02 15:04:05"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 64, Col: 62}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 62, Col: 62}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 					if templ_7745c5c3_Err != nil {
@@ -93,7 +93,7 @@ func Data(props DataProps, version string) templ.Component {
 					var templ_7745c5c3_Var4 string
 					templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(record.Hash)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 65, Col: 86}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 63, Col: 86}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 					if templ_7745c5c3_Err != nil {
@@ -115,13 +115,13 @@ func Data(props DataProps, version string) templ.Component {
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs("/data/" + record.Hash)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 70, Col: 46}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 68, Col: 46}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" hx-target=\"#records-list\" hx-swap=\"innerHTML\">Delete</a></td></tr>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" hx-include=\"[name=&#39;filter&#39;], [name=&#39;sort&#39;], [name=&#39;page&#39;]\">Delete</a></td></tr>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -161,7 +161,7 @@ func Data(props DataProps, version string) templ.Component {
 						var templ_7745c5c3_Var9 string
 						templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(i))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 88, Col: 25}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages/data.templ`, Line: 85, Col: 25}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 						if templ_7745c5c3_Err != nil {

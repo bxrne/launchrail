@@ -38,15 +38,13 @@ templ Data(props DataProps, version string) {
 								id="table-filter"
 								hx-trigger="keyup changed delay:500ms"
 								hx-get="/data"
-								hx-target="#records-list"
 								hx-include="[name='sort'], [name='page']"
 								name="filter" />
 							<select class="form-select mr-3" 
 								name="sort"
 								hx-get="/data"
-								hx-target="#records-list"
 								hx-include="[name='filter'], [name='page']">
-								<option value="time_desc">Newest First</option>
+								<option value="time_desc" selected>Newest First</option>
 								<option value="time_asc">Oldest First</option>
 							</select>
 						</div>
@@ -68,8 +66,7 @@ templ Data(props DataProps, version string) {
 											<a href={ templ.URL("/explore/" + record.Hash) } class="Link mr-3 color-fg-accent">View</a>
 											<a href="#" class="Link color-fg-danger" 
 												hx-delete={ "/data/" + record.Hash }
-												hx-target="#records-list"
-												hx-swap="innerHTML">
+												hx-include="[name='filter'], [name='sort'], [name='page']">
 												Delete
 											</a>
 										</td>

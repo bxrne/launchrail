@@ -124,25 +124,27 @@ func (h *DataHandler) DeleteRecord(c *gin.Context) {
 		return
 	}
 
-	// Get updated records list
-	records, err := h.records.ListRecords()
-	if err != nil {
-		renderTempl(c, pages.ErrorPage(err.Error()))
-		return
+	// Get parameters to preserve
+	page := c.Query("page")
+	sort := c.Query("sort")
+	filter := c.Query("filter")
+
+	// Build redirect URL with parameters
+	redirectURL := "/data?"
+	if page != "" {
+		redirectURL += "page=" + page + "&"
+	}
+	if sort != "" {
+		redirectURL += "sort=" + sort + "&"
+	}
+	if filter != "" {
+		redirectURL += "filter=" + filter
 	}
 
-	// Convert to SimulationRecord slice
-	simRecords := make([]pages.SimulationRecord, len(records))
-	for i, record := range records {
-		simRecords[i] = pages.SimulationRecord{
-			Name:         record.Name,
-			Hash:         record.Hash,
-			LastModified: record.LastModified,
-		}
-	}
+	// Trim trailing &
+	redirectURL = strings.TrimSuffix(redirectURL, "&")
 
-	// Render just the records list component
-	renderTempl(c, pages.Data(pages.DataProps{Records: simRecords}, h.Cfg.Setup.App.Version))
+	c.Redirect(http.StatusFound, redirectURL)
 }
 
 // GetRecordData handles the request to get data from a specific record
