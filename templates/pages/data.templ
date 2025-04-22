@@ -22,59 +22,66 @@ type DataProps struct {
     Pagination Pagination
 }
 
+// New component that renders only the records list. This is useful for HTMX swaps
+templ RecordList(props DataProps) {
+    <div class="Box color-shadow-medium p-4" id="records-list">
+        if len(props.Records) > 0 {
+            <div class="table-container">
+                <table class="table width-full">
+                    <thead>
+                        <tr>
+                            <th class="text-left">Time</th>
+                            <th class="text-left">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        for _, record := range props.Records {
+                            <tr>
+                                <td>
+                                    { record.LastModified.Format("2006-01-02 15:04:05") }
+                                    <span class="hash-tooltip octicon octicon-question" data-hash={ record.Hash }>?</span>
+                                </td>
+                                <td>
+                                    <a href={ templ.URL("/explore/" + record.Hash) } class="Link mr-3 color-fg-accent">View</a>
+                                    <a href="#" class="Link color-fg-danger"
+                                        hx-delete={ "/data/" + record.Hash }
+                                        hx-include="[name='filter'], [name='sort'], [name='page']"
+                                        hx-target="#records-list"
+                                        hx-swap="outerHTML">
+                                        Delete
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                if props.Pagination.TotalPages > 1 {
+                    <div class="pagination d-flex flex-justify-center mt-3">
+                        for i := 1; i <= props.Pagination.TotalPages; i++ {
+                            <a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == props.Pagination.CurrentPage) }
+                                hx-get="/data"
+                                hx-target="#records-list"
+                                hx-swap="outerHTML"
+                                hx-include="[name='filter'], [name='sort']">
+                                { fmt.Sprint(i) }
+                            </a>
+                        }
+                    </div>
+                }
+            </div>
+        } else {
+            <div class="p-3">No records found.</div>
+        }
+    </div>
+}
+
 templ Data(props DataProps, version string) {
-	@layouts.Base(layouts.BaseProps{
-		Title: "Simulation Records",
-	}) {
-		<div class="container-xl">
-			<h1 class="h3 text-center p-4">Simulation Records</h1>
-			<div class="Box color-shadow-medium p-4" id="records-list">
-				if len(props.Records) > 0 {
-					<div class="table-container">
-						<table class="table width-full">
-							<thead>
-								<tr>
-									<th class="text-left">Time</th>
-									<th class="text-left">Actions</th>
-								</tr>
-							</thead>
-							<tbody>
-								for _, record := range props.Records {
-									<tr>
-										<td>
-											{ record.LastModified.Format("2006-01-02 15:04:05") }
-											<span class="hash-tooltip octicon octicon-question" data-hash={ record.Hash }>?</span>
-										</td>
-										<td>
-											<a href={ templ.URL("/explore/" + record.Hash) } class="Link mr-3 color-fg-accent">View</a>
-											<a href="#" class="Link color-fg-danger" 
-												hx-delete={ "/data/" + record.Hash }
-												hx-include="[name='filter'], [name='sort'], [name='page']">
-												Delete
-											</a>
-										</td>
-									</tr>
-								}
-							</tbody>
-						</table>
-						if props.Pagination.TotalPages > 1 {
-							<div class="pagination d-flex flex-justify-center mt-3">
-								for i := 1; i <= props.Pagination.TotalPages; i++ {
-									<a href="#" class={ "Link--secondary mx-1 px-2", templ.KV("color-fg-accent", i == props.Pagination.CurrentPage) }
-										hx-get="/data"
-										hx-target="#records-list"
-										hx-swap="outerHTML"
-										hx-include="[name='filter'], [name='sort']">
-										{ fmt.Sprint(i) }
-									</a>
-								}
-							</div>
-						}
-					</div>
-				} else {
-					<div class="p-3">No records found.</div>
-				}
-			</div>
-		</div>
-	}
+    @layouts.Base(layouts.BaseProps{
+        Title: "Simulation Records",
+    }) {
+        <div class="container-xl">
+            <h1 class="h3 text-center p-4">Simulation Records</h1>
+            @RecordList(props)
+        </div>
+    }
 }

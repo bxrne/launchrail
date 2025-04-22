@@ -104,8 +104,6 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 		sim.rulesSystem,
 		sim.launchRailSystem,
 		sim.logParasiteSystem,
-		sim.motionParasite,
-		sim.dynamicsParasite,
 	}
 
 	return sim, nil

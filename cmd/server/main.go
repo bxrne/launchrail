@@ -128,7 +128,7 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, e
 
 	// After parsing POST data into newCfg, ensure consistency by calling Manager.Initialize():
 	m := simulation.NewManager(&simConfig, logger.GetLogger(currentCfg.Setup.Logging.Level))
-
+	// TODO: Pass logger as props
 	// Initialize the manager to set up stores & apply config consistently
 	if err := m.Initialize(); err != nil {
 		return nil, fmt.Errorf("failed to initialize simulation manager: %w", err)
@@ -305,20 +305,7 @@ func main() {
 
 	r.GET("/explore/:hash/json", dataHandler.GetExplorerData)
 
-	r.POST("/run", func(c *gin.Context) {
-		simConfig, err := configFromCtx(c, cfg)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		if err := runSim(simConfig, dataHandler.records); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
-	})
+	r.POST("/run", handleSimRun)
 
 	r.POST("/plot", func(c *gin.Context) {
 		hash := c.PostForm("hash")

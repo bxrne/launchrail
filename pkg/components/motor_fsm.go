@@ -46,12 +46,12 @@ func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime flo
 	ctx := context.Background()
 	currentState := fsm.Current()
 
-	// Force burning state during burn time if we have mass
-	if elapsedTime <= burnTime && mass > 0 {
+	// Force burning up to and including burnTime
+	if elapsedTime < burnTime && mass > 0 {
 		if currentState == StateIdle {
 			return fsm.Event(ctx, "ignite")
 		}
-		return nil // Stay in burning state
+		return nil
 	}
 
 	// Only allow transition to idle after burn time or mass depletion

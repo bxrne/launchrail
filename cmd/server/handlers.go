@@ -56,6 +56,14 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 		return
 	}
 
+	sortParam := c.Query("sort")
+	if sortParam == "" {
+		// default to newest first
+		sortRecords(records, false)
+	} else {
+		// ...existing code...
+	}
+
 	// Calculate pagination
 	totalRecords := len(records)
 	totalPages := int(math.Ceil(float64(totalRecords) / float64(params.ItemsPerPage)))
@@ -91,22 +99,64 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 // DeleteRecord handles the request to delete a specific record
 func (h *DataHandler) DeleteRecord(c *gin.Context) {
 	hash := c.Param("hash")
+
+	// Delete the record
 	err := h.records.DeleteRecord(hash)
 	if err != nil {
 		renderTempl(c, pages.ErrorPage("Failed to delete record"))
 		return
 	}
 
-	// Get parameters to preserve
-	page := c.Query("page")
-
-	// Build redirect URL with parameters
-	redirectURL := "/data"
-	if page != "" {
-		redirectURL += "?page=" + page
+	// Prepare pagination parameters
+	params := ListParams{
+		Page:         parseInt(c.Query("page"), 1),
+		ItemsPerPage: 15,
 	}
 
-	c.Redirect(http.StatusFound, redirectURL)
+	// Retrieve and (re)sort records
+	records, err := h.records.ListRecords()
+	if err != nil {
+		renderTempl(c, pages.ErrorPage(err.Error()))
+		return
+	}
+
+	sortParam := c.Query("sort")
+	if sortParam == "" {
+		sortRecords(records, false) // newest first by default
+	} else {
+		sortRecords(records, sortParam == "time_asc")
+	}
+
+	// Calculate pagination window
+	totalRecords := len(records)
+	totalPages := int(math.Ceil(float64(totalRecords) / float64(params.ItemsPerPage)))
+	startIndex := (params.Page - 1) * params.ItemsPerPage
+	endIndex := min(startIndex+params.ItemsPerPage, totalRecords)
+	if startIndex >= totalRecords {
+		startIndex = 0
+		endIndex = min(params.ItemsPerPage, totalRecords)
+		params.Page = 1
+	}
+
+	pagedRecords := records[startIndex:endIndex]
+
+	// Convert to SimulationRecords
+	simRecords := make([]pages.SimulationRecord, len(pagedRecords))
+	for i, record := range pagedRecords {
+		simRecords[i] = pages.SimulationRecord{
+			Hash:         record.Hash,
+			LastModified: record.LastModified,
+		}
+	}
+
+	// Render only the updated record list (partial HTML) so htmx can swap it in-place
+	renderTempl(c, pages.RecordList(pages.DataProps{
+		Records: simRecords,
+		Pagination: pages.Pagination{
+			CurrentPage: params.Page,
+			TotalPages:  totalPages,
+		},
+	}))
 }
 
 // GetRecordData handles the request to get data from a specific record
