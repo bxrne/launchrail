@@ -10,7 +10,7 @@ setup:
       - "./plugins/windeffect.so"
 
 server:
-  port: 5656
+  port: 5658
 
 engine:
   simulation:

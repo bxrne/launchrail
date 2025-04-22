@@ -305,8 +305,6 @@ func main() {
 
 	r.GET("/explore/:hash/json", dataHandler.GetExplorerData)
 
-	r.POST("/run", handleSimRun)
-
 	r.POST("/plot", func(c *gin.Context) {
 		hash := c.PostForm("hash")
 		source := c.PostForm("source")
