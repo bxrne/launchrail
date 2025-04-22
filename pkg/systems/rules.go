@@ -1,6 +1,8 @@
 package systems
 
 import (
+	"math"
+
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/components"
@@ -84,13 +86,15 @@ func (s *RulesSystem) processRules(entity *states.PhysicsState) Event {
 }
 
 func (s *RulesSystem) detectApogee(entity *states.PhysicsState) bool {
-	// Must be moving downward to be at apogee
-	if entity.Velocity.Vec.Y >= 0 {
+	const velocityWindow = 0.5 // m/s window to detect velocity near zero
+
+	// Must be near zero vertical velocity
+	if math.Abs(entity.Velocity.Vec.Y) > velocityWindow {
 		return false
 	}
 
 	// Must be coasting (motor burned out)
-	if entity.Motor.FSM.Current() != components.StateIdle {
+	if entity.Motor != nil && entity.Motor.FSM.Current() != components.StateIdle {
 		return false
 	}
 

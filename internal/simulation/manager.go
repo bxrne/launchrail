@@ -1,6 +1,8 @@
 package simulation
 
 import (
+	"fmt"
+
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/internal/storage"
@@ -38,6 +40,16 @@ func NewManager(cfg *config.Config, log *logf.Logger) *Manager {
 }
 
 func (m *Manager) Initialize() error {
+	// Validate config consistency for step & max_time
+	simStep := m.cfg.Engine.Simulation.Step
+	simMax := m.cfg.Engine.Simulation.MaxTime
+	if simStep <= 0 || simStep > 0.1 {
+		return fmt.Errorf("invalid simulation step: must be >0 and <=0.1")
+	}
+	if simMax <= 0 {
+		return fmt.Errorf("invalid simulation max_time: must be >0")
+	}
+
 	// Load motor data
 	motorData, err := thrustcurves.Load(m.cfg.Engine.Options.MotorDesignation, http_client.NewHTTPClient())
 	if err != nil {

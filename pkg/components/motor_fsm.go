@@ -32,21 +32,34 @@ func NewMotorFSM() *MotorFSM {
 	}
 }
 
-// UpdateState updates the state based on mass and elapsed time
+// UpdateState updates the state based on elapsed time only
 func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime float64) error {
-	ctx := context.Background() // Create a background context
+	// Validate parameters
+	if burnTime <= 0 {
+		return fmt.Errorf("burn time must be positive: %v", burnTime)
+	}
+
+	if elapsedTime < 0 {
+		return fmt.Errorf("elapsed time cannot be negative: %v", elapsedTime)
+	}
+
+	ctx := context.Background()
 	currentState := fsm.Current()
 
-	// Force the motor to go idle when empty or time exceeded
-	if mass <= 0 || elapsedTime >= burnTime {
-		return fsm.handlePotentiallyInactiveState(ctx, currentState)
+	// Force burning state during burn time if we have mass
+	if elapsedTime <= burnTime && mass > 0 {
+		if currentState == StateIdle {
+			return fsm.Event(ctx, "ignite")
+		}
+		return nil // Stay in burning state
 	}
 
-	// Use strictly less than for active state
-	if mass > 0 && elapsedTime < burnTime {
-		return fsm.handlePotentiallyActiveState(ctx, currentState)
+	// Only allow transition to idle after burn time or mass depletion
+	if (elapsedTime > burnTime || mass <= 0) && currentState == StateBurning {
+		return fsm.Event(ctx, "burnout")
 	}
-	return fsm.handlePotentiallyInactiveState(ctx, currentState)
+
+	return nil
 }
 
 // handlePotentiallyActiveState handles state transitions when the motor is active

@@ -27,7 +27,7 @@ func TestAdd(t *testing.T) {
 }
 
 // TEST: GIVEN an entity WHEN it reaches apogee THEN the event is detected
-func TestApogeeDetection(t *testing.T) {
+func TestApogeeDetection(t *testing.T) { // TODO: Fix this test
 	cfg := &config.Engine{
 		Simulation: config.Simulation{
 			GroundTolerance: 0.1,

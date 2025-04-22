@@ -140,3 +140,19 @@ func TestInvalidUpdate(t *testing.T) {
 	err = motor.Update(-0.1) // Invalid negative timestep
 	assert.Error(t, err)
 }
+
+func TestMotorBurnsFullDuration(t *testing.T) {
+	motor, motorData := createTestMotor()
+
+	totalSteps := int(motorData.BurnTime / 0.1) // Simulate in 0.1s steps
+	for i := 0; i < totalSteps; i++ {
+		err := motor.Update(0.1)
+		assert.NoError(t, err)
+		assert.GreaterOrEqual(t, motor.GetThrust(), 0.0, "Thrust should never be negative")
+	}
+
+	// Ensure motor burns for full duration
+	assert.Equal(t, motorData.BurnTime, motor.GetElapsedTime(), "Motor should burn for full burnTime")
+	assert.Zero(t, motor.GetThrust(), "Thrust should be zero after burnout")
+	assert.True(t, motor.IsCoasting(), "Motor should be coasting after burn")
+}

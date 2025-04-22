@@ -14,16 +14,16 @@ server:
 
 engine:
   simulation:
-    step: 0.001
+    step: 0.01
     max_time: 300.0
-    ground_tolerance: 0.06
+    ground_tolerance: 0.01
   external:
     openrocket_version: "23.09"
   options:
     motor_designation: "269H110-14A"
     openrocket_file: "./testdata/openrocket/l1.ork"
     launchrail:
-      length: 2.21
+      length: 4
       angle: 5.0
       orientation: 0.01
     launchsite:

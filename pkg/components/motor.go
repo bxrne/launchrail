@@ -34,6 +34,10 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 		return nil, fmt.Errorf("thrust curve data is required")
 	}
 
+	if md.MaxThrust <= 0 {
+		md.MaxThrust = findMaxThrust(md.Thrust)
+	}
+
 	m := &Motor{
 		ID:          id,
 		Position:    types.Vector3{},
@@ -75,7 +79,6 @@ func validateThrustCurve(curve [][]float64) [][]float64 {
 	return curve
 }
 
-// Update updates the motor state based on the current time step
 func (m *Motor) Update(dt float64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -84,34 +87,64 @@ func (m *Motor) Update(dt float64) error {
 		return fmt.Errorf("invalid timestep")
 	}
 
-	// Calculate new elapsed time
-	newElapsedTime := m.elapsedTime + dt
+	// Update elapsed time
+	m.elapsedTime += dt
 
-	// Clamp to burn time if we would exceed it
-	if newElapsedTime > m.burnTime {
-		dt = m.burnTime - m.elapsedTime
-		newElapsedTime = m.burnTime
-	}
+	// First interpolate thrust
+	m.thrust = m.interpolateThrust(m.elapsedTime)
 
-	m.elapsedTime = newElapsedTime
+	// Handle state and mass updates
+	if m.elapsedTime <= m.burnTime {
+		// Force burning state
+		if m.FSM.Current() == StateIdle {
+			ctx := context.Background()
+			if err := m.FSM.Event(ctx, "ignite"); err != nil {
+				return fmt.Errorf("failed to transition to burning state: %v", err)
+			}
+		}
 
-	// Check for burnout
-	if m.elapsedTime >= m.burnTime {
+		// Update mass proportional to thrust
+		if m.FSM.Current() == StateBurning {
+			// Calculate mass loss based on thrust ratio
+			thrustRatio := m.thrust / m.Props.MaxThrust
+			massFlow := m.interpolateMassFlow(m.elapsedTime)
+			massLoss := massFlow * dt * thrustRatio
+
+			// Protect against numerical errors
+			newMass := m.Mass - massLoss
+			if newMass < 0 {
+				newMass = 0
+			}
+			m.Mass = math.Max(0, newMass)
+		}
+	} else if m.elapsedTime >= m.burnTime && m.FSM.Current() == StateBurning {
 		return m.handleBurnout()
 	}
 
-	// Update thrust and mass if not in idle state
-	m.updateThrustAndMass(dt)
+	return nil
+}
 
-	// Try to ignite if in idle state
-	if m.FSM.Current() == StateIdle {
-		ctx := context.Background()
-		if err := m.FSM.Event(ctx, "ignite"); err != nil {
-			return fmt.Errorf("failed to transition to burning state: %v", err)
-		}
+// interpolateMassFlow calculates mass flow rate at a given time
+func (m *Motor) interpolateMassFlow(t float64) float64 {
+	if t <= 0 || t >= m.burnTime {
+		return 0
 	}
 
-	return nil
+	// Find thrust at current time
+	currentThrust := m.interpolateThrust(t)
+
+	// Calculate instantaneous mass flow based on rocket equation
+	// dm/dt = F/ve where ve is exhaust velocity (assumed constant)
+	// We can approximate ve using average values
+	averageThrust := m.Props.AvgThrust
+	averageMassFlow := m.Props.TotalMass / m.burnTime
+
+	if averageThrust <= 0 {
+		return 0
+	}
+
+	// Scale mass flow by thrust ratio
+	return (currentThrust / averageThrust) * averageMassFlow
 }
 
 func (m *Motor) handleBurnout() error {
@@ -126,17 +159,43 @@ func (m *Motor) handleBurnout() error {
 	return nil
 }
 
-func (m *Motor) updateThrustAndMass(dt float64) {
-	if m.FSM.Current() == StateBurning {
-		// Get current thrust from interpolation
-		m.thrust = m.interpolateThrust(m.elapsedTime)
+func (m *Motor) interpolateThrust(totalDt float64) float64 {
+	// If before burn start, use initial thrust
+	if totalDt <= m.Thrustcurve[0][0] {
+		return m.Thrustcurve[0][1]
+	}
 
-		// Calculate mass loss based on thrust and time step
-		if m.Mass > 0 && m.thrust > 0 {
-			propellantMassFlow := m.Props.TotalMass / m.burnTime
-			massLoss := propellantMassFlow * dt
-			m.Mass = math.Max(0, m.Mass-massLoss)
+	// If past burn time, return 0
+	if totalDt > m.burnTime {
+		return 0
+	}
+
+	// Find the surrounding data points for interpolation
+	for i := 0; i < len(m.Thrustcurve)-1; i++ {
+		t1, thrust1 := m.Thrustcurve[i][0], m.Thrustcurve[i][1]
+		t2, thrust2 := m.Thrustcurve[i+1][0], m.Thrustcurve[i+1][1]
+
+		if totalDt >= t1 && totalDt <= t2 {
+			// Linear interpolation
+			ratio := (totalDt - t1) / (t2 - t1)
+			return thrust1 + (ratio * (thrust2 - thrust1))
 		}
+	}
+
+	// If we're between last data point and burn time
+	// Use the last thrust value
+	return m.Thrustcurve[len(m.Thrustcurve)-1][1]
+}
+
+func (m *Motor) updateThrustAndMass(dt float64) {
+	// Always interpolate thrust regardless of state
+	m.thrust = m.interpolateThrust(m.elapsedTime)
+
+	// Always update mass if we have thrust
+	if m.Mass > 0 && m.thrust > 0 {
+		propellantMassFlow := m.Props.TotalMass / m.burnTime
+		massLoss := propellantMassFlow * dt
+		m.Mass = math.Max(0, m.Mass-massLoss)
 	}
 }
 
@@ -145,16 +204,11 @@ func (m *Motor) GetThrust() float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if m.FSM.Current() == StateIdle || m.elapsedTime >= m.burnTime {
-		return 0
+	// Return interpolated thrust if burning
+	if m.FSM.Current() == StateBurning {
+		return m.interpolateThrust(m.elapsedTime)
 	}
-
-	thrust := m.interpolateThrust(m.elapsedTime)
-	if math.IsNaN(thrust) || thrust < 0 {
-		return 0
-	}
-
-	return thrust
+	return 0
 }
 
 // IsCoasting returns true if the motor has completed its burn
@@ -201,32 +255,6 @@ func (m *Motor) Type() string {
 	return "Motor"
 }
 
-func (m *Motor) interpolateThrust(totalDt float64) float64 {
-	// Don't interpolate if we're idle or beyond burn time
-	if m.FSM.Current() == StateIdle || totalDt >= m.burnTime {
-		return 0
-	}
-
-	// Find the appropriate thrust curve segment
-	for i := 0; i < len(m.Thrustcurve)-1; i++ {
-		t1, thrust1 := m.Thrustcurve[i][0], m.Thrustcurve[i][1]
-		t2, thrust2 := m.Thrustcurve[i+1][0], m.Thrustcurve[i+1][1]
-
-		if totalDt >= t1 && totalDt <= t2 {
-			// Linear interpolation
-			ratio := (totalDt - t1) / (t2 - t1)
-			return thrust1 + (ratio * (thrust2 - thrust1))
-		}
-	}
-
-	// If we're at the last point, return the final thrust value
-	if totalDt == m.burnTime {
-		return m.Thrustcurve[len(m.Thrustcurve)-1][1]
-	}
-
-	return 0
-}
-
 // String returns a string representation of the motor component
 func (m *Motor) String() string {
 	return fmt.Sprintf("Motor{ID: %d, Position: %s, Mass: %f, Thrust: %f}", m.ID.ID(), m.Position.String(), m.Mass, m.thrust)
@@ -242,4 +270,14 @@ func (m *Motor) GetElapsedTime() float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.elapsedTime
+}
+
+func findMaxThrust(thrustData [][]float64) float64 {
+	maxVal := 0.0
+	for _, point := range thrustData {
+		if point[1] > maxVal {
+			maxVal = point[1]
+		}
+	}
+	return maxVal
 }

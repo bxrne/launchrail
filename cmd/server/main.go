@@ -126,6 +126,14 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, e
 		},
 	}
 
+	// After parsing POST data into newCfg, ensure consistency by calling Manager.Initialize():
+	m := simulation.NewManager(&simConfig, logger.GetLogger(currentCfg.Setup.Logging.Level))
+
+	// Initialize the manager to set up stores & apply config consistently
+	if err := m.Initialize(); err != nil {
+		return nil, fmt.Errorf("failed to initialize simulation manager: %w", err)
+	}
+
 	// Validate the configuration
 	if err := simConfig.Validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate config: %w", err)
