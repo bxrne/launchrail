@@ -46,6 +46,10 @@ func TestManager_Initialize(t *testing.T) {
 						External: config.External{
 							OpenRocketVersion: "23.09",
 						},
+						Simulation: config.Simulation{
+							Step:    0.01,
+							MaxTime: 10,
+						},
 					},
 				}
 			},
@@ -192,6 +196,10 @@ func TestManager_Close(t *testing.T) {
 			},
 			External: config.External{
 				OpenRocketVersion: "23.09",
+			},
+			Simulation: config.Simulation{
+				Step:    0.01,
+				MaxTime: 10,
 			},
 		},
 	}
