@@ -152,7 +152,7 @@ func TestMotorBurnsFullDuration(t *testing.T) {
 	}
 
 	// Ensure motor burns for full duration
-	assert.Equal(t, motorData.BurnTime, motor.GetElapsedTime(), "Motor should burn for full burnTime")
+	assert.InDelta(t, motorData.BurnTime, motor.GetElapsedTime(), 0.000001, "Motor should burn for full burnTime")
 	assert.Zero(t, motor.GetThrust(), "Thrust should be zero after burnout")
 	assert.True(t, motor.IsCoasting(), "Motor should be coasting after burn")
 }

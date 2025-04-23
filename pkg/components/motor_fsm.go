@@ -11,11 +11,13 @@ import (
 const (
 	StateIdle    = "idle"
 	StateBurning = "burning"
+	StateIgnited = "IGNITED"
 )
 
 // MotorFSM represents the finite state machine for the motor
 type MotorFSM struct {
 	*fsm.FSM
+	elapsedTime float64
 }
 
 // NewMotorFSM creates a new FSM for the motor
@@ -24,8 +26,9 @@ func NewMotorFSM() *MotorFSM {
 		FSM: fsm.NewFSM(
 			string(StateIdle), // Set initial state to "idle"
 			fsm.Events{
-				{Name: "ignite", Src: []string{string(StateIdle)}, Dst: string(StateBurning)},
+				{Name: "ignite", Src: []string{string(StateIdle)}, Dst: string(StateIgnited)},
 				{Name: "burnout", Src: []string{string(StateBurning)}, Dst: string(StateIdle)},
+				{Name: "start_burning", Src: []string{string(StateIgnited)}, Dst: string(StateBurning)},
 			},
 			fsm.Callbacks{},
 		),
@@ -34,31 +37,41 @@ func NewMotorFSM() *MotorFSM {
 
 // UpdateState updates the state based on elapsed time only
 func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime float64) error {
-	// Validate parameters
-	if burnTime <= 0 {
-		return fmt.Errorf("burn time must be positive: %v", burnTime)
-	}
-
+	// Clamp negative values
 	if elapsedTime < 0 {
-		return fmt.Errorf("elapsed time cannot be negative: %v", elapsedTime)
+		elapsedTime = 0
+	}
+	if burnTime < 0 {
+		burnTime = 0
 	}
 
 	ctx := context.Background()
-	currentState := fsm.Current()
+	currentState := fsm.FSM.Current()
 
-	// Force burning up to and including burnTime
+	// Active burning period
 	if elapsedTime < burnTime && mass > 0 {
-		if currentState == StateIdle {
-			return fsm.Event(ctx, "ignite")
+		switch currentState {
+		case StateIdle:
+			// Idle -> Burning
+			if err := fsm.FSM.Event(ctx, "ignite"); err != nil {
+				return err
+			}
+			if err := fsm.FSM.Event(ctx, "start_burning"); err != nil {
+				return err
+			}
+		case StateIgnited:
+			// Ignited -> Burning
+			if err := fsm.FSM.Event(ctx, "start_burning"); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
 
-	// Only allow transition to idle after burn time or mass depletion
-	if (elapsedTime > burnTime || mass <= 0) && currentState == StateBurning {
-		return fsm.Event(ctx, "burnout")
+	// Transition to idle after burn or if mass depleted
+	if currentState == StateBurning {
+		return fsm.FSM.Event(ctx, "burnout")
 	}
-
 	return nil
 }
 
@@ -67,6 +80,8 @@ func (fsm *MotorFSM) handlePotentiallyActiveState(ctx context.Context, currentSt
 	switch currentState {
 	case StateIdle:
 		return fsm.Event(ctx, "ignite")
+	case StateIgnited:
+		return fsm.Event(ctx, "start_burning")
 	case StateBurning:
 		// Already in burning state, no action needed
 		return nil
@@ -83,6 +98,8 @@ func (fsm *MotorFSM) handlePotentiallyInactiveState(ctx context.Context, current
 	case StateIdle:
 		// Already in idle state, no action needed
 		return nil
+	case StateIgnited:
+		return fsm.Event(ctx, "burnout")
 	default:
 		return fmt.Errorf("invalid state: %s", currentState)
 	}

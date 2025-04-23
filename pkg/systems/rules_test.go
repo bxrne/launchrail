@@ -27,22 +27,23 @@ func TestAdd(t *testing.T) {
 }
 
 // TEST: GIVEN an entity WHEN it reaches apogee THEN the event is detected
-func TestApogeeDetection(t *testing.T) { // TODO: Fix this test
+func TestApogeeDetection(t *testing.T) {
 	cfg := &config.Engine{
 		Simulation: config.Simulation{
 			GroundTolerance: 0.1,
 		},
 	}
 	rs := systems.NewRulesSystem(&ecs.World{}, cfg)
+
+	motor_fsm := components.NewMotorFSM()
+	motor_fsm.SetState("BURNOUT")
+
 	entity := &states.PhysicsState{
 		Position:  &types.Position{Vec: types.Vector3{Y: 100}},
-		Velocity:  &types.Velocity{Vec: types.Vector3{Y: -1}},
-		Motor:     &components.Motor{}, // Initialize motor
+		Velocity:  &types.Velocity{Vec: types.Vector3{Y: -10}}, 
+		Motor:     &components.Motor{FSM: motor_fsm},
 		Parachute: &components.Parachute{Trigger: "apogee", Deployed: false},
 	}
-
-	// Simulate motor burnout
-	entity.Motor.SetState("BURNOUT")
 
 	rs.Add(entity)
 	_ = rs.Update(0)
@@ -58,18 +59,16 @@ func TestLandingDetection(t *testing.T) {
 		},
 	}
 	rs := systems.NewRulesSystem(&ecs.World{}, cfg)
+	motor_fsm := components.NewMotorFSM()
 	entity := &states.PhysicsState{
 		Position:     &types.Position{Vec: types.Vector3{Y: 0.05}}, // Slightly above ground tolerance
 		Velocity:     &types.Velocity{Vec: types.Vector3{Y: -0.1}}, // Simulate downward velocity
 		Acceleration: &types.Acceleration{Vec: types.Vector3{}},    // Initialize acceleration
-		Motor:        &components.Motor{},                          // Initialize motor
+		Motor:        &components.Motor{FSM: motor_fsm},                          // Initialize motor
+		Parachute:    &components.Parachute{Trigger: "apogee", Deployed: true},
 	}
 
-	// Simulate motor burnout
-	entity.Motor.SetState("BURNOUT")
-
 	rs.Add(entity)
-	_ = rs.Update(0) // Simulate apogee first
 	_ = rs.Update(0)
 	assert.Equal(t, systems.Land, rs.GetLastEvent())
 }

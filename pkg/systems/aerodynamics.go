@@ -61,6 +61,15 @@ func (a *AerodynamicSystem) getTemperature(altitude float64) float64 {
 
 // CalculateDrag now handles atmospheric effects and Mach number
 func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vector3 {
+    // Validate inputs
+    if a == nil || a.isa == nil || entity.Position == nil || entity.Velocity == nil || entity.Nosecone == nil || entity.Bodytube == nil {
+        return types.Vector3{}
+    }
+
+	if entity == (states.PhysicsState{}) {
+		return types.Vector3{}
+	}
+
 	// Get atmospheric data
 	atmData := a.getAtmosphericData(entity.Position.Vec.Y)
 
@@ -74,7 +83,7 @@ func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vect
 		entity.Velocity.Vec.Z*entity.Velocity.Vec.Z)
 	machNumber := velocity / atmData.soundSpeed
 
-	if entity.Mass.Value <= 0 || velocity <= 0 {
+	if velocity <= 0 {
 		return types.Vector3{} // Avoid NaN
 	}
 

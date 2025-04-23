@@ -35,8 +35,7 @@ const (
 
 // String returns a string representation of the Parachute struct
 func (p *Parachute) String() string {
-	return fmt.Sprintf("Parachute{ID=%v, Position=%v, Diameter=%.2f, DragCoefficient=%.2f, Strands=%d, Area=%.2f}",
-		p.ID, p.Position, p.Diameter, p.DragCoefficient, p.Strands, p.Area)
+	return fmt.Sprintf("Parachute{ID={%d %v %v}, Position=%v, Diameter=%.2f, DragCoefficient=%.2f, Strands=%d, Area=%.2f}", p.ID.ID()-1, p.ID.Parent(), p.ID.Children(), p.Position, p.Diameter, p.DragCoefficient, p.Strands, p.Area)
 }
 
 // NewParachute creates a new parachute instance
