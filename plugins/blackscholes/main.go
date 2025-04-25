@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/bxrne/launchrail/pkg/plugin"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/zerodha/logf"
 )
@@ -19,6 +18,8 @@ type BlackScholesPlugin struct {
 	// TODO: Potentially add configuration for which state variable (e.g., Velocity.X, Velocity.Y) is affected
 }
 
+var Plugin BlackScholesPlugin
+
 // Initialize is called when the plugin is loaded
 func (p *BlackScholesPlugin) Initialize(log logf.Logger) error {
 	p.log = log
@@ -30,7 +31,7 @@ func (p *BlackScholesPlugin) Initialize(log logf.Logger) error {
 	p.log.Debug("Random number generator seeded", "seed", seed)
 
 	// TODO: Initialize parameters (e.g., load from config file)
-	p.turbulenceIntensity = 0.05 // Example initial value for turbulence intensity (adjust based on desired effect)
+	p.turbulenceIntensity = 0.05   // Example initial value for turbulence intensity (adjust based on desired effect)
 	p.deterministicForcesMu = 9.81 // Example initial value (gravity) - currently unused here
 
 	return nil
@@ -97,13 +98,4 @@ func (p *BlackScholesPlugin) AfterSimStep(state *states.PhysicsState) error {
 func (p *BlackScholesPlugin) Cleanup() error {
 	p.log.Info("Cleaning up Black-Scholes turbulence plugin")
 	return nil
-}
-
-// Export the plugin instance
-// The symbol name 'Plugin' is conventional for go plugin loading
-var Plugin plugin.SimulationPlugin = &BlackScholesPlugin{}
-
-func main() {
-	// This main function is required for the Go plugin build process,
-	// but it won't be executed when loaded as a plugin.
 }
