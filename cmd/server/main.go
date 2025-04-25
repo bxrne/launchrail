@@ -299,7 +299,7 @@ func main() {
 	apiVersion := fmt.Sprintf("/api/v%s", strings.Split(cfg.Setup.App.Version, ".")[0])
 	api := r.Group(apiVersion)
 	{
-		api.POST("/run", handleSimRun)
+		api.POST("/run", dataHandler.handleSimRun)
 		api.GET("/data", dataHandler.ListRecordsAPI)
 		api.GET("/explore/:hash", dataHandler.GetExplorerData)
 		api.GET("/spec", func(c *gin.Context) {
@@ -371,15 +371,12 @@ func main() {
 		}
 
 		pageStr := c.Query("page")
-		page, err := parseInt(pageStr, "page")
-		if err != nil {
-			log.Error("Invalid page number", "error", err)
-			render(c, pages.ErrorPage("Invalid page number"))
-			return
+		page, _ := parseInt(pageStr, "page") // Ignore error, check value instead
+		if page < 1 { // Default to page 1 if not specified, zero, negative, or parse error
+			page = 1
 		}
-		if page < 1 {
-			page = 1 // Default to page 1 if not specified or invalid
-		}
+
+		// Update pagination data
 		explorerData.Pagination.CurrentPage = page
 
 		render(c, pages.Explorer(explorerData, cfg.Setup.App.Version))
@@ -514,8 +511,8 @@ func main() {
 	}
 }
 
-// handleSimRun handles API requests to start simulations
-func handleSimRun(c *gin.Context) {
+// handleSimRun handles API requests to start simulations (now a method of DataHandler)
+func (h *DataHandler) handleSimRun(c *gin.Context) {
 	cfg, err := config.GetConfig()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to load config: %v", err)})
@@ -528,13 +525,8 @@ func handleSimRun(c *gin.Context) {
 		return
 	}
 
-	dataHandler, err := NewDataHandler(cfg)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := runSim(simConfig, dataHandler.records); err != nil {
+	// Use the existing record manager from the DataHandler instance (h.records)
+	if err := runSim(simConfig, h.records); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
