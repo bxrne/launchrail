@@ -46,9 +46,15 @@ type ListParams struct {
 
 func (h *DataHandler) ListRecords(c *gin.Context) {
 	params := ListParams{
-		Page:         parseInt(c.Query("page"), 1),
+		Page:         1,
 		ItemsPerPage: 15,
 	}
+
+	page, err := parseInt(c.Query("page"), "page")
+	if err != nil || page < 1 {
+		page = 1
+	}
+	params.Page = page
 
 	records, err := h.records.ListRecords()
 	if err != nil {
@@ -60,8 +66,6 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 	if sortParam == "" {
 		// default to newest first
 		sortRecords(records, false)
-	} else {
-		// ...existing code...
 	}
 
 	// Calculate pagination
@@ -109,9 +113,15 @@ func (h *DataHandler) DeleteRecord(c *gin.Context) {
 
 	// Prepare pagination parameters
 	params := ListParams{
-		Page:         parseInt(c.Query("page"), 1),
+		Page:         1,
 		ItemsPerPage: 15,
 	}
+
+	page, err := parseInt(c.Query("page"), "page")
+	if err != nil || page < 1 {
+		page = 1
+	}
+	params.Page = page
 
 	// Retrieve and (re)sort records
 	records, err := h.records.ListRecords()
@@ -247,7 +257,10 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 	table := c.Query("table")
 	column := c.Query("col")
 	direction := c.Query("dir")
-	page := parseInt(c.Query("page"), 1)
+	page, err := parseInt(c.Query("page"), "page")
+	if err != nil || page < 1 {
+		page = 1
+	}
 
 	record, err := h.records.GetRecord(hash)
 	if err != nil {
@@ -317,7 +330,10 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 func (h *DataHandler) GetTableRows(c *gin.Context) {
 	hash := c.Param("hash")
 	table := c.Query("table")
-	page := parseInt(c.Query("page"), 1)
+	page, err := parseInt(c.Query("page"), "page")
+	if err != nil || page < 1 {
+		page = 1
+	}
 
 	record, err := h.records.GetRecord(hash)
 	if err != nil {
@@ -377,7 +393,10 @@ func (h *DataHandler) handleTableRequest(c *gin.Context, hash string, table stri
 		return
 	}
 
-	page := parseInt(c.Query("page"), 1)
+	page, err := parseInt(c.Query("page"), "page")
+	if err != nil || page < 1 {
+		page = 1
+	}
 	sortCol := c.Query("sort")
 	sortDir := c.Query("dir")
 
@@ -496,7 +515,10 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 	}
 
 	// Apply query parameters
-	page := parseInt(c.Query("page"), 1)
+	page, err := parseInt(c.Query("page"), "page")
+	if err != nil || page < 1 {
+		page = 1
+	}
 	filter := c.Query("filter")
 	itemsPerPage := 15
 
@@ -535,4 +557,26 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 			"totalPages":  totalPages,
 		},
 	})
+}
+
+func parseFloat(valueStr string, fieldName string) (float64, error) {
+	if valueStr == "" {
+		return 0, fmt.Errorf("%s is required", fieldName)
+	}
+	value, err := strconv.ParseFloat(valueStr, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s: %w", fieldName, err)
+	}
+	return value, nil
+}
+
+func parseInt(valueStr string, fieldName string) (int, error) {
+	if valueStr == "" {
+		return 0, fmt.Errorf("%s is required", fieldName)
+	}
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s: %w", fieldName, err)
+	}
+	return value, nil
 }

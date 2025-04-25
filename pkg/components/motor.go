@@ -47,13 +47,17 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 		Props:       md,
 		// Initialize thrust to first data point
 		thrust:      md.Thrust[0][1],
-		FSM:         NewMotorFSM(),
 		burnTime:    md.BurnTime,
 		logger:      logger,
+		// FSM is initialized below after m is fully defined
 	}
+	m.FSM = NewMotorFSM(m, logger) // Initialize FSM here, passing the motor instance
 
 	m.logger.Info("Motor created", "ID", m.ID.ID(), "Mass", m.Mass, "BurnTime", m.burnTime)
-	m.FSM.Event(context.Background(), "ignite")
+	err := m.FSM.Event(context.Background(), "ignite")
+	if err != nil {
+		return nil, fmt.Errorf("failed to transition motor state to ignited: %w", err)
+	}
 	return m, nil
 }
 
@@ -100,40 +104,9 @@ func (m *Motor) Update(dt float64) error {
 		m.coasting = true
 	}
 	// Update the motor FSM state
-	_ = m.FSM.UpdateState(m.Mass, m.elapsedTime, m.burnTime)
-	return nil
-}
-
-func (m *Motor) interpolateMassFlow(t float64) float64 {
-	if t <= 0 || t >= m.burnTime {
-		return 0
-	}
-
-	// Find thrust at current time
-	currentThrust := m.interpolateThrust(t)
-
-	// Calculate instantaneous mass flow based on rocket equation
-	// dm/dt = F/ve where ve is exhaust velocity (assumed constant)
-	// We can approximate ve using average values
-	averageThrust := m.Props.AvgThrust
-	averageMassFlow := m.Props.TotalMass / m.burnTime
-
-	if averageThrust <= 0 {
-		return 0
-	}
-
-	// Scale mass flow by thrust ratio
-	return (currentThrust / averageThrust) * averageMassFlow
-}
-
-func (m *Motor) handleBurnout() error {
-	// Only transition to burnout if we're burning
-	if m.FSM.Current() == StateBurning {
-		m.thrust = 0
-		ctx := context.Background()
-		if err := m.FSM.Event(ctx, "burnout"); err != nil {
-			m.logger.Error("failed to transition to idle state", "error", err)
-		}
+	err := m.FSM.UpdateState(m.Mass, m.elapsedTime, m.burnTime)
+	if err != nil {
+		return fmt.Errorf("failed to update motor state: %w", err)
 	}
 	return nil
 }
@@ -191,8 +164,11 @@ func (m *Motor) Reset() {
 	m.Mass = m.Props.TotalMass
 	m.thrust = m.Thrustcurve[0][1]
 	m.coasting = false
-	m.FSM = NewMotorFSM()
-	m.FSM.Event(context.Background(), "ignite")
+	m.FSM = NewMotorFSM(m, m.logger) // Pass motor and logger
+	err := m.FSM.Event(context.Background(), "ignite")
+	if err != nil {
+		m.logger.Error("failed to transition to idle state", "error", err)
+	}
 }
 
 func (m *Motor) SetState(state string) {

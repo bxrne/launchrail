@@ -8,8 +8,11 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
+	"github.com/bxrne/launchrail/pkg/thrustcurves" // Import thrustcurves
 	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/zerodha/logf"
+	"io" // Import io package for io.Discard
 )
 
 // TEST: GIVEN Nothing WHEN NewRulesSystem is called THEN a new rules system is returned
@@ -35,13 +38,18 @@ func TestApogeeDetection(t *testing.T) {
 	}
 	rs := systems.NewRulesSystem(&ecs.World{}, cfg)
 
-	motor_fsm := components.NewMotorFSM()
-	motor_fsm.SetState("BURNOUT")
+	logger := logf.New(logf.Opts{Writer: io.Discard}) // Use logf.Opts with io.Discard
+	motorProps := &thrustcurves.MotorData{} // Use thrustcurves.MotorData
+	motor := &components.Motor{ // Create a minimal motor for the test
+		Props: motorProps,
+	}
+	motor.FSM = components.NewMotorFSM(motor, logger) // Pass motor and logger
+	motor.FSM.SetState("BURNOUT")
 
 	entity := &states.PhysicsState{
 		Position:  &types.Position{Vec: types.Vector3{Y: 100}},
-		Velocity:  &types.Velocity{Vec: types.Vector3{Y: -10}}, 
-		Motor:     &components.Motor{FSM: motor_fsm},
+		Velocity:  &types.Velocity{Vec: types.Vector3{Y: -0.01}}, // Simulate velocity just after apogee
+		Motor:     motor,
 		Parachute: &components.Parachute{Trigger: "apogee", Deployed: false},
 	}
 
@@ -59,12 +67,17 @@ func TestLandingDetection(t *testing.T) {
 		},
 	}
 	rs := systems.NewRulesSystem(&ecs.World{}, cfg)
-	motor_fsm := components.NewMotorFSM()
+	logger := logf.New(logf.Opts{Writer: io.Discard}) // Use logf.Opts with io.Discard
+	motorProps := &thrustcurves.MotorData{} // Use thrustcurves.MotorData
+	motor := &components.Motor{ // Create a minimal motor for the test
+		Props: motorProps,
+	}
+	motor.FSM = components.NewMotorFSM(motor, logger) // Pass motor and logger
 	entity := &states.PhysicsState{
 		Position:     &types.Position{Vec: types.Vector3{Y: 0.05}}, // Slightly above ground tolerance
 		Velocity:     &types.Velocity{Vec: types.Vector3{Y: -0.1}}, // Simulate downward velocity
 		Acceleration: &types.Acceleration{Vec: types.Vector3{}},    // Initialize acceleration
-		Motor:        &components.Motor{FSM: motor_fsm},                          // Initialize motor
+		Motor:        motor,                          // Initialize motor
 		Parachute:    &components.Parachute{Trigger: "apogee", Deployed: true},
 	}
 

@@ -229,26 +229,6 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, e
 	return &simConfig, nil
 }
 
-// Helper function to parse float values from strings, returning an error on failure
-func parseFloat(value string, fieldName string) (float64, error) {
-	result, err := strconv.ParseFloat(value, 64)
-	if err != nil {
-		// Return a specific error indicating which field failed
-		return 0, fmt.Errorf("invalid value for %s: '%s' is not a valid float", fieldName, value)
-	}
-	return result, nil
-}
-
-// Helper function to parse int values from strings
-func parseInt(value string, defaultValue int) int {
-	result, err := strconv.Atoi(value)
-	if err != nil {
-		return defaultValue
-	}
-	return result
-}
-
-// Helper function to find the minimum of two integers
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -256,7 +236,6 @@ func min(a, b int) int {
 	return b
 }
 
-// Helper function to render templ components in Gin
 func render(c *gin.Context, component templ.Component) {
 	err := component.Render(c.Request.Context(), c.Writer)
 	if err != nil {
@@ -386,10 +365,22 @@ func main() {
 				Events:   eventsData,
 			},
 			Pagination: pages.Pagination{
-				CurrentPage: parseInt(c.Query("page"), 1),
+				CurrentPage: 1,
 				TotalPages:  calculateTotalPages(len(motionData), 15),
 			},
 		}
+
+		pageStr := c.Query("page")
+		page, err := parseInt(pageStr, "page")
+		if err != nil {
+			log.Error("Invalid page number", "error", err)
+			render(c, pages.ErrorPage("Invalid page number"))
+			return
+		}
+		if page < 1 {
+			page = 1 // Default to page 1 if not specified or invalid
+		}
+		explorerData.Pagination.CurrentPage = page
 
 		render(c, pages.Explorer(explorerData, cfg.Setup.App.Version))
 	})
