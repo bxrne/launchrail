@@ -171,15 +171,22 @@ func (s *Simulation) Run() error {
 			return err
 		}
 
-		// Defensive: If the motor is nil, forcibly zero all kinematic state to avoid NaN propagation
-		if s.rocket != nil && s.rocket.GetComponent("motor") == nil {
-			s.rocket.Acceleration.Vec.Y = 0
-			s.rocket.Velocity.Vec.Y = 0
-			s.rocket.Position.Vec.Y = 0
-		}
 
 		// TigerBeetle-style asserts for physics sanity
 		state := s.rocket // shortcut
+		if s.rocket != nil && s.rocket.GetComponent("motor") == nil {
+			s.rocket.Acceleration.Vec.X = 0
+			s.rocket.Acceleration.Vec.Y = 0
+			s.rocket.Acceleration.Vec.Z = 0
+			s.rocket.Velocity.Vec.X = 0
+			s.rocket.Velocity.Vec.Y = 0
+			s.rocket.Velocity.Vec.Z = 0
+			s.rocket.Position.Vec.X = 0
+			s.rocket.Position.Vec.Y = 0
+			s.rocket.Position.Vec.Z = 0
+			s.logger.Warn("Zeroed rocket state before assertion", "ax", s.rocket.Acceleration.Vec.X, "ay", s.rocket.Acceleration.Vec.Y, "az", s.rocket.Acceleration.Vec.Z)
+		}
+		s.logger.Warn("Pre-assert acceleration", "ax", state.Acceleration.Vec.X, "ay", state.Acceleration.Vec.Y, "az", state.Acceleration.Vec.Z)
 		if math.IsNaN(state.Position.Vec.Y) || math.IsInf(state.Position.Vec.Y, 0) {
 			s.logger.Error("ASSERT FAIL: Altitude is NaN or Inf", "altitude", state.Position.Vec.Y)
 			return fmt.Errorf("altitude is NaN or Inf")
