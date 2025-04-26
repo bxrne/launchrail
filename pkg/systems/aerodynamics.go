@@ -128,7 +128,7 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 					continue
 				}
 				force := a.CalculateDrag(*entity)
-				moment := a.calculateAerodynamicMoment(*entity)
+				moment := a.CalculateAerodynamicMoment(*entity)
 				resultChan <- force
 				momentChan <- moment
 			}
@@ -172,7 +172,7 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 		// Apply angular accelerations from moments
 		moment := <-momentChan
 		if entity.AngularAcceleration != nil {
-			inertia := calculateInertia(entity)
+			inertia := CalculateInertia(entity)
 			angAcc := moment.DivideScalar(inertia)
 
 			entity.AngularAcceleration.X = float64(angAcc.X)
@@ -239,7 +239,7 @@ func getAtmosphericDensity(altitude float64) float64 {
 }
 
 // calculateAerodynamicMoment calculates the aerodynamic moments on the entity
-func (a *AerodynamicSystem) calculateAerodynamicMoment(entity states.PhysicsState) types.Vector3 {
+func (a *AerodynamicSystem) CalculateAerodynamicMoment(entity states.PhysicsState) types.Vector3 {
 	// Get atmospheric data
 	atmData := a.getAtmosphericData(entity.Position.Vec.Y)
 
@@ -273,13 +273,14 @@ func (a *AerodynamicSystem) calculateAerodynamicMoment(entity states.PhysicsStat
 	}
 }
 
-// calculateInertia returns a simplified moment of inertia value
-func calculateInertia(entity *states.PhysicsState) float64 {
-	// Simple approximation using cylinder formula
-	radius := entity.Bodytube.Radius
-	length := entity.Bodytube.Length
-	mass := entity.Mass.Value
-
-	// I = (1/12) * m * (3r² + l²) for a cylinder
-	return (1.0 / 12.0) * mass * (3*radius*radius + length*length)
+// CalculateInertia returns a simplified moment of inertia value
+func CalculateInertia(entity *states.PhysicsState) float64 {
+	if entity == nil || entity.Bodytube == nil || entity.Mass == nil {
+		return 0
+	}
+	inertia := 0.5 * entity.Mass.Value * entity.Bodytube.Radius * entity.Bodytube.Radius
+	if math.IsNaN(inertia) || math.IsInf(inertia, 0) {
+		return 0
+	}
+	return inertia
 }

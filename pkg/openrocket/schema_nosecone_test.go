@@ -5,7 +5,48 @@ import (
 	"testing"
 )
 
-// TEST: GIVEN a Nosecone struct WHEN calling the String method THEN return a string representation of the Nosecone struct
+func TestNosecone_GetMass_Conical(t *testing.T) {
+	nc := &openrocket.Nosecone{
+		Length:    10,
+		AftRadius: 2,
+		Thickness: 0.2,
+		Shape:     "conical",
+		Material:  openrocket.Material{Density: 1.0},
+	}
+	got := nc.GetMass()
+	if got <= 0 {
+		t.Errorf("Expected positive mass for conical, got %v", got)
+	}
+}
+
+func TestNosecone_GetMass_Ogive(t *testing.T) {
+	nc := &openrocket.Nosecone{
+		Length:    10,
+		AftRadius: 2,
+		Thickness: 0.2,
+		Shape:     "ogive",
+		Material:  openrocket.Material{Density: 1.0},
+	}
+	got := nc.GetMass()
+	if got <= 0 {
+		t.Errorf("Expected positive mass for ogive, got %v", got)
+	}
+}
+
+func TestNosecone_GetMass_Invalid(t *testing.T) {
+	nc := &openrocket.Nosecone{
+		Length:    0,
+		AftRadius: 0,
+		Thickness: 0,
+		Shape:     "conical",
+		Material:  openrocket.Material{Density: 1.0},
+	}
+	got := nc.GetMass()
+	if got != 0 {
+		t.Errorf("Expected zero mass for invalid dimensions, got %v", got)
+	}
+}
+
 func TestSchemaNoseconeString(t *testing.T) {
 	nc := &openrocket.Nosecone{
 		Name:                 "name",
@@ -32,7 +73,6 @@ func TestSchemaNoseconeString(t *testing.T) {
 	}
 }
 
-// TEST: GIVEN a NoseSubcomponents struct WHEN calling the String method THEN return a string representation of the NoseSubcomponents struct
 func TestSchemaNoseSubcomponentsString(t *testing.T) {
 	ns := &openrocket.NoseSubcomponents{
 		CenteringRing: openrocket.CenteringRing{},

@@ -56,18 +56,18 @@ func (s *RulesSystem) Add(entity *states.PhysicsState) {
 // Update applies rules of flight to entities
 func (s *RulesSystem) Update(dt float64) error {
 	for _, entity := range s.entities {
-		s.processRules(entity)
+		s.ProcessRules(entity)
 	}
 	return nil
 }
 
-func (s *RulesSystem) processRules(entity *states.PhysicsState) Event {
+func (s *RulesSystem) ProcessRules(entity *states.PhysicsState) Event {
 	if entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Motor == nil {
 		return None
 	}
 
 	// Check for apogee
-	if !s.hasApogee && s.detectApogee(entity) {
+	if !s.hasApogee && s.DetectApogee(entity) {
 		s.hasApogee = true
 		return Apogee
 	}
@@ -85,7 +85,7 @@ func (s *RulesSystem) processRules(entity *states.PhysicsState) Event {
 	return None
 }
 
-func (s *RulesSystem) detectApogee(entity *states.PhysicsState) bool {
+func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 	const velocityWindow = 0.5 // m/s window to detect velocity near zero
 
 	// Must be near zero vertical velocity

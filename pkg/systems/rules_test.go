@@ -3,25 +3,47 @@ package systems_test
 import (
 	"testing"
 
+	"io"
+
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
-	"github.com/bxrne/launchrail/pkg/thrustcurves" // Import thrustcurves
+	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/zerodha/logf"
-	"io" // Import io package for io.Discard
 )
 
-// TEST: GIVEN Nothing WHEN NewRulesSystem is called THEN a new rules system is returned
+func TestProcessRules_NilEntity(t *testing.T) {
+	rs := systems.NewRulesSystem(&ecs.World{}, &config.Engine{})
+	result := rs.ProcessRules(nil)
+	if result != systems.None {
+		t.Errorf("Expected None for nil entity, got %v", result)
+	}
+}
+
+func TestDetectApogee_HighVelocity(t *testing.T) {
+	lg := logger.GetLogger("debug")
+	rs := systems.NewRulesSystem(&ecs.World{}, &config.Engine{Simulation: config.Simulation{GroundTolerance: 0.1}})
+	entity := &states.PhysicsState{
+		Velocity: &types.Velocity{Vec: types.Vector3{Y: 10}},
+		Motor:    &components.Motor{FSM: components.NewMotorFSM(nil, *lg)},
+		Position: &types.Position{Vec: types.Vector3{Y: 100}},
+	}
+	result := rs.DetectApogee(entity)
+	if result {
+		t.Errorf("Expected false for high velocity, got %v", result)
+	}
+}
+
 func TestNewRulesSystem(t *testing.T) {
 	rs := systems.NewRulesSystem(&ecs.World{}, &config.Engine{})
 	assert.NotNil(t, rs)
 }
 
-// TEST: GIVEN a rules system WHEN Add is called with an entities state THEN its stored
 func TestAdd(t *testing.T) {
 	rs := systems.NewRulesSystem(&ecs.World{}, &config.Engine{})
 	en := &states.PhysicsState{}
@@ -29,7 +51,6 @@ func TestAdd(t *testing.T) {
 	rs.Add(en)
 }
 
-// TEST: GIVEN an entity WHEN it reaches apogee THEN the event is detected
 func TestApogeeDetection(t *testing.T) {
 	cfg := &config.Engine{
 		Simulation: config.Simulation{
@@ -38,17 +59,17 @@ func TestApogeeDetection(t *testing.T) {
 	}
 	rs := systems.NewRulesSystem(&ecs.World{}, cfg)
 
-	logger := logf.New(logf.Opts{Writer: io.Discard}) // Use logf.Opts with io.Discard
-	motorProps := &thrustcurves.MotorData{} // Use thrustcurves.MotorData
-	motor := &components.Motor{ // Create a minimal motor for the test
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	motorProps := &thrustcurves.MotorData{}
+	motor := &components.Motor{
 		Props: motorProps,
 	}
-	motor.FSM = components.NewMotorFSM(motor, logger) // Pass motor and logger
+	motor.FSM = components.NewMotorFSM(motor, logger)
 	motor.FSM.SetState(components.StateIdle)
 
 	entity := &states.PhysicsState{
 		Position:  &types.Position{Vec: types.Vector3{Y: 100}},
-		Velocity:  &types.Velocity{Vec: types.Vector3{Y: -0.01}}, // Simulate velocity just after apogee
+		Velocity:  &types.Velocity{Vec: types.Vector3{Y: -0.01}},
 		Motor:     motor,
 		Parachute: &components.Parachute{Trigger: "apogee", Deployed: false},
 	}
@@ -59,7 +80,6 @@ func TestApogeeDetection(t *testing.T) {
 	assert.True(t, entity.Parachute.Deployed)
 }
 
-// TEST: GIVEN an entity WHEN it lands THEN the event is detected
 func TestLandingDetection(t *testing.T) {
 	cfg := &config.Engine{
 		Simulation: config.Simulation{
@@ -67,33 +87,31 @@ func TestLandingDetection(t *testing.T) {
 		},
 	}
 	rs := systems.NewRulesSystem(&ecs.World{}, cfg)
-	logger := logf.New(logf.Opts{Writer: io.Discard}) // Use logf.Opts with io.Discard
-	motorProps := &thrustcurves.MotorData{} // Use thrustcurves.MotorData
-	motor := &components.Motor{ // Create a minimal motor for the test
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	motorProps := &thrustcurves.MotorData{}
+	motor := &components.Motor{
 		Props: motorProps,
 	}
-	motor.FSM = components.NewMotorFSM(motor, logger) // Pass motor and logger
+	motor.FSM = components.NewMotorFSM(motor, logger)
 	entity := &states.PhysicsState{
-		Position:     &types.Position{Vec: types.Vector3{Y: 100}}, // Well above ground tolerance
-		Velocity:     &types.Velocity{Vec: types.Vector3{Y: 0.0}}, // Near zero velocity (apogee)
-		Acceleration: &types.Acceleration{Vec: types.Vector3{}},    // Initialize acceleration
-		Motor:        motor,                          // Initialize motor
+		Position:     &types.Position{Vec: types.Vector3{Y: 100}},
+		Velocity:     &types.Velocity{Vec: types.Vector3{Y: 0.0}},
+		Acceleration: &types.Acceleration{Vec: types.Vector3{}},
+		Motor:        motor,
 		Parachute:    &components.Parachute{Trigger: "apogee", Deployed: false},
 	}
 
 	rs.Add(entity)
-	_ = rs.Update(0) // Should trigger apogee
+	_ = rs.Update(0)
 	assert.Equal(t, systems.Apogee, rs.GetLastEvent())
 	assert.True(t, entity.Parachute.Deployed)
 
-	// Now simulate descent to ground
-	entity.Position.Vec.Y = 0.05 // At or below ground tolerance
+	entity.Position.Vec.Y = 0.05
 	entity.Velocity.Vec.Y = -0.1
 	_ = rs.Update(0)
 	assert.Equal(t, systems.Land, rs.GetLastEvent())
 }
 
-// TEST: GIVEN an invalid entity WHEN processed THEN no event is triggered
 func TestInvalidEntityHandling(t *testing.T) {
 	rs := systems.NewRulesSystem(&ecs.World{}, &config.Engine{})
 	entity := &states.PhysicsState{}
