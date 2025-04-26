@@ -1,0 +1,49 @@
+name: Docker Build & Publish
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  docker-build-push:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ghcr.io
+      REPOSITORY: bxrne/launchrail
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.23
+
+      - name: Set up Python (for commitizen)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install commitizen
+        run: pip install commitizen
+
+      - name: Calculate SemVer version
+        id: version
+        run: echo "version=$(cz semver --increment PATCH --dry-run --changelog --file CHANGELOG.md | grep 'Bump version:' | awk '{print $3}')" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.version.outputs.version }} .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.version.outputs.version }}
