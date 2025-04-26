@@ -158,8 +158,13 @@ func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce 
 	}
 
 	// Calculate acceleration
+	if entity.Mass == nil || entity.Mass.Value <= 0 {
+		entity.Acceleration.Vec.Y = 0
+		return
+	}
 	newAcceleration := netForce / entity.Mass.Value
 	if math.IsNaN(newAcceleration) || math.IsInf(newAcceleration, 0) {
+		entity.Acceleration.Vec.Y = 0
 		return
 	}
 
