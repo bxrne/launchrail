@@ -1,5 +1,10 @@
 name: Docker Build & Publish
 
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
 on:
   push:
     branches:
@@ -29,9 +34,16 @@ jobs:
       - name: Install commitizen
         run: pip install commitizen
 
-      - name: Calculate SemVer version
-        id: version
-        run: echo "version=$(cz semver --increment PATCH --dry-run --changelog --file CHANGELOG.md | grep 'Bump version:' | awk '{print $3}')" >> $GITHUB_OUTPUT
+      - name: Bump version and create tag
+        id: cz_bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          cz bump --changelog --yes
+          TAG=$(cz version --project)
+          git tag $TAG
+          git push origin $TAG
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -42,8 +54,10 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.version.outputs.version }} .
+          docker build -t ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.cz_bump.outputs.tag }} .
+          docker tag ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.cz_bump.outputs.tag }} ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:latest
 
-      - name: Push Docker image
+      - name: Push Docker images
         run: |
-          docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.version.outputs.version }}
+          docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.cz_bump.outputs.tag }}
+          docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:latest
