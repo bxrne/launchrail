@@ -13,9 +13,24 @@ import (
 )
 
 func TestCalculateAerodynamicMoment_ZeroVelocity(t *testing.T) {
-	system := &systems.AerodynamicSystem{}
+	minCfg := &config.Engine{
+		Options: config.Options{
+			Launchsite: config.Launchsite{
+				Atmosphere: config.Atmosphere{
+					ISAConfiguration: config.ISAConfiguration{
+						// Provide default values if needed, otherwise zero values are okay for ISA model
+					},
+				},
+			},
+		},
+	}
+	system := systems.NewAerodynamicSystem(nil, 1, minCfg) // Provide nil world, 1 worker, minimal config
+
 	entity := states.PhysicsState{
+		Position: &types.Position{Vec: types.Vector3{X: 0, Y: 0, Z: 0}},
 		Velocity: &types.Velocity{Vec: types.Vector3{X: 0, Y: 0, Z: 0}},
+		Nosecone: &components.Nosecone{Length: 0.5, Shape: "ogive"},
+		Bodytube: &components.Bodytube{Length: 1.0, Radius: 0.05},
 	}
 	moment := system.CalculateAerodynamicMoment(entity)
 	if moment.Y != 0 {
