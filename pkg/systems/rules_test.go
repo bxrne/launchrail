@@ -28,9 +28,11 @@ func TestProcessRules_NilEntity(t *testing.T) {
 func TestDetectApogee_HighVelocity(t *testing.T) {
 	lg := logger.GetLogger("debug")
 	rs := systems.NewRulesSystem(&ecs.World{}, &config.Engine{Simulation: config.Simulation{GroundTolerance: 0.1}})
+	motor := &components.Motor{}
+	motor.FSM = components.NewMotorFSM(motor, *lg)
 	entity := &states.PhysicsState{
 		Velocity: &types.Velocity{Vec: types.Vector3{Y: 10}},
-		Motor:    &components.Motor{FSM: components.NewMotorFSM(nil, *lg)},
+		Motor:    motor,
 		Position: &types.Position{Vec: types.Vector3{Y: 100}},
 	}
 	result := rs.DetectApogee(entity)
