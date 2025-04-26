@@ -50,7 +50,7 @@ func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericDat
 		density:     isaData.Density,
 		pressure:    isaData.Pressure,
 		temperature: isaData.Temperature,
-		soundSpeed:  a.isa.GetSpeedOfSound(altitude),
+		soundSpeed:  isaData.SoundSpeed, // Use SoundSpeed directly from isaData
 	}
 }
 
@@ -77,7 +77,7 @@ func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vect
 	dragForce := vectorPool.Get().(*types.Vector3)
 	defer vectorPool.Put(dragForce)
 
-	// Calculate mach number
+	// Calculate velocity magnitude
 	velocity := math.Sqrt(entity.Velocity.Vec.X*entity.Velocity.Vec.X +
 		entity.Velocity.Vec.Y*entity.Velocity.Vec.Y +
 		entity.Velocity.Vec.Z*entity.Velocity.Vec.Z)
@@ -85,8 +85,14 @@ func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vect
 		return types.Vector3{} // No force if velocity is invalid or too low
 	}
 
+	// Prevent division by zero if sound speed is invalid
+	if atmData.soundSpeed <= 0 {
+		return types.Vector3{} // Cannot calculate Mach, return zero drag
+	}
+
 	// Calculate drag coefficient using Barrowman method
-	cd := a.calculateDragCoeff(velocity / atmData.soundSpeed, entity)
+	mach := velocity / atmData.soundSpeed
+	cd := a.calculateDragCoeff(mach, entity)
 
 	// Calculate reference area
 	area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
