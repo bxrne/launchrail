@@ -43,9 +43,9 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 	burnTime := md.BurnTime
 	if len(thrustcurve) > 0 {
 		lastCurveTime := thrustcurve[len(thrustcurve)-1][0]
-		if math.Abs(burnTime-lastCurveTime) > 1e-6 {
-			logger.Warn("BurnTime and thrust curve last time mismatch, overriding burnTime", "old", burnTime, "new", lastCurveTime)
-			burnTime = lastCurveTime
+		// Only warn if thrust curve ends before burnTime
+		if lastCurveTime < burnTime-1e-6 {
+			logger.Warn("Thrust curve ends before official burnTime; thrust will be zero after curve ends", "curveEnd", lastCurveTime, "burnTime", burnTime)
 		}
 	}
 	m := &Motor{
