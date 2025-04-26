@@ -97,9 +97,11 @@ func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vect
 	forceMagnitude := 0.5 * cd * atmData.density * area * velocity * velocity
 
 	// Apply force in opposite direction of velocity
-	dragForce.X = -entity.Velocity.Vec.X * forceMagnitude / velocity
-	dragForce.Y = -entity.Velocity.Vec.Y * forceMagnitude / velocity
-	dragForce.Z = -entity.Velocity.Vec.Z * forceMagnitude / velocity
+	velVec := types.Vector3{X: entity.Velocity.Vec.X, Y: entity.Velocity.Vec.Y, Z: entity.Velocity.Vec.Z}
+	velUnitVec := velVec.Normalize()
+	dragForce.X = -velUnitVec.X * forceMagnitude
+	dragForce.Y = -velUnitVec.Y * forceMagnitude
+	dragForce.Z = -velUnitVec.Z * forceMagnitude
 
 	return *dragForce
 }

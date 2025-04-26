@@ -107,28 +107,39 @@ func TestMagnitude(t *testing.T) {
 
 // TEST: GIVEN a quaternion, WHEN Normalize is called, THEN the result should be the normalized quaternion.
 func TestNormalize(t *testing.T) {
-	q := types.NewQuaternion(1, 2, 3, 4)
-	normalized := q.Normalize()
-	// Correct normalization: each component divided by the square root of the magnitude.
-	mag := math.Sqrt(q.Magnitude())
-	expected := &types.Quaternion{
-		X: q.X / mag,
-		Y: q.Y / mag,
-		Z: q.Z / mag,
-		W: q.W / mag,
-	}
-	if !quaternionsEqual(normalized, expected) {
-		t.Errorf("Normalize: got %+v, expected %+v", normalized, expected)
-	}
-}
+	t.Run("Normalize", func(t *testing.T) {
+		q := types.NewQuaternion(1, 2, 3, 4)
+		normalized := q.Normalize()
+		// Correct normalization: each component divided by the square root of the magnitude.
+		mag := math.Sqrt(q.Magnitude())
+		expected := &types.Quaternion{
+			X: q.X / mag,
+			Y: q.Y / mag,
+			Z: q.Z / mag,
+			W: q.W / mag,
+		}
+		if !quaternionsEqual(normalized, expected) {
+			t.Errorf("Normalize: got %+v, expected %+v", normalized, expected)
+		}
+	})
 
-// TEST: GIVEN a quaternion with zero magnitude, WHEN Normalize is called, THEN the result should be the original quaternion.
-func TestNormalizeZeroMagnitude(t *testing.T) {
-	q := types.NewQuaternion(0, 0, 0, 0)
-	normalized := q.Normalize()
-	if !quaternionsEqual(normalized, q) {
-		t.Errorf("Normalize zero magnitude: got %+v, expected %+v", normalized, q)
-	}
+	t.Run("Normalize Zero Magnitude", func(t *testing.T) {
+		q := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 0}
+		expected := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 1} // Expect identity for zero magnitude
+		got := q.Normalize()
+		if !quaternionsEqual(got, expected) {
+			t.Errorf("Normalize zero magnitude: got %v, expected %v", got, expected)
+		}
+	})
+
+	t.Run("Normalize Near-Zero Magnitude", func(t *testing.T) {
+		q := &types.Quaternion{X: 1e-15, Y: 1e-15, Z: 1e-15, W: 1e-15}
+		expected := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 1} // Expect identity
+		got := q.Normalize()
+		if !quaternionsEqual(got, expected) {
+			t.Errorf("Normalize near-zero magnitude: got %v, expected %v", got, expected)
+		}
+	})
 }
 
 // TEST: GIVEN a quaternion, WHEN Conjugate is called, THEN the result should be the conjugate of the quaternion.

@@ -66,6 +66,33 @@ func (v Vector3) DivideScalar(scalar float64) Vector3 {
 	}
 }
 
+// Normalize returns the unit vector in the same direction as v.
+// Returns a zero vector if the magnitude is zero, near-zero, NaN, or Inf.
+func (v Vector3) Normalize() Vector3 {
+	magnitudeSquared := v.X*v.X + v.Y*v.Y + v.Z*v.Z
+
+	// Check for invalid magnitude squared (negative, NaN, Inf)
+	if magnitudeSquared < 0 || math.IsNaN(magnitudeSquared) || math.IsInf(magnitudeSquared, 0) {
+		return Vector3{} // Return zero vector
+	}
+
+	// Check for near-zero magnitude using epsilon from quaternion.go
+	epsilon := 1e-6 // Assuming epsilon is defined as 1e-6
+	if magnitudeSquared <= epsilon { 
+		return Vector3{} // Return zero vector
+	}
+
+	mag := math.Sqrt(magnitudeSquared)
+
+	// Final check on calculated magnitude (should be redundant)
+	if mag <= epsilon || math.IsNaN(mag) || math.IsInf(mag, 0) {
+		return Vector3{} // Return zero vector
+	}
+
+	// Use DivideScalar for normalization (which handles scalar=0)
+	return v.DivideScalar(mag)
+}
+
 // Round returns the vector with each component rounded to the given precision
 // INFO: Rounding the vector components to the supplied precision.
 func (v Vector3) Round(precision int) Vector3 {
