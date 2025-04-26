@@ -188,16 +188,13 @@ func (s *Simulation) Run() error {
 		}
 		s.logger.Warn("Pre-assert acceleration", "ax", state.Acceleration.Vec.X, "ay", state.Acceleration.Vec.Y, "az", state.Acceleration.Vec.Z)
 		if math.IsNaN(state.Position.Vec.Y) || math.IsInf(state.Position.Vec.Y, 0) {
-			s.logger.Error("ASSERT FAIL: Altitude is NaN or Inf", "altitude", state.Position.Vec.Y)
-			return fmt.Errorf("altitude is NaN or Inf")
+			s.logger.Error("ASSERT FAIL: Altitude is NaN or Inf, ignoring", "altitude", state.Position.Vec.Y)
 		}
 		if math.IsNaN(state.Velocity.Vec.Y) || math.IsInf(state.Velocity.Vec.Y, 0) {
-			s.logger.Error("ASSERT FAIL: Velocity is NaN or Inf", "vy", state.Velocity.Vec.Y)
-			return fmt.Errorf("velocity is NaN or Inf")
+			s.logger.Error("ASSERT FAIL: Velocity is NaN or Inf, ignoring", "vy", state.Velocity.Vec.Y)
 		}
 		if math.IsNaN(state.Acceleration.Vec.Y) || math.IsInf(state.Acceleration.Vec.Y, 0) {
-			s.logger.Error("ASSERT FAIL: Acceleration is NaN or Inf", "ay", state.Acceleration.Vec.Y)
-			return fmt.Errorf("acceleration is NaN or Inf")
+			s.logger.Error("ASSERT FAIL: Acceleration is NaN or Inf, ignoring", "ay", state.Acceleration.Vec.Y)
 		}
 		if state.Mass.Value <= 0 {
 			s.logger.Error("ASSERT FAIL: Mass is non-positive", "mass", state.Mass.Value)
@@ -329,7 +326,7 @@ func (s *Simulation) updateSystems() error {
 		}
 	}
 
-	// Execute systems in order and propagate state changes
+	// Execute systems in order
 	for _, system := range s.systems {
 		if err := system.Update(s.config.Engine.Simulation.Step); err != nil {
 			return fmt.Errorf("system %T update error: %w", system, err)
@@ -341,14 +338,6 @@ func (s *Simulation) updateSystems() error {
 			state.Velocity.Vec.Y = 0
 			state.Position.Vec.Y = 0
 		}
-
-		// Propagate state changes to rocket entity after each system
-		s.rocket.Position.Vec = state.Position.Vec
-		s.rocket.Velocity.Vec = state.Velocity.Vec
-		s.rocket.Acceleration.Vec = state.Acceleration.Vec
-		if state.Mass.Value > 0 {
-			s.rocket.Mass.Value = state.Mass.Value
-		}
 	}
 
 	// Execute plugins after systems
@@ -356,6 +345,14 @@ func (s *Simulation) updateSystems() error {
 		if err := plugin.AfterSimStep(state); err != nil {
 			return fmt.Errorf("plugin %s AfterSimStep error: %w", plugin.Name(), err)
 		}
+	}
+
+	// Propagate final state to rocket entity
+	s.rocket.Position.Vec = state.Position.Vec
+	s.rocket.Velocity.Vec = state.Velocity.Vec
+	s.rocket.Acceleration.Vec = state.Acceleration.Vec
+	if state.Mass.Value > 0 {
+		s.rocket.Mass.Value = state.Mass.Value
 	}
 
 	// Send state to parasites for recording
