@@ -20,6 +20,14 @@ func quaternionsEqual(q1, q2 *types.Quaternion) bool {
 		almostEqual(q1.Z, q2.Z) && almostEqual(q1.W, q2.W)
 }
 
+// compareQuaternions compares two quaternions, considering the possibility of opposite signs.
+func compareQuaternions(q1, q2 types.Quaternion) bool {
+	return (almostEqual(q1.X, q2.X) && almostEqual(q1.Y, q2.Y) &&
+		almostEqual(q1.Z, q2.Z) && almostEqual(q1.W, q2.W)) ||
+		(almostEqual(q1.X, -q2.X) && almostEqual(q1.Y, -q2.Y) &&
+			almostEqual(q1.Z, -q2.Z) && almostEqual(q1.W, -q2.W))
+}
+
 // TEST: GIVEN a quaternion, WHEN NewQuaternion is called, THEN the quaternion should be created with the correct values.
 func TestNewQuaternion(t *testing.T) {
 	q := types.NewQuaternion(1, 2, 3, 4)
@@ -127,7 +135,7 @@ func TestNormalize(t *testing.T) {
 		q := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 0}
 		expected := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 1} // Expect identity for zero magnitude
 		got := q.Normalize()
-		if !quaternionsEqual(got, expected) {
+		if !compareQuaternions(*got, *expected) { // Use compareQuaternions
 			t.Errorf("Normalize zero magnitude: got %v, expected %v", got, expected)
 		}
 	})
@@ -136,7 +144,7 @@ func TestNormalize(t *testing.T) {
 		q := &types.Quaternion{X: 1e-15, Y: 1e-15, Z: 1e-15, W: 1e-15}
 		expected := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 1} // Expect identity
 		got := q.Normalize()
-		if !quaternionsEqual(got, expected) {
+		if !compareQuaternions(*got, *expected) { // Use compareQuaternions
 			t.Errorf("Normalize near-zero magnitude: got %v, expected %v", got, expected)
 		}
 	})

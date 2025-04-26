@@ -81,20 +81,24 @@ func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vect
 	velocity := math.Sqrt(entity.Velocity.Vec.X*entity.Velocity.Vec.X +
 		entity.Velocity.Vec.Y*entity.Velocity.Vec.Y +
 		entity.Velocity.Vec.Z*entity.Velocity.Vec.Z)
-	machNumber := velocity / atmData.soundSpeed
-
-	if velocity <= 0 {
-		return types.Vector3{} // Avoid NaN
+	if math.IsNaN(velocity) || math.IsInf(velocity, 0) || velocity < 0.01 {
+		return types.Vector3{} // No force if velocity is invalid or too low
 	}
 
 	// Calculate drag coefficient using Barrowman method
-	cd := a.calculateDragCoeff(machNumber, entity)
+	cd := a.calculateDragCoeff(velocity / atmData.soundSpeed, entity)
 
 	// Calculate reference area
 	area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
 
-	// Calculate drag force
-	forceMagnitude := 0.5 * cd * atmData.density * area * velocity * velocity
+	// Calculate dynamic pressure
+	q := 0.5 * atmData.density * velocity * velocity
+
+	// Calculate force magnitude (Cd * q * area)
+	forceMagnitude := cd * q * area
+	if math.IsNaN(forceMagnitude) || math.IsInf(forceMagnitude, 0) {
+		return types.Vector3{} // No force if magnitude calculation is invalid
+	}
 
 	// Apply force in opposite direction of velocity
 	velVec := types.Vector3{X: entity.Velocity.Vec.X, Y: entity.Velocity.Vec.Y, Z: entity.Velocity.Vec.Z}
