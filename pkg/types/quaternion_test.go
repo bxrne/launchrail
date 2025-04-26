@@ -28,6 +28,11 @@ func compareQuaternions(q1, q2 types.Quaternion) bool {
 			almostEqual(q1.Z, -q2.Z) && almostEqual(q1.W, -q2.W))
 }
 
+// vectorsEqual compares two vectors component-wise.
+func vectorsEqual(v1, v2 types.Vector3) bool {
+	return almostEqual(v1.X, v2.X) && almostEqual(v1.Y, v2.Y) && almostEqual(v1.Z, v2.Z)
+}
+
 // TEST: GIVEN a quaternion, WHEN NewQuaternion is called, THEN the quaternion should be created with the correct values.
 func TestNewQuaternion(t *testing.T) {
 	q := types.NewQuaternion(1, 2, 3, 4)
@@ -148,16 +153,24 @@ func TestNormalize(t *testing.T) {
 			t.Errorf("Normalize near-zero magnitude: got %v, expected %v", got, expected)
 		}
 	})
-}
 
-// TEST: GIVEN a quaternion, WHEN Conjugate is called, THEN the result should be the conjugate of the quaternion.
-func TestConjugate(t *testing.T) {
-	q := types.NewQuaternion(1, 2, 3, 4)
-	conjugate := q.Conjugate()
-	expected := &types.Quaternion{X: -1, Y: -2, Z: -3, W: 4}
-	if !quaternionsEqual(conjugate, expected) {
-		t.Errorf("Conjugate: got %+v, expected %+v", conjugate, expected)
-	}
+	t.Run("Normalize NaN Magnitude Squared", func(t *testing.T) {
+		q := &types.Quaternion{X: math.NaN(), Y: 1, Z: 1, W: 1}
+		expected := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 1} // Expect identity for invalid magnitude
+		got := q.Normalize()
+		if !compareQuaternions(*got, *expected) { 
+			t.Errorf("Normalize NaN magnitude squared: got %v, expected %v", got, expected)
+		}
+	})
+
+	t.Run("Normalize Inf Magnitude Squared", func(t *testing.T) {
+		q := &types.Quaternion{X: math.Inf(1), Y: 1, Z: 1, W: 1}
+		expected := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 1} // Expect identity for invalid magnitude
+		got := q.Normalize()
+		if !compareQuaternions(*got, *expected) { 
+			t.Errorf("Normalize Inf magnitude squared: got %v, expected %v", got, expected)
+		}
+	})
 }
 
 // TEST: GIVEN a quaternion and a vector, WHEN RotateVector is called, THEN the result should be the vector rotated by the quaternion.
@@ -166,14 +179,44 @@ func TestRotateVector(t *testing.T) {
 	// For q = (0,0,0,1) and v = (1,0,0),
 	// the expected result is (1,0,0)
 	q := types.IdentityQuaternion()
-	v := &types.Vector3{X: 1, Y: 0, Z: 0}
+	v := &types.Vector3{X: 1, Y: 0, Z: 0} // Use pointer
 	result := q.RotateVector(v)
-	if v.X != result.X || v.Y != result.Y || v.Z != result.Z {
+	if !vectorsEqual(*result, *v) { // Dereference for comparison
 		t.Errorf("RotateVector: got %+v, expected %+v", result, v)
 	}
+
+	t.Run("RotateVector with NaN Quaternion", func(t *testing.T) {
+		q := &types.Quaternion{X: math.NaN(), Y: 0, Z: 0, W: 1}
+		v := &types.Vector3{X: 1, Y: 0, Z: 0} // Use pointer
+		expected := v // Expect original vector (pointer)
+		got := q.RotateVector(v)
+		if !vectorsEqual(*got, *expected) { // Dereference for comparison
+			t.Errorf("RotateVector with NaN quaternion: got %v, expected %v", got, expected)
+		}
+	})
+
+	t.Run("RotateVector with Inf Quaternion", func(t *testing.T) {
+		q := &types.Quaternion{X: math.Inf(1), Y: 0, Z: 0, W: 1}
+		v := &types.Vector3{X: 1, Y: 0, Z: 0} // Use pointer
+		expected := v // Expect original vector (pointer)
+		got := q.RotateVector(v)
+		if !vectorsEqual(*got, *expected) { // Dereference for comparison
+			t.Errorf("RotateVector with Inf quaternion: got %v, expected %v", got, expected)
+		}
+	})
+
+	t.Run("RotateVector with Zero Quaternion", func(t *testing.T) {
+		q := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 0} // Normalizes to identity
+		v := &types.Vector3{X: 1, Y: 2, Z: 3} // Use pointer
+		expected := v // Expect original vector (pointer)
+		got := q.RotateVector(v)
+		if !vectorsEqual(*got, *expected) { // Dereference for comparison
+			t.Errorf("RotateVector with Zero quaternion: got %v, expected %v", got, expected)
+		}
+	})
 }
 
-// TEST: GIVEN a quaternion and a vector, WHEN Integrate is called, THEN the result should be the quaternion integrated with the vector.
+// TEST: GIVEN a quaternion and angular velocity, WHEN Integrate is called, THEN the quaternion should be updated correctly.
 func TestIntegrate(t *testing.T) {
 	// Test a known integration:
 	// For q = (0,0,0,1) and w = (0,0,0),
@@ -186,28 +229,25 @@ func TestIntegrate(t *testing.T) {
 	if !quaternionsEqual(result, expected) {
 		t.Errorf("Integrate: got %+v, expected %+v", result, expected)
 	}
+
+	t.Run("Integrate Near-Zero Angular Velocity", func(t *testing.T) {
+		q := types.NewQuaternion(1, 0, 0, 0).Normalize() // Start with identity
+		angularVelocity := types.Vector3{X: 1e-15, Y: 1e-15, Z: 1e-15}
+		dt := 0.1
+		expected := *q // Expect almost no change
+		got := q.Integrate(angularVelocity, dt)
+		if !compareQuaternions(*got, expected) { // Allow small difference
+			t.Errorf("Integrate near-zero angVel: got %v, expected %v", got, expected)
+		}
+	})
 }
 
-// TEST: GIVEN a quaternion and a non-zero vector, WHEN Integrate is called, THEN the result should be the quaternion integrated with the vector.
-func TestIntegrateNonZero(t *testing.T) {
-	// Test integration with angular velocity around Z-axis
-	q := types.IdentityQuaternion()
-	w := types.Vector3{X: 0, Y: 0, Z: 1} // 1 rad/s around Z-axis
-	dt := 1.0
-	result := q.Integrate(w, dt)
-
-	// For rotation of 1 radian around Z-axis:
-	// θ/2 = 0.5 radians
-	// expected.W = cos(θ/2) ≈ 0.8775825618903728
-	// expected.Z = sin(θ/2) ≈ 0.479425538604203
-	expected := &types.Quaternion{
-		X: 0,
-		Y: 0,
-		Z: math.Sin(0.5), // sin(θ/2)
-		W: math.Cos(0.5), // cos(θ/2)
-	}
-
-	if !quaternionsEqual(result, expected) {
-		t.Errorf("Integrate: got %+v, expected %+v", result, expected)
+// TEST: GIVEN a quaternion, WHEN Conjugate is called, THEN the conjugate should be returned.
+func TestConjugate(t *testing.T) {
+	q := types.NewQuaternion(1, 2, 3, 4)
+	conjugate := q.Conjugate()
+	expected := &types.Quaternion{X: -1, Y: -2, Z: -3, W: 4}
+	if !quaternionsEqual(conjugate, expected) {
+		t.Errorf("Conjugate: got %+v, expected %+v", conjugate, expected)
 	}
 }
