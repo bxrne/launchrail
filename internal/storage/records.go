@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"runtime"
+	"github.com/bxrne/launchrail/internal/logger"
 )
 
 type Record struct {
@@ -93,6 +95,9 @@ func NewRecordManager(baseDir string) (*RecordManager, error) {
 
 // CreateRecord creates a new record with a unique hash
 func (rm *RecordManager) CreateRecord() (*Record, error) {
+	pc, file, line, _ := runtime.Caller(1)
+	log := logger.GetLogger("")
+	log.Info("CreateRecord called", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 

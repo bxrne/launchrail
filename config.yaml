@@ -4,7 +4,7 @@ setup:
     version: "0.0.1"
     base_dir: ".launchrail"
   logging:
-    level: "debug"
+    level: "info"
   plugins:
     paths:
       - "./plugins/windeffect.so"

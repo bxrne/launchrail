@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
@@ -513,6 +514,8 @@ func main() {
 
 // handleSimRun handles API requests to start simulations (now a method of DataHandler)
 func (h *DataHandler) handleSimRun(c *gin.Context) {
+	log := logger.GetLogger("") // Use default or global log level if not available
+	log.Info("handleSimRun invoked", "time", time.Now().Format(time.RFC3339), "remote_addr", c.ClientIP())
 	cfg, err := config.GetConfig()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to load config: %v", err)})
