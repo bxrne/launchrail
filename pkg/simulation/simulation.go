@@ -188,14 +188,20 @@ func (s *Simulation) Run() error {
 			s.logger.Error("ASSERT FAIL: Mass is non-positive", "mass", state.Mass.Value)
 			return fmt.Errorf("mass is non-positive")
 		}
-		if math.Abs(state.Motor.GetThrust()) > 1e6 {
-			s.logger.Error("ASSERT FAIL: Thrust out of bounds", "thrust", state.Motor.GetThrust())
-			return fmt.Errorf("thrust out of bounds")
-		}
-
-		// Log key physics values
-		if int(s.currentTime*1000)%100 == 0 { // every 0.1s
-			s.logger.Info("Sim state", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value, "thrust", state.Motor.GetThrust())
+		if state.Motor != nil {
+			if math.Abs(state.Motor.GetThrust()) > 1e6 {
+				s.logger.Error("ASSERT FAIL: Thrust out of bounds", "thrust", state.Motor.GetThrust())
+				return fmt.Errorf("thrust out of bounds")
+			}
+			// Log key physics values
+			if int(s.currentTime*1000)%100 == 0 { // every 0.1s
+				s.logger.Info("Sim state", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value, "thrust", state.Motor.GetThrust())
+			}
+		} else {
+			// Defensive: log or skip if Motor is nil
+			if int(s.currentTime*1000)%100 == 0 {
+				s.logger.Warn("Sim state: Motor is nil", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value)
+			}
 		}
 
 		// Stop if landed - check rules system state
@@ -224,6 +230,48 @@ func (s *Simulation) updateSystems() error {
 	}
 
 	// Re-use existing state rather than creating new one
+	// Defensive: check for nil components before type assertion to avoid panics in tests
+	getMotor := func() *components.Motor {
+		c := s.rocket.GetComponent("motor")
+		if c == nil {
+			return nil
+		}
+		motor, _ := c.(*components.Motor)
+		return motor
+	}
+	getBodytube := func() *components.Bodytube {
+		c := s.rocket.GetComponent("bodytube")
+		if c == nil {
+			return nil
+		}
+		bodytube, _ := c.(*components.Bodytube)
+		return bodytube
+	}
+	getNosecone := func() *components.Nosecone {
+		c := s.rocket.GetComponent("nosecone")
+		if c == nil {
+			return nil
+		}
+		nosecone, _ := c.(*components.Nosecone)
+		return nosecone
+	}
+	getFinset := func() *components.TrapezoidFinset {
+		c := s.rocket.GetComponent("finset")
+		if c == nil {
+			return nil
+		}
+		finset, _ := c.(*components.TrapezoidFinset)
+		return finset
+	}
+	getParachute := func() *components.Parachute {
+		c := s.rocket.GetComponent("parachute")
+		if c == nil {
+			return nil
+		}
+		parachute, _ := c.(*components.Parachute)
+		return parachute
+	}
+
 	state := &states.PhysicsState{
 		Time:                s.currentTime,
 		Entity:              s.rocket.BasicEntity,
@@ -234,11 +282,11 @@ func (s *Simulation) updateSystems() error {
 		Velocity:            s.rocket.Velocity,
 		Acceleration:        s.rocket.Acceleration,
 		Mass:                s.rocket.Mass,
-		Motor:               s.rocket.GetComponent("motor").(*components.Motor),
-		Bodytube:            s.rocket.GetComponent("bodytube").(*components.Bodytube),
-		Nosecone:            s.rocket.GetComponent("nosecone").(*components.Nosecone),
-		Finset:              s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
-		Parachute:           s.rocket.GetComponent("parachute").(*components.Parachute),
+		Motor:               getMotor(),
+		Bodytube:            getBodytube(),
+		Nosecone:            getNosecone(),
+		Finset:              getFinset(),
+		Parachute:           getParachute(),
 	}
 
 	// Execute plugins before systems
@@ -248,9 +296,11 @@ func (s *Simulation) updateSystems() error {
 		}
 	}
 
-	// Update motor first
-	if err := state.Motor.Update(s.config.Engine.Simulation.Step); err != nil {
-		return err
+	// Update motor first (defensive: skip if nil)
+	if state.Motor != nil {
+		if err := state.Motor.Update(s.config.Engine.Simulation.Step); err != nil {
+			return err
+		}
 	}
 
 	// Execute systems in order and propagate state changes
