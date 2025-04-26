@@ -7,6 +7,8 @@ type Quaternion struct {
 	X, Y, Z, W float64
 }
 
+const epsilon = 1e-12 // Small threshold for magnitude checks
+
 // NewQuaternion creates a new Quaternion
 func NewQuaternion(x, y, z, w float64) *Quaternion {
 	return &Quaternion{
@@ -67,12 +69,32 @@ func (q *Quaternion) Scale(scalar float64) *Quaternion {
 	}
 }
 
-// Normalize normalizes a quaternion using the square root of the sum of squares
+// Normalize normalizes a quaternion
 func (q *Quaternion) Normalize() *Quaternion {
-	mag := math.Sqrt(q.Magnitude())
-	if mag == 0 {
-		return q // Return the original quaternion if the magnitude is zero.
+	magnitudeSquared := q.Magnitude()
+
+	// Check for invalid magnitude squared (negative or NaN)
+	if magnitudeSquared < 0 || math.IsNaN(magnitudeSquared) {
+		// Quaternion is invalid, return identity for stability
+		return &Quaternion{W: 1, X: 0, Y: 0, Z: 0}
 	}
+
+	// Check for near-zero magnitude
+	if magnitudeSquared <= epsilon {
+		// Near-zero magnitude, treat as identity.
+		return &Quaternion{W: 1, X: 0, Y: 0, Z: 0}
+	}
+
+	// Calculate magnitude
+	mag := math.Sqrt(magnitudeSquared)
+
+	// Final check on calculated magnitude (should be redundant if above checks are good)
+	if mag <= epsilon || math.IsNaN(mag) || math.IsInf(mag, 0) {
+		// If somehow mag is still invalid, return identity
+		return &Quaternion{W: 1, X: 0, Y: 0, Z: 0}
+	}
+
+	// Normalize components
 	return &Quaternion{
 		X: q.X / mag,
 		Y: q.Y / mag,
