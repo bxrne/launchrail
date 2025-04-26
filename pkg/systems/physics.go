@@ -153,7 +153,12 @@ func (s *PhysicsSystem) calculateNetForce(entity *states.PhysicsState, force typ
 }
 
 func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce float64, dt float64) {
+	if entity.Motor == nil {
+		entity.Acceleration.Vec.Y = 0
+		return
+	}
 	if math.IsNaN(netForce) || math.IsInf(netForce, 0) {
+		entity.Acceleration.Vec.Y = 0
 		return // Skip update if force is invalid
 	}
 

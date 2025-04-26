@@ -14,6 +14,7 @@ import (
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
+	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/zerodha/logf"
 )
 
@@ -170,6 +171,13 @@ func (s *Simulation) Run() error {
 			return err
 		}
 
+		// Defensive: If the motor is nil, forcibly zero all kinematic state to avoid NaN propagation
+		if s.rocket != nil && s.rocket.GetComponent("motor") == nil {
+			s.rocket.Acceleration.Vec.Y = 0
+			s.rocket.Velocity.Vec.Y = 0
+			s.rocket.Position.Vec.Y = 0
+		}
+
 		// TigerBeetle-style asserts for physics sanity
 		state := s.rocket // shortcut
 		if math.IsNaN(state.Position.Vec.Y) || math.IsInf(state.Position.Vec.Y, 0) {
@@ -272,6 +280,17 @@ func (s *Simulation) updateSystems() error {
 		return parachute
 	}
 
+	motor := getMotor()
+	mass := s.rocket.Mass
+	if motor == nil || mass == nil || mass.Value <= 0 {
+		// Defensive: set mass to a safe default if motor is nil or mass is invalid
+		if s.rocket != nil && s.rocket.Mass != nil && s.rocket.Mass.Value > 0 {
+			mass = s.rocket.Mass
+		} else {
+			mass = &types.Mass{Value: 1.0}
+		}
+		s.logger.Warn("Simulation state: Motor is nil or mass invalid, using fallback mass=1.0")
+	}
 	state := &states.PhysicsState{
 		Time:                s.currentTime,
 		Entity:              s.rocket.BasicEntity,
@@ -281,8 +300,8 @@ func (s *Simulation) updateSystems() error {
 		AngularAcceleration: s.rocket.AngularAcceleration,
 		Velocity:            s.rocket.Velocity,
 		Acceleration:        s.rocket.Acceleration,
-		Mass:                s.rocket.Mass,
-		Motor:               getMotor(),
+		Mass:                mass,
+		Motor:               motor,
 		Bodytube:            getBodytube(),
 		Nosecone:            getNosecone(),
 		Finset:              getFinset(),
@@ -307,6 +326,13 @@ func (s *Simulation) updateSystems() error {
 	for _, system := range s.systems {
 		if err := system.Update(s.config.Engine.Simulation.Step); err != nil {
 			return fmt.Errorf("system %T update error: %w", system, err)
+		}
+
+		// Defensive: If the motor is nil, forcibly zero all kinematic state to avoid NaN propagation
+		if state.Motor == nil {
+			state.Acceleration.Vec.Y = 0
+			state.Velocity.Vec.Y = 0
+			state.Position.Vec.Y = 0
 		}
 
 		// Propagate state changes to rocket entity after each system
