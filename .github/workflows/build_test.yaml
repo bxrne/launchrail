@@ -39,9 +39,9 @@ jobs:
       
       - name: Build individual plugins
         run: |
-          for dir in plugins/*; do
+          for dir in ./plugins/*; do
             if [ -d "$dir" ]; then
-              go build -buildmode=plugin -o "$dir/plugin.so" "$dir"
+              go build -buildmode=plugin -o "./$dir/plugin.so" "./$dir"
             fi
           done
       - name: SonarQube Scan
