@@ -19,25 +19,9 @@ import (
 
 // runSim starts the simulation with the given configuration
 func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
+	var err error
 	log := logger.GetLogger(cfg.Setup.Logging.Level)
 	log.Info("Starting simulation run")
-
-	// Create a new record for the simulation
-	record, err := recordManager.CreateRecord()
-	if err != nil {
-		log.Error("Failed to create record", "Error", err)
-		return fmt.Errorf("failed to create simulation record: %w", err)
-	}
-	// Defer closing the record only if creation succeeded
-	defer func() {
-		if cerr := record.Close(); cerr != nil {
-			log.Error("Failed to close simulation record", "Error", cerr)
-			// Don't overwrite the original error if there was one
-			if err == nil {
-				err = cerr
-			}
-		}
-	}()
 
 	// Initialize the simulation manager
 	simManager := simulation.NewManager(cfg, log)
@@ -56,6 +40,22 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
 		log.Error("Failed to initialize simulation manager", "Error", err)
 		return fmt.Errorf("failed to initialize simulation manager: %w", err)
 	}
+
+	// Only now create a new record for the simulation
+	record, err := recordManager.CreateRecord()
+	if err != nil {
+		log.Error("Failed to create record", "Error", err)
+		return fmt.Errorf("failed to create simulation record: %w", err)
+	}
+	// Defer closing the record only if creation succeeded
+	defer func() {
+		if cerr := record.Close(); cerr != nil {
+			log.Error("Failed to close simulation record", "Error", cerr)
+			if err == nil {
+				err = cerr
+			}
+		}
+	}()
 
 	// Run the simulation
 	if err = simManager.Run(); err != nil {
