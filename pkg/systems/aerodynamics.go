@@ -173,7 +173,13 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 		moment := <-momentChan
 		if entity.AngularAcceleration != nil {
 			inertia := CalculateInertia(entity)
-			angAcc := moment.DivideScalar(inertia)
+			var angAcc types.Vector3
+			if inertia != 0 {
+				angAcc = moment.DivideScalar(inertia)
+			} else {
+				// Inertia is zero, so angular acceleration is zero (or handle as error)
+				angAcc = types.Vector3{}
+			}
 
 			entity.AngularAcceleration.X = float64(angAcc.X)
 			entity.AngularAcceleration.Y = float64(angAcc.Y)
@@ -273,12 +279,19 @@ func (a *AerodynamicSystem) CalculateAerodynamicMoment(entity states.PhysicsStat
 	}
 }
 
-// CalculateInertia returns a simplified moment of inertia value
+// CalculateInertia returns a simplified moment of inertia value for pitch/yaw
 func CalculateInertia(entity *states.PhysicsState) float64 {
-	if entity == nil || entity.Bodytube == nil || entity.Mass == nil {
-		return 0
+	if entity == nil || entity.Bodytube == nil || entity.Mass == nil || entity.Bodytube.Radius <= 0 || entity.Bodytube.Length <= 0 || entity.Mass.Value <= 0 {
+		return 0 // Return 0 for invalid inputs to prevent NaN/Inf later
 	}
-	inertia := 0.5 * entity.Mass.Value * entity.Bodytube.Radius * entity.Bodytube.Radius
+	// Moment of inertia for a cylinder about an axis perpendicular to the length through the center
+	// I = (1/12) * m * (3*r^2 + L^2)
+	r := entity.Bodytube.Radius
+	l := entity.Bodytube.Length
+	m := entity.Mass.Value
+	inertia := (1.0 / 12.0) * m * (3*r*r + l*l)
+
+	// Double-check for NaN/Inf just in case, although input checks should prevent this
 	if math.IsNaN(inertia) || math.IsInf(inertia, 0) {
 		return 0
 	}
