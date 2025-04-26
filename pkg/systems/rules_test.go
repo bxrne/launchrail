@@ -44,7 +44,7 @@ func TestApogeeDetection(t *testing.T) {
 		Props: motorProps,
 	}
 	motor.FSM = components.NewMotorFSM(motor, logger) // Pass motor and logger
-	motor.FSM.SetState("BURNOUT")
+	motor.FSM.SetState(components.StateIdle)
 
 	entity := &states.PhysicsState{
 		Position:  &types.Position{Vec: types.Vector3{Y: 100}},
@@ -74,14 +74,21 @@ func TestLandingDetection(t *testing.T) {
 	}
 	motor.FSM = components.NewMotorFSM(motor, logger) // Pass motor and logger
 	entity := &states.PhysicsState{
-		Position:     &types.Position{Vec: types.Vector3{Y: 0.05}}, // Slightly above ground tolerance
-		Velocity:     &types.Velocity{Vec: types.Vector3{Y: -0.1}}, // Simulate downward velocity
+		Position:     &types.Position{Vec: types.Vector3{Y: 100}}, // Well above ground tolerance
+		Velocity:     &types.Velocity{Vec: types.Vector3{Y: 0.0}}, // Near zero velocity (apogee)
 		Acceleration: &types.Acceleration{Vec: types.Vector3{}},    // Initialize acceleration
 		Motor:        motor,                          // Initialize motor
-		Parachute:    &components.Parachute{Trigger: "apogee", Deployed: true},
+		Parachute:    &components.Parachute{Trigger: "apogee", Deployed: false},
 	}
 
 	rs.Add(entity)
+	_ = rs.Update(0) // Should trigger apogee
+	assert.Equal(t, systems.Apogee, rs.GetLastEvent())
+	assert.True(t, entity.Parachute.Deployed)
+
+	// Now simulate descent to ground
+	entity.Position.Vec.Y = 0.05 // At or below ground tolerance
+	entity.Velocity.Vec.Y = -0.1
 	_ = rs.Update(0)
 	assert.Equal(t, systems.Land, rs.GetLastEvent())
 }
