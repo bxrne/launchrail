@@ -2,6 +2,7 @@ package simulation
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
@@ -167,6 +168,34 @@ func (s *Simulation) Run() error {
 	for {
 		if err := s.updateSystems(); err != nil {
 			return err
+		}
+
+		// TigerBeetle-style asserts for physics sanity
+		state := s.rocket // shortcut
+		if math.IsNaN(state.Position.Vec.Y) || math.IsInf(state.Position.Vec.Y, 0) {
+			s.logger.Error("ASSERT FAIL: Altitude is NaN or Inf", "altitude", state.Position.Vec.Y)
+			return fmt.Errorf("altitude is NaN or Inf")
+		}
+		if math.IsNaN(state.Velocity.Vec.Y) || math.IsInf(state.Velocity.Vec.Y, 0) {
+			s.logger.Error("ASSERT FAIL: Velocity is NaN or Inf", "vy", state.Velocity.Vec.Y)
+			return fmt.Errorf("velocity is NaN or Inf")
+		}
+		if math.IsNaN(state.Acceleration.Vec.Y) || math.IsInf(state.Acceleration.Vec.Y, 0) {
+			s.logger.Error("ASSERT FAIL: Acceleration is NaN or Inf", "ay", state.Acceleration.Vec.Y)
+			return fmt.Errorf("acceleration is NaN or Inf")
+		}
+		if state.Mass.Value <= 0 {
+			s.logger.Error("ASSERT FAIL: Mass is non-positive", "mass", state.Mass.Value)
+			return fmt.Errorf("mass is non-positive")
+		}
+		if math.Abs(state.Motor.GetThrust()) > 1e6 {
+			s.logger.Error("ASSERT FAIL: Thrust out of bounds", "thrust", state.Motor.GetThrust())
+			return fmt.Errorf("thrust out of bounds")
+		}
+
+		// Log key physics values
+		if int(s.currentTime*1000)%100 == 0 { // every 0.1s
+			s.logger.Info("Sim state", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value, "thrust", state.Motor.GetThrust())
 		}
 
 		// Stop if landed - check rules system state

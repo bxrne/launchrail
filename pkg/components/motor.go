@@ -39,15 +39,24 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 		md.MaxThrust = findMaxThrust(md.Thrust)
 	}
 
+	thrustcurve := validateThrustCurve(md.Thrust)
+	burnTime := md.BurnTime
+	if len(thrustcurve) > 0 {
+		lastCurveTime := thrustcurve[len(thrustcurve)-1][0]
+		if math.Abs(burnTime-lastCurveTime) > 1e-6 {
+			logger.Warn("BurnTime and thrust curve last time mismatch, overriding burnTime", "old", burnTime, "new", lastCurveTime)
+			burnTime = lastCurveTime
+		}
+	}
 	m := &Motor{
 		ID:          id,
 		Position:    types.Vector3{},
-		Thrustcurve: validateThrustCurve(md.Thrust),
+		Thrustcurve: thrustcurve,
 		Mass:        md.TotalMass,
 		Props:       md,
 		// Initialize thrust to first data point
 		thrust:      md.Thrust[0][1],
-		burnTime:    md.BurnTime,
+		burnTime:    burnTime,
 		logger:      logger,
 		// FSM is initialized below after m is fully defined
 	}
