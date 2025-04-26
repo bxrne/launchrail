@@ -11,6 +11,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/internal/plot_transformer"
 	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
 )
@@ -441,13 +442,7 @@ func (h *DataHandler) handleTableRequest(c *gin.Context, hash string, table stri
 
 	// For motion and dynamics, convert string data to float64
 	if table != "events" {
-		floatData := make([][]float64, len(pagedData))
-		for i, row := range pagedData {
-			floatData[i] = make([]float64, len(row))
-			for j, val := range row {
-				floatData[i][j], _ = strconv.ParseFloat(val, 64)
-			}
-		}
+		floatData := plot_transformer.TransformRowsToFloat64(pagedData)
 		c.JSON(http.StatusOK, gin.H{
 			"headers": headers,
 			"data":    floatData,

@@ -5,13 +5,13 @@ import (
 	"math"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/internal/plot_transformer"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/templates/pages"
@@ -373,7 +373,7 @@ func main() {
 
 		pageStr := c.Query("page")
 		page, _ := parseInt(pageStr, "page") // Ignore error, check value instead
-		if page < 1 { // Default to page 1 if not specified, zero, negative, or parse error
+		if page < 1 {                        // Default to page 1 if not specified, zero, negative, or parse error
 			page = 1
 		}
 
@@ -415,86 +415,12 @@ func main() {
 			return
 		}
 
-		// Convert rows to float64 array unless events
-		var floatData [][]float64
-		if source != "events" {
-			floatData = make([][]float64, len(rows))
-			for i, row := range rows {
-				floatData[i] = make([]float64, len(row))
-				for j, val := range row {
-					floatData[i][j], _ = strconv.ParseFloat(val, 64)
-				}
-			}
-		}
-
-		// Find field indices
-		xIndex, yIndex, zIndex := -1, -1, -1
-		for i, h := range headers {
-			if h == xAxis {
-				xIndex = i
-			}
-			if h == yAxis {
-				yIndex = i
-			}
-			if h == zAxis {
-				zIndex = i
-			}
-		}
-
-		if xIndex < 0 || yIndex < 0 || (zAxis != "" && zIndex < 0) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid axes"})
+		// Use plot_transformer for all plotting transformation logic
+		plotData, plotLayout, err := plot_transformer.TransformForPlot(headers, rows, source, xAxis, yAxis, zAxis)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-
-		// Build the response data as if we were going to feed Plotly
-		// Return rows as strings if events, otherwise as floats
-		var xData, yData, zData []interface{}
-		if source == "events" {
-			for _, row := range rows {
-				xData = append(xData, row[xIndex])
-				yData = append(yData, row[yIndex])
-				if zIndex >= 0 {
-					zData = append(zData, row[zIndex])
-				}
-			}
-		} else {
-			for _, row := range floatData {
-				xData = append(xData, row[xIndex])
-				yData = append(yData, row[yIndex])
-				if zIndex >= 0 {
-					zData = append(zData, row[zIndex])
-				}
-			}
-		}
-
-		plotLayout := map[string]interface{}{
-			"title": fmt.Sprintf("%s vs %s%s", yAxis, xAxis, func() string {
-				if zAxis != "" {
-					return " vs " + zAxis
-				}
-				return ""
-			}()),
-			"xaxis": map[string]string{"title": xAxis},
-			"yaxis": map[string]string{"title": yAxis},
-		}
-
-		plotData := []map[string]interface{}{
-			{
-				"x": xData,
-				"y": yData,
-				"type": func() string {
-					if zAxis != "" {
-						return "scatter3d"
-					}
-					return "scatter"
-				}(),
-				"mode": "markers",
-			},
-		}
-		if zAxis != "" {
-			plotData[0]["z"] = zData
-		}
-
 		c.JSON(http.StatusOK, gin.H{"plotData": plotData, "plotLayout": plotLayout})
 	})
 
@@ -537,15 +463,9 @@ func (h *DataHandler) handleSimRun(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
 }
 
+// Deprecated: Use plot_transformer.TransformRowsToFloat64 instead.
 func convertToFloat64(data [][]string) [][]float64 {
-	result := make([][]float64, len(data))
-	for i, row := range data {
-		result[i] = make([]float64, len(row))
-		for j, val := range row {
-			result[i][j], _ = strconv.ParseFloat(val, 64)
-		}
-	}
-	return result
+	return plot_transformer.TransformRowsToFloat64(data)
 }
 
 func calculateTotalPages(total int, perPage int) int {
