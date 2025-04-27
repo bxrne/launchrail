@@ -1,3 +1,9 @@
+## v0.1.1 (2025-04-27)
+
+### Fix
+
+- Add strings package import to storage module files
+
 ## v0.1.0 (2025-04-27)
 
 ### Feat
