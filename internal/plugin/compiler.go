@@ -42,7 +42,7 @@ func CompileAllPlugins(pluginsSourceDir, pluginsOutputDir string, logger logf.Lo
 		outputPath := filepath.Join(pluginsOutputDir, pluginName+".so")
 
 		// Basic check: does the directory contain Go files?
-		hasGoFiles, err := checkDirForGoFiles(sourcePath)
+		hasGoFiles, err := CheckDirForGoFiles(sourcePath)
 		if err != nil {
 			logger.Warn("Error checking directory for Go files, skipping", "dir", sourcePath, "error", err)
 			continue
@@ -54,6 +54,7 @@ func CompileAllPlugins(pluginsSourceDir, pluginsOutputDir string, logger logf.Lo
 
 		logger.Info("Compiling plugin", "name", pluginName, "source", sourcePath, "output", outputPath)
 		cmd := exec.Command(goExecutable, "build", "-buildmode=plugin", "-o", outputPath, sourcePath)
+		cmd.Dir = sourcePath // Set working directory to the plugin source
 		cmd.Stderr = os.Stderr // Pipe build errors to main stderr
 		cmd.Stdout = os.Stdout // Pipe build output to main stdout
 
@@ -78,8 +79,8 @@ func CompileAllPlugins(pluginsSourceDir, pluginsOutputDir string, logger logf.Lo
 	return nil
 }
 
-// checkDirForGoFiles checks if a directory contains any .go files.
-func checkDirForGoFiles(dirPath string) (bool, error) {
+// CheckDirForGoFiles checks if a directory contains any .go files.
+func CheckDirForGoFiles(dirPath string) (bool, error) {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
 		return false, err
