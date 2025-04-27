@@ -29,16 +29,9 @@ func TestLoadPluginInvalidPath(t *testing.T) {
 func TestLoadPluginSuccess(t *testing.T) {
 	l := logger.GetLogger("debug")
 
-	// Compile plugins first and check for errors.
-	// The actual path needed for loading will be constructed later.
-	err := plugin.CompileAllPlugins("../../plugins", "../../plugins", *l)
-	if err != nil {
-		t.Fatalf("CompileAllPlugins failed: %v", err)
-	}
-
 	// INFO: Add any built-in plugins here for confidence
 	m := plugin.NewManager(*l)
-	err = m.LoadPlugin("../../plugins/windeffect.so")
+	err := m.LoadPlugin("../../plugins/windeffect.so")
 	require.NoError(t, err)
 	require.NotEmpty(t, m.GetPlugins())
 
