@@ -117,10 +117,12 @@ func calculateTotalMass(orkData *openrocket.RocketDocument, motor *components.Mo
 	// Access the Rocket document within the OpenrocketDocument
 	// The schema confirmed orkData.Rocket exists.
 	// Reverting explicit dereference.
+
 	if orkData == nil || len(orkData.Subcomponents.Stages) == 0 {
 		fmt.Println("Warning: Cannot calculate mass, OpenRocket data or stages missing.")
 		return 0.0
 	}
+
 	if motor == nil {
 		fmt.Println("Warning: Cannot calculate total mass, motor component is nil.")
 		return 0.0
@@ -153,13 +155,11 @@ func calculateTotalMass(orkData *openrocket.RocketDocument, motor *components.Mo
 	// Top-level components
 	addMass("Nosecone", &sustainerSubs.Nosecone)
 	addMass("BodyTube", &sustainerSubs.BodyTube) // Tube material mass
-
 	// Components nested within BodyTube
 	addMass("TrapezoidFinset", &bodyTubeSubs.TrapezoidFinset)
 	addMass("Parachute", &bodyTubeSubs.Parachute)
 	addMass("Shockcord", &bodyTubeSubs.Shockcord)
 	addMass("InnerTube", &bodyTubeSubs.InnerTube) // Inner tube material mass
-
 	// CenteringRings (Iterate)
 	for i := range bodyTubeSubs.CenteringRings {
 		addMass(fmt.Sprintf("CenteringRing[%d]", i), &bodyTubeSubs.CenteringRings[i])
@@ -170,29 +170,39 @@ func calculateTotalMass(orkData *openrocket.RocketDocument, motor *components.Mo
 	addMass("Nosecone.MassComponent", &noseSubs.MassComponent)
 	addMass("InnerTube.MassComponent", &innerTubeSubs.MassComponent)
 
-	// --- Add Motor Mass ---
-	// Motor mass (propellant + casing) from components.Motor
-	// GetMass() returns the current mass, which is the initial mass at t=0.
-	motorMass := motor.GetMass() // No argument needed
-	if math.IsNaN(motorMass) || motorMass < 0 {
-		motorName := "unknown"
-		if motor.Props != nil && motor.Props.Designation != "" { // Check if empty string
-			motorName = string(motor.Props.Designation) // It's already a string (or string alias)
-		}
-		fmt.Printf("Warning: Invalid initial mass (%.4f) obtained from motor component '%s', skipping motor mass.\n", motorMass, motorName)
-	} else {
-		// fmt.Printf("Adding mass for Motor '%s': %.4f\n", string(motor.Props.Designation), motorMass) // Debug
-		totalMass += motorMass
-	}
+	// --- Add Motor Mass --- (Extracted to helper)
+	totalMass += getValidMotorMass(motor)
 
 	// --- Final Validation ---
 	if math.IsNaN(totalMass) || totalMass <= 0 {
 		fmt.Printf("Warning: Final calculated total mass is invalid or zero (%.4f). Returning 0.\n", totalMass)
 		return 0.0
 	}
-
 	// fmt.Printf("Final Calculated Total Mass: %.4f\n", totalMass) // Debug
 	return totalMass
+}
+
+// getValidMotorMass calculates and validates the motor's initial mass.
+// It returns the valid mass or 0.0 if invalid, logging a warning.
+func getValidMotorMass(motor *components.Motor) float64 {
+	if motor == nil {
+		fmt.Println("Warning: Motor component is nil in getValidMotorMass.")
+		return 0.0
+	}
+
+	motorMass := motor.GetMass() // GetMass() returns the current mass (initial mass at t=0)
+
+	if math.IsNaN(motorMass) || motorMass < 0 {
+		motorName := "unknown"
+		if motor.Props != nil && motor.Props.Designation != "" { // Check if empty string
+			motorName = string(motor.Props.Designation)
+		}
+		fmt.Printf("Warning: Invalid initial mass (%.4f) obtained from motor component '%s', skipping motor mass.\n", motorMass, motorName)
+		return 0.0 // Return 0 if mass is invalid
+	}
+
+	// fmt.Printf("Adding mass for Motor '%s': %.4f\n", string(motor.Props.Designation), motorMass) // Debug
+	return motorMass // Return the valid mass
 }
 
 // AddComponent adds a component to the entity
