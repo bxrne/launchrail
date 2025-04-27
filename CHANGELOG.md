@@ -1,3 +1,9 @@
+## v0.1.3 (2025-04-27)
+
+### Fix
+
+- **storage**: Add strings import for filepath manipulation in storage package
+
 ## v0.1.2 (2025-04-27)
 
 ### Fix
