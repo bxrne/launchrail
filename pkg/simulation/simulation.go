@@ -152,6 +152,66 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	return nil
 }
 
+// assertAndLogPhysicsSanity performs assertions and logging for the simulation state.
+func (s *Simulation) assertAndLogPhysicsSanity(state *entities.RocketEntity) error {
+	if state != nil && state.GetComponent("motor") == nil {
+		state.Acceleration.Vec.X = 0
+		state.Acceleration.Vec.Y = 0
+		state.Acceleration.Vec.Z = 0
+		state.Velocity.Vec.X = 0
+		state.Velocity.Vec.Y = 0
+		state.Velocity.Vec.Z = 0
+		state.Position.Vec.X = 0
+		state.Position.Vec.Y = 0
+		state.Position.Vec.Z = 0
+		s.logger.Warn("Zeroed rocket state before assertion", "ax", state.Acceleration.Vec.X, "ay", state.Acceleration.Vec.Y, "az", state.Acceleration.Vec.Z)
+	}
+	if state == nil {
+		return nil
+	}
+	s.logger.Warn("Pre-assert acceleration", "ax", state.Acceleration.Vec.X, "ay", state.Acceleration.Vec.Y, "az", state.Acceleration.Vec.Z)
+	if math.IsNaN(state.Position.Vec.Y) || math.IsInf(state.Position.Vec.Y, 0) {
+		s.logger.Error("ASSERT FAIL: Altitude is NaN or Inf, ignoring", "altitude", state.Position.Vec.Y)
+	}
+	if math.IsNaN(state.Velocity.Vec.Y) || math.IsInf(state.Velocity.Vec.Y, 0) {
+		s.logger.Error("ASSERT FAIL: Velocity is NaN or Inf, ignoring", "vy", state.Velocity.Vec.Y)
+	}
+	if math.IsNaN(state.Acceleration.Vec.Y) || math.IsInf(state.Acceleration.Vec.Y, 0) {
+		s.logger.Error("ASSERT FAIL: Acceleration is NaN or Inf, ignoring", "ay", state.Acceleration.Vec.Y)
+	}
+	if state.Mass.Value <= 0 {
+		s.logger.Error("ASSERT FAIL: Mass is non-positive", "mass", state.Mass.Value)
+		return fmt.Errorf("mass is non-positive")
+	}
+	if state.Motor != nil {
+		if math.Abs(state.Motor.GetThrust()) > 1e6 {
+			s.logger.Error("ASSERT FAIL: Thrust out of bounds", "thrust", state.Motor.GetThrust())
+			return fmt.Errorf("thrust out of bounds")
+		}
+		if int(s.currentTime*1000)%100 == 0 {
+			s.logger.Info("Sim state", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value, "thrust", state.Motor.GetThrust())
+		}
+	} else {
+		if int(s.currentTime*1000)%100 == 0 {
+			s.logger.Warn("Sim state: Motor is nil", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value)
+		}
+	}
+	return nil
+}
+
+// shouldStopSimulation checks if the simulation should stop and logs the reason.
+func (s *Simulation) shouldStopSimulation() bool {
+	if s.rulesSystem.GetLastEvent() == systems.Land {
+		s.logger.Info("Rocket has landed; stopping simulation")
+		return true
+	}
+	if s.currentTime >= s.config.Engine.Simulation.MaxTime {
+		s.logger.Info("Reached maximum simulation time")
+		return true
+	}
+	return false
+}
+
 // Run executes the simulation
 func (s *Simulation) Run() error {
 	defer func() {
@@ -161,7 +221,6 @@ func (s *Simulation) Run() error {
 		s.dynamicsParasite.Stop()
 	}()
 
-	// Validate simulation parameters
 	if s.config.Engine.Simulation.Step <= 0 || s.config.Engine.Simulation.Step > 0.01 {
 		return fmt.Errorf("invalid simulation step: must be between 0 and 0.01")
 	}
@@ -170,70 +229,20 @@ func (s *Simulation) Run() error {
 		if err := s.updateSystems(); err != nil {
 			return err
 		}
-
-
-		// TigerBeetle-style asserts for physics sanity
-		state := s.rocket // shortcut
-		if s.rocket != nil && s.rocket.GetComponent("motor") == nil {
-			s.rocket.Acceleration.Vec.X = 0
-			s.rocket.Acceleration.Vec.Y = 0
-			s.rocket.Acceleration.Vec.Z = 0
-			s.rocket.Velocity.Vec.X = 0
-			s.rocket.Velocity.Vec.Y = 0
-			s.rocket.Velocity.Vec.Z = 0
-			s.rocket.Position.Vec.X = 0
-			s.rocket.Position.Vec.Y = 0
-			s.rocket.Position.Vec.Z = 0
-			s.logger.Warn("Zeroed rocket state before assertion", "ax", s.rocket.Acceleration.Vec.X, "ay", s.rocket.Acceleration.Vec.Y, "az", s.rocket.Acceleration.Vec.Z)
+		state := s.rocket
+		if err := s.assertAndLogPhysicsSanity(state); err != nil {
+			return err
 		}
-		s.logger.Warn("Pre-assert acceleration", "ax", state.Acceleration.Vec.X, "ay", state.Acceleration.Vec.Y, "az", state.Acceleration.Vec.Z)
-		if math.IsNaN(state.Position.Vec.Y) || math.IsInf(state.Position.Vec.Y, 0) {
-			s.logger.Error("ASSERT FAIL: Altitude is NaN or Inf, ignoring", "altitude", state.Position.Vec.Y)
-		}
-		if math.IsNaN(state.Velocity.Vec.Y) || math.IsInf(state.Velocity.Vec.Y, 0) {
-			s.logger.Error("ASSERT FAIL: Velocity is NaN or Inf, ignoring", "vy", state.Velocity.Vec.Y)
-		}
-		if math.IsNaN(state.Acceleration.Vec.Y) || math.IsInf(state.Acceleration.Vec.Y, 0) {
-			s.logger.Error("ASSERT FAIL: Acceleration is NaN or Inf, ignoring", "ay", state.Acceleration.Vec.Y)
-		}
-		if state.Mass.Value <= 0 {
-			s.logger.Error("ASSERT FAIL: Mass is non-positive", "mass", state.Mass.Value)
-			return fmt.Errorf("mass is non-positive")
-		}
-		if state.Motor != nil {
-			if math.Abs(state.Motor.GetThrust()) > 1e6 {
-				s.logger.Error("ASSERT FAIL: Thrust out of bounds", "thrust", state.Motor.GetThrust())
-				return fmt.Errorf("thrust out of bounds")
-			}
-			// Log key physics values
-			if int(s.currentTime*1000)%100 == 0 { // every 0.1s
-				s.logger.Info("Sim state", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value, "thrust", state.Motor.GetThrust())
-			}
-		} else {
-			// Defensive: log or skip if Motor is nil
-			if int(s.currentTime*1000)%100 == 0 {
-				s.logger.Warn("Sim state: Motor is nil", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value)
-			}
-		}
-
-		// Stop if landed - check rules system state
-		if s.rulesSystem.GetLastEvent() == systems.Land {
-			s.logger.Info("Rocket has landed; stopping simulation")
+		if s.shouldStopSimulation() {
 			break
 		}
-
 		s.currentTime += s.config.Engine.Simulation.Step
-
-		// Also add a maximum time check to prevent infinite loops
-		if s.currentTime >= s.config.Engine.Simulation.MaxTime {
-			s.logger.Info("Reached maximum simulation time")
-			break
-		}
 	}
 
 	close(s.doneChan)
 	return nil
 }
+
 
 // updateSystems updates all systems in the simulation
 func (s *Simulation) updateSystems() error {
