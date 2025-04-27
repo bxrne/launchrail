@@ -73,12 +73,22 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 		return nil, err
 	}
 
-	dir = filepath.Join(baseDir, dir)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	// Resolve the absolute path of the dir parameter relative to baseDir
+	absDir, err := filepath.Abs(filepath.Join(baseDir, dir))
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve directory: %v", err)
+	}
+
+	// Ensure the resolved path is within the baseDir
+	if !strings.HasPrefix(absDir, filepath.Clean(baseDir)+string(os.PathSeparator)) {
+		return nil, fmt.Errorf("invalid directory: %s", dir)
+	}
+
+	if err := os.MkdirAll(absDir, 0755); err != nil {
 		return nil, err
 	}
 
-	filePath := filepath.Join(dir, fmt.Sprintf("%s.csv", store))
+	filePath := filepath.Join(absDir, fmt.Sprintf("%s.csv", store))
 
 	// Open file in read/write mode with append flag.
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
