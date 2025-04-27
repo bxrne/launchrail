@@ -130,7 +130,7 @@ func calculateTotalMass(orkData *openrocket.RocketDocument, motor *components.Mo
 
 	var totalMass float64
 	// Assuming single stage - previously validated
-	stage := orkData.Subcomponents.Stages[0] // Standard access
+	stage := orkData.Subcomponents.Stages[0]       // Standard access
 	sustainerSubs := &stage.SustainerSubcomponents // Pass pointer to avoid copying large struct
 
 	// --- Add mass for standard components --- (Extracted to helper)
@@ -146,6 +146,12 @@ func calculateTotalMass(orkData *openrocket.RocketDocument, motor *components.Mo
 	}
 	// fmt.Printf("Final Calculated Total Mass: %.4f\n", totalMass) // Debug
 	return totalMass
+}
+
+// massProvider defines the interface for components that can provide their mass.
+// This allows calculateTotalMass to work with any component implementing GetMass().
+type massProvider interface {
+	GetMass() float64
 }
 
 // sumStandardComponentMasses iterates through standard components and adds their mass.
@@ -179,7 +185,7 @@ func sumStandardComponentMasses(
 }
 
 // addComponentMass validates and adds the mass of a single component to the total mass.
-func addComponentMass(totalMass *float64, compName string, comp openrocket.MassProvider) {
+func addComponentMass(totalMass *float64, compName string, comp massProvider) {
 	if comp == nil { // Check if the component itself is nil
 		// fmt.Printf("Info: Skipping mass for nil component '%s'\n", compName)
 		return

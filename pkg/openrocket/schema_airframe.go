@@ -147,9 +147,9 @@ func (i *InnerTube) GetMass() float64 {
 	// Note: Mass of subcomponents (e.g., motor mount, internal components)
 	// are handled separately by the caller.
 	if math.IsNaN(materialMass) || materialMass < 0 {
-		 fmt.Printf("Warning: Invalid mass (%.4f) calculated for InnerTube '%s' material, returning 0.\n", materialMass, i.Name)
-		 return 0.0
-	 }
+		fmt.Printf("Warning: Invalid mass (%.4f) calculated for InnerTube '%s' material, returning 0.\n", materialMass, i.Name)
+		return 0.0
+	}
 
 	return materialMass
 }
