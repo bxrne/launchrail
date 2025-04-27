@@ -67,8 +67,14 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 		return nil, err
 	}
 
-	dir = filepath.Join(baseDir, dir)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	// Clean and validate the dir parameter to prevent directory traversal
+	cleanDir := filepath.Clean(dir)
+	absDir := filepath.Join(baseDir, cleanDir)
+	if !strings.HasPrefix(absDir, baseDir) {
+		return nil, fmt.Errorf("invalid directory: %s", dir)
+	}
+
+	if err := os.MkdirAll(absDir, 0755); err != nil {
 		return nil, err
 	}
 
