@@ -67,14 +67,14 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 		return nil, err
 	}
 
-	// Clean and validate the dir parameter to prevent directory traversal
-	cleanDir := filepath.Clean(dir)
-	if strings.Contains(cleanDir, "..") || strings.ContainsAny(cleanDir, "/\\") {
-		return nil, fmt.Errorf("invalid directory: %s", dir)
+	// Resolve the absolute path of the dir parameter relative to baseDir
+	absDir, err := filepath.Abs(filepath.Join(baseDir, dir))
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve directory: %v", err)
 	}
 
-	absDir := filepath.Join(baseDir, cleanDir)
-	if !strings.HasPrefix(absDir, baseDir) {
+	// Ensure the resolved path is within the baseDir
+	if !strings.HasPrefix(absDir, filepath.Clean(baseDir)+string(os.PathSeparator)) {
 		return nil, fmt.Errorf("invalid directory: %s", dir)
 	}
 
