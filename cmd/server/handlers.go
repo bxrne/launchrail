@@ -175,6 +175,12 @@ func (h *DataHandler) GetRecordData(c *gin.Context) {
 	hash := c.Param("hash")
 	dataType := c.Param("type")
 
+	// Validate the hash to ensure it is a single-component identifier
+	if strings.Contains(hash, "/") || strings.Contains(hash, "\\") || strings.Contains(hash, "..") {
+		renderTempl(c, pages.ErrorPage("Invalid record identifier"))
+		return
+	}
+
 	record, err := h.records.GetRecord(hash)
 	if err != nil {
 		renderTempl(c, pages.ErrorPage("Record not found"))

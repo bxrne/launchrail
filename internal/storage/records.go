@@ -175,6 +175,11 @@ func (rm *RecordManager) ListRecords() ([]*Record, error) {
 
 // GetRecord retrieves an existing record by hash without creating a new one.
 func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
+	// Validate the hash to ensure it is a single-component identifier
+	if strings.Contains(hash, "/") || strings.Contains(hash, "\\") || strings.Contains(hash, "..") {
+		return nil, fmt.Errorf("invalid record identifier")
+	}
+
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 
