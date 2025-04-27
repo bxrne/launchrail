@@ -78,7 +78,7 @@ func (v Vector3) Normalize() Vector3 {
 
 	// Check for near-zero magnitude using epsilon from quaternion.go
 	epsilon := 1e-6 // Assuming epsilon is defined as 1e-6
-	if magnitudeSquared <= epsilon { 
+	if magnitudeSquared <= epsilon {
 		return Vector3{} // Return zero vector
 	}
 
