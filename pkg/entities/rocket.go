@@ -131,44 +131,10 @@ func calculateTotalMass(orkData *openrocket.RocketDocument, motor *components.Mo
 	var totalMass float64
 	// Assuming single stage - previously validated
 	stage := orkData.Subcomponents.Stages[0] // Standard access
-	sustainerSubs := stage.SustainerSubcomponents
-	noseSubs := sustainerSubs.Nosecone.Subcomponents
-	bodyTubeSubs := sustainerSubs.BodyTube.Subcomponents
-	innerTubeSubs := bodyTubeSubs.InnerTube.Subcomponents
+	sustainerSubs := &stage.SustainerSubcomponents // Pass pointer to avoid copying large struct
 
-	// Helper to add mass from components implementing GetMass interface
-	addMass := func(compName string, comp openrocket.MassProvider) { // Use MassProvider interface
-		if comp == nil { // Check if the component itself is nil (e.g., optional components not present)
-			// fmt.Printf("Info: Skipping mass for nil component '%s'\n", compName)
-			return
-		}
-		mass := comp.GetMass()
-		if math.IsNaN(mass) || mass < 0 {
-			fmt.Printf("Warning: Invalid mass (%.4f) calculated for component '%s' (%T), skipping.\n", mass, compName, comp)
-			return
-		}
-		// fmt.Printf("Adding mass for %s (%T): %.4f\n", compName, comp, mass) // Debug
-		totalMass += mass
-	}
-
-	// --- Add mass for components with GetMass() ---
-	// Top-level components
-	addMass("Nosecone", &sustainerSubs.Nosecone)
-	addMass("BodyTube", &sustainerSubs.BodyTube) // Tube material mass
-	// Components nested within BodyTube
-	addMass("TrapezoidFinset", &bodyTubeSubs.TrapezoidFinset)
-	addMass("Parachute", &bodyTubeSubs.Parachute)
-	addMass("Shockcord", &bodyTubeSubs.Shockcord)
-	addMass("InnerTube", &bodyTubeSubs.InnerTube) // Inner tube material mass
-	// CenteringRings (Iterate)
-	for i := range bodyTubeSubs.CenteringRings {
-		addMass(fmt.Sprintf("CenteringRing[%d]", i), &bodyTubeSubs.CenteringRings[i])
-	}
-
-	// --- Add mass for explicit MassComponents ---
-	// (Using their own GetMass method now)
-	addMass("Nosecone.MassComponent", &noseSubs.MassComponent)
-	addMass("InnerTube.MassComponent", &innerTubeSubs.MassComponent)
+	// --- Add mass for standard components --- (Extracted to helper)
+	sumStandardComponentMasses(&totalMass, sustainerSubs)
 
 	// --- Add Motor Mass --- (Extracted to helper)
 	totalMass += getValidMotorMass(motor)
@@ -180,6 +146,51 @@ func calculateTotalMass(orkData *openrocket.RocketDocument, motor *components.Mo
 	}
 	// fmt.Printf("Final Calculated Total Mass: %.4f\n", totalMass) // Debug
 	return totalMass
+}
+
+// sumStandardComponentMasses iterates through standard components and adds their mass.
+func sumStandardComponentMasses(
+	totalMass *float64,
+	sustainer *openrocket.SustainerSubcomponents, // Pass pointer to sustainer subcomponents
+) {
+	// Derive necessary sub-component structs from the sustainer
+	noseSubs := &sustainer.Nosecone.Subcomponents
+	bodyTubeSubs := &sustainer.BodyTube.Subcomponents
+	innerTubeSubs := &bodyTubeSubs.InnerTube.Subcomponents // InnerTube is within BodyTube
+
+	// --- Add mass for components with GetMass() ---
+	// Top-level components (accessed via sustainer)
+	addComponentMass(totalMass, "Nosecone", &sustainer.Nosecone)
+	addComponentMass(totalMass, "BodyTube", &sustainer.BodyTube) // Tube material mass
+	// Components nested within BodyTube (accessed via bodyTubeSubs)
+	addComponentMass(totalMass, "TrapezoidFinset", &bodyTubeSubs.TrapezoidFinset)
+	addComponentMass(totalMass, "Parachute", &bodyTubeSubs.Parachute)
+	addComponentMass(totalMass, "Shockcord", &bodyTubeSubs.Shockcord)
+	addComponentMass(totalMass, "InnerTube", &bodyTubeSubs.InnerTube) // Inner tube material mass
+	// CenteringRings (Iterate via bodyTubeSubs)
+	for i := range bodyTubeSubs.CenteringRings {
+		addComponentMass(totalMass, fmt.Sprintf("CenteringRing[%d]", i), &bodyTubeSubs.CenteringRings[i])
+	}
+
+	// --- Add mass for explicit MassComponents ---
+	// (Using derived noseSubs and innerTubeSubs)
+	addComponentMass(totalMass, "Nosecone.MassComponent", &noseSubs.MassComponent)
+	addComponentMass(totalMass, "InnerTube.MassComponent", &innerTubeSubs.MassComponent)
+}
+
+// addComponentMass validates and adds the mass of a single component to the total mass.
+func addComponentMass(totalMass *float64, compName string, comp openrocket.MassProvider) {
+	if comp == nil { // Check if the component itself is nil
+		// fmt.Printf("Info: Skipping mass for nil component '%s'\n", compName)
+		return
+	}
+	mass := comp.GetMass()
+	if math.IsNaN(mass) || mass < 0 {
+		fmt.Printf("Warning: Invalid mass (%.4f) calculated for component '%s' (%T), skipping.\n", mass, compName, comp)
+		return
+	}
+	// fmt.Printf("Adding mass for %s (%T): %.4f\n", compName, comp, mass) // Debug
+	*totalMass += mass
 }
 
 // getValidMotorMass calculates and validates the motor's initial mass.
