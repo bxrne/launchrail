@@ -38,9 +38,30 @@ func NewMotorFSM(motor *Motor, log logf.Logger) *MotorFSM {
 	}
 }
 
+// handleBurningTransition manages FSM transitions during the burning period.
+func (fsm *MotorFSM) handleBurningTransition(ctx context.Context, state string) error {
+	switch state {
+	case StateIdle:
+		if err := fsm.triggerEvent(ctx, "ignite"); err != nil {
+			return err
+		}
+		return fsm.triggerEvent(ctx, "start_burning")
+	case StateIgnited:
+		return fsm.triggerEvent(ctx, "start_burning")
+	}
+	return nil
+}
+
+// triggerEvent wraps FSM.Event with error propagation.
+func (fsm *MotorFSM) triggerEvent(ctx context.Context, event string) error {
+	if err := fsm.FSM.Event(ctx, event); err != nil {
+		return err
+	}
+	return nil
+}
+
 // UpdateState updates the state based on elapsed time only
 func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime float64) error {
-	// Clamp negative values
 	if elapsedTime < 0 {
 		elapsedTime = 0
 	}
@@ -51,32 +72,16 @@ func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime flo
 	ctx := context.Background()
 	currentState := fsm.FSM.Current()
 
-	// Active burning period
 	if elapsedTime < burnTime && mass > 0 {
-		switch currentState {
-		case StateIdle:
-			// Idle -> Burning
-			if err := fsm.FSM.Event(ctx, "ignite"); err != nil {
-				return err
-			}
-			if err := fsm.FSM.Event(ctx, "start_burning"); err != nil {
-				return err
-			}
-		case StateIgnited:
-			// Ignited -> Burning
-			if err := fsm.FSM.Event(ctx, "start_burning"); err != nil {
-				return err
-			}
-		}
-		return nil
+		return fsm.handleBurningTransition(ctx, currentState)
 	}
 
-	// Transition to idle after burn or if mass depleted
 	if currentState == StateBurning {
-		return fsm.FSM.Event(ctx, "burnout")
+		return fsm.triggerEvent(ctx, "burnout")
 	}
 	return nil
 }
+
 
 // GetState returns the current state of the FSM
 func (fsm *MotorFSM) GetState() string {
