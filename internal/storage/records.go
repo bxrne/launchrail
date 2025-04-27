@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
-	"runtime"
+
 	"github.com/bxrne/launchrail/internal/logger"
 )
 
