@@ -25,7 +25,7 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
 	log.Info("Starting simulation run")
 
 	// Initialize the simulation manager
-	simManager := simulation.NewManager(cfg, log)
+	simManager := simulation.NewManager(cfg, *log)
 	// Defer closing the manager
 	defer func() {
 		if cerr := simManager.Close(); cerr != nil {
@@ -211,7 +211,7 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, e
 	}
 
 	// After parsing POST data into newCfg, ensure consistency by calling Manager.Initialize():
-	m := simulation.NewManager(&simConfig, logger.GetLogger(currentCfg.Setup.Logging.Level))
+	m := simulation.NewManager(&simConfig, *logger.GetLogger(currentCfg.Setup.Logging.Level))
 	// Initialize the manager to set up stores & apply config consistently
 	if err := m.Initialize(); err != nil {
 		log.Error("Manager initialization failed within configFromCtx", "error", err)

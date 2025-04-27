@@ -5,6 +5,7 @@ import (
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/http_client"
+	"github.com/bxrne/launchrail/internal/plugin"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/pkg/diff"
 	"github.com/bxrne/launchrail/pkg/openrocket"
@@ -15,7 +16,7 @@ import (
 
 type Manager struct {
 	cfg     *config.Config
-	log     *logf.Logger
+	log     logf.Logger
 	sim     *simulation.Simulation
 	status  SimulationStatus
 	simHash string
@@ -31,7 +32,7 @@ const (
 	StatusError    SimulationStatus = "error"
 )
 
-func NewManager(cfg *config.Config, log *logf.Logger) *Manager {
+func NewManager(cfg *config.Config, log logf.Logger) *Manager {
 	return &Manager{
 		cfg:    cfg,
 		log:    log,
@@ -40,6 +41,16 @@ func NewManager(cfg *config.Config, log *logf.Logger) *Manager {
 }
 
 func (m *Manager) Initialize() error {
+	// Compile plugins first
+	m.log.Info("Compiling external plugins...")
+	if err := plugin.CompilePlugins("./plugins", "./plugins", m.log); err != nil {
+		m.log.Error("Failed to compile one or more plugins", "error", err)
+		// Depending on requirements, we might want to allow proceeding even if some plugins fail.
+		// For now, treat compilation failure as a fatal initialization error.
+		return fmt.Errorf("plugin compilation failed: %w", err)
+	}
+	m.log.Info("Plugin compilation finished.")
+
 	// Validate config consistency for step & max_time
 	simStep := m.cfg.Engine.Simulation.Step
 	simMax := m.cfg.Engine.Simulation.MaxTime

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/internal/plugin"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,8 +17,26 @@ func TestNewManager(t *testing.T) {
 	cfg := &config.Config{}
 	log := logf.New(logf.Opts{})
 
-	manager := simulation.NewManager(cfg, &log)
+	manager := simulation.NewManager(cfg, log)
 	assert.NotNil(t, manager)
+}
+
+func TestMain(m *testing.M) {
+	// Mock plugin compilation for all tests in this package
+	originalCompilePlugins := plugin.CompilePlugins
+	plugin.CompilePlugins = func(sourceDir, outputDir string, logger logf.Logger) error {
+		// No-op for tests, assume plugins are pre-compiled or not needed
+		logger.Info("[Test Mock] Skipping plugin compilation")
+		return nil
+	}
+
+	// Run tests
+	exitCode := m.Run()
+
+	// Restore original function
+	plugin.CompilePlugins = originalCompilePlugins
+
+	os.Exit(exitCode)
 }
 
 func TestManager_Initialize(t *testing.T) {
@@ -103,7 +122,7 @@ func TestManager_Initialize(t *testing.T) {
 			cfg := tt.setupConfig()
 			log := logf.New(logf.Opts{})
 
-			manager := simulation.NewManager(cfg, &log)
+			manager := simulation.NewManager(cfg, log)
 			err := manager.Initialize()
 
 			if tt.expectedError {
@@ -148,7 +167,7 @@ func TestManager_Run(t *testing.T) {
 						},
 					},
 				}
-				manager := simulation.NewManager(cfg, &log)
+				manager := simulation.NewManager(cfg, log)
 				err := manager.Initialize()
 				require.NoError(t, err)
 				return manager
@@ -204,7 +223,7 @@ func TestManager_Close(t *testing.T) {
 		},
 	}
 
-	manager := simulation.NewManager(cfg, &log)
+	manager := simulation.NewManager(cfg, log)
 	err = manager.Initialize()
 	require.NoError(t, err)
 
