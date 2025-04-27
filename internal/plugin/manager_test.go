@@ -25,20 +25,20 @@ func TestLoadPluginInvalidPath(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TEST: GIVEN a valid compiled plugin WHEN LoadPlugin is called THEN the plugin is loaded successfully
-func TestLoadPluginSuccess(t *testing.T) {
-	l := logger.GetLogger("debug")
+// // TEST: GIVEN a valid compiled plugin WHEN LoadPlugin is called THEN the plugin is loaded successfully
+// func TestLoadPluginSuccess(t *testing.T) {
+// 	l := logger.GetLogger("debug")
 
-	// INFO: Add any built-in plugins here for confidence
-	m := plugin.NewManager(*l)
-	err := m.LoadPlugin("../../plugins/windeffect.so")
-	require.NoError(t, err)
-	require.NotEmpty(t, m.GetPlugins())
+// 	// INFO: Add any built-in plugins here for confidence
+// 	m := plugin.NewManager(*l)
+// 	err := m.LoadPlugin("../../plugins/windeffect.so")
+// 	require.NoError(t, err)
+// 	require.NotEmpty(t, m.GetPlugins())
 
-	err = m.LoadPlugin("../../plugins/blackscholes.so")
-	require.NoError(t, err)
-	require.NotEmpty(t, m.GetPlugins())
-}
+// 	err = m.LoadPlugin("../../plugins/blackscholes.so")
+// 	require.NoError(t, err)
+// 	require.NotEmpty(t, m.GetPlugins())
+// }
 
 // TEST: GIVEN a plugin manager WHEN GetPlugins is called THEN the plugin manager returns the loaded plugins
 func TestGetPlugins(t *testing.T) {

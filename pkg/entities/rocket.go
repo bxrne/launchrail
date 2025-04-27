@@ -1,6 +1,8 @@
 package entities
 
 import (
+	"fmt"
+	"math"
 	"sync"
 
 	"github.com/EngoEngine/ecs"
@@ -22,6 +24,27 @@ type RocketEntity struct {
 // NewRocketEntity creates a new rocket entity from OpenRocket data
 func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor *components.Motor) *RocketEntity {
 	if orkData == nil || motor == nil {
+		fmt.Println("Error: Cannot create RocketEntity, OpenRocket data or motor is nil.")
+		return nil
+	}
+
+	// Validate motor first (needs mass)
+	// GetMass() returns the *current* mass. For initial mass, this is fine.
+	if motor.GetMass() <= 0 {
+		// Use Designation for motor name if Props is not nil and Designation is not empty
+		motorName := "unknown"
+		if motor.Props != nil && motor.Props.Designation != "" { // Check if empty string
+			motorName = string(motor.Props.Designation) // It's already a string (or string alias)
+		}
+		fmt.Printf("Error: Cannot create RocketEntity, motor '%s' has invalid initial mass.\n", motorName)
+		return nil
+	}
+
+	initialMass := calculateTotalMass(orkData, motor) // Pass motor here
+
+	// Validate mass before creating entity
+	if initialMass <= 0 {
+		fmt.Printf("Error: Cannot create RocketEntity, calculated initial mass is invalid (%.4f).\n", initialMass)
 		return nil
 	}
 
@@ -52,14 +75,9 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 		},
 		Mass: &types.Mass{
 			BasicEntity: basic,
-			Value:       calculateTotalMass(orkData), // Set mass first
+			Value:       initialMass, // Set mass first
 		},
 		components: make(map[string]interface{}),
-	}
-
-	// Validate mass
-	if rocket.Mass.Value <= 0 {
-		return nil
 	}
 
 	// Store components with proper error handling
@@ -92,55 +110,99 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 	return rocket
 }
 
-// Calculate total mass by summing all components from OpenRocket data
-func calculateTotalMass(orkData *openrocket.RocketDocument) float64 {
+// calculateTotalMass sums masses of all components from OpenRocket data.
+// It attempts to calculate material mass where possible and adds explicit MassComponent masses.
+// Motor mass is handled separately via the components.Motor struct passed to NewRocketEntity.
+func calculateTotalMass(orkData *openrocket.RocketDocument, motor *components.Motor) float64 {
+	// Access the Rocket document within the OpenrocketDocument
+	// The schema confirmed orkData.Rocket exists.
+	// Reverting explicit dereference.
+
 	if orkData == nil || len(orkData.Subcomponents.Stages) == 0 {
-		// Consider logging an error here
+		fmt.Println("Warning: Cannot calculate mass, OpenRocket data or stages missing.")
+		return 0.0
+	}
+
+	if motor == nil {
+		fmt.Println("Warning: Cannot calculate total mass, motor component is nil.")
 		return 0.0
 	}
 
 	var totalMass float64
-	// Assuming single stage - validated in OpenrocketDocument.Validate
-	stage := orkData.Subcomponents.Stages[0]
+	// Assuming single stage - previously validated
+	stage := orkData.Subcomponents.Stages[0] // Standard access
+	sustainerSubs := stage.SustainerSubcomponents
+	noseSubs := sustainerSubs.Nosecone.Subcomponents
+	bodyTubeSubs := sustainerSubs.BodyTube.Subcomponents
+	innerTubeSubs := bodyTubeSubs.InnerTube.Subcomponents
 
-	// Helper for components with pointer receiver GetMass()
-	addMass := func(component interface{ GetMass() float64 }) {
-		// component is expected to be a non-nil pointer to the struct
-		if component != nil {
-			totalMass += component.GetMass()
-			// TODO: Potentially check for NaN/negative mass from GetMass() implementations
+	// Helper to add mass from components implementing GetMass interface
+	addMass := func(compName string, comp openrocket.MassProvider) { // Use MassProvider interface
+		if comp == nil { // Check if the component itself is nil (e.g., optional components not present)
+			// fmt.Printf("Info: Skipping mass for nil component '%s'\n", compName)
+			return
 		}
+		mass := comp.GetMass()
+		if math.IsNaN(mass) || mass < 0 {
+			fmt.Printf("Warning: Invalid mass (%.4f) calculated for component '%s' (%T), skipping.\n", mass, compName, comp)
+			return
+		}
+		// fmt.Printf("Adding mass for %s (%T): %.4f\n", compName, comp, mass) // Debug
+		totalMass += mass
 	}
 
 	// --- Add mass for components with GetMass() ---
-	sustainerSubs := stage.SustainerSubcomponents // Value struct
+	// Top-level components
+	addMass("Nosecone", &sustainerSubs.Nosecone)
+	addMass("BodyTube", &sustainerSubs.BodyTube) // Tube material mass
+	// Components nested within BodyTube
+	addMass("TrapezoidFinset", &bodyTubeSubs.TrapezoidFinset)
+	addMass("Parachute", &bodyTubeSubs.Parachute)
+	addMass("Shockcord", &bodyTubeSubs.Shockcord)
+	addMass("InnerTube", &bodyTubeSubs.InnerTube) // Inner tube material mass
+	// CenteringRings (Iterate)
+	for i := range bodyTubeSubs.CenteringRings {
+		addMass(fmt.Sprintf("CenteringRing[%d]", i), &bodyTubeSubs.CenteringRings[i])
+	}
 
-	// Pass addresses (&) to satisfy pointer receivers for GetMass
-	addMass(&sustainerSubs.Nosecone)
-	addMass(&sustainerSubs.BodyTube)
+	// --- Add mass for explicit MassComponents ---
+	// (Using their own GetMass method now)
+	addMass("Nosecone.MassComponent", &noseSubs.MassComponent)
+	addMass("InnerTube.MassComponent", &innerTubeSubs.MassComponent)
 
-	// Process subcomponents of BodyTube
-	bodyTubeSubs := sustainerSubs.BodyTube.Subcomponents // Value struct
-	addMass(&bodyTubeSubs.TrapezoidFinset)
+	// --- Add Motor Mass --- (Extracted to helper)
+	totalMass += getValidMotorMass(motor)
 
-	// --- Add mass for components with direct Mass field ---
-	noseSubs := sustainerSubs.Nosecone.Subcomponents
-	totalMass += noseSubs.MassComponent.Mass // Assumes MassComponent always exists if NoseSubcomponents does
-
-	// --- Components currently omitted due to missing GetMass() or data in schema ---
-	// - Parachute: No GetMass() in schema_parachute.go
-	// - Shockcord: No GetMass() in schema_common.go
-	// - InnerTube: No GetMass() in schema_airframe.go
-	// - CenteringRing: No GetMass() in schema_common.go (would need iteration if added)
-	// - MotorMount/Motor: No GetMass() in schema_motor.go (Motor mass handled dynamically)
-	// NOTE: This means the calculated mass will be an UNDERESTIMATE.
-	// To fix this, GetMass() methods or manual calculations based on
-	// material/dimensions need to be added to the respective schema types.
-
-	// NOTE: Calculation also relies on the correctness of existing GetMass methods.
-	// As observed, Nosecone.GetMass and BodyTube.GetMass implementations might be inaccurate.
-
+	// --- Final Validation ---
+	if math.IsNaN(totalMass) || totalMass <= 0 {
+		fmt.Printf("Warning: Final calculated total mass is invalid or zero (%.4f). Returning 0.\n", totalMass)
+		return 0.0
+	}
+	// fmt.Printf("Final Calculated Total Mass: %.4f\n", totalMass) // Debug
 	return totalMass
+}
+
+// getValidMotorMass calculates and validates the motor's initial mass.
+// It returns the valid mass or 0.0 if invalid, logging a warning.
+func getValidMotorMass(motor *components.Motor) float64 {
+	if motor == nil {
+		fmt.Println("Warning: Motor component is nil in getValidMotorMass.")
+		return 0.0
+	}
+
+	motorMass := motor.GetMass() // GetMass() returns the current mass (initial mass at t=0)
+
+	if math.IsNaN(motorMass) || motorMass < 0 {
+		motorName := "unknown"
+		if motor.Props != nil && motor.Props.Designation != "" { // Check if empty string
+			motorName = string(motor.Props.Designation)
+		}
+		fmt.Printf("Warning: Invalid initial mass (%.4f) obtained from motor component '%s', skipping motor mass.\n", motorMass, motorName)
+		return 0.0 // Return 0 if mass is invalid
+	}
+
+	// fmt.Printf("Adding mass for Motor '%s': %.4f\n", string(motor.Props.Designation), motorMass) // Debug
+	return motorMass // Return the valid mass
 }
 
 // AddComponent adds a component to the entity

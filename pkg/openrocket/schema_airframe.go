@@ -122,6 +122,38 @@ type InnerTube struct {
 	Subcomponents        NoseSubcomponents `xml:"subcomponents"` // TODO: Refactor naming here
 }
 
+// GetMass calculates the mass of the inner tube material itself (excluding subcomponents like motor).
+func (i *InnerTube) GetMass() float64 {
+	// --- Input parameters ---
+	length := i.Length
+	thickness := i.Thickness
+	density := i.Material.Density
+	outerRadius := i.OuterRadius // InnerTube uses numeric OuterRadius
+
+	if density <= 0 || length <= 0 || outerRadius <= 0 || thickness <= 0 || thickness >= outerRadius {
+		// Invalid dimensions or material
+		// fmt.Printf("Warning: Invalid dimensions or material for InnerTube '%s', cannot calculate material mass.\n", i.Name)
+		return 0.0
+	}
+
+	// --- Calculate Inner Radius ---
+	innerRadius := outerRadius - thickness
+
+	// --- Calculate Volume & Mass ---
+	// Volume = pi * (R_outer^2 - R_inner^2) * L
+	materialVolume := math.Pi * (outerRadius*outerRadius - innerRadius*innerRadius) * length
+	materialMass := materialVolume * density
+
+	// Note: Mass of subcomponents (e.g., motor mount, internal components)
+	// are handled separately by the caller.
+	if math.IsNaN(materialMass) || materialMass < 0 {
+		 fmt.Printf("Warning: Invalid mass (%.4f) calculated for InnerTube '%s' material, returning 0.\n", materialMass, i.Name)
+		 return 0.0
+	 }
+
+	return materialMass
+}
+
 // String returns full string representation of the innertube
 func (i *InnerTube) String() string {
 	return fmt.Sprintf("InnerTube{Name=%s, ID=%s, AxialOffset=%s, Position=%s, Material=%s, Length=%.2f, RadialPosition=%.2f, RadialDirection=%.2f, OuterRadius=%.2f, Thickness=%.2f, ClusterConfiguration=%s, ClusterScale=%.2f, ClusterRotation=%.2f, MotorMount=%s, Subcomponents=%s}", i.Name, i.ID, i.AxialOffset.String(), i.Position.String(), i.Material.String(), i.Length, i.RadialPosition, i.RadialDirection, i.OuterRadius, i.Thickness, i.ClusterConfiguration, i.ClusterScale, i.ClusterRotation, i.MotorMount.String(), i.Subcomponents.String())

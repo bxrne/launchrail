@@ -3,6 +3,7 @@ package openrocket
 import (
 	"encoding/xml"
 	"fmt"
+	"math"
 )
 
 // Parachute represents the parachute element of the XML document
@@ -31,6 +32,34 @@ type Parachute struct {
 // String returns full string representation of the parachute
 func (p *Parachute) String() string {
 	return fmt.Sprintf("Parachute{Name=%s, ID=%s, AxialOffset=%s, Position=%s, PackedLength=%.2f, PackedRadius=%.2f, RadialPosition=%.2f, RadialDirection=%.2f, CD=%s, Material=%s, DeployEvent=%s, DeployAltitude=%.2f, DeployDelay=%.2f, DeploymentConfig=%s, Diameter=%.2f, LineCount=%d, LineLength=%.2f, LineMaterial=%s}", p.Name, p.ID, p.AxialOffset.String(), p.Position.String(), p.PackedLength, p.PackedRadius, p.RadialPosition, p.RadialDirection, p.CD, p.Material.String(), p.DeployEvent, p.DeployAltitude, p.DeployDelay, p.DeploymentConfig.String(), p.Diameter, p.LineCount, p.LineLength, p.LineMaterial.String())
+}
+
+// GetMass calculates the mass of the parachute based on canopy and line materials/dimensions.
+// NOTE: This calculation assumes Parachute.Material.Density represents AREAL density (e.g., kg/m^2).
+// Line mass calculation is currently a placeholder and needs LineMaterial definition (density, thickness/linear density).
+func (p *Parachute) GetMass() float64 {
+	if p.Material.Density <= 0 || p.Diameter <= 0 {
+		return 0.0 // Cannot calculate without material density and diameter
+	}
+
+	// Canopy Mass (assuming flat circle and areal density)
+	canopyRadius := p.Diameter / 2.0
+	canopyArea := math.Pi * canopyRadius * canopyRadius
+	canopyMass := canopyArea * p.Material.Density // Density is assumed areal (mass/area)
+
+	// Line Mass Placeholder
+	// TODO: Implement line mass: Requires LineMaterial definition (Density, likely linear).
+	// Approx: lineMass = p.LineLength * p.LineCount * linearDensityOfLineMaterial
+	lineMass := 0.0 // Placeholder for now
+
+	totalMass := canopyMass + lineMass
+
+	if math.IsNaN(totalMass) || totalMass < 0 {
+		fmt.Printf("Warning: Invalid mass (%.4f) calculated for Parachute '%s', returning 0.\n", totalMass, p.Name)
+		return 0.0
+	}
+
+	return totalMass
 }
 
 // DeploymentConfig represents the deployment configuration element of the XML document

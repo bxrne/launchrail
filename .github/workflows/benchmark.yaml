@@ -1,0 +1,63 @@
+name: Run Benchmarks and Update Results
+
+on:
+  push:
+    branches:
+      - main # Or your default branch
+
+permissions:
+  contents: write # Needed to commit BENCHMARK.md
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21' # Use the Go version your project requires
+
+      - name: Run Benchmarks and Capture Output
+        id: run_bench
+        run: |
+          cd cmd/bench
+          # Run the benchmark executable and capture all output
+          output=$(go run .)
+          echo "Captured output:" # Debugging line
+          echo "$output" # Debugging line
+          # Extract content between markers
+          content=$(echo "$output" | awk '/--- MARKDOWN OUTPUT START ---/{flag=1; next} /--- MARKDOWN OUTPUT END ---/{flag=0} flag')
+          echo "Extracted content:" # Debugging line
+          echo "$content" # Debugging line
+          # Escape special characters for multiline echo
+          content=$(echo "$content" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/`/\\`/g' | sed 's/\$/\\$/g')
+          # Set the output for the next step
+          echo "markdown_content<<EOF" >> $GITHUB_OUTPUT
+          echo "$content" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update BENCHMARK.md
+        run: |
+          echo "Creating/Updating BENCHMARK.md"
+          # Ensure the extracted content is not empty before writing
+          if [ -z "${{ steps.run_bench.outputs.markdown_content }}" ]; then
+            echo "Warning: No markdown content extracted from benchmark output."
+            echo "# Benchmark Results\n\nNo results generated." > BENCHMARK.md
+          else
+            echo "${{ steps.run_bench.outputs.markdown_content }}" > BENCHMARK.md
+            echo "BENCHMARK.md updated successfully."
+          fi
+          cat BENCHMARK.md # Debugging: Show file content
+
+      - name: Commit and Push BENCHMARK.md
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: Update benchmark results [skip ci]"
+          file_pattern: BENCHMARK.md
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
+          commit_author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
