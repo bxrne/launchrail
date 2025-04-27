@@ -8,14 +8,15 @@ import (
 
 // BenchmarkResult holds the outcome of a single benchmark comparison.
 type BenchmarkResult struct {
-	Name        string
-	Passed      bool
-	Metric      string // e.g., "Apogee", "Max Velocity"
-	Expected    float64
-	Actual      float64
-	Difference  float64
-	Tolerance   float64
-	Description string
+	Name          string
+	Description   string
+	Metric        string // e.g., "Apogee", "Max Velocity"
+	Expected      float64
+	Actual        float64
+	Difference    float64
+	Tolerance     float64
+	ToleranceType string // Type of tolerance applied ("relative" or "absolute")
+	Passed        bool
 }
 
 // Benchmark defines the interface for a runnable benchmark case.
@@ -122,3 +123,37 @@ func (s *BenchmarkSuite) RunAll() (map[string][]BenchmarkResult, bool, error) {
 // 	 time.Sleep(1 * time.Second) // Simulate work
 // 	 return map[string]float64{"Apogee": 7400.0, "MaxVelocity": 1050.0}, nil // Example simulated data
 // }
+
+// compareFloat compares two floats within a tolerance, handling zero expected values.
+func compareFloat(name, description string, expected, actual, tolerance float64) BenchmarkResult {
+	passed := false
+	var diff float64
+
+	if expected == 0 {
+		// For zero expected values, consider it a pass if actual is within tolerance
+		if actual <= tolerance {
+			passed = true
+		}
+		diff = actual
+	} else {
+		diff = actual - expected
+		if diff < 0 {
+			diff = -diff // Absolute difference
+		}
+		if diff <= tolerance {
+			passed = true
+		}
+	}
+
+	return BenchmarkResult{
+		Name:        name,
+		Description: description,
+		Metric:      "Float Comparison",
+		Expected:    expected,
+		Actual:      actual,
+		Difference:  diff,
+		Tolerance:   tolerance,
+		ToleranceType: "absolute",
+		Passed:      passed,
+	}
+}

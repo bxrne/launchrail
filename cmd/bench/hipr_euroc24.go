@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"path/filepath"
 
 	"github.com/bxrne/launchrail/internal/logger" // Import custom logger
@@ -72,46 +71,50 @@ func (b *HiprEuroc24Benchmark) LoadData(benchDataDir string) error {
 // Run performs the comparison between benchmark data and simulated data.
 func (b *HiprEuroc24Benchmark) Run(simData interface{}) ([]BenchmarkResult, error) {
 	results := []BenchmarkResult{}
+	benchLogger := logger.GetLogger("info") // Get logger instance
 
-	fmt.Println("Running comparison...")
+	benchLogger.Info("Running comparison...")
 
-	// --- Placeholder for extracting data from simData ---
-	// This needs to be defined based on how simulation results are structured.
-	// Example: simResults := simData.(map[string]float64) // Or a specific struct
-	simApogee := 7448.0    // Placeholder value from dtl3.csv
-	simMaxVelocity := 1055.31 // Placeholder value from dtl3.csv
-	simLiftoffTime := 0.0     // Placeholder
-	simApogeeTime := 20.60    // Placeholder
-	simTouchdownTime := 122.12 // Placeholder
+	// --- Define Ground Truth Expected Values for hipr-euroc24 ---
+	// These values represent the known correct results for this dataset.
+	// TODO: Potentially load these from a config file instead of hardcoding.
+	const expectedApogeeGroundTruth = 7448.0
+	const expectedMaxVGroundTruth = 1055.31
+	const expectedLiftoffTimeGroundTruth = 0.0
+	const expectedApogeeTimeGroundTruth = 20.60 // Time of Apogee Event
+	const expectedTouchdownTimeGroundTruth = 122.12 // Time of Touchdown State
+
+	// --- Calculate Actual Values from Loaded Benchmark Data ---
+	actualApogeeFromData, _ := b.findApogee()
+	actualMaxVFromData, _ := b.findMaxVelocity()
+	actualLiftoffTimeFromData := b.findEventTime("EV_LIFTOFF")
+	actualApogeeEventTimeFromData := b.findEventTime("EV_APOGEE")
+	actualTouchdownTimeFromData := b.findStateTime("TOUCHDOWN")
 
 	// --- Perform Comparisons ---
 
 	// 1. Apogee Comparison
-	expectedApogee, _ := b.findApogee()
 	apogeeTolerance := 0.05 // 5% tolerance
-	results = append(results, compareFloat("Apogee", expectedApogee, simApogee, apogeeTolerance))
+	results = append(results, compareFloat("Apogee", "Compare apogee height", expectedApogeeGroundTruth, actualApogeeFromData, apogeeTolerance))
 
 	// 2. Max Velocity Comparison
-	expectedMaxV, _ := b.findMaxVelocity()
 	maxVTolerance := 0.05 // 5% tolerance
-	results = append(results, compareFloat("Max Velocity", expectedMaxV, simMaxVelocity, maxVTolerance))
+	results = append(results, compareFloat("Max Velocity", "Compare maximum velocity", expectedMaxVGroundTruth, actualMaxVFromData, maxVTolerance))
 
 	// 3. Event Timing Comparisons (Example)
 	liftoffTolerance := 0.1 // 100ms tolerance
-	expectedLiftoffTime := b.findEventTime("EV_LIFTOFF")
-	results = append(results, compareFloat("Liftoff Time", expectedLiftoffTime, simLiftoffTime, liftoffTolerance))
+	results = append(results, compareFloat("Liftoff Time", "Compare liftoff event time", expectedLiftoffTimeGroundTruth, actualLiftoffTimeFromData, liftoffTolerance))
 
 	apogeeTimeTolerance := 0.5 // 500ms tolerance
-	expectedApogeeEventTime := b.findEventTime("EV_APOGEE") // Note: This might need refinement if multiple apogee events exist
-	results = append(results, compareFloat("Apogee Event Time", expectedApogeeEventTime, simApogeeTime, apogeeTimeTolerance))
+	// Note: findEventTime returns the *first* occurrence.
+	results = append(results, compareFloat("Apogee Event Time", "Compare apogee event time", expectedApogeeTimeGroundTruth, actualApogeeEventTimeFromData, apogeeTimeTolerance))
 
 	touchdownTolerance := 1.0 // 1s tolerance
-	expectedTouchdownTime := b.findStateTime("TOUCHDOWN")
-	results = append(results, compareFloat("Touchdown Time", expectedTouchdownTime, simTouchdownTime, touchdownTolerance))
+	results = append(results, compareFloat("Touchdown Time", "Compare touchdown state time", expectedTouchdownTimeGroundTruth, actualTouchdownTimeFromData, touchdownTolerance))
 
 	// TODO: Add more comparisons (e.g., trajectory matching, other event times)
 
-	fmt.Println("Comparison complete.")
+	benchLogger.Info("Comparison complete.")
 	return results, nil
 }
 
@@ -163,36 +166,4 @@ func (b *HiprEuroc24Benchmark) findStateTime(stateName string) float64 {
 		}
 	}
 	return -1 // Indicate not found
-}
-
-// compareFloat is a helper to create a BenchmarkResult for float comparison.
-func compareFloat(metricName string, expected, actual, tolerancePercent float64) BenchmarkResult {
-	diff := math.Abs(expected - actual)
-	var toleranceValue float64
-
-	// Handle expected value of zero (or close to zero) separately
-	if math.Abs(expected) < 1e-9 { // Use epsilon comparison for float zero
-		// If expected is zero, interpret tolerancePercent as the absolute allowed difference.
-		toleranceValue = tolerancePercent // Treat as absolute tolerance
-	} else {
-		// Otherwise, calculate the tolerance value as a percentage of the expected value.
-		toleranceValue = math.Abs(expected * tolerancePercent)
-	}
-
-	passed := diff <= toleranceValue
-
-	return BenchmarkResult{
-		Name:        metricName,
-		Passed:      passed,
-		Metric:      metricName,
-		Expected:    expected,
-		Actual:      actual,
-		Difference:  diff,
-		Tolerance:   toleranceValue,
-		Description: fmt.Sprintf("%s: Expected=%.2f, Actual=%.2f, Diff=%.2f, Tolerance=%.2f (%.1f%% interpreted %s)",
-			metricName,
-			expected, actual, diff, toleranceValue,
-			tolerancePercent*100,
-			func() string { if math.Abs(expected) < 1e-9 { return "absolute" } else { return "relative" } }()),
-	}
 }

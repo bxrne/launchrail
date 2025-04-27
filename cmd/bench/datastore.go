@@ -160,16 +160,18 @@ func LoadFlightStates(filePath string) ([]FlightState, error) {
 
 	data := make([]FlightState, 0, len(records))
 	for i, record := range records {
-		if len(record) < 2 {
-			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want >= 2", filepath.Base(filePath), i+2, len(record))
+		if len(record) != 3 { // Expect exactly 3 columns
+			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 3", filepath.Base(filePath), i+1, len(record))
 		}
 
-		ts, err := parseFloat(record[0], i, "ts", filePath)
+		// Parse column 1 (index 1) as timestamp
+		ts, err := parseFloat(record[1], i, "ts", filePath)
 		if err != nil {
 			return nil, err
 		}
 
-		data = append(data, FlightState{Timestamp: ts, State: record[1]})
+		// Take column 2 (index 2) as state string
+		data = append(data, FlightState{Timestamp: ts, State: record[2]})
 	}
 	return data, nil
 }

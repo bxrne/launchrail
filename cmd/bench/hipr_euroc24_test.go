@@ -102,26 +102,27 @@ func TestCompareFloat(t *testing.T) {
 	tests := []struct {
 		name            string
 		metricName      string
+		description     string
 		expected        float64
 		actual          float64
 		tolerancePercent float64
 		expectedPass    bool
 	}{
-		{"Pass Within Tolerance", "Altitude", 100.0, 102.0, 0.05, true},
-		{"Pass Exact Match", "Velocity", 50.0, 50.0, 0.10, true},
-		{"Pass Edge of Tolerance (Upper)", "Time", 10.0, 10.5, 0.05, true},
-		{"Pass Edge of Tolerance (Lower)", "Pressure", 1000.0, 970.0, 0.03, true},
-		{"Fail Outside Tolerance (Upper)", "Altitude", 100.0, 106.0, 0.05, false},
-		{"Fail Outside Tolerance (Lower)", "Velocity", 50.0, 44.0, 0.10, false},
-		{"Zero Expected, Non-Zero Actual, Pass", "ErrorCount", 0.0, 0.01, 0.1, true}, // Tolerance calc needs care
-		{"Zero Expected, Non-Zero Actual, Fail", "ErrorCount", 0.0, 1.0, 0.1, false}, // Needs absolute tolerance or special handling
-		{"Negative Values, Pass", "Temperature", -10.0, -10.2, 0.05, true},
-		{"Negative Values, Fail", "Temperature", -10.0, -11.0, 0.05, false},
+		{"Pass Within Tolerance", "Altitude", "Test altitude", 100.0, 102.0, 0.05, true},
+		{"Pass Exact Match", "Velocity", "Test velocity", 50.0, 50.0, 0.10, true},
+		{"Pass Edge of Tolerance (Upper)", "Time", "Test time", 10.0, 10.5, 0.05, true},
+		{"Pass Edge of Tolerance (Lower)", "Pressure", "Test pressure", 1000.0, 970.0, 0.03, true},
+		{"Fail Outside Tolerance (Upper)", "Altitude", "Test altitude", 100.0, 106.0, 0.05, false},
+		{"Fail Outside Tolerance (Lower)", "Velocity", "Test velocity", 50.0, 44.0, 0.10, false},
+		{"Zero Expected, Non-Zero Actual, Pass", "ErrorCount", "Test error count", 0.0, 0.01, 0.1, true}, // Tolerance calc needs care
+		{"Zero Expected, Non-Zero Actual, Fail", "ErrorCount", "Test error count", 0.0, 1.0, 0.1, false}, // Needs absolute tolerance or special handling
+		{"Negative Values, Pass", "Temperature", "Test temperature", -10.0, -10.2, 0.05, true},
+		{"Negative Values, Fail", "Temperature", "Test temperature", -10.0, -11.0, 0.05, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := compareFloat(tt.metricName, tt.expected, tt.actual, tt.tolerancePercent)
+			result := compareFloat(tt.metricName, tt.description, tt.expected, tt.actual, tt.tolerancePercent)
 			assert.Equal(t, tt.expectedPass, result.Passed, "Pass/Fail status mismatch")
 			assert.Equal(t, tt.metricName, result.Metric)
 			assert.Equal(t, tt.expected, result.Expected)
