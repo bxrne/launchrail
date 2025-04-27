@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/bxrne/launchrail/internal/config" // Import config package
 	"github.com/bxrne/launchrail/internal/logger"
@@ -54,10 +56,16 @@ func main() {
 		os.Exit(1) // Exit explicitly if RunAll returns an error
 	}
 
-	// --- Print Results Summary ---
+	// Format and print results to stdout for capture
+	markdownOutput := formatResultsToMarkdown(results)
+	fmt.Println("\n--- MARKDOWN OUTPUT START ---") // Marker for easy capture
+	fmt.Print(markdownOutput)
+	fmt.Println("--- MARKDOWN OUTPUT END ---")
+
+	// --- Print Results Summary to logs (keep existing log output) ---
 	failedCount := 0
 	passedCount := 0
-	benchLogger.Info("--- Benchmark Results Summary ---")
+	benchLogger.Info("--- Benchmark Results Summary (Logs) ---")
 	for benchmarkName, benchmarkResults := range results {
 		fmt.Printf("\nResults for %s:\n", benchmarkName)
 		benchmarkFailed := false
@@ -91,4 +99,39 @@ func main() {
 		benchLogger.Info("Benchmark suite finished successfully.")
 		os.Exit(0) // Exit with zero status code if all metrics passed
 	}
+}
+
+// formatResultsToMarkdown formats the benchmark results into a Markdown string.
+func formatResultsToMarkdown(results map[string][]BenchmarkResult) string {
+	var markdown bytes.Buffer
+
+	markdown.WriteString("# Benchmark Results\n\n")
+
+	for benchmarkName, benchmarkResults := range results {
+		markdown.WriteString(fmt.Sprintf("## %s\n\n", benchmarkName))
+		markdown.WriteString("| Metric        | Description   | Expected | Actual   | Diff     | Tolerance | Type     | Status |\n")
+		markdown.WriteString("|---------------|---------------|----------|----------|----------|-----------|----------|--------|\n")
+
+		for _, res := range benchmarkResults {
+			status := ":white_check_mark: PASSED"
+			if !res.Passed {
+				status = ":x: FAILED"
+			}
+			// Format floats for better readability
+			// Using %.3f for precision, adjust as needed
+			expectedStr := fmt.Sprintf("%.3f", res.Expected)
+			actualStr := fmt.Sprintf("%.3f", res.Actual)
+			diffStr := fmt.Sprintf("%.3f", res.Difference)
+			toleranceStr := fmt.Sprintf("%.3f", res.Tolerance)
+
+			// Escape pipe characters in description if any
+			description := strings.ReplaceAll(res.Description, "|", "\\|")
+
+			markdown.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s | %s |\n",
+				res.Metric, description, expectedStr, actualStr, diffStr, toleranceStr, res.ToleranceType, status))
+		}
+		markdown.WriteString("\n") // Add space between benchmarks
+	}
+
+	return markdown.String()
 }
