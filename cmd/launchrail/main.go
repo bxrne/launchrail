@@ -18,14 +18,14 @@ func main() {
 
 	// Initialize logger
 	log := logger.GetLogger(cfg.Setup.Logging.Level)
-	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version)
+	log.Info("Logger initialized", "level", cfg.Setup.Logging.Level)
 
 	// Create and initialize simulation manager
-	simManager := simulation.NewManager(cfg, log)
+	simManager := simulation.NewManager(cfg, *log) // Dereference pointer to pass interface value
 	defer simManager.Close()
 
 	if err := simManager.Initialize(); err != nil {
-		log.Fatal("Failed to initialize simulation", "Error", err)
+		log.Fatal("Failed to initialize simulation manager", "error", err)
 	}
 
 	// Run simulation

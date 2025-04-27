@@ -9,14 +9,14 @@ import (
 // LogParasiteSystem logs rocket state data
 type LogParasiteSystem struct {
 	world    *ecs.World
-	logger   *logf.Logger
+	logger   logf.Logger
 	entities []*states.PhysicsState // Change to pointer slice
 	dataChan chan *states.PhysicsState
 	done     chan struct{}
 }
 
 // NewLogParasiteSystem creates a new LogParasiteSystem
-func NewLogParasiteSystem(world *ecs.World, logger *logf.Logger) *LogParasiteSystem {
+func NewLogParasiteSystem(world *ecs.World, logger logf.Logger) *LogParasiteSystem {
 	return &LogParasiteSystem{
 		world:    world,
 		logger:   logger,

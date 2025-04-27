@@ -60,7 +60,7 @@ func TestNewSimulation(t *testing.T) {
 	stores, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	sim, err := simulation.NewSimulation(cfg, &log, stores)
+	sim, err := simulation.NewSimulation(cfg, log, stores)
 	require.NoError(t, err)
 	require.NotNil(t, sim)
 }
@@ -80,7 +80,7 @@ func TestLoadRocket(t *testing.T) {
 	stores, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	sim, err := simulation.NewSimulation(cfg, &log, stores)
+	sim, err := simulation.NewSimulation(cfg, log, stores)
 	require.NoError(t, err)
 
 	orkData, err := openrocket.Load("../../testdata/openrocket/l1.ork", "23.09")
@@ -117,7 +117,7 @@ func TestRun(t *testing.T) {
 	stores, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	sim, err := simulation.NewSimulation(cfg, &log, stores)
+	sim, err := simulation.NewSimulation(cfg, log, stores)
 	require.NoError(t, err)
 
 	orkData, err := openrocket.Load("../../testdata/openrocket/l1.ork", "23.09")

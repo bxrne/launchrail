@@ -31,7 +31,7 @@ type Simulation struct {
 	rulesSystem       *systems.RulesSystem
 	rocket            *entities.RocketEntity
 	config            *config.Config
-	logger            *logf.Logger
+	logger            logf.Logger
 	updateChan        chan struct{}
 	doneChan          chan struct{}
 	stateChan         chan *states.PhysicsState
@@ -42,7 +42,7 @@ type Simulation struct {
 }
 
 // NewSimulation creates a new rocket simulation
-func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores) (*Simulation, error) {
+func NewSimulation(cfg *config.Config, log logf.Logger, stores *storage.Stores) (*Simulation, error) {
 	world := &ecs.World{}
 
 	sim := &Simulation{
@@ -52,7 +52,7 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 		updateChan:    make(chan struct{}),
 		doneChan:      make(chan struct{}),
 		stateChan:     make(chan *states.PhysicsState, 100),
-		pluginManager: plugin.NewManager(*log),
+		pluginManager: plugin.NewManager(log),
 	}
 
 	for _, pluginPath := range cfg.Setup.Plugins.Paths {
@@ -115,7 +115,7 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 // LoadRocket loads a rocket entity into the simulation
 func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *thrustcurves.MotorData) error {
 	// Create motor component with logger
-	motor, err := components.NewMotor(ecs.NewBasic(), motorData, *s.logger)
+	motor, err := components.NewMotor(ecs.NewBasic(), motorData, s.logger)
 	if err != nil {
 		return err
 	}
@@ -221,7 +221,6 @@ func logPeriodicSimState(s *Simulation, state *entities.RocketEntity, hasMotor b
 		s.logger.Warn("Sim state: Motor is nil", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value)
 	}
 }
-
 
 // shouldStopSimulation checks if the simulation should stop and logs the reason.
 func (s *Simulation) shouldStopSimulation() bool {

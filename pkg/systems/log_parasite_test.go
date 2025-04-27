@@ -41,7 +41,7 @@ func createTestMotor() (*components.Motor, *thrustcurves.MotorData) {
 func TestLogParasiteSystem(t *testing.T) {
 	world := &ecs.World{}
 	logger := logf.New(logf.Opts{})
-	system := systems.NewLogParasiteSystem(world, &logger)
+	system := systems.NewLogParasiteSystem(world, logger)
 
 	// Test initialization
 	if system == nil {
