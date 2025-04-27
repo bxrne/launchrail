@@ -1,3 +1,9 @@
+## v0.1.2 (2025-04-27)
+
+### Fix
+
+- **storage**: Fixed use of RecordsList via templ
+
 ## v0.1.1 (2025-04-27)
 
 ### Fix
