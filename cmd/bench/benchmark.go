@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/bxrne/launchrail/internal/logger" // Import custom logger
 )
@@ -125,35 +126,37 @@ func (s *BenchmarkSuite) RunAll() (map[string][]BenchmarkResult, bool, error) {
 // }
 
 // compareFloat compares two floats within a tolerance, handling zero expected values.
-func compareFloat(name, description string, expected, actual, tolerance float64) BenchmarkResult {
+func compareFloat(name, description string, expected, actual, tolerancePercent float64) BenchmarkResult {
 	passed := false
-	var diff float64
+	diff := actual - expected
+	absoluteDiff := math.Abs(diff)
+	toleranceType := "relative"
+	var calculatedTolerance float64
 
 	if expected == 0 {
-		// For zero expected values, consider it a pass if actual is within tolerance
-		if actual <= tolerance {
+		// For zero expected values, tolerance is absolute.
+		toleranceType = "absolute"
+		calculatedTolerance = tolerancePercent // Treat the input as absolute tolerance here
+		if absoluteDiff <= calculatedTolerance {
 			passed = true
 		}
-		diff = actual
 	} else {
-		diff = actual - expected
-		if diff < 0 {
-			diff = -diff // Absolute difference
-		}
-		if diff <= tolerance {
+		// Calculate relative tolerance
+		calculatedTolerance = math.Abs(expected * tolerancePercent)
+		if absoluteDiff <= calculatedTolerance {
 			passed = true
 		}
 	}
 
 	return BenchmarkResult{
-		Name:        name,
-		Description: description,
-		Metric:      "Float Comparison",
-		Expected:    expected,
-		Actual:      actual,
-		Difference:  diff,
-		Tolerance:   tolerance,
-		ToleranceType: "absolute",
-		Passed:      passed,
+		Name:          name, // Use the provided metric name
+		Description:   description,
+		Metric:        name, // Use the provided metric name here as well
+		Expected:      expected,
+		Actual:        actual,
+		Difference:    diff, // Report the signed difference
+		Tolerance:     calculatedTolerance, // Report the calculated absolute tolerance value
+		ToleranceType: toleranceType,
+		Passed:        passed,
 	}
 }

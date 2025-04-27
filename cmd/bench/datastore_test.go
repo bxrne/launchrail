@@ -91,13 +91,15 @@ func TestLoadFlightInfo_ErrorHandling(t *testing.T) {
 }
 
 func TestLoadEventInfo(t *testing.T) {
-	csvContent := `ts,event
-0.1,LAUNCH
-5.2,BURNOUT
-21.2,APOGEE
-30.5,DROGUE_DEPLOY
-45.1,MAIN_DEPLOY
-60.0,LANDED
+	// Arrange: Use comma delimiter, matching default CSV reader
+	// LoadEventInfo reads ts from index 1 and event from index 2.
+	csvContent := `#,ts,event,out_idx
+1,0.1,LAUNCH,1
+2,5.2,BURNOUT,2
+3,21.2,APOGEE,3
+4,30.5,DROGUE_DEPLOY,4
+5,45.1,MAIN_DEPLOY,5
+6,60.0,LANDED,6
 `
 	filePath := createTempCSV(t, csvContent)
 
@@ -111,8 +113,8 @@ func TestLoadEventInfo(t *testing.T) {
 	assert.Equal(t, "LANDED", data[5].Event)
 
 	// Test error case (invalid float)
-	invalidCsv := `ts,event
-not_a_float,FAIL
+	invalidCsv := `#,ts,event,out_idx
+1,not_a_float,FAIL,1
 `
 	invalidFilePath := createTempCSV(t, invalidCsv)
 	_, err = LoadEventInfo(invalidFilePath)
@@ -120,9 +122,9 @@ not_a_float,FAIL
 	assert.ErrorContains(t, err, "invalid float value 'not_a_float'")
 
 	// Test error case (missing column)
-	missingColCsv := `ts
-1.0
-`
+	missingColCsv := `#	ts
+1	1.0
+` // Keep tabs here to test the column count error correctly
 	missingColFilePath := createTempCSV(t, missingColCsv)
 	_, err = LoadEventInfo(missingColFilePath)
 	require.Error(t, err)
@@ -130,14 +132,16 @@ not_a_float,FAIL
 }
 
 func TestLoadFlightStates(t *testing.T) {
-	csvContent := `ts,state
-0.0,PRELAUNCH
-0.1,POWERED_ASCENT
-5.2,COAST
-21.2,APOGEE_STATE
-21.3,DROGUE_DESCENT
-45.1,MAIN_DESCENT
-60.0,LANDED_STATE
+	// Arrange: Use comma delimiter, matching default CSV reader
+	// LoadFlightStates reads ts from index 1 and state from index 2.
+	csvContent := `#,ts,state
+1,0.0,PRELAUNCH
+2,0.1,POWERED_ASCENT
+3,5.2,COAST
+4,21.2,APOGEE_STATE
+5,21.3,DROGUE_DESCENT
+6,45.1,MAIN_DESCENT
+7,60.0,LANDED_STATE
 ` // Using distinct state names
 	filePath := createTempCSV(t, csvContent)
 
@@ -151,8 +155,8 @@ func TestLoadFlightStates(t *testing.T) {
 	assert.Equal(t, "LANDED_STATE", data[6].State)
 
 	// Test error case (invalid float)
-	invalidCsv := `ts,state
-bad_ts,FAIL_STATE
+	invalidCsv := `#,ts,state
+1,bad_ts,FAIL_STATE
 `
 	invalidFilePath := createTempCSV(t, invalidCsv)
 	_, err = LoadFlightStates(invalidFilePath)
@@ -160,9 +164,9 @@ bad_ts,FAIL_STATE
 	assert.ErrorContains(t, err, "invalid float value 'bad_ts'")
 
 	// Test error case (missing column)
-	missingColCsv := `ts
-1.0
-`
+	missingColCsv := `#	ts
+1	1.0
+` // Keep tabs here to test the column count error correctly
 	missingColFilePath := createTempCSV(t, missingColCsv)
 	_, err = LoadFlightStates(missingColFilePath)
 	require.Error(t, err)
