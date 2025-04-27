@@ -1,3 +1,9 @@
+## v0.3.2 (2025-04-27)
+
+### Fix
+
+- **rocket-entity,-airframe-openrocket-schema**: Add massProvider interface and fix formatting in rocket mass calculations
+
 ## v0.3.1 (2025-04-27)
 
 ### Refactor
