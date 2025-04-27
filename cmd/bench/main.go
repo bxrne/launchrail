@@ -1,32 +1,33 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/bxrne/launchrail/internal/logger" // Import custom logger
+	"github.com/bxrne/launchrail/internal/config" // Import config package
+	"github.com/bxrne/launchrail/internal/logger"
 )
 
 func main() {
-	// Initialize logger (using "info" level as default for now)
-	// TODO: Consider making the log level configurable (e.g., via flag or internal/config)
-	benchLogger := logger.GetLogger("info")
-
-	// --- Command Line Flags ---
-	benchdataPath := flag.String("benchdata", "./benchdata", "Path to the benchmark data directory")
-	// TODO: Add flag for simulation config if needed
-	flag.Parse()
-
-	if *benchdataPath == "" {
-		benchLogger.Fatal("Error: --benchdata flag is required") // Use Fatal for exit
+	// --- Load Configuration ---
+	cfg, err := config.GetConfig()
+	if err != nil {
+		// Use a temporary basic logger for config loading errors
+		basicLogger := logger.GetLogger("error") // Default to error if config fails
+		basicLogger.Fatal("Failed to load configuration", "error", err)
 	}
 
-	absBenchdataPath, err := filepath.Abs(*benchdataPath)
+	// --- Initialize Logger with Config Level ---
+	benchLogger := logger.GetLogger(cfg.Setup.Logging.Level)
+
+	// --- Define Benchmark Data Path (Hardcoded) ---
+	const benchdataPath = "./benchdata"
+
+	absBenchdataPath, err := filepath.Abs(benchdataPath)
 	if err != nil {
 		// Log the error and exit
-		benchLogger.Error("Error getting absolute path for benchdata", "path", *benchdataPath, "error", err)
+		benchLogger.Error("Error getting absolute path for benchdata", "path", benchdataPath, "error", err)
 		os.Exit(1)
 	}
 
@@ -72,7 +73,9 @@ func main() {
 			fmt.Printf("  [%s] %s: %s\n", status, res.Name, res.Description)
 		}
 		if benchmarkFailed {
-			// TODO: You could add overall benchmark failure tracking here if needed, beyond individual metrics
+			benchLogger.Error("Benchmark failed", "name", benchmarkName)
+		} else {
+			benchLogger.Info("Benchmark passed", "name", benchmarkName)
 		}
 	}
 
