@@ -24,9 +24,8 @@ jobs:
       - name: Run Benchmarks and Capture Output
         id: run_bench
         run: |
-          cd cmd/bench
-          # Run the benchmark executable and capture all output
-          output=$(go run .)
+          # Run from project root to find config.yaml
+          output=$(go run ./cmd/bench --benchdata ./testdata/benchmarks)
           echo "Captured output:" # Debugging line
           echo "$output" # Debugging line
           # Extract content between markers
