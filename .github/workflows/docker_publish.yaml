@@ -43,6 +43,7 @@ jobs:
           cz bump --changelog --yes
           if [ $? -ne 0 ]; then
             echo "No commits eligible for bumping. Skipping tag creation."
+            echo "tag=" >> $GITHUB_OUTPUT
             exit 0
           fi
           set -e
@@ -59,11 +60,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Docker image
+        if: steps.cz_bump.outputs.tag != ''
         run: |
           docker build -t ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.cz_bump.outputs.tag }} .
           docker tag ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.cz_bump.outputs.tag }} ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:latest
 
       - name: Push Docker images
+        if: steps.cz_bump.outputs.tag != ''
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.cz_bump.outputs.tag }}
           docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:latest
