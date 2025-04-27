@@ -35,11 +35,9 @@ jobs:
 
       - name: Create Bump and Changelog
         id: cz
-        uses: commitizen-tools/commitizen-action@v0.20.0 # Use a specific tag
+        uses: commitizen-tools/commitizen-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # commitizen_tool_args: "--prerelease alpha" # Uncomment for prereleases
-          # changelog_increment_filename: "CHANGELOG.md" # Default is CHANGELOG.md
 
       - name: Print Version Details # Optional debugging
         if: steps.cz.outputs.bumped == 'true'
