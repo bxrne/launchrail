@@ -12,7 +12,43 @@ import (
 	"github.com/bxrne/launchrail/pkg/types"
 )
 
-// TEST: GIVEN a new aerodynamic system WHEN getting air density at sea level THEN returns correct value
+func TestCalculateAerodynamicMoment_ZeroVelocity(t *testing.T) {
+	minCfg := &config.Engine{
+		Options: config.Options{
+			Launchsite: config.Launchsite{
+				Atmosphere: config.Atmosphere{
+					ISAConfiguration: config.ISAConfiguration{
+						// Provide default values if needed, otherwise zero values are okay for ISA model
+					},
+				},
+			},
+		},
+	}
+	system := systems.NewAerodynamicSystem(nil, 1, minCfg) // Provide nil world, 1 worker, minimal config
+
+	entity := states.PhysicsState{
+		Position: &types.Position{Vec: types.Vector3{X: 0, Y: 0, Z: 0}},
+		Velocity: &types.Velocity{Vec: types.Vector3{X: 0, Y: 0, Z: 0}},
+		Nosecone: &components.Nosecone{Length: 0.5, Shape: "ogive"},
+		Bodytube: &components.Bodytube{Length: 1.0, Radius: 0.05},
+	}
+	moment := system.CalculateAerodynamicMoment(entity)
+	if moment.Y != 0 {
+		t.Errorf("Expected zero moment for zero velocity, got %v", moment.Y)
+	}
+}
+
+func TestCalculateInertia_Cylinder(t *testing.T) {
+	entity := &states.PhysicsState{
+		Bodytube: &components.Bodytube{Radius: 0.1, Length: 1.0},
+		Mass:     &types.Mass{Value: 2.0},
+	}
+	inertia := systems.CalculateInertia(entity)
+	if inertia <= 0 {
+		t.Errorf("Expected positive inertia, got %v", inertia)
+	}
+}
+
 func TestAerodynamicSystem_GetAirDensity_SeaLevel(t *testing.T) {
 	cfg := &config.Engine{
 		Options: config.Options{
@@ -34,7 +70,6 @@ func TestAerodynamicSystem_GetAirDensity_SeaLevel(t *testing.T) {
 	}
 }
 
-// TEST: GIVEN a moving rocket WHEN calculating drag THEN returns correct drag force
 func TestAerodynamicSystem_CalculateDrag(t *testing.T) {
 	cfg := &config.Engine{
 		Options: config.Options{
@@ -66,7 +101,6 @@ func TestAerodynamicSystem_CalculateDrag(t *testing.T) {
 	}
 }
 
-// TEST: GIVEN a rocket at different altitudes WHEN getting speed of sound THEN returns correct values
 func TestAerodynamicSystem_GetSpeedOfSound(t *testing.T) {
 	cfg := &config.Engine{
 		Options: config.Options{
@@ -91,7 +125,6 @@ func TestAerodynamicSystem_GetSpeedOfSound(t *testing.T) {
 	}
 }
 
-// TEST: GIVEN a system with multiple entities WHEN updating THEN processes all entities
 func TestAerodynamicSystem_Update(t *testing.T) {
 	world := ecs.World{}
 	cfg := &config.Engine{

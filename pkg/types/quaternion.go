@@ -7,6 +7,8 @@ type Quaternion struct {
 	X, Y, Z, W float64
 }
 
+const epsilon = 1e-12 // Small threshold for magnitude checks
+
 // NewQuaternion creates a new Quaternion
 func NewQuaternion(x, y, z, w float64) *Quaternion {
 	return &Quaternion{
@@ -67,12 +69,32 @@ func (q *Quaternion) Scale(scalar float64) *Quaternion {
 	}
 }
 
-// Normalize normalizes a quaternion using the square root of the sum of squares
+// Normalize normalizes a quaternion
 func (q *Quaternion) Normalize() *Quaternion {
-	mag := math.Sqrt(q.Magnitude())
-	if mag == 0 {
-		return q // Return the original quaternion if the magnitude is zero.
+	magnitudeSquared := q.Magnitude()
+
+	// Check for invalid magnitude squared (negative or NaN)
+	if magnitudeSquared < 0 || math.IsNaN(magnitudeSquared) {
+		// Quaternion is invalid, return identity for stability
+		return &Quaternion{W: 1, X: 0, Y: 0, Z: 0}
 	}
+
+	// Check for near-zero magnitude
+	if magnitudeSquared <= epsilon {
+		// Near-zero magnitude, treat as identity.
+		return &Quaternion{W: 1, X: 0, Y: 0, Z: 0}
+	}
+
+	// Calculate magnitude
+	mag := math.Sqrt(magnitudeSquared)
+
+	// Final check on calculated magnitude (should be redundant if above checks are good)
+	if mag <= epsilon || math.IsNaN(mag) || math.IsInf(mag, 0) {
+		// If somehow mag is still invalid, return identity
+		return &Quaternion{W: 1, X: 0, Y: 0, Z: 0}
+	}
+
+	// Normalize components
 	return &Quaternion{
 		X: q.X / mag,
 		Y: q.Y / mag,
@@ -126,19 +148,41 @@ func (q *Quaternion) Conjugate() *Quaternion {
 	}
 }
 
-// RotateVector rotates a vector by the quaternion
+// RotateVector rotates a vector v by the quaternion q.
+// Ensures q is normalized. Returns original v if q or v is invalid, or if q normalizes to identity.
 func (q *Quaternion) RotateVector(v *Vector3) *Vector3 {
-	// Rotate vector by quaternion
-	quat := q.Conjugate()
-	quat = quat.Multiply(&Quaternion{
-		W: 0,
-		X: v.X,
-		Y: v.Y,
-		Z: v.Z,
-	}).Multiply(q)
-	return &Vector3{
-		X: quat.X,
-		Y: quat.Y,
-		Z: quat.Z,
+	// Check for invalid vector components
+	if v == nil || math.IsNaN(v.X) || math.IsNaN(v.Y) || math.IsNaN(v.Z) ||
+		math.IsInf(v.X, 0) || math.IsInf(v.Y, 0) || math.IsInf(v.Z, 0) {
+		return v // Return original vector if v is invalid
 	}
+
+	// Check for invalid quaternion components
+	if q == nil || math.IsNaN(q.X) || math.IsNaN(q.Y) || math.IsNaN(q.Z) || math.IsNaN(q.W) ||
+		math.IsInf(q.X, 0) || math.IsInf(q.Y, 0) || math.IsInf(q.Z, 0) || math.IsInf(q.W, 0) {
+		return v // Return original vector if q is invalid
+	}
+
+	// Normalize the quaternion (handles zero/invalid magnitude by returning identity)
+	qNorm := q.Normalize()
+
+	// If normalization results in identity, no rotation occurs (or q was invalid)
+	if qNorm.IsIdentity() {
+		return v
+	}
+
+	// Represent the vector as a pure quaternion
+	p := &Quaternion{X: v.X, Y: v.Y, Z: v.Z, W: 0}
+
+	// Compute the rotated vector using normalized quaternion: qNorm * p * qNorm.Conjugate()
+	qConj := qNorm.Conjugate()
+	rotatedP := qNorm.Multiply(p).Multiply(qConj)
+
+	// Extract the vector part
+	return &Vector3{X: rotatedP.X, Y: rotatedP.Y, Z: rotatedP.Z}
+}
+
+// IsIdentity checks if the quaternion is the identity quaternion
+func (q *Quaternion) IsIdentity() bool {
+	return math.Abs(q.X) <= epsilon && math.Abs(q.Y) <= epsilon && math.Abs(q.Z) <= epsilon && math.Abs(q.W-1) <= epsilon
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/internal/plot_transformer"
 	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
 )
@@ -41,18 +42,20 @@ func renderTempl(c *gin.Context, component templ.Component) {
 
 type ListParams struct {
 	Page         int
-	Sort         string
-	Filter       string
 	ItemsPerPage int
 }
 
 func (h *DataHandler) ListRecords(c *gin.Context) {
 	params := ListParams{
-		Page:         parseInt(c.Query("page"), 1),
-		Sort:         c.Query("sort"),
-		Filter:       c.Query("filter"),
-		ItemsPerPage: 15, // Changed from 10 to 15
+		Page:         1,
+		ItemsPerPage: 15,
 	}
+
+	page, err := parseInt(c.Query("page"), "page")
+	if err != nil || page < 1 {
+		page = 1
+	}
+	params.Page = page
 
 	records, err := h.records.ListRecords()
 	if err != nil {
@@ -60,26 +63,11 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 		return
 	}
 
-	// Apply filtering
-	if params.Filter != "" {
-		filtered := make([]*storage.Record, 0)
-		for _, r := range records {
-			if strings.Contains(strings.ToLower(r.Hash), strings.ToLower(params.Filter)) {
-				filtered = append(filtered, r)
-			}
-		}
-		records = filtered
+	sortParam := c.Query("sort")
+	if sortParam == "" {
+		// default to newest first
+		sortRecords(records, false)
 	}
-
-	// Apply sorting
-	sort.Slice(records, func(i, j int) bool {
-		switch params.Sort {
-		case "time_asc":
-			return records[i].LastModified.Before(records[j].LastModified)
-		default: // time_desc
-			return records[i].LastModified.After(records[j].LastModified)
-		}
-	})
 
 	// Calculate pagination
 	totalRecords := len(records)
@@ -110,39 +98,76 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 			CurrentPage: params.Page,
 			TotalPages:  totalPages,
 		},
-	},
-		h.Cfg.Setup.App.Version,
-	))
+	}, h.Cfg.Setup.App.Version))
 }
 
 // DeleteRecord handles the request to delete a specific record
 func (h *DataHandler) DeleteRecord(c *gin.Context) {
 	hash := c.Param("hash")
+
+	// Delete the record
 	err := h.records.DeleteRecord(hash)
 	if err != nil {
 		renderTempl(c, pages.ErrorPage("Failed to delete record"))
 		return
 	}
 
-	// Get updated records list
+	// Prepare pagination parameters
+	params := ListParams{
+		Page:         1,
+		ItemsPerPage: 15,
+	}
+
+	page, err := parseInt(c.Query("page"), "page")
+	if err != nil || page < 1 {
+		page = 1
+	}
+	params.Page = page
+
+	// Retrieve and (re)sort records
 	records, err := h.records.ListRecords()
 	if err != nil {
 		renderTempl(c, pages.ErrorPage(err.Error()))
 		return
 	}
 
-	// Convert to SimulationRecord slice
-	simRecords := make([]pages.SimulationRecord, len(records))
-	for i, record := range records {
+	sortParam := c.Query("sort")
+	if sortParam == "" {
+		sortRecords(records, false) // newest first by default
+	} else {
+		sortRecords(records, sortParam == "time_asc")
+	}
+
+	// Calculate pagination window
+	totalRecords := len(records)
+	totalPages := int(math.Ceil(float64(totalRecords) / float64(params.ItemsPerPage)))
+	startIndex := (params.Page - 1) * params.ItemsPerPage
+	endIndex := min(startIndex+params.ItemsPerPage, totalRecords)
+	if startIndex >= totalRecords {
+		startIndex = 0
+		endIndex = min(params.ItemsPerPage, totalRecords)
+		params.Page = 1
+	}
+
+	pagedRecords := records[startIndex:endIndex]
+
+	// Convert to SimulationRecords
+	simRecords := make([]pages.SimulationRecord, len(pagedRecords))
+	for i, record := range pagedRecords {
 		simRecords[i] = pages.SimulationRecord{
-			Name:         record.Name,
 			Hash:         record.Hash,
 			LastModified: record.LastModified,
 		}
 	}
 
-	// Render just the records list component
-	renderTempl(c, pages.Data(pages.DataProps{Records: simRecords}, h.Cfg.Setup.App.Version))
+	// Render only the updated record list (partial HTML) so htmx can swap it in-place
+	renderTempl(c, pages.RecordList(pages.DataProps{
+		Records: simRecords,
+		Pagination: pages.Pagination{
+			CurrentPage: params.Page,
+			TotalPages:  totalPages,
+		},
+	}))
 }
 
 // GetRecordData handles the request to get data from a specific record
@@ -233,7 +258,10 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 	table := c.Query("table")
 	column := c.Query("col")
 	direction := c.Query("dir")
-	page := parseInt(c.Query("page"), 1)
+	page, err := parseInt(c.Query("page"), "page")
+	if err != nil || page < 1 {
+		page = 1
+	}
 
 	record, err := h.records.GetRecord(hash)
 	if err != nil {
@@ -303,7 +331,10 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 func (h *DataHandler) GetTableRows(c *gin.Context) {
 	hash := c.Param("hash")
 	table := c.Query("table")
-	page := parseInt(c.Query("page"), 1)
+	page, err := parseInt(c.Query("page"), "page")
+	if err != nil || page < 1 {
+		page = 1
+	}
 
 	record, err := h.records.GetRecord(hash)
 	if err != nil {
@@ -363,7 +394,10 @@ func (h *DataHandler) handleTableRequest(c *gin.Context, hash string, table stri
 		return
 	}
 
-	page := parseInt(c.Query("page"), 1)
+	page, err := parseInt(c.Query("page"), "page")
+	if err != nil || page < 1 {
+		page = 1
+	}
 	sortCol := c.Query("sort")
 	sortDir := c.Query("dir")
 
@@ -408,13 +442,7 @@ func (h *DataHandler) handleTableRequest(c *gin.Context, hash string, table stri
 
 	// For motion and dynamics, convert string data to float64
 	if table != "events" {
-		floatData := make([][]float64, len(pagedData))
-		for i, row := range pagedData {
-			floatData[i] = make([]float64, len(row))
-			for j, val := range row {
-				floatData[i][j], _ = strconv.ParseFloat(val, 64)
-			}
-		}
+		floatData := plot_transformer.TransformRowsToFloat64(pagedData)
 		c.JSON(http.StatusOK, gin.H{
 			"headers": headers,
 			"data":    floatData,
@@ -482,7 +510,10 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 	}
 
 	// Apply query parameters
-	page := parseInt(c.Query("page"), 1)
+	page, err := parseInt(c.Query("page"), "page")
+	if err != nil || page < 1 {
+		page = 1
+	}
 	filter := c.Query("filter")
 	itemsPerPage := 15
 
@@ -521,4 +552,26 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 			"totalPages":  totalPages,
 		},
 	})
+}
+
+func parseFloat(valueStr string, fieldName string) (float64, error) {
+	if valueStr == "" {
+		return 0, fmt.Errorf("%s is required", fieldName)
+	}
+	value, err := strconv.ParseFloat(valueStr, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s: %w", fieldName, err)
+	}
+	return value, nil
+}
+
+func parseInt(valueStr string, fieldName string) (int, error) {
+	if valueStr == "" {
+		return 0, fmt.Errorf("%s is required", fieldName)
+	}
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s: %w", fieldName, err)
+	}
+	return value, nil
 }

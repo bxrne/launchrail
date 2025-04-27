@@ -3,6 +3,8 @@ package openrocket
 import (
 	"encoding/xml"
 	"fmt"
+	"math"
+	"strconv"
 )
 
 // SustainerSubcomponents represents the sustainer subcomponents element of the XML document
@@ -30,9 +32,45 @@ type BodyTube struct {
 	Subcomponents BodyTubeSubcomponents `xml:"subcomponents"`
 }
 
-// GetMass returns the mass of the bodytube
+// GetMass returns the mass of the bodytube material itself (excluding subcomponents).
 func (b *BodyTube) GetMass() float64 {
-	return b.Material.Density * b.Length * b.Thickness
+	// --- Input parameters ---
+	length := b.Length
+	thickness := b.Thickness
+	density := b.Material.Density
+	radiusStr := b.Radius
+
+	// --- Determine Outer Radius ---
+	outerRadius, err := strconv.ParseFloat(radiusStr, 64)
+	if err != nil {
+		// Failed to parse - likely "auto" or invalid format.
+		// Cannot calculate mass without a numeric radius derived from context.
+		// TODO: Log a warning: "Cannot calculate BodyTube mass for ID=%s: Radius is '%s', requires numeric value."
+		return 0.0 // Return 0 mass, acknowledging incompleteness
+	}
+
+	// --- Validate inputs ---
+	if density <= 0 || length <= 0 || outerRadius <= 0 {
+		// Invalid dimensions or material
+		// TODO: Log a warning: "Invalid dimensions/material for BodyTube ID=%s"
+		return 0.0
+	}
+
+	// --- Calculate Inner Radius ---
+	innerRadius := outerRadius - thickness
+	if innerRadius < 0 {
+		innerRadius = 0 // Treat as solid rod if thickness >= outerRadius
+	}
+
+	// --- Calculate Volume & Mass ---
+	// Volume = pi * (R_outer^2 - R_inner^2) * L
+	materialVolume := math.Pi * (outerRadius*outerRadius - innerRadius*innerRadius) * length
+	materialMass := materialVolume * density
+
+	// Note: Mass of subcomponents (fins, parachutes, etc.) inside this tube
+	// are handled separately by the caller (e.g., calculateTotalMass).
+
+	return materialMass
 }
 
 // String returns full string representation of the BodyTube

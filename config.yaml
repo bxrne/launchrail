@@ -4,26 +4,27 @@ setup:
     version: "0.0.1"
     base_dir: ".launchrail"
   logging:
-    level: "debug"
+    level: "info"
   plugins:
     paths:
       - "./plugins/windeffect.so"
+      - "./plugins/blackscholes.so"
 
 server:
-  port: 5656
+  port: 8080
 
 engine:
   simulation:
     step: 0.001
     max_time: 300.0
-    ground_tolerance: 0.06
+    ground_tolerance: 0.01
   external:
     openrocket_version: "23.09"
   options:
     motor_designation: "269H110-14A"
     openrocket_file: "./testdata/openrocket/l1.ork"
     launchrail:
-      length: 2.21
+      length: 4
       angle: 5.0
       orientation: 0.01
     launchsite:

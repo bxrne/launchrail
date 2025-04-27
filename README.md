@@ -16,6 +16,37 @@ go run ./cmd/launchrail
 air # for hot reload (dev)
 ```
 
+---
+
+## Running as a Docker Container
+
+You can run LaunchRail as a Docker container either by building locally or pulling from GitHub Container Registry (GHCR).
+
+### Build and Run Locally
+
+```sh
+# Build the Docker image
+DOCKER_BUILDKIT=1 docker build -t launchrail:latest .
+
+# Run the container (exposes port 8080)
+docker run --rm -it -p 8080:8080 launchrail:latest
+```
+
+### Pull and Run from GHCR
+
+```sh
+# Pull the latest published image from GHCR
+docker pull ghcr.io/bxrne/launchrail:latest
+
+# Or pull a specific version (replace <tag> with the version you want)
+docker pull ghcr.io/bxrne/launchrail:<tag>
+
+# Run the container
+docker run --rm -it -p 8080:8080 ghcr.io/bxrne/launchrail:latest
+```
+
+---
+
 ### Testing
 
 Run locally with the command below, runs on change for PRs and on main push (see [build and test CI](.github/workflows/build_test.yaml)).

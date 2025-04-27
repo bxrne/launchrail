@@ -19,6 +19,7 @@ type AtmosphereData struct {
 	Density     float64
 	Temperature float64
 	Pressure    float64
+	SoundSpeed  float64
 }
 
 // NewISAModel creates a new ISAModel with the given configuration
@@ -48,13 +49,21 @@ func (isa *ISAModel) GetAtmosphere(altitude float64) AtmosphereData {
 
 	// Calculate new values
 	temp := isa.cfg.SeaLevelTemperature + isa.cfg.TemperatureLapseRate*altitude // T_0 (sea level temperature) - Lapse rate * altitude
-	pressure := isa.cfg.SeaLevelPressure * math.Pow(temp/isa.cfg.SeaLevelTemperature, -isa.cfg.GravitationalAccel/(isa.cfg.TemperatureLapseRate*isa.cfg.SpecificGasConstant))
-	density := pressure / (isa.cfg.SpecificGasConstant * temp)
+	pressure := 0.0
+	density := 0.0
+	soundSpeed := 0.0
+
+	if temp > 0 { // Check temperature is valid for calculations
+		pressure = isa.cfg.SeaLevelPressure * math.Pow(temp/isa.cfg.SeaLevelTemperature, -isa.cfg.GravitationalAccel/(isa.cfg.TemperatureLapseRate*isa.cfg.SpecificGasConstant))
+		density = pressure / (isa.cfg.SpecificGasConstant * temp)
+		soundSpeed = math.Sqrt(isa.cfg.RatioSpecificHeats * isa.cfg.SpecificGasConstant * temp)
+	} // Else, pressure, density, soundSpeed remain 0
 
 	data := AtmosphereData{
 		Density:     density,
 		Temperature: temp,
 		Pressure:    pressure,
+		SoundSpeed:  soundSpeed, // Store calculated sound speed
 	}
 
 	// Cache the result
@@ -67,6 +76,6 @@ func (isa *ISAModel) GetAtmosphere(altitude float64) AtmosphereData {
 
 // GetSpeedOfSound calculates speed of sound at given altitude
 func (isa *ISAModel) GetSpeedOfSound(altitude float64) float64 {
-	atm := isa.GetAtmosphere(altitude)
-	return math.Sqrt(isa.cfg.RatioSpecificHeats * isa.cfg.SpecificGasConstant * atm.Temperature)
+	// Retrieve cached/calculated data including sound speed
+	return isa.GetAtmosphere(altitude).SoundSpeed
 }

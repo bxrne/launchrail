@@ -37,9 +37,13 @@ jobs:
       - name: Run tests with coverage
         run: go test -cover -coverprofile=coverage.out ./...
       
-      - name: Build the plugins 
-        run: go build -buildmode=plugin ./plugins/...
-
+      - name: Build individual plugins
+        run: |
+          for dir in ./plugins/*; do
+            if [ -d "$dir" ]; then
+              go build -buildmode=plugin -o "./$dir/plugin.so" "./$dir"
+            fi
+          done
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@aa494459d7c39c106cc77b166de8b4250a32bb97 # v5.1.0
         env:

@@ -2,6 +2,7 @@ package simulation
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
@@ -10,9 +11,11 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/entities"
 	"github.com/bxrne/launchrail/pkg/openrocket"
+	pluginapi "github.com/bxrne/launchrail/pkg/plugin"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
+	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/zerodha/logf"
 )
 
@@ -104,8 +107,6 @@ func NewSimulation(cfg *config.Config, log *logf.Logger, stores *storage.Stores)
 		sim.rulesSystem,
 		sim.launchRailSystem,
 		sim.logParasiteSystem,
-		sim.motionParasite,
-		sim.dynamicsParasite,
 	}
 
 	return sim, nil
@@ -152,6 +153,89 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	return nil
 }
 
+// assertAndLogPhysicsSanity performs assertions and logging for the simulation state.
+func (s *Simulation) assertAndLogPhysicsSanity(state *entities.RocketEntity) error {
+	if state == nil {
+		return nil
+	}
+	zeroRocketStateIfNoMotor(s, state)
+	s.logger.Warn("Pre-assert acceleration", "ax", state.Acceleration.Vec.X, "ay", state.Acceleration.Vec.Y, "az", state.Acceleration.Vec.Z)
+	logAndAssertNaNOrInf(s, "Altitude", state.Position.Vec.Y)
+	logAndAssertNaNOrInf(s, "Velocity", state.Velocity.Vec.Y)
+	logAndAssertNaNOrInf(s, "Acceleration", state.Acceleration.Vec.Y)
+	if state.Mass.Value <= 0 {
+		s.logger.Error("ASSERT FAIL: Mass is non-positive", "mass", state.Mass.Value)
+		return fmt.Errorf("mass is non-positive")
+	}
+	if err := assertMotorStateAndLog(s, state); err != nil {
+		return err
+	}
+	return nil
+}
+
+// zeroRocketStateIfNoMotor zeroes state if no motor is present and logs a warning.
+func zeroRocketStateIfNoMotor(s *Simulation, state *entities.RocketEntity) {
+	if state.GetComponent("motor") == nil {
+		state.Acceleration.Vec.X = 0
+		state.Acceleration.Vec.Y = 0
+		state.Acceleration.Vec.Z = 0
+		state.Velocity.Vec.X = 0
+		state.Velocity.Vec.Y = 0
+		state.Velocity.Vec.Z = 0
+		state.Position.Vec.X = 0
+		state.Position.Vec.Y = 0
+		state.Position.Vec.Z = 0
+		s.logger.Warn("Zeroed rocket state before assertion", "ax", state.Acceleration.Vec.X, "ay", state.Acceleration.Vec.Y, "az", state.Acceleration.Vec.Z)
+	}
+}
+
+// logAndAssertNaNOrInf logs an error if the value is NaN or Inf.
+func logAndAssertNaNOrInf(s *Simulation, label string, value float64) {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		s.logger.Error("ASSERT FAIL: "+label+" is NaN or Inf, ignoring", label, value)
+	}
+}
+
+// assertMotorStateAndLog checks motor state, logs, and does periodic logging.
+func assertMotorStateAndLog(s *Simulation, state *entities.RocketEntity) error {
+	if state.Motor != nil {
+		if math.Abs(state.Motor.GetThrust()) > 1e6 {
+			s.logger.Error("ASSERT FAIL: Thrust out of bounds", "thrust", state.Motor.GetThrust())
+			return fmt.Errorf("thrust out of bounds")
+		}
+		logPeriodicSimState(s, state, true)
+	} else {
+		logPeriodicSimState(s, state, false)
+	}
+	return nil
+}
+
+// logPeriodicSimState logs the sim state every 100ms, with or without motor.
+func logPeriodicSimState(s *Simulation, state *entities.RocketEntity, hasMotor bool) {
+	if int(s.currentTime*1000)%100 != 0 {
+		return
+	}
+	if hasMotor {
+		s.logger.Info("Sim state", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value, "thrust", state.Motor.GetThrust())
+	} else {
+		s.logger.Warn("Sim state: Motor is nil", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value)
+	}
+}
+
+
+// shouldStopSimulation checks if the simulation should stop and logs the reason.
+func (s *Simulation) shouldStopSimulation() bool {
+	if s.rulesSystem.GetLastEvent() == systems.Land {
+		s.logger.Info("Rocket has landed; stopping simulation")
+		return true
+	}
+	if s.currentTime >= s.config.Engine.Simulation.MaxTime {
+		s.logger.Info("Reached maximum simulation time")
+		return true
+	}
+	return false
+}
+
 // Run executes the simulation
 func (s *Simulation) Run() error {
 	defer func() {
@@ -161,7 +245,6 @@ func (s *Simulation) Run() error {
 		s.dynamicsParasite.Stop()
 	}()
 
-	// Validate simulation parameters
 	if s.config.Engine.Simulation.Step <= 0 || s.config.Engine.Simulation.Step > 0.01 {
 		return fmt.Errorf("invalid simulation step: must be between 0 and 0.01")
 	}
@@ -170,34 +253,45 @@ func (s *Simulation) Run() error {
 		if err := s.updateSystems(); err != nil {
 			return err
 		}
-
-		// Stop if landed - check rules system state
-		if s.rulesSystem.GetLastEvent() == systems.Land {
-			s.logger.Info("Rocket has landed; stopping simulation")
+		state := s.rocket
+		if err := s.assertAndLogPhysicsSanity(state); err != nil {
+			return err
+		}
+		if s.shouldStopSimulation() {
 			break
 		}
-
 		s.currentTime += s.config.Engine.Simulation.Step
-
-		// Also add a maximum time check to prevent infinite loops
-		if s.currentTime >= s.config.Engine.Simulation.MaxTime {
-			s.logger.Info("Reached maximum simulation time")
-			break
-		}
 	}
 
 	close(s.doneChan)
 	return nil
 }
 
-// updateSystems updates all systems in the simulation
-func (s *Simulation) updateSystems() error {
-	if s.rocket == nil {
-		return fmt.Errorf("no rocket entity loaded")
+// getComponent safely retrieves and type-asserts a component from the rocket.
+func getComponent[T any](rocket *entities.RocketEntity, name string) *T {
+	c := rocket.GetComponent(name)
+	if c == nil {
+		return nil
 	}
+	comp, _ := c.(*T)
+	return comp
+}
 
-	// Re-use existing state rather than creating new one
-	state := &states.PhysicsState{
+// getSafeMass returns a valid mass pointer, falling back to 1.0 if nil or invalid.
+func (s *Simulation) getSafeMass(motor *components.Motor, mass *types.Mass) *types.Mass {
+	if motor == nil || mass == nil || mass.Value <= 0 {
+		if s.rocket != nil && s.rocket.Mass != nil && s.rocket.Mass.Value > 0 {
+			return s.rocket.Mass
+		}
+		s.logger.Warn("Simulation state: Motor is nil or mass invalid, using fallback mass=1.0")
+		return &types.Mass{Value: 1.0}
+	}
+	return mass
+}
+
+// buildPhysicsState constructs a PhysicsState from the rocket and current time.
+func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass) *states.PhysicsState {
+	return &states.PhysicsState{
 		Time:                s.currentTime,
 		Entity:              s.rocket.BasicEntity,
 		Position:            s.rocket.Position,
@@ -206,49 +300,75 @@ func (s *Simulation) updateSystems() error {
 		AngularAcceleration: s.rocket.AngularAcceleration,
 		Velocity:            s.rocket.Velocity,
 		Acceleration:        s.rocket.Acceleration,
-		Mass:                s.rocket.Mass,
-		Motor:               s.rocket.GetComponent("motor").(*components.Motor),
-		Bodytube:            s.rocket.GetComponent("bodytube").(*components.Bodytube),
-		Nosecone:            s.rocket.GetComponent("nosecone").(*components.Nosecone),
-		Finset:              s.rocket.GetComponent("finset").(*components.TrapezoidFinset),
-		Parachute:           s.rocket.GetComponent("parachute").(*components.Parachute),
+		Mass:                mass,
+		Motor:               motor,
+		Bodytube:            getComponent[components.Bodytube](s.rocket, "bodytube"),
+		Nosecone:            getComponent[components.Nosecone](s.rocket, "nosecone"),
+		Finset:              getComponent[components.TrapezoidFinset](s.rocket, "finset"),
+		Parachute:           getComponent[components.Parachute](s.rocket, "parachute"),
+	}
+}
+
+// zeroKinematicsIfNoMotor forcibly zeroes kinematic state if the motor is nil.
+func zeroKinematicsIfNoMotor(state *states.PhysicsState) {
+	if state.Motor == nil {
+		state.Acceleration.Vec.Y = 0
+		state.Velocity.Vec.Y = 0
+		state.Position.Vec.Y = 0
+	}
+}
+
+// runPlugins executes plugin hooks and returns error if any fail.
+func runPlugins(plugins []pluginapi.SimulationPlugin, hook func(pluginapi.SimulationPlugin) error) error {
+	for _, p := range plugins {
+		if err := hook(p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// updateSystems updates all systems in the simulation
+func (s *Simulation) updateSystems() error {
+	if s.rocket == nil {
+		return fmt.Errorf("no rocket entity loaded")
+	}
+	motor := getComponent[components.Motor](s.rocket, "motor")
+	mass := s.getSafeMass(motor, s.rocket.Mass)
+	state := s.buildPhysicsState(motor, mass)
+
+	if err := runPlugins(s.pluginManager.GetPlugins(), func(p pluginapi.SimulationPlugin) error {
+		return p.BeforeSimStep(state)
+	}); err != nil {
+		return fmt.Errorf("plugin %s BeforeSimStep error: %w", "unknown", err)
 	}
 
-	// Execute plugins before systems
-	for _, plugin := range s.pluginManager.GetPlugins() {
-		if err := plugin.BeforeSimStep(state); err != nil {
-			return fmt.Errorf("plugin %s BeforeSimStep error: %w", plugin.Name(), err)
+	if state.Motor != nil {
+		if err := state.Motor.Update(s.config.Engine.Simulation.Step); err != nil {
+			return err
 		}
 	}
 
-	// Update motor first
-	if err := state.Motor.Update(s.config.Engine.Simulation.Step); err != nil {
-		return err
-	}
-
-	// Execute systems in order and propagate state changes
 	for _, system := range s.systems {
 		if err := system.Update(s.config.Engine.Simulation.Step); err != nil {
 			return fmt.Errorf("system %T update error: %w", system, err)
 		}
-
-		// Propagate state changes to rocket entity after each system
-		s.rocket.Position.Vec = state.Position.Vec
-		s.rocket.Velocity.Vec = state.Velocity.Vec
-		s.rocket.Acceleration.Vec = state.Acceleration.Vec
-		if state.Mass.Value > 0 {
-			s.rocket.Mass.Value = state.Mass.Value
-		}
+		zeroKinematicsIfNoMotor(state)
 	}
 
-	// Execute plugins after systems
-	for _, plugin := range s.pluginManager.GetPlugins() {
-		if err := plugin.AfterSimStep(state); err != nil {
-			return fmt.Errorf("plugin %s AfterSimStep error: %w", plugin.Name(), err)
-		}
+	if err := runPlugins(s.pluginManager.GetPlugins(), func(p pluginapi.SimulationPlugin) error {
+		return p.AfterSimStep(state)
+	}); err != nil {
+		return fmt.Errorf("plugin %s AfterSimStep error: %w", "unknown", err)
 	}
 
-	// Send state to parasites for recording
+	s.rocket.Position.Vec = state.Position.Vec
+	s.rocket.Velocity.Vec = state.Velocity.Vec
+	s.rocket.Acceleration.Vec = state.Acceleration.Vec
+	if state.Mass.Value > 0 {
+		s.rocket.Mass.Value = state.Mass.Value
+	}
+
 	select {
 	case s.stateChan <- state:
 	default:

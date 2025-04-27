@@ -35,6 +35,21 @@ func (a *AerodynamicSystem) GetAirDensity(altitude float64) float64 {
 
 // NewAerodynamicSystem creates a new AerodynamicSystem
 func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Engine) *AerodynamicSystem {
+	if cfg == nil || cfg.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelDensity == 0 {
+		cfg = &config.Engine{
+			Options: config.Options{
+				Launchsite: config.Launchsite{
+					Atmosphere: config.Atmosphere{
+						ISAConfiguration: config.ISAConfiguration{
+							SeaLevelDensity: 1.225, // Default sea level density in kg/m³
+							SeaLevelPressure: 101325, // Default sea level pressure in Pa
+							SeaLevelTemperature: 288.15, // Default sea level temperature in K
+						},
+					},
+				},
+			},
+		}
+	}
 	return &AerodynamicSystem{
 		world:    world,
 		entities: make([]*states.PhysicsState, 0),
@@ -45,12 +60,32 @@ func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Engine) *Ae
 
 // getAtmosphericData retrieves atmospheric data from cache or calculates it
 func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericData {
+	if a.isa == nil {
+		// Fallback to standard sea level values if ISA model isn't initialized
+		return &atmosphericData{
+			density:     1.225,
+			pressure:    101325,
+			temperature: 288.15,
+			soundSpeed:  340.29,
+		}
+	}
+	
 	isaData := a.isa.GetAtmosphere(altitude)
+	if isaData.Density <= 0 || isaData.Pressure <= 0 || isaData.Temperature <= 0 {
+		// Return standard values if ISA data is invalid
+		return &atmosphericData{
+			density:     1.225,
+			pressure:    101325,
+			temperature: 288.15,
+			soundSpeed:  340.29,
+		}
+	}
+	
 	return &atmosphericData{
 		density:     isaData.Density,
 		pressure:    isaData.Pressure,
 		temperature: isaData.Temperature,
-		soundSpeed:  a.isa.GetSpeedOfSound(altitude),
+		soundSpeed:  isaData.SoundSpeed,
 	}
 }
 
@@ -61,6 +96,15 @@ func (a *AerodynamicSystem) getTemperature(altitude float64) float64 {
 
 // CalculateDrag now handles atmospheric effects and Mach number
 func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vector3 {
+    // Validate inputs
+    if a == nil || a.isa == nil || entity.Position == nil || entity.Velocity == nil || entity.Nosecone == nil || entity.Bodytube == nil {
+        return types.Vector3{}
+    }
+
+	if entity == (states.PhysicsState{}) {
+		return types.Vector3{}
+	}
+
 	// Get atmospheric data
 	atmData := a.getAtmosphericData(entity.Position.Vec.Y)
 
@@ -68,25 +112,41 @@ func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vect
 	dragForce := vectorPool.Get().(*types.Vector3)
 	defer vectorPool.Put(dragForce)
 
-	// Calculate mach number
+	// Calculate velocity magnitude
 	velocity := math.Sqrt(entity.Velocity.Vec.X*entity.Velocity.Vec.X +
 		entity.Velocity.Vec.Y*entity.Velocity.Vec.Y +
 		entity.Velocity.Vec.Z*entity.Velocity.Vec.Z)
-	machNumber := velocity / atmData.soundSpeed
+	if math.IsNaN(velocity) || math.IsInf(velocity, 0) || velocity < 0.01 {
+		return types.Vector3{} // No force if velocity is invalid or too low
+	}
+
+	// Prevent division by zero if sound speed is invalid
+	if atmData.soundSpeed <= 0 {
+		return types.Vector3{} // Cannot calculate Mach, return zero drag
+	}
 
 	// Calculate drag coefficient using Barrowman method
-	cd := a.calculateDragCoeff(machNumber, entity)
+	mach := velocity / atmData.soundSpeed
+	cd := a.calculateDragCoeff(mach, entity)
 
 	// Calculate reference area
 	area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
 
-	// Calculate drag force
-	forceMagnitude := 0.5 * cd * atmData.density * area * velocity * velocity
+	// Calculate dynamic pressure
+	q := 0.5 * atmData.density * velocity * velocity
+
+	// Calculate force magnitude (Cd * q * area)
+	forceMagnitude := cd * q * area
+	if math.IsNaN(forceMagnitude) || math.IsInf(forceMagnitude, 0) {
+		return types.Vector3{} // No force if magnitude calculation is invalid
+	}
 
 	// Apply force in opposite direction of velocity
-	dragForce.X = -entity.Velocity.Vec.X * forceMagnitude / velocity
-	dragForce.Y = -entity.Velocity.Vec.Y * forceMagnitude / velocity
-	dragForce.Z = -entity.Velocity.Vec.Z * forceMagnitude / velocity
+	velVec := types.Vector3{X: entity.Velocity.Vec.X, Y: entity.Velocity.Vec.Y, Z: entity.Velocity.Vec.Z}
+	velUnitVec := velVec.Normalize()
+	dragForce.X = -velUnitVec.X * forceMagnitude
+	dragForce.Y = -velUnitVec.Y * forceMagnitude
+	dragForce.Z = -velUnitVec.Z * forceMagnitude
 
 	return *dragForce
 }
@@ -115,7 +175,7 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 					continue
 				}
 				force := a.CalculateDrag(*entity)
-				moment := a.calculateAerodynamicMoment(*entity)
+				moment := a.CalculateAerodynamicMoment(*entity)
 				resultChan <- force
 				momentChan <- moment
 			}
@@ -159,8 +219,14 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 		// Apply angular accelerations from moments
 		moment := <-momentChan
 		if entity.AngularAcceleration != nil {
-			inertia := calculateInertia(entity)
-			angAcc := moment.DivideScalar(inertia)
+			inertia := CalculateInertia(entity)
+			var angAcc types.Vector3
+			if inertia != 0 {
+				angAcc = moment.DivideScalar(inertia)
+			} else {
+				// Inertia is zero, so angular acceleration is zero (or handle as error)
+				angAcc = types.Vector3{}
+			}
 
 			entity.AngularAcceleration.X = float64(angAcc.X)
 			entity.AngularAcceleration.Y = float64(angAcc.Y)
@@ -226,7 +292,7 @@ func getAtmosphericDensity(altitude float64) float64 {
 }
 
 // calculateAerodynamicMoment calculates the aerodynamic moments on the entity
-func (a *AerodynamicSystem) calculateAerodynamicMoment(entity states.PhysicsState) types.Vector3 {
+func (a *AerodynamicSystem) CalculateAerodynamicMoment(entity states.PhysicsState) types.Vector3 {
 	// Get atmospheric data
 	atmData := a.getAtmosphericData(entity.Position.Vec.Y)
 
@@ -260,13 +326,21 @@ func (a *AerodynamicSystem) calculateAerodynamicMoment(entity states.PhysicsStat
 	}
 }
 
-// calculateInertia returns a simplified moment of inertia value
-func calculateInertia(entity *states.PhysicsState) float64 {
-	// Simple approximation using cylinder formula
-	radius := entity.Bodytube.Radius
-	length := entity.Bodytube.Length
-	mass := entity.Mass.Value
+// CalculateInertia returns a simplified moment of inertia value for pitch/yaw
+func CalculateInertia(entity *states.PhysicsState) float64 {
+	if entity == nil || entity.Bodytube == nil || entity.Mass == nil || entity.Bodytube.Radius <= 0 || entity.Bodytube.Length <= 0 || entity.Mass.Value <= 0 {
+		return 0 // Return 0 for invalid inputs to prevent NaN/Inf later
+	}
+	// Moment of inertia for a cylinder about an axis perpendicular to the length through the center
+	// I = (1/12) * m * (3*r^2 + L^2)
+	r := entity.Bodytube.Radius
+	l := entity.Bodytube.Length
+	m := entity.Mass.Value
+	inertia := (1.0 / 12.0) * m * (3*r*r + l*l)
 
-	// I = (1/12) * m * (3r² + l²) for a cylinder
-	return (1.0 / 12.0) * mass * (3*radius*radius + length*length)
+	// Double-check for NaN/Inf just in case, although input checks should prevent this
+	if math.IsNaN(inertia) || math.IsInf(inertia, 0) {
+		return 0
+	}
+	return inertia
 }

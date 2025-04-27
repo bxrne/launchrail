@@ -5,10 +5,13 @@ import (
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
 	"github.com/bxrne/launchrail/pkg/types"
+	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/stretchr/testify/assert"
+	"github.com/zerodha/logf"
 )
 
 // TEST: GIVEN a new physics system WHEN initialized THEN has correct default values
@@ -63,19 +66,18 @@ func TestCalculateNetForce_InvalidMass(t *testing.T) {
 
 // TEST: GIVEN an entity with rotation WHEN updating THEN updates angular state
 func TestUpdate_AngularMotion(t *testing.T) {
-	cfg := &config.Engine{
-		Options: config.Options{
-			Launchsite: config.Launchsite{
-				Atmosphere: config.Atmosphere{
-					ISAConfiguration: config.ISAConfiguration{
-						GravitationalAccel: 9.81,
-					},
-				},
-			},
-		},
-	}
+	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Engine{})
 
-	system := systems.NewPhysicsSystem(&ecs.World{}, cfg)
+	// Create minimal valid motor data
+	logger := logf.New(logf.Opts{})
+	md := &thrustcurves.MotorData{
+		Thrust:    [][]float64{{0.0, 0.0}, {1.0, 0.0}}, // Minimal 2-point curve
+		TotalMass: 0.1,                              // Example mass
+		BurnTime:  1.0,                              // Match thrust curve
+	}
+	motor, err := components.NewMotor(ecs.NewBasic(), md, logger)
+	assert.NoError(t, err, "Failed to create test motor")
+
 	entity := &states.PhysicsState{
 		Mass:                &types.Mass{Value: 1.0},
 		Position:            &types.Position{Vec: types.Vector3{Y: 10}},
@@ -84,12 +86,15 @@ func TestUpdate_AngularMotion(t *testing.T) {
 		Orientation:         &types.Orientation{},
 		AngularVelocity:     &types.Vector3{Y: 1.0},
 		AngularAcceleration: &types.Vector3{Y: 0.5},
+		Motor:               motor, // Use constructed motor
 	}
 
 	system.Add(entity)
-	err := system.Update(0.01)
+	err = system.Update(0.01) // Use the error from NewMotor creation
 	assert.NoError(t, err)
-	assert.Greater(t, entity.AngularVelocity.Y, 1.0)
+	// Check if angular velocity increased as expected
+	expectedAngularVelocityY := 1.0 + (0.5 * 0.01)
+	assert.InDelta(t, expectedAngularVelocityY, entity.AngularVelocity.Y, 1e-9, "Angular velocity Y did not update correctly")
 }
 
 // TEST: GIVEN an entity with invalid timestep WHEN updating THEN returns error
