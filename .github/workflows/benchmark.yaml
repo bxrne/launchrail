@@ -24,8 +24,8 @@ jobs:
       - name: Run Benchmarks and Capture Output
         id: run_bench
         run: |
-          # Run from project root to find config.yaml
-          output=$(go run ./cmd/bench --benchdata ./testdata/benchmarks)
+          # Run from project root to find config.yaml, ignore exit code
+          output=$(go run ./cmd/bench --benchdata ./testdata/benchmarks || true)
           echo "Captured output:" # Debugging line
           echo "$output" # Debugging line
           # Extract content between markers
@@ -39,18 +39,33 @@ jobs:
           echo "$content" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Update BENCHMARK.md
+      - name: Write Output to BENCHMARK.md
         run: |
-          echo "Creating/Updating BENCHMARK.md"
-          # Ensure the extracted content is not empty before writing
-          if [ -z "${{ steps.run_bench.outputs.markdown_content }}" ]; then
-            echo "Warning: No markdown content extracted from benchmark output."
-            echo "# Benchmark Results\n\nNo results generated." > BENCHMARK.md
-          else
-            echo "${{ steps.run_bench.outputs.markdown_content }}" > BENCHMARK.md
-            echo "BENCHMARK.md updated successfully."
+          TITLE="# Benchmark Results"
+          FILE="BENCHMARK.md"
+          markdown_output=$(echo "${{ steps.run_bench.outputs.markdown_content }}" | sed '/^$/d') # Remove blank lines
+
+          # Check if markdown_output is empty or only whitespace
+          if [ -z "$(echo "$markdown_output" | tr -d '[:space:]')" ]; then
+            echo "No benchmark output captured, skipping BENCHMARK.md update."
+            exit 0
           fi
-          cat BENCHMARK.md # Debugging: Show file content
+
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          NEW_ENTRY="## $TIMESTAMP\n\n$markdown_output\n\n---"
+
+          if [ -f "$FILE" ] && grep -qFx "$TITLE" "$FILE"; then
+            # File exists and has the correct title
+            echo "Prepending results to existing $FILE"
+            # Read content after the title line
+            OLD_CONTENT=$(tail -n +2 "$FILE")
+            # Write title, new entry, separator, and old content
+            echo -e "$TITLE\n\n$NEW_ENTRY\n$OLD_CONTENT" > "$FILE"
+          else
+            # File doesn't exist or doesn't have the correct title
+            echo "Creating or overwriting $FILE"
+            echo -e "$TITLE\n\n$NEW_ENTRY" > "$FILE"
+          fi
 
       - name: Commit and Push BENCHMARK.md
         uses: stefanzweifel/git-auto-commit-action@v5
