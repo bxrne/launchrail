@@ -54,6 +54,11 @@ type Stores struct {
 // NewStorage creates a new storage service.
 // If the provided baseDir is not absolute, it is prepended with the user's home directory.
 func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error) {
+	// Validate the dir to ensure it is a valid directory name
+	if strings.Contains(dir, "/") || strings.Contains(dir, "\\") || strings.Contains(dir, "..") {
+		return nil, fmt.Errorf("invalid directory name")
+	}
+
 	// If baseDir is not absolute, prepend the user's home directory.
 	if !filepath.IsAbs(baseDir) {
 		homeDir, err := os.UserHomeDir()
