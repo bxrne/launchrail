@@ -1,3 +1,19 @@
+## v0.3.0 (2025-04-27)
+
+### Feat
+
+- **benchmark,-rocket-components,-openrocket-parsing**: Added more accurrate vehicle mass calculation to simulation and updated benchmark and openrocket code
+- **benchmark-framework-and-@ULAS-HiPR-initial-dataset-from-EuRoc24-competition**: Added various sensor dumps from the flight, which were sourced from COTS parts
+
+### Fix
+
+- **benchmark**: Update csv format and improve float comparison with rel. tolerance
+
+### Refactor
+
+- **rocket-entity**: Refactor motor mass calculation into separate helper function
+- **benchmark-and-ulas-hipr-euroc24**: Tidied benchmark comparison and tolerance logic
+
 ## v0.2.1 (2025-04-27)
 
 ### Refactor
