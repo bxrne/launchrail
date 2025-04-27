@@ -1,8 +1,9 @@
 package openrocket_test
 
 import (
-	"github.com/bxrne/launchrail/pkg/openrocket"
 	"testing"
+
+	"github.com/bxrne/launchrail/pkg/openrocket"
 )
 
 // TEST: GIVEN a TrapezoidFinset struct WHEN calling the String method THEN return a string representation of the TrapezoidFinset struct
@@ -24,17 +25,45 @@ func TestSchemaTrapezoidFinsetString(t *testing.T) {
 		Cant:          0.0,
 		TabHeight:     0.0,
 		TabLength:     0.0,
-		TabPositions:  []openrocket.TabPosition{},
-		FilletRadius:  0.0,
-		RootChord:     0.0,
-		TipChord:      0.0,
-		SweepLength:   0.0,
-		Height:        0.0,
+		TabPositions: []openrocket.TabPosition{
+			{RelativeTo: "RootChord", Value: 0.01},
+			{RelativeTo: "TipChord", Value: 0.02},
+		},
+		FilletRadius: 0.0,
+		RootChord:    0.0,
+		TipChord:     0.0,
+		SweepLength:  0.0,
+		Height:       0.0,
 	}
 
-	expected := "TrapezoidFinset{Name=name, ID=id, InstanceCount=0, FinCount=0, RadiusOffset=RadiusOffset{Method=, Value=0.00}, AngleOffset=AngleOffset{Method=, Value=0.00}, Rotation=0.00, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, Finish=finish, Material=Material{Type=, Density=0.00, Name=}, Thickness=0.00, CrossSection=cross, Cant=0.00, TabHeight=0.00, TabLength=0.00, TabPositions=(), FilletRadius=0.00, RootChord=0.00, TipChord=0.00, SweepLength=0.00, Height=0.00}"
+	expected := "TrapezoidFinset{Name=name, ID=id, InstanceCount=0, FinCount=0, RadiusOffset=RadiusOffset{Method=, Value=0.00}, AngleOffset=AngleOffset{Method=, Value=0.00}, Rotation=0.00, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, Finish=finish, Material=Material{Type=, Density=0.00, Name=}, Thickness=0.00, CrossSection=cross, Cant=0.00, TabHeight=0.00, TabLength=0.00, TabPositions=(TabPosition{RelativeTo=RootChord, Value=0.01}, TabPosition{RelativeTo=TipChord, Value=0.02}), FilletRadius=0.00, RootChord=0.00, TipChord=0.00, SweepLength=0.00, Height=0.00}"
 	if tf.String() != expected {
 		t.Errorf("Expected %s, got %s", expected, tf.String())
+	}
+}
+
+// TEST: GIVEN a TrapezoidFinset struct with dimensions and density WHEN calling the GetMass method THEN return the calculated mass
+func TestSchemaTrapezoidFinsetGetMass(t *testing.T) {
+	tf := &openrocket.TrapezoidFinset{
+		RootChord: 0.1,   // 10 cm
+		TipChord:  0.05,  // 5 cm
+		Height:    0.15,  // 15 cm
+		Thickness: 0.003, // 3 mm
+		Material: openrocket.Material{
+			Density: 1200, // Example density kg/m^3
+		},
+	}
+
+	// Expected calculation: area = (0.1 + 0.05) * 0.15 / 2 = 0.01125 m^2
+	// volume = area * thickness = 0.01125 * 0.003 = 0.00003375 m^3
+	// mass = volume * density = 0.00003375 * 1200 = 0.0405 kg
+	expectedMass := 0.0405
+	calculatedMass := tf.GetMass()
+
+	// Use a small tolerance for floating point comparison
+	tolerance := 1e-9
+	if calculatedMass < expectedMass-tolerance || calculatedMass > expectedMass+tolerance {
+		t.Errorf("Expected mass %f, got %f", expectedMass, calculatedMass)
 	}
 }
 
