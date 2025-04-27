@@ -18,6 +18,12 @@ var CompilePlugins = CompileAllPlugins
 func CompileAllPlugins(pluginsSourceDir, pluginsOutputDir string, logger logf.Logger) error {
 	logger.Info("Starting plugin compilation", "sourceDir", pluginsSourceDir, "outputDir", pluginsOutputDir)
 
+	goExecutable, err := exec.LookPath("go")
+	if err != nil {
+		return fmt.Errorf("could not find 'go' executable in PATH: %w", err)
+	}
+	logger.Debug("Found 'go' executable", "path", goExecutable)
+
 	entries, err := os.ReadDir(pluginsSourceDir)
 	if err != nil {
 		return fmt.Errorf("failed to read plugins source directory '%s': %w", pluginsSourceDir, err)
@@ -47,7 +53,7 @@ func CompileAllPlugins(pluginsSourceDir, pluginsOutputDir string, logger logf.Lo
 		}
 
 		logger.Info("Compiling plugin", "name", pluginName, "source", sourcePath, "output", outputPath)
-		cmd := exec.Command("go", "build", "-buildmode=plugin", "-o", outputPath, sourcePath)
+		cmd := exec.Command(goExecutable, "build", "-buildmode=plugin", "-o", outputPath, sourcePath)
 		cmd.Stderr = os.Stderr // Pipe build errors to main stderr
 		cmd.Stdout = os.Stdout // Pipe build output to main stdout
 
