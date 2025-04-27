@@ -34,7 +34,7 @@ jobs:
       - name: Install commitizen
         run: pip install commitizen
 
-      - name: Bump version and create tag
+      - name: Bump version, update changelog, commit, and tag
         id: cz_bump
         run: |
           git config user.name "github-actions[bot]"
@@ -48,7 +48,10 @@ jobs:
           fi
           set -e
           TAG=$(cz version --project)
+          git add CHANGELOG.md .cz.toml # add other version files if needed
+          git commit -m "chore(release): $TAG [skip ci]"
           git tag $TAG
+          git push origin HEAD:main
           git push origin $TAG
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
