@@ -35,6 +35,21 @@ func (a *AerodynamicSystem) GetAirDensity(altitude float64) float64 {
 
 // NewAerodynamicSystem creates a new AerodynamicSystem
 func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Engine) *AerodynamicSystem {
+	if cfg == nil || cfg.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelDensity == 0 {
+		cfg = &config.Engine{
+			Options: config.Options{
+				Launchsite: config.Launchsite{
+					Atmosphere: config.Atmosphere{
+						ISAConfiguration: config.ISAConfiguration{
+							SeaLevelDensity: 1.225, // Default sea level density in kg/m³
+							SeaLevelPressure: 101325, // Default sea level pressure in Pa
+							SeaLevelTemperature: 288.15, // Default sea level temperature in K
+						},
+					},
+				},
+			},
+		}
+	}
 	return &AerodynamicSystem{
 		world:    world,
 		entities: make([]*states.PhysicsState, 0),
@@ -45,12 +60,32 @@ func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Engine) *Ae
 
 // getAtmosphericData retrieves atmospheric data from cache or calculates it
 func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericData {
+	if a.isa == nil {
+		// Fallback to standard sea level values if ISA model isn't initialized
+		return &atmosphericData{
+			density:     1.225,
+			pressure:    101325,
+			temperature: 288.15,
+			soundSpeed:  340.29,
+		}
+	}
+	
 	isaData := a.isa.GetAtmosphere(altitude)
+	if isaData.Density <= 0 || isaData.Pressure <= 0 || isaData.Temperature <= 0 {
+		// Return standard values if ISA data is invalid
+		return &atmosphericData{
+			density:     1.225,
+			pressure:    101325,
+			temperature: 288.15,
+			soundSpeed:  340.29,
+		}
+	}
+	
 	return &atmosphericData{
 		density:     isaData.Density,
 		pressure:    isaData.Pressure,
 		temperature: isaData.Temperature,
-		soundSpeed:  isaData.SoundSpeed, // Use SoundSpeed directly from isaData
+		soundSpeed:  isaData.SoundSpeed,
 	}
 }
 
