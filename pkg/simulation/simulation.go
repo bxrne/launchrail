@@ -155,7 +155,27 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 
 // assertAndLogPhysicsSanity performs assertions and logging for the simulation state.
 func (s *Simulation) assertAndLogPhysicsSanity(state *entities.RocketEntity) error {
-	if state != nil && state.GetComponent("motor") == nil {
+	if state == nil {
+		return nil
+	}
+	zeroRocketStateIfNoMotor(s, state)
+	s.logger.Warn("Pre-assert acceleration", "ax", state.Acceleration.Vec.X, "ay", state.Acceleration.Vec.Y, "az", state.Acceleration.Vec.Z)
+	logAndAssertNaNOrInf(s, "Altitude", state.Position.Vec.Y)
+	logAndAssertNaNOrInf(s, "Velocity", state.Velocity.Vec.Y)
+	logAndAssertNaNOrInf(s, "Acceleration", state.Acceleration.Vec.Y)
+	if state.Mass.Value <= 0 {
+		s.logger.Error("ASSERT FAIL: Mass is non-positive", "mass", state.Mass.Value)
+		return fmt.Errorf("mass is non-positive")
+	}
+	if err := assertMotorStateAndLog(s, state); err != nil {
+		return err
+	}
+	return nil
+}
+
+// zeroRocketStateIfNoMotor zeroes state if no motor is present and logs a warning.
+func zeroRocketStateIfNoMotor(s *Simulation, state *entities.RocketEntity) {
+	if state.GetComponent("motor") == nil {
 		state.Acceleration.Vec.X = 0
 		state.Acceleration.Vec.Y = 0
 		state.Acceleration.Vec.Z = 0
@@ -167,38 +187,41 @@ func (s *Simulation) assertAndLogPhysicsSanity(state *entities.RocketEntity) err
 		state.Position.Vec.Z = 0
 		s.logger.Warn("Zeroed rocket state before assertion", "ax", state.Acceleration.Vec.X, "ay", state.Acceleration.Vec.Y, "az", state.Acceleration.Vec.Z)
 	}
-	if state == nil {
-		return nil
+}
+
+// logAndAssertNaNOrInf logs an error if the value is NaN or Inf.
+func logAndAssertNaNOrInf(s *Simulation, label string, value float64) {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		s.logger.Error("ASSERT FAIL: "+label+" is NaN or Inf, ignoring", label, value)
 	}
-	s.logger.Warn("Pre-assert acceleration", "ax", state.Acceleration.Vec.X, "ay", state.Acceleration.Vec.Y, "az", state.Acceleration.Vec.Z)
-	if math.IsNaN(state.Position.Vec.Y) || math.IsInf(state.Position.Vec.Y, 0) {
-		s.logger.Error("ASSERT FAIL: Altitude is NaN or Inf, ignoring", "altitude", state.Position.Vec.Y)
-	}
-	if math.IsNaN(state.Velocity.Vec.Y) || math.IsInf(state.Velocity.Vec.Y, 0) {
-		s.logger.Error("ASSERT FAIL: Velocity is NaN or Inf, ignoring", "vy", state.Velocity.Vec.Y)
-	}
-	if math.IsNaN(state.Acceleration.Vec.Y) || math.IsInf(state.Acceleration.Vec.Y, 0) {
-		s.logger.Error("ASSERT FAIL: Acceleration is NaN or Inf, ignoring", "ay", state.Acceleration.Vec.Y)
-	}
-	if state.Mass.Value <= 0 {
-		s.logger.Error("ASSERT FAIL: Mass is non-positive", "mass", state.Mass.Value)
-		return fmt.Errorf("mass is non-positive")
-	}
+}
+
+// assertMotorStateAndLog checks motor state, logs, and does periodic logging.
+func assertMotorStateAndLog(s *Simulation, state *entities.RocketEntity) error {
 	if state.Motor != nil {
 		if math.Abs(state.Motor.GetThrust()) > 1e6 {
 			s.logger.Error("ASSERT FAIL: Thrust out of bounds", "thrust", state.Motor.GetThrust())
 			return fmt.Errorf("thrust out of bounds")
 		}
-		if int(s.currentTime*1000)%100 == 0 {
-			s.logger.Info("Sim state", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value, "thrust", state.Motor.GetThrust())
-		}
+		logPeriodicSimState(s, state, true)
 	} else {
-		if int(s.currentTime*1000)%100 == 0 {
-			s.logger.Warn("Sim state: Motor is nil", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value)
-		}
+		logPeriodicSimState(s, state, false)
 	}
 	return nil
 }
+
+// logPeriodicSimState logs the sim state every 100ms, with or without motor.
+func logPeriodicSimState(s *Simulation, state *entities.RocketEntity, hasMotor bool) {
+	if int(s.currentTime*1000)%100 != 0 {
+		return
+	}
+	if hasMotor {
+		s.logger.Info("Sim state", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value, "thrust", state.Motor.GetThrust())
+	} else {
+		s.logger.Warn("Sim state: Motor is nil", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value)
+	}
+}
+
 
 // shouldStopSimulation checks if the simulation should stop and logs the reason.
 func (s *Simulation) shouldStopSimulation() bool {
