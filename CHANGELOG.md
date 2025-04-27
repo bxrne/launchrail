@@ -1,3 +1,13 @@
+## v0.2.0 (2025-04-27)
+
+### Feat
+
+- **plugins**: add plugin compilation and change logger to interface type
+
+### Fix
+
+- **plugin-compilation**: Use search for go exec in PATH instead of assumption that it was available
+
 ## v0.1.3 (2025-04-27)
 
 ### Fix
