@@ -6,7 +6,6 @@
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=bxrne_launchrail&metric=coverage)](https://sonarcloud.io/summary/new_code?id=bxrne_launchrail)
 [![Go Reference](https://pkg.go.dev/badge/github.com/bxrne/launchrail.svg)](https://pkg.go.dev/github.com/bxrne/launchrail)
 
-<img alt="logo" src="./logo.jpg" height=360 />
 
 Launchrail is an open-source 6DOF High-Powered Rocket Simulator. It leverages [OpenRocket](http://openrocket.info/) design files for configuration and [ThrustCurve](https://www.thrustcurve.org/) API for motor curves. The project also explores using financial algorithms to model atmospheric turbulence.
 
