@@ -69,6 +69,10 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 
 	// Clean and validate the dir parameter to prevent directory traversal
 	cleanDir := filepath.Clean(dir)
+	if strings.Contains(cleanDir, "..") || strings.ContainsAny(cleanDir, "/\\") {
+		return nil, fmt.Errorf("invalid directory: %s", dir)
+	}
+
 	absDir := filepath.Join(baseDir, cleanDir)
 	if !strings.HasPrefix(absDir, baseDir) {
 		return nil, fmt.Errorf("invalid directory: %s", dir)
@@ -78,7 +82,7 @@ func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error)
 		return nil, err
 	}
 
-	filePath := filepath.Join(dir, fmt.Sprintf("%s.csv", store))
+	filePath := filepath.Join(absDir, fmt.Sprintf("%s.csv", store))
 
 	// Open file in read/write mode with append flag.
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
