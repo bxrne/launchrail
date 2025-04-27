@@ -1,3 +1,9 @@
+## v0.3.1 (2025-04-27)
+
+### Refactor
+
+- **rocket-entity**: Refactor mass calculation into helper functions for better code organization
+
 ## v0.3.0 (2025-04-27)
 
 ### Feat
