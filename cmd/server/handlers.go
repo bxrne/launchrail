@@ -477,23 +477,14 @@ func (h *DataHandler) GetTableData(c *gin.Context) {
 	h.handleTableRequest(c, hash, table)
 }
 
-// sortRecords sorts records based on LastModified timestamp
+// sortRecords sorts records based on CreationTime timestamp
 func sortRecords(records []*storage.Record, ascending bool) {
-	// Use bubble sort for simplicity - can be optimized if needed
-	n := len(records)
-	for i := 0; i < n-1; i++ {
-		for j := 0; j < n-i-1; j++ {
-			shouldSwap := false
-			if ascending {
-				shouldSwap = records[j].LastModified.After(records[j+1].LastModified)
-			} else {
-				shouldSwap = records[j].LastModified.Before(records[j+1].LastModified)
-			}
-			if shouldSwap {
-				records[j], records[j+1] = records[j+1], records[j]
-			}
+	sort.Slice(records, func(i, j int) bool {
+		if ascending {
+			return records[i].CreationTime.Before(records[j].CreationTime)
 		}
-	}
+		return records[i].CreationTime.After(records[j].CreationTime)
+	})
 }
 
 // ListRecordsAPI godoc
@@ -580,4 +571,15 @@ func parseInt(valueStr string, fieldName string) (int, error) {
 		return 0, fmt.Errorf("invalid %s: %w", fieldName, err)
 	}
 	return value, nil
+}
+
+func parseOrDefaultInt(value string, defaultValue int) int {
+	if value == "" {
+		return defaultValue
+	}
+	intVal, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultValue
+	}
+	return intVal
 }

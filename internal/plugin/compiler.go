@@ -38,8 +38,17 @@ func CompileAllPlugins(pluginsSourceDir, pluginsOutputDir string, logger logf.Lo
 		}
 
 		pluginName := entry.Name()
-		sourcePath := filepath.Join(pluginsSourceDir, pluginName)
-		outputPath := filepath.Join(pluginsOutputDir, pluginName+".so")
+		// Ensure sourcePath and outputPath are absolute for reliable relative path calculation
+		sourcePath, err := filepath.Abs(filepath.Join(pluginsSourceDir, pluginName))
+		if err != nil {
+			logger.Warn("Failed to get absolute path for source, skipping", "dir", pluginName, "error", err)
+			continue
+		}
+		outputPath, err := filepath.Abs(filepath.Join(pluginsOutputDir, pluginName+".so"))
+        if err != nil {
+			logger.Warn("Failed to get absolute path for output, skipping", "dir", pluginName, "error", err)
+			continue
+		}
 
 		// Basic check: does the directory contain Go files?
 		hasGoFiles, err := CheckDirForGoFiles(sourcePath)
@@ -52,9 +61,19 @@ func CompileAllPlugins(pluginsSourceDir, pluginsOutputDir string, logger logf.Lo
 			continue
 		}
 
-		logger.Info("Compiling plugin", "name", pluginName, "source", sourcePath, "output", outputPath)
-		cmd := exec.Command(goExecutable, "build", "-buildmode=plugin", "-o", outputPath, sourcePath)
-		cmd.Dir = sourcePath // Set working directory to the plugin source
+		// Calculate the relative path for the output file from the source directory
+		relOutputPath, err := filepath.Rel(sourcePath, outputPath)
+		if err != nil {
+			err := fmt.Errorf("failed to calculate relative output path for plugin '%s': %w", pluginName, err)
+			logger.Error("Plugin path calculation error", "name", pluginName, "source", sourcePath, "output", outputPath, "error", err)
+			compileErrors = append(compileErrors, err)
+			continue
+		}
+
+		logger.Info("Compiling plugin", "name", pluginName, "source", sourcePath, "output", outputPath, "relativeOutput", relOutputPath)
+        // Use "." for source path argument since cmd.Dir is the source directory
+		cmd := exec.Command(goExecutable, "build", "-buildmode=plugin", "-o", relOutputPath, ".")
+		cmd.Dir = sourcePath   // Set working directory to the plugin source directory
 		cmd.Stderr = os.Stderr // Pipe build errors to main stderr
 		cmd.Stdout = os.Stdout // Pipe build output to main stdout
 
