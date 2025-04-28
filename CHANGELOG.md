@@ -1,3 +1,17 @@
+## v0.3.3 (2025-04-28)
+
+### Fix
+
+- **server**: Refactor API pagination from page/size to limit/offset
+- **server**: Add version parsing safety checks and refactor API version handling
+
+### Refactor
+
+- **plugin**: Remove unused test code and add missing go.work.sum dependency
+- **plugin**: extract plugin compilation logic into separate function
+- **server**: Remove unused parseOrDefaultInt helper function from handlers
+- **server,-plugin-compilation,-storage-mgr**: Refactor record sorting to use CreationTime and add unit tests for handlers
+
 ## v0.3.2 (2025-04-27)
 
 ### Fix
