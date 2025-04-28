@@ -9,20 +9,20 @@ import (
 	"sync"
 )
 
-// StorageType is the type of storage service (MOTION, EVENTS, etc.)
-type StorageType string
+// SimStorageType is the type of storage service (MOTION, EVENTS, etc.)
+type SimStorageType string
 
 const (
-	// MOTION storage StorageType
-	MOTION StorageType = "MOTION"
-	// EVENTS storage StorageType
-	EVENTS StorageType = "EVENTS"
-	// DYNAMICS storage StorageType
-	DYNAMICS StorageType = "DYNAMICS"
+	// MOTION storage SimStorageType
+	MOTION SimStorageType = "MOTION"
+	// EVENTS storage SimStorageType
+	EVENTS SimStorageType = "EVENTS"
+	// DYNAMICS storage SimStorageType
+	DYNAMICS SimStorageType = "DYNAMICS"
 )
 
 // StorageHeaders is a map of columns for storage types
-var StorageHeaders = map[StorageType][]string{
+var StorageHeaders = map[SimStorageType][]string{
 	MOTION: {
 		"time", "altitude", "velocity", "acceleration", "thrust",
 	},
@@ -38,7 +38,7 @@ var StorageHeaders = map[StorageType][]string{
 type Storage struct {
 	baseDir  string
 	dir      string
-	store    StorageType
+	store    SimStorageType
 	mu       sync.RWMutex
 	filePath string
 	writer   *csv.Writer
@@ -54,7 +54,7 @@ type Stores struct {
 
 // NewStorage creates a new storage service.
 // If the provided baseDir is not absolute, it is prepended with the user's home directory.
-func NewStorage(baseDir string, dir string, store StorageType) (*Storage, error) {
+func NewStorage(baseDir string, dir string, store SimStorageType) (*Storage, error) {
 	// Validate the dir to ensure it is a valid directory name
 	if strings.Contains(dir, "/") || strings.Contains(dir, "\\") || strings.Contains(dir, "..") {
 		return nil, fmt.Errorf("invalid directory name")

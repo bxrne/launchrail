@@ -1,12 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	st "github.com/bxrne/launchrail/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zerodha/logf"
 )
 
 // Helper function to create a temporary directory and files for benchmark data
@@ -200,51 +204,109 @@ func TestHiprEuroc24Benchmark_Run(t *testing.T) {
 
 }
 
-// TestRunHiprEuroc24Benchmark requires setting up a mock simulation record
-// or using actual simulation data, which makes it more of an integration test.
-// This is a placeholder demonstrating the structure.
+// TestRunHiprEuroc24Benchmark tests the full Run sequence.
+// NOTE: This test requires actual simulation data in the dummy record files
+// to properly assert the results. For now, it mainly checks for panics and errors.
 func TestRunHiprEuroc24Benchmark(t *testing.T) {
-	// Setup: Create temp dir, mock config, mock record manager, mock record
-	// Removed unused tempDir variable
-	cfg := BenchmarkConfig{
-		BenchdataPath: "testdata", // Assuming ground truth CSVs are in testdata/hipr-euroc24
-		SimRecordHash: "mockSimHash",
-		// Mock RecordManager needed here
+	benchmarkName := "hipr-euroc24"
+	// Setup: Create temp dirs
+	tempDataPathBase := t.TempDir() // For ground truth data
+	tempRecordPath := t.TempDir()   // For RecordManager
+
+	// Setup: RecordManager and dummy record
+	rm, err := st.NewRecordManager(tempRecordPath)
+	require.NoError(t, err, "Failed to create RecordManager")
+	testSimHash := "dummy-sim-hash"
+
+	// Create dummy record structure needed by rm.GetRecord
+	dummyRecordDir := filepath.Join(tempRecordPath, "records", testSimHash)
+	err = os.MkdirAll(dummyRecordDir, 0755)
+	require.NoError(t, err, "Failed to create dummy record directory")
+
+	// Create EMPTY dummy simulation result files
+	for _, storeType := range []st.SimStorageType{st.MOTION, st.EVENTS, st.DYNAMICS} { // Use renamed type
+		filename := fmt.Sprintf("%s.csv", strings.ToLower(string(storeType))) // Correct filename generation
+		dummyFilePath := filepath.Join(dummyRecordDir, filename)
+		// TODO: Populate these files with mock simulation data for full assertion testing
+		file, err := os.Create(dummyFilePath)
+		require.NoError(t, err, "Failed to create dummy file: %s", dummyFilePath)
+		file.Close() // Close the file immediately after creation
 	}
 
-	// Mock the RecordManager and the GetRecord/LoadTelemetry interactions
-	// This part is complex and requires a mocking library or manual mocks.
-	// For now, we assume the benchmark can be created.
+	// Create an empty manifest file required by RecordManager
+	manifestPath := filepath.Join(dummyRecordDir, "manifest.json")
+	manifestFile, err := os.Create(manifestPath)
+	require.NoError(t, err, "Failed to create dummy manifest.json")
+	_, err = manifestFile.WriteString("{}") // Write empty JSON object
+	require.NoError(t, err, "Failed to write to dummy manifest.json")
+	manifestFile.Close()
+
+	// --- Setup Benchmark Configuration ---
+	// Initialize RecordManager with the base temp directory
+
+	// Setup: Configure Benchmark
+	cfg := BenchmarkConfig{
+		BenchdataPath: tempDataPathBase, // Base path for ground truth
+		SimRecordHash: testSimHash,    // Dummy hash for sim results
+		RecordManager: rm,             // Initialized RecordManager
+	}
+
+	// Setup: Logger
+	log := logf.New(logf.Opts{Level: logf.DebugLevel})
+	_ = log // Avoid unused variable error if logger isn't passed
+
+	// Setup: Create Benchmark Instance
 	b := NewHiprEuroc24Benchmark(cfg)
 
-	// Load Ground Truth Data (requires testdata/hipr-euroc24 CSVs)
-	err := b.LoadData(cfg.BenchdataPath)
-	require.NoError(t, err, "Failed to load ground truth test data")
+	// Setup: Write GROUND TRUTH CSV files to the benchmark data directory
+	benchmarkSubDir := filepath.Join(tempDataPathBase, benchmarkName)
+	err = os.MkdirAll(benchmarkSubDir, 0755)
+	require.NoError(t, err, "Error creating benchmark data subdir")
 
-	// --- MOCKING LoadTelemetry --- (This is the hard part)
-	// You would need to mock b.config.RecordManager.GetRecord to return a mock record,
-	// and then mock the equivalent of LoadTelemetry to return specific test data.
-	// Example (conceptual using testify/mock):
-	// mockRM := new(MockRecordManager)
-	// mockRec := new(MockRecord)
-	// mockTelemetry := &storage.TelemetryData{ Time: []float64{0, 1, 2}, Altitude: []float64{0, 10, 5} ... }
-	// mockRec.On("LoadTelemetry").Return(mockTelemetry, nil)
-	// mockRM.On("GetRecord", "mockSimHash").Return(mockRec, nil)
-	// b.config.RecordManager = mockRM
+	flightInfoPath := filepath.Join(benchmarkSubDir, "fl001 - flight_info_processed.csv")
+	err = os.WriteFile(flightInfoPath, []byte(`Timestamp (s),Altitude (m),Velocity (m/s),Acceleration (m/s^2)
+0.0,0.0,0.0,30.0
+1.0,15.0,30.0,20.0
+2.0,55.0,40.0,10.0
+3.0,105.0,50.0,0.0
+4.0,155.0,50.0,-10.0
+5.0,195.0,40.0,-10.0
+6.0,225.0,30.0,-10.0
+7.0,245.0,20.0,-10.0
+8.0,255.0,10.0,-10.0
+9.0,255.0,0.0,-10.0
+10.0,245.0,-10.0,-10.0`), 0644)
+	require.NoError(t, err)
+	eventInfoPath := filepath.Join(benchmarkSubDir, "fl001 - event_info_processed.csv")
+	err = os.WriteFile(eventInfoPath, []byte(`#,"Timestamp (s)","Event Name",out_idx
+1,0.0,EV_LIFTOFF,0
+2,5.5,EV_MECO,0
+3,9.0,EV_APOGEE,0
+4,9.5,EV_DROGUE_DEPLOY,0
+5,15.0,EV_MAIN_DEPLOY,0`), 0644)
+	require.NoError(t, err)
+	flightStatesPath := filepath.Join(benchmarkSubDir, "fl001 - flight_states_processed.csv")
+	err = os.WriteFile(flightStatesPath, []byte(`#,"Timestamp (s)","State Name"
+1,3.1,EnginePressure
+2,3.2,EngineTemp
+3,9.1,ApogeeFlag
+4,9.6,DroguePressure
+5,122.12,TOUCHDOWN
+6,15.1,MainPressure`), 0644)
+	require.NoError(t, err)
 
-	// Execute Run (assuming mocks are set up)
-	// results, err := b.Run() // This would fail without proper mocking
+	// Action: Load Ground Truth Data
+	err = b.LoadData(tempDataPathBase) // Load from the base path
+	require.NoError(t, err, "LoadData failed")
 
-	// Assertions (Example - would depend on mocked telemetry)
-	// assert.NoError(t, err)
-	// assert.NotEmpty(t, results)
-	// assert.True(t, results[0].Passed) // e.g., Check if Apogee passed based on mock data
+	// Action: Run the benchmark comparison
+	results, err := b.Run()
 
-	// Mark test as skipped until mocking is implemented
-	t.Skip("Skipping TestRunHiprEuroc24Benchmark: Requires mocking RecordManager/Record/Telemetry")
+	// Assertions
+	require.NoError(t, err, "Run failed")
+	require.NotEmpty(t, results, "Run should produce results")
 
-	// Keep the original Run call structure for reference if needed later
-	// results, err := b.Run() // Corrected call signature
-	// require.NoError(t, err)
-	// assert.NotEmpty(t, results)
+	// TODO: Add more specific assertions once dummy simulation CSVs are populated.
+	// Example: Check if specific metrics passed/failed based on known dummy data.
+	// assert.True(t, results[0].Passed, "Apogee check should pass/fail based on dummy data")
 }

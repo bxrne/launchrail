@@ -15,11 +15,11 @@ type StorageParasiteSystem struct {
 	entities  []*states.PhysicsState // Change to pointer slice
 	dataChan  chan *states.PhysicsState
 	done      chan struct{}
-	storeType storage.StorageType
+	storeType storage.SimStorageType
 }
 
 // NewStorageParasiteSystem creates a new StorageParasiteSystem
-func NewStorageParasiteSystem(world *ecs.World, store storage.StorageInterface, storeType storage.StorageType) *StorageParasiteSystem {
+func NewStorageParasiteSystem(world *ecs.World, store storage.StorageInterface, storeType storage.SimStorageType) *StorageParasiteSystem {
 	return &StorageParasiteSystem{
 		world:     world,
 		storage:   store,
