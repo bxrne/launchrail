@@ -115,6 +115,57 @@ func TestManager_Initialize(t *testing.T) {
 			expectedError:  true,
 			expectedStatus: simulation.StatusIdle,
 		},
+		{
+			name: "invalid simulation step (too low)",
+			setupConfig: func() *config.Config {
+				return &config.Config{
+					Setup: config.Setup{App: config.App{BaseDir: tempDir}},
+					Engine: config.Engine{
+						Options: config.Options{MotorDesignation: "269H110-14A", OpenRocketFile: "../../testdata/openrocket/l1.ork"},
+						Simulation: config.Simulation{
+							Step:    0,
+							MaxTime: 10,
+						},
+					},
+				}
+			},
+			expectedError:  true,
+			expectedStatus: simulation.StatusIdle,
+		},
+		{
+			name: "invalid simulation step (too high)",
+			setupConfig: func() *config.Config {
+				return &config.Config{
+					Setup: config.Setup{App: config.App{BaseDir: tempDir}},
+					Engine: config.Engine{
+						Options: config.Options{MotorDesignation: "269H110-14A", OpenRocketFile: "../../testdata/openrocket/l1.ork"},
+						Simulation: config.Simulation{
+							Step:    0.2,
+							MaxTime: 10,
+						},
+					},
+				}
+			},
+			expectedError:  true,
+			expectedStatus: simulation.StatusIdle,
+		},
+		{
+			name: "invalid simulation max time",
+			setupConfig: func() *config.Config {
+				return &config.Config{
+					Setup: config.Setup{App: config.App{BaseDir: tempDir}},
+					Engine: config.Engine{
+						Options: config.Options{MotorDesignation: "269H110-14A", OpenRocketFile: "../../testdata/openrocket/l1.ork"},
+						Simulation: config.Simulation{
+							Step:    0.01,
+							MaxTime: -5,
+						},
+					},
+				}
+			},
+			expectedError:  true,
+			expectedStatus: simulation.StatusIdle,
+		},
 	}
 
 	for _, tt := range tests {
@@ -130,7 +181,6 @@ func TestManager_Initialize(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-
 		})
 	}
 }

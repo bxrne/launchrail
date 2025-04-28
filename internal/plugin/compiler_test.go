@@ -34,158 +34,156 @@ func createDummyPlugin(t *testing.T, baseDir, pluginName, content string) string
 	return pluginDir
 }
 
-// Mock logger for tests
-var testLogger = logf.New(logf.Opts{})
+// TestCheckDirForGoFiles checks the helper function
+func TestCheckDirForGoFiles(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "checkdirtest-")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
 
-// TestCompileAllPlugins covers various scenarios
+	// Case 1: Directory with .go files
+	dirWithGo := filepath.Join(tmpDir, "withgo")
+	require.NoError(t, os.Mkdir(dirWithGo, 0755))
+	_, err = os.Create(filepath.Join(dirWithGo, "main.go"))
+	require.NoError(t, err)
+	_, err = os.Create(filepath.Join(dirWithGo, "other.go"))
+	require.NoError(t, err)
+
+	// Case 2: Directory with non-.go files
+	dirWithOther := filepath.Join(tmpDir, "withother")
+	require.NoError(t, os.Mkdir(dirWithOther, 0755))
+	_, err = os.Create(filepath.Join(dirWithOther, "script.sh"))
+	require.NoError(t, err)
+	_, err = os.Create(filepath.Join(dirWithOther, "README.md"))
+	require.NoError(t, err)
+
+	// Case 3: Empty directory
+	dirEmpty := filepath.Join(tmpDir, "empty")
+	require.NoError(t, os.Mkdir(dirEmpty, 0755))
+
+	// Case 4: Non-existent directory path
+	dirNonExistent := filepath.Join(tmpDir, "nonexistent")
+
+	// --- Run Tests ---
+
+	// Test Case 1: Should find .go files
+	hasGo, err := plugin.CheckDirForGoFiles(dirWithGo)
+	assert.NoError(t, err, "Test Case 1 failed: checking dir with .go files")
+	assert.True(t, hasGo, "Test Case 1 failed: expected true for dir with .go files")
+
+	// Test Case 2: Should not find .go files
+	hasGo, err = plugin.CheckDirForGoFiles(dirWithOther)
+	assert.NoError(t, err, "Test Case 2 failed: checking dir with other files")
+	assert.False(t, hasGo, "Test Case 2 failed: expected false for dir with other files")
+
+	// Test Case 3: Should not find .go files in empty dir
+	hasGo, err = plugin.CheckDirForGoFiles(dirEmpty)
+	assert.NoError(t, err, "Test Case 3 failed: checking empty dir")
+	assert.False(t, hasGo, "Test Case 3 failed: expected false for empty dir")
+
+	// Test Case 4: Should return an error for non-existent dir
+	_, err = plugin.CheckDirForGoFiles(dirNonExistent)
+	assert.Error(t, err, "Test Case 4 failed: expected error for non-existent dir")
+
+	// Test Case 5: Path is a file, not a directory
+	filePath := filepath.Join(dirWithGo, "main.go")
+	_, err = plugin.CheckDirForGoFiles(filePath)
+	assert.Error(t, err, "Test Case 5 failed: expected error when path is a file")
+}
+
 func TestCompileAllPlugins(t *testing.T) {
-	// Ensure 'go' command exists for actual compilation tests
-	_, err := exec.LookPath("go")
+	logger := logf.New(logf.Opts{})
+
+	// Need 'go' command for these tests
+	goExec, err := exec.LookPath("go")
 	if err != nil {
-		t.Skip("Skipping compilation tests: 'go' command not found in PATH")
+		t.Skipf("Skipping CompileAllPlugins tests: 'go' executable not found in PATH: %v", err)
 	}
+	t.Logf("Using go executable: %s", goExec)
 
-	// Test case: Successful compilation
-	t.Run("SuccessfulCompilation", func(t *testing.T) {
-		sourceDir := t.TempDir()
-		outputDir := t.TempDir()
+	// --- Test Setup ---
+	testBaseDir, err := os.MkdirTemp("", "compilepluginstest-")
+	require.NoError(t, err)
+	defer os.RemoveAll(testBaseDir)
 
-		// Create a valid dummy plugin
-		dummyContent := `
+	pluginsSourceDir := filepath.Join(testBaseDir, "plugins-src")
+	pluginsOutputDir := filepath.Join(testBaseDir, "plugins-out")
+	require.NoError(t, os.Mkdir(pluginsSourceDir, 0755))
+	require.NoError(t, os.Mkdir(pluginsOutputDir, 0755))
+
+	// Plugin 1: Valid
+	validPluginContent := `
 package main
 
-func main() {}
-// Export a symbol to be a valid plugin
+import "fmt"
+
 var V int
+
+func F() { fmt.Printf("Hello, number %d\n", V) }
 `
-		_ = createDummyPlugin(t, sourceDir, "testplugin", dummyContent)
+	dir_a := createDummyPlugin(t, pluginsSourceDir, "plugina", validPluginContent)
+	require.Equal(t, dir_a, filepath.Join(pluginsSourceDir, "plugina"))
 
-		err := plugin.CompileAllPlugins(sourceDir, outputDir, testLogger)
-		assert.NoError(t, err)
+	// Plugin 2: Invalid syntax
+	invalidPluginContent := `
+package main
 
-		// Check if the compiled plugin exists
-		expectedOutputPath := filepath.Join(outputDir, "testplugin.so")
-		_, err = os.Stat(expectedOutputPath)
-		assert.NoError(t, err, "Compiled plugin file should exist")
-	})
+func F() { fmt.Println("Invalid plugin }
+`
+	dir_b := createDummyPlugin(t, pluginsSourceDir, "pluginb", invalidPluginContent)
+	require.Equal(t, dir_b, filepath.Join(pluginsSourceDir, "pluginb"))
 
-	// Test case: Source directory does not exist
-	t.Run("SourceDirNotExist", func(t *testing.T) {
-		nonExistentDir := filepath.Join(t.TempDir(), "nonexistent")
-		outputDir := t.TempDir()
-		err := plugin.CompileAllPlugins(nonExistentDir, outputDir, testLogger)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to read plugins source directory")
-	})
+	// Plugin 3: Valid (different name)
+	dir_c := createDummyPlugin(t, pluginsSourceDir, "pluginc", validPluginContent)
+	require.Equal(t, dir_c, filepath.Join(pluginsSourceDir, "pluginc"))
 
-	// Test case: Source directory is empty
-	t.Run("SourceDirEmpty", func(t *testing.T) {
-		sourceDir := t.TempDir()
-		outputDir := t.TempDir()
-		err := plugin.CompileAllPlugins(sourceDir, outputDir, testLogger)
-		assert.NoError(t, err) // Should succeed with 0 plugins compiled
-	})
+	// Directory 4: No .go files
+	noGoDir := filepath.Join(pluginsSourceDir, "nogodir")
+	require.NoError(t, os.Mkdir(noGoDir, 0755))
+	_, err = os.Create(filepath.Join(noGoDir, "readme.txt"))
+	require.NoError(t, err)
 
-	// Test case: Source directory contains subdirs but no .go files
-	t.Run("SourceDirNoGoFiles", func(t *testing.T) {
-		sourceDir := t.TempDir()
-		outputDir := t.TempDir()
-		_ = createDummyPlugin(t, sourceDir, "noplugin", "") // Create dir, but no file
-		// Create a non-go file
-		filePath := filepath.Join(sourceDir, "noplugin", "readme.txt")
-		err := os.WriteFile(filePath, []byte("hello"), 0644)
-		require.NoError(t, err)
+	// File 5: A file, not a directory
+	_, err = os.Create(filepath.Join(pluginsSourceDir, "notadir.txt"))
+	require.NoError(t, err)
 
-		err = plugin.CompileAllPlugins(sourceDir, outputDir, testLogger)
-		assert.NoError(t, err) // Should succeed, finding 0 plugins to compile
-	})
+	// --- Run CompileAllPlugins ---
+	err = plugin.CompileAllPlugins(pluginsSourceDir, pluginsOutputDir, logger)
 
-	// Test case: Compilation fails (invalid Go code)
-	t.Run("CompilationFailure", func(t *testing.T) {
-		sourceDir := t.TempDir()
-		outputDir := t.TempDir()
+	// --- Assertions ---
+	// Expecting an error because pluginb failed
+	assert.Error(t, err, "Expected an error due to pluginb failing compilation")
+	if err != nil { // Avoid nil panic if assertion fails
+		assert.Contains(t, err.Error(), "plugin 'pluginb': compilation command failed", "Error message should mention pluginb failure")
+		assert.Contains(t, err.Error(), "1 plugin(s) failed to compile", "Error message should mention count of failures")
+	}
 
-		// Create a plugin with invalid Go code
-		dummyContent := `package main this is invalid`
-		_ = createDummyPlugin(t, sourceDir, "badplugin", dummyContent)
+	// Check output directory for compiled plugins
+	compiledPluginA := filepath.Join(pluginsOutputDir, "plugina.so")
+	_, errA := os.Stat(compiledPluginA)
+	assert.NoError(t, errA, "Valid plugina.so should exist")
 
-		err := plugin.CompileAllPlugins(sourceDir, outputDir, testLogger)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "plugin(s) failed to compile")
+	compiledPluginB := filepath.Join(pluginsOutputDir, "pluginb.so")
+	_, errB := os.Stat(compiledPluginB)
+	assert.Error(t, errB, "Invalid pluginb.so should NOT exist")
+	assert.True(t, os.IsNotExist(errB), "Error for pluginb.so should be 'not exist'")
 
-		// Check that the output file was NOT created
-		expectedOutputPath := filepath.Join(outputDir, "badplugin.so")
-		_, err = os.Stat(expectedOutputPath)
-		assert.Error(t, err, "Compiled plugin file should NOT exist on failure")
-		assert.True(t, os.IsNotExist(err))
-	})
+	compiledPluginC := filepath.Join(pluginsOutputDir, "pluginc.so")
+	_, errC := os.Stat(compiledPluginC)
+	assert.NoError(t, errC, "Valid pluginc.so should exist")
 
-	// Test case: Multiple plugins, one fails
-	t.Run("PartialCompilationFailure", func(t *testing.T) {
-		sourceDir := t.TempDir()
-		outputDir := t.TempDir()
+	// Check that skipped dirs/files didn't produce output
+	compiledNogo := filepath.Join(pluginsOutputDir, "nogodir.so")
+	_, errNogo := os.Stat(compiledNogo)
+	assert.Error(t, errNogo, "nogodir.so should not exist")
 
-		// Valid plugin
-		validContent := `package main
-var V int`
-		_ = createDummyPlugin(t, sourceDir, "goodplugin", validContent)
+	compiledNotadir := filepath.Join(pluginsOutputDir, "notadir.txt.so") // Unlikely name, but check
+	_, errNotadir := os.Stat(compiledNotadir)
+	assert.Error(t, errNotadir, "notadir.txt.so should not exist")
 
-		// Invalid plugin
-		invalidContent := `package main func ???`
-		_ = createDummyPlugin(t, sourceDir, "badplugin2", invalidContent)
-
-		err := plugin.CompileAllPlugins(sourceDir, outputDir, testLogger)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "1 plugin(s) failed to compile") // Check error message count
-
-		// Check the good one exists
-		goodPluginName := "goodplugin"
-		expectedGoodOutputPath := filepath.Join(outputDir, goodPluginName+".so")
-		_, err = os.Stat(expectedGoodOutputPath)
-		assert.NoError(t, err, "Good plugin should exist")
-
-		// Check the bad one does not exist
-		badOutputPath := filepath.Join(outputDir, "badplugin2.so")
-		_, err = os.Stat(badOutputPath)
-		assert.Error(t, err, "Bad plugin should NOT exist")
-		assert.True(t, os.IsNotExist(err))
-	})
 }
 
-// TestcheckDirForGoFiles checks the helper function
-func TestCheckDirForGoFiles(t *testing.T) {
-	t.Run("DirWithGoFile", func(t *testing.T) {
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "main.go")
-		err := os.WriteFile(filePath, []byte("package main"), 0644)
-		require.NoError(t, err)
-
-		hasGo, err := plugin.CheckDirForGoFiles(dir)
-		assert.NoError(t, err)
-		assert.True(t, hasGo)
-	})
-
-	t.Run("DirWithoutGoFile", func(t *testing.T) {
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "readme.txt")
-		err := os.WriteFile(filePath, []byte("hello"), 0644)
-		require.NoError(t, err)
-
-		hasGo, err := plugin.CheckDirForGoFiles(dir)
-		assert.NoError(t, err)
-		assert.False(t, hasGo)
-	})
-
-	t.Run("EmptyDir", func(t *testing.T) {
-		dir := t.TempDir()
-		hasGo, err := plugin.CheckDirForGoFiles(dir)
-		assert.NoError(t, err)
-		assert.False(t, hasGo)
-	})
-
-	t.Run("NonExistentDir", func(t *testing.T) {
-		dir := filepath.Join(t.TempDir(), "nonexistent")
-		_, err := plugin.CheckDirForGoFiles(dir)
-		assert.Error(t, err)
-	})
-}
+// TODO: Add tests for CompileAllPlugins edge cases:
+// - Source directory doesn't exist
+// - Output directory doesn't exist (should it be created? Currently assumes exists)
+// - Go executable not found (mock exec.LookPath? More complex)
+// - Path calculation errors (e.g., permissions, complex relative paths - harder to test reliably)

@@ -437,7 +437,6 @@ func (h *DataHandler) handleTableRequest(c *gin.Context, hash string, table stri
 	totalPages := int(math.Ceil(float64(len(data)) / float64(itemsPerPage)))
 	startIndex := (page - 1) * itemsPerPage
 	endIndex := min(startIndex+itemsPerPage, len(data))
-
 	if startIndex >= len(data) {
 		startIndex = 0
 		endIndex = min(itemsPerPage, len(data))
@@ -477,23 +476,14 @@ func (h *DataHandler) GetTableData(c *gin.Context) {
 	h.handleTableRequest(c, hash, table)
 }
 
-// sortRecords sorts records based on LastModified timestamp
+// sortRecords sorts records based on CreationTime timestamp
 func sortRecords(records []*storage.Record, ascending bool) {
-	// Use bubble sort for simplicity - can be optimized if needed
-	n := len(records)
-	for i := 0; i < n-1; i++ {
-		for j := 0; j < n-i-1; j++ {
-			shouldSwap := false
-			if ascending {
-				shouldSwap = records[j].LastModified.After(records[j+1].LastModified)
-			} else {
-				shouldSwap = records[j].LastModified.Before(records[j+1].LastModified)
-			}
-			if shouldSwap {
-				records[j], records[j+1] = records[j+1], records[j]
-			}
+	sort.Slice(records, func(i, j int) bool {
+		if ascending {
+			return records[i].CreationTime.Before(records[j].CreationTime)
 		}
-	}
+		return records[i].CreationTime.After(records[j].CreationTime)
+	})
 }
 
 // ListRecordsAPI godoc
@@ -502,9 +492,10 @@ func sortRecords(records []*storage.Record, ascending bool) {
 // @Tags Data
 // @Accept json
 // @Produce json
-// @Param page query int false "Page number"
 // @Param filter query string false "Filter by hash"
 // @Param sort query string false "Sort order (time_asc or time_desc)"
+// @Param limit query int false "Limit the number of records"
+// @Param offset query int false "Offset for pagination"
 // @Success 200 {object} RecordsResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/data [get]
@@ -516,14 +507,20 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 	}
 
 	// Apply query parameters
-	page, err := parseInt(c.Query("page"), "page")
-	if err != nil || page < 1 {
-		page = 1
-	}
 	filter := c.Query("filter")
-	itemsPerPage := 15
+	sortOrder := c.Query("sort")
 
-	// Apply filtering
+	// Parse limit and offset for pagination
+	limit, err := parseInt(c.Query("limit"), "limit")
+	if err != nil || limit < 0 { // Treat invalid or negative limit as no limit
+		limit = 0
+	}
+	offset, err := parseInt(c.Query("offset"), "offset")
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	// Apply filtering *before* calculating total for pagination
 	if filter != "" {
 		filtered := make([]*storage.Record, 0)
 		for _, r := range records {
@@ -534,29 +531,31 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 		records = filtered
 	}
 
-	// Apply sorting
-	sortOrder := c.Query("sort")
 	sortRecords(records, sortOrder == "time_asc")
 
-	// Calculate pagination
+	// Calculate pagination based on limit and offset
 	totalRecords := len(records)
-	totalPages := int(math.Ceil(float64(totalRecords) / float64(itemsPerPage)))
-	startIndex := (page - 1) * itemsPerPage
-	endIndex := min(startIndex+itemsPerPage, totalRecords)
+	startIndex := offset
+	endIndex := totalRecords // Default endIndex is the total number of records
 
-	if startIndex >= totalRecords {
-		startIndex = 0
-		endIndex = min(itemsPerPage, totalRecords)
-		page = 1
+	// Apply limit if it's greater than 0
+	if limit > 0 {
+		endIndex = min(startIndex+limit, totalRecords)
 	}
 
-	// Return paginated records
+	// Ensure startIndex is within bounds
+	if startIndex >= totalRecords {
+		// If offset is past the end, return an empty list but correct total
+		startIndex = totalRecords
+		endIndex = totalRecords
+	} else if startIndex < 0 { // Should not happen with default 0, but good practice
+	    startIndex = 0
+	}
+
+	// Return paginated records with total count
 	c.JSON(http.StatusOK, gin.H{
+		"total":   totalRecords, // Add total count
 		"records": records[startIndex:endIndex],
-		"pagination": gin.H{
-			"currentPage": page,
-			"totalPages":  totalPages,
-		},
 	})
 }
 
