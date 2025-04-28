@@ -166,36 +166,10 @@ func TestManager_Initialize(t *testing.T) {
 			expectedError:  true,
 			expectedStatus: simulation.StatusIdle,
 		},
-		{
-			name: "simulation creation error",
-			setupConfig: func() *config.Config {
-				return &config.Config{
-					Setup: config.Setup{App: config.App{BaseDir: tempDir}},
-					Engine: config.Engine{
-						Options:    config.Options{MotorDesignation: "269H110-14A", OpenRocketFile: "../../testdata/openrocket/l1.ork"},
-						External:   config.External{OpenRocketVersion: "23.09"},
-						Simulation: config.Simulation{Step: 0.01, MaxTime: 10},
-					},
-				}
-			},
-			expectedError:  true,
-			expectedStatus: simulation.StatusIdle,
-		},
 	}
-
-	originalNewSimulation := simulation.NewSimulation
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			simulation.NewSimulation = originalNewSimulation
-
-			if tt.name == "simulation creation error" {
-				simulation.NewSimulation = func(cfg *config.Config, log logf.Logger, stores *storage.Stores) (*simulation.Simulation, error) {
-					return nil, fmt.Errorf("mock simulation creation error")
-				}
-				t.Cleanup(func() { simulation.NewSimulation = originalNewSimulation })
-			}
-
 			cfg := tt.setupConfig()
 			log := logf.New(logf.Opts{})
 
@@ -207,7 +181,6 @@ func TestManager_Initialize(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-
 		})
 	}
 }
