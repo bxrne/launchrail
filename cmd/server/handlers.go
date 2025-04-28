@@ -572,14 +572,3 @@ func parseInt(valueStr string, fieldName string) (int, error) {
 	}
 	return value, nil
 }
-
-func parseOrDefaultInt(value string, defaultValue int) int {
-	if value == "" {
-		return defaultValue
-	}
-	intVal, err := strconv.Atoi(value)
-	if err != nil {
-		return defaultValue
-	}
-	return intVal
-}
