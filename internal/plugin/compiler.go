@@ -38,51 +38,19 @@ func CompileAllPlugins(pluginsSourceDir, pluginsOutputDir string, logger logf.Lo
 		}
 
 		pluginName := entry.Name()
-		// Ensure sourcePath and outputPath are absolute for reliable relative path calculation
-		sourcePath, err := filepath.Abs(filepath.Join(pluginsSourceDir, pluginName))
+		sourcePath := filepath.Join(pluginsSourceDir, pluginName)
+
+		err := compileSinglePlugin(goExecutable, sourcePath, pluginsOutputDir, pluginName, logger)
 		if err != nil {
-			logger.Warn("Failed to get absolute path for source, skipping", "dir", pluginName, "error", err)
-			continue
-		}
-		outputPath, err := filepath.Abs(filepath.Join(pluginsOutputDir, pluginName+".so"))
-        if err != nil {
-			logger.Warn("Failed to get absolute path for output, skipping", "dir", pluginName, "error", err)
-			continue
-		}
-
-		// Basic check: does the directory contain Go files?
-		hasGoFiles, err := CheckDirForGoFiles(sourcePath)
-		if err != nil {
-			logger.Warn("Error checking directory for Go files, skipping", "dir", sourcePath, "error", err)
-			continue
-		}
-		if !hasGoFiles {
-			logger.Debug("Directory does not contain Go files, skipping", "dir", sourcePath)
-			continue
-		}
-
-		// Calculate the relative path for the output file from the source directory
-		relOutputPath, err := filepath.Rel(sourcePath, outputPath)
-		if err != nil {
-			err := fmt.Errorf("failed to calculate relative output path for plugin '%s': %w", pluginName, err)
-			logger.Error("Plugin path calculation error", "name", pluginName, "source", sourcePath, "output", outputPath, "error", err)
-			compileErrors = append(compileErrors, err)
-			continue
-		}
-
-		logger.Info("Compiling plugin", "name", pluginName, "source", sourcePath, "output", outputPath, "relativeOutput", relOutputPath)
-        // Use "." for source path argument since cmd.Dir is the source directory
-		cmd := exec.Command(goExecutable, "build", "-buildmode=plugin", "-o", relOutputPath, ".")
-		cmd.Dir = sourcePath   // Set working directory to the plugin source directory
-		cmd.Stderr = os.Stderr // Pipe build errors to main stderr
-		cmd.Stdout = os.Stdout // Pipe build output to main stdout
-
-		if err := cmd.Run(); err != nil {
-			compileErr := fmt.Errorf("failed to compile plugin '%s': %w", pluginName, err)
 			logger.Error("Plugin compilation failed", "name", pluginName, "error", err)
-			compileErrors = append(compileErrors, compileErr)
+			compileErrors = append(compileErrors, fmt.Errorf("plugin '%s': %w", pluginName, err))
 		} else {
-			logger.Info("Successfully compiled plugin", "name", pluginName, "output", outputPath)
+			// Only log success if compileSinglePlugin didn't return an error (and didn't skip).
+			// We are in the else block, meaning err IS nil from compileSinglePlugin.
+			// compileSinglePlugin returns nil on success OR skip, so logging here is correct
+			// for actual successes, as skips are handled internally in compileSinglePlugin.
+			// The previous redundant check `if err == nil` is removed.
+			logger.Info("Successfully compiled plugin", "name", pluginName)
 			compiledCount++
 		}
 	}
@@ -92,10 +60,66 @@ func CompileAllPlugins(pluginsSourceDir, pluginsOutputDir string, logger logf.Lo
 	if len(compileErrors) > 0 {
 		// Combine errors (or return the first one, depending on desired behavior)
 		// For now, let's just return a generic error indicating failures occurred.
-		return fmt.Errorf("%d plugin(s) failed to compile", len(compileErrors))
+		// return fmt.Errorf("%d plugin(s) failed to compile", len(compileErrors))
+		// Combine errors for a more detailed final error message
+		var errorMessages []string
+		for _, e := range compileErrors {
+			errorMessages = append(errorMessages, e.Error())
+		}
+		return fmt.Errorf("%d plugin(s) failed to compile:\n - %s",
+			len(compileErrors), strings.Join(errorMessages, "\n - "))
 	}
 
 	return nil
+}
+
+// compileSinglePlugin handles the compilation logic for a single plugin.
+// It returns an error if compilation fails or an issue occurs before compilation.
+// It returns nil if compilation is successful OR if the directory is skipped (e.g., no .go files).
+func compileSinglePlugin(goExecutable, sourcePath, pluginsOutputDir, pluginName string, logger logf.Logger) error {
+	// Ensure sourcePath and outputPath are absolute for reliable relative path calculation
+	absSourcePath, err := filepath.Abs(sourcePath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute source path: %w", err)
+	}
+	absOutputPath, err := filepath.Abs(filepath.Join(pluginsOutputDir, pluginName+".so"))
+	if err != nil {
+		return fmt.Errorf("failed to get absolute output path: %w", err)
+	}
+
+	// Basic check: does the directory contain Go files?
+	hasGoFiles, err := CheckDirForGoFiles(absSourcePath)
+	if err != nil {
+		// Log the warning here, but return the error for aggregation
+		logger.Warn("Error checking directory for Go files, skipping plugin", "dir", absSourcePath, "error", err)
+		return fmt.Errorf("error checking directory for Go files: %w", err)
+	}
+	if !hasGoFiles {
+		logger.Debug("Directory does not contain Go files, skipping", "dir", absSourcePath)
+		return nil // Not an error, just skip
+	}
+
+	// Calculate the relative path for the output file from the source directory
+	relOutputPath, err := filepath.Rel(absSourcePath, absOutputPath)
+	if err != nil {
+		// Log the error here, but return it for aggregation
+		logger.Error("Plugin path calculation error", "name", pluginName, "source", absSourcePath, "output", absOutputPath, "error", err)
+		return fmt.Errorf("failed to calculate relative output path: %w", err)
+	}
+
+	logger.Info("Compiling plugin", "name", pluginName, "source", absSourcePath, "output", absOutputPath, "relativeOutput", relOutputPath)
+	// Use "." for source path argument since cmd.Dir is the source directory
+	cmd := exec.Command(goExecutable, "build", "-buildmode=plugin", "-o", relOutputPath, ".")
+	cmd.Dir = absSourcePath // Set working directory to the plugin source directory
+	cmd.Stderr = os.Stderr  // Pipe build errors to main stderr
+	cmd.Stdout = os.Stdout  // Pipe build output to main stdout
+
+	if err := cmd.Run(); err != nil {
+		// Don't need to log here, as the calling function will log the aggregated error
+		return fmt.Errorf("compilation command failed: %w", err)
+	}
+
+	return nil // Success
 }
 
 // CheckDirForGoFiles checks if a directory contains any .go files.
