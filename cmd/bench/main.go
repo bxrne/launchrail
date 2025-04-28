@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,9 +10,16 @@ import (
 
 	"github.com/bxrne/launchrail/internal/config" // Import config package
 	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/internal/simulation"
+	"github.com/bxrne/launchrail/internal/storage"
 )
 
 func main() {
+	// --- Command Line Flags ---
+	orkfilePath := flag.String("orkfile", "", "Path to the OpenRocket (.ork) design file for simulation.")
+	benchdataPath := flag.String("benchdata", "./benchdata", "Path to the benchmark data directory (for ground truth CSVs, if needed).")
+	flag.Parse()
+
 	// --- Load Configuration ---
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -23,30 +31,85 @@ func main() {
 	// --- Initialize Logger with Config Level ---
 	benchLogger := logger.GetLogger(cfg.Setup.Logging.Level)
 
-	// --- Define Benchmark Data Path (Hardcoded) ---
-	const benchdataPath = "./benchdata"
+	// --- Validate ORK File Path ---
+	if *orkfilePath == "" {
+		benchLogger.Fatal("Missing required flag: --orkfile")
+	}
+	absOrkfilePath, err := filepath.Abs(*orkfilePath)
+	if err != nil {
+		benchLogger.Fatal("Error getting absolute path for orkfile", "path", *orkfilePath, "error", err)
+	}
+	if _, err := os.Stat(absOrkfilePath); os.IsNotExist(err) {
+		benchLogger.Fatal("ORK file not found", "path", absOrkfilePath)
+	}
+	benchLogger.Info("Using ORK file for simulation", "path", absOrkfilePath)
 
-	absBenchdataPath, err := filepath.Abs(benchdataPath)
+	// --- Benchmark Data Path (from flag) ---
+	absBenchdataPath, err := filepath.Abs(*benchdataPath)
 	if err != nil {
 		// Log the error and exit
-		benchLogger.Error("Error getting absolute path for benchdata", "path", benchdataPath, "error", err)
+		benchLogger.Error("Error getting absolute path for benchdata", "path", *benchdataPath, "error", err)
 		os.Exit(1)
 	}
-
 	benchLogger.Info("Benchmark Data Directory", "path", absBenchdataPath)
 
-	// --- Benchmark Suite Setup ---
-	config := BenchmarkConfig{
-		BenchdataPath: absBenchdataPath,
+	// --- Update Config with ORK File Path ---
+	cfg.Engine.Options.OpenRocketFile = absOrkfilePath
+	benchLogger.Info("Updated config with ORK file path")
+
+	// --- Initialize and Run Simulation ---
+	benchLogger.Info("Initializing simulation manager...")
+	// Initialize Simulation Manager (Pass dereferenced logger)
+	simManager := simulation.NewManager(cfg, *benchLogger)
+
+	// Initialize simulation environment (reads ORK from config)
+	if err := simManager.Initialize(); err != nil {
+		benchLogger.Fatal("Failed to initialize simulation manager", "error", err)
 	}
-	suite := NewBenchmarkSuite(config)
+	// Defer closing the simulation manager's resources
+	defer func() {
+		if err := simManager.Close(); err != nil {
+			benchLogger.Error("Error closing simulation manager", "error", err)
+		}
+	}()
+
+	// Get the simulation hash generated during initialization
+	simHash := simManager.GetSimHash()
+	if simHash == "" {
+		benchLogger.Fatal("Failed to retrieve simulation hash after initialization")
+	}
+	benchLogger.Info("Simulation initialized", "recordHash", simHash)
+
+	// Run the simulation
+	benchLogger.Info("Running simulation...")
+	if err := simManager.Run(); err != nil {
+		benchLogger.Fatal("Simulation run failed", "error", err)
+	}
+	benchLogger.Info("Simulation run completed successfully")
+
+	// --- Setup Benchmark Suite ---
+	// Initialize Record Manager AFTER simulation run is complete and manager is closed (via defer)
+	// Use the base directory from Setup configuration
+	benchLogger.Info("Initializing record manager for benchmark results...")
+	rm, err := storage.NewRecordManager(cfg.Setup.App.BaseDir) // Use Setup.App.BaseDir
+	if err != nil {
+		benchLogger.Fatal("Failed to initialize record manager", "error", err)
+	}
+
+	// Configure the benchmark suite
+	benchmarkConfig := BenchmarkConfig{
+		BenchdataPath: absBenchdataPath,
+		SimRecordHash: simHash, // Pass the retrieved hash
+		RecordManager: rm,      // Pass the RecordManager
+	}
+	suite := NewBenchmarkSuite(benchmarkConfig)
 
 	// Add specific benchmarks to the suite
-	suite.AddBenchmark(NewHiprEuroc24Benchmark(config)) // Pass config here
+	suite.AddBenchmark(NewHiprEuroc24Benchmark(benchmarkConfig)) // Pass config here
 	// Add more benchmarks here as needed
 
 	// --- Run Benchmarks ---
-	benchLogger.Info("Starting benchmark suite...")
+	benchLogger.Info("Starting benchmark suite comparison...")
 	// Assign overallPass to _ as we now check failedCount directly
 	results, _, err := suite.RunAll()
 	if err != nil {

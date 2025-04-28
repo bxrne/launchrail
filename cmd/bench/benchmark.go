@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/bxrne/launchrail/internal/logger" // Import custom logger
+	"github.com/bxrne/launchrail/internal/storage"
 )
 
 // BenchmarkResult holds the outcome of a single benchmark comparison.
@@ -25,7 +26,7 @@ type Benchmark interface {
 	Name() string
 	LoadData(dataPath string) error
 	Setup() error
-	Run(simData interface{}) ([]BenchmarkResult, error) // simData needs definition
+	Run() ([]BenchmarkResult, error) // Removed simData parameter
 }
 
 // BenchmarkSuite manages and runs a collection of benchmarks.
@@ -37,7 +38,8 @@ type BenchmarkSuite struct {
 // BenchmarkConfig holds configuration for the suite.
 type BenchmarkConfig struct {
 	BenchdataPath string
-	// Add other config like simulation parameters if needed
+	SimRecordHash string             // Added: Hash of the simulation record to use
+	RecordManager *storage.RecordManager // Added: Record manager to load the sim record
 }
 
 // NewBenchmarkSuite creates a new benchmark suite.
@@ -83,9 +85,8 @@ func (s *BenchmarkSuite) RunAll() (map[string][]BenchmarkResult, bool, error) {
 		}
 
 		// 3. Run Comparison
-		// TODO: This needs the actual simulation data passed in.
-		// For now, passing nil, which means benchmarks might use internal/loaded data.
-		results, err := bench.Run(nil) // Pass simulation data here eventually
+		// The benchmark now uses its internal config (SimRecordHash, RecordManager)
+		results, err := bench.Run() // Call Run without simData
 		if err != nil {
 			// Log and return the error
 			benchLogger.Error("Error running benchmark comparison", "name", bench.Name(), "error", err)

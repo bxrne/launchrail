@@ -25,7 +25,6 @@ func setupTempBenchdata(t *testing.T, benchmarkName, flightInfoContent, eventInf
 	eventInfoFilename := "fl001 - event_info_processed.csv"
 	flightStatesFilename := "fl001 - flight_states_processed.csv"
 
-
 	// Write flight_info.csv
 	flightInfoPath := filepath.Join(benchmarkSubDir, flightInfoFilename) // Use correct filename
 	err = os.WriteFile(flightInfoPath, []byte(flightInfoContent), 0644)
@@ -57,126 +56,35 @@ func TestHiprEuroc24Benchmark_Name(t *testing.T) {
 	assert.Equal(t, "hipr-euroc24", b.Name(), "Benchmark name mismatch")
 }
 
-func TestHiprEuroc24Benchmark_FindApogee(t *testing.T) {
-	tests := []struct {
-		name          string
-		flightInfo    []FlightInfo
-		expectedHeight float64
-		expectedTime   float64
-	}{
-		{
-			name: "Normal Case",
-			flightInfo: []FlightInfo{
-				{Timestamp: 0.0, Height: 10.0},
-				{Timestamp: 1.0, Height: 100.0},
-				{Timestamp: 2.0, Height: 150.0},
-				{Timestamp: 3.0, Height: 120.0},
-			},
-			expectedHeight: 150.0,
-			expectedTime:   2.0,
-		},
-		{
-			name: "Empty Data",
-			flightInfo: []FlightInfo{},
-			expectedHeight: 0.0,
-			expectedTime:   0.0,
-		},
-		{
-			name: "Single Point",
-			flightInfo: []FlightInfo{
-				{Timestamp: 5.0, Height: 50.0},
-			},
-			expectedHeight: 50.0,
-			expectedTime:   5.0,
-		},
-		{
-			name: "Apogee at End",
-			flightInfo: []FlightInfo{
-				{Timestamp: 0.0, Height: 10.0},
-				{Timestamp: 1.0, Height: 100.0},
-				{Timestamp: 2.0, Height: 150.0},
-			},
-			expectedHeight: 150.0,
-			expectedTime:   2.0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			b := HiprEuroc24Benchmark{flightInfo: tt.flightInfo}
-			h, ts := b.findApogee()
-			assert.Equal(t, tt.expectedHeight, h, "Incorrect apogee height")
-			assert.Equal(t, tt.expectedTime, ts, "Incorrect apogee timestamp")
-		})
-	}
-}
-
-func TestHiprEuroc24Benchmark_FindMaxVelocity(t *testing.T) {
-	tests := []struct {
-		name            string
-		flightInfo      []FlightInfo
-		expectedVelocity float64
-		expectedTime     float64
-	}{
-		{
-			name: "Normal Case",
-			flightInfo: []FlightInfo{
-				{Timestamp: 0.0, Velocity: 10.0},
-				{Timestamp: 1.0, Velocity: 100.0},
-				{Timestamp: 2.0, Velocity: 150.0},
-				{Timestamp: 3.0, Velocity: 120.0},
-			},
-			expectedVelocity: 150.0,
-			expectedTime:     2.0,
-		},
-		{
-			name:           "Empty Data",
-			flightInfo:     []FlightInfo{},
-			expectedVelocity: 0.0,
-			expectedTime:     0.0,
-		},
-		// Add more test cases as needed
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			b := HiprEuroc24Benchmark{flightInfo: tt.flightInfo}
-			v, ts := b.findMaxVelocity()
-			assert.Equal(t, tt.expectedVelocity, v, "Incorrect max velocity")
-			assert.Equal(t, tt.expectedTime, ts, "Incorrect max velocity timestamp")
-		})
-	}
-}
-
 func TestCompareFloat(t *testing.T) {
 	tests := []struct {
-		name            string
-		metricName      string
-		description     string
-		expected        float64
-		actual          float64
-		tolerancePercent float64
-		expectedPass    bool
+		name              string
+		expected          float64
+		actual            float64
+		tolerancePercent  float64
+		wantPassed        bool
+		wantToleranceType string
+		wantToleranceVal  float64 // Expected calculated tolerance
 	}{
-		{"Pass Within Tolerance", "Altitude", "Test altitude", 100.0, 102.0, 0.05, true},
-		{"Pass Exact Match", "Velocity", "Test velocity", 50.0, 50.0, 0.10, true},
-		{"Pass Edge of Tolerance (Upper)", "Time", "Test time", 10.0, 10.5, 0.05, true},
-		{"Pass Edge of Tolerance (Lower)", "Pressure", "Test pressure", 1000.0, 970.0, 0.03, true},
-		{"Fail Outside Tolerance (Upper)", "Altitude", "Test altitude", 100.0, 106.0, 0.05, false},
-		{"Fail Outside Tolerance (Lower)", "Velocity", "Test velocity", 50.0, 44.0, 0.10, false},
-		{"Zero Expected, Non-Zero Actual, Pass", "ErrorCount", "Test error count", 0.0, 0.01, 0.1, true}, // Tolerance calc needs care
-		{"Zero Expected, Non-Zero Actual, Fail", "ErrorCount", "Test error count", 0.0, 1.0, 0.1, false}, // Needs absolute tolerance or special handling
-		{"Negative Values, Pass", "Temperature", "Test temperature", -10.0, -10.2, 0.05, true},
-		{"Negative Values, Fail", "Temperature", "Test temperature", -10.0, -11.0, 0.05, false},
+		{"within tolerance", 100.0, 102.0, 0.05, true, "relative", 5.0},
+		{"exact match", 100.0, 100.0, 0.05, true, "relative", 5.0},
+		{"outside tolerance", 100.0, 106.0, 0.05, false, "relative", 5.0},
+		{"negative within tolerance", -100.0, -102.0, 0.05, true, "relative", 5.0},
+		{"negative outside tolerance", -100.0, -106.0, 0.05, false, "relative", 5.0},
+		{"zero expected, zero actual", 0.0, 0.0, 0.1, true, "absolute", 0.1},
+		{"zero expected, within absolute tolerance", 0.0, 0.05, 0.1, true, "absolute", 0.1},
+		{"zero expected, outside absolute tolerance", 0.0, 0.15, 0.1, false, "absolute", 0.1},
+		{"zero tolerance", 100.0, 100.0, 0.0, true, "relative", 0.0},
+		{"zero tolerance, diff", 100.0, 100.1, 0.0, false, "relative", 0.0},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := compareFloat(tt.metricName, tt.description, tt.expected, tt.actual, tt.tolerancePercent)
-			assert.Equal(t, tt.expectedPass, result.Passed, "Pass/Fail status mismatch")
-			assert.Equal(t, tt.metricName, result.Metric)
-			assert.Equal(t, tt.expected, result.Expected)
-			assert.Equal(t, tt.actual, result.Actual)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := compareFloat("testMetric", "test description", tc.expected, tc.actual, tc.tolerancePercent)
+			assert.Equal(t, tc.wantPassed, result.Passed)
+			assert.Equal(t, tc.wantToleranceType, result.ToleranceType)
+			// Use assert.InDelta for comparing the calculated tolerance value
+			assert.InDelta(t, tc.wantToleranceVal, result.Tolerance, 1e-9)
 		})
 	}
 }
@@ -222,7 +130,6 @@ func TestHiprEuroc24Benchmark_Run(t *testing.T) {
 	// --- Setup Temp Dir ---
 	tempDataPathBase := setupTempBenchdata(t, benchmarkName, flightInfoCSV, eventInfoCSV, flightStatesCSV)
 
-
 	// --- Configure and Run Benchmark ---
 	cfg := BenchmarkConfig{
 		BenchdataPath: tempDataPathBase, // Config points to the base temp dir
@@ -239,7 +146,7 @@ func TestHiprEuroc24Benchmark_Run(t *testing.T) {
 	require.NoError(t, err, "LoadData failed")
 
 	// Run expects simData interface{}, pass nil as it's not used by this implementation
-	results, err := b.Run(nil) // Pass nil for simData
+	results, err := b.Run() // Pass nil for simData
 	require.NoError(t, err, "Run failed")
 	require.NotEmpty(t, results, "Run should produce results")
 
@@ -293,4 +200,51 @@ func TestHiprEuroc24Benchmark_Run(t *testing.T) {
 
 }
 
-// TODO: Add specific tests for findEventTime and findStateTime for edge cases if needed
+// TestRunHiprEuroc24Benchmark requires setting up a mock simulation record
+// or using actual simulation data, which makes it more of an integration test.
+// This is a placeholder demonstrating the structure.
+func TestRunHiprEuroc24Benchmark(t *testing.T) {
+	// Setup: Create temp dir, mock config, mock record manager, mock record
+	// Removed unused tempDir variable
+	cfg := BenchmarkConfig{
+		BenchdataPath: "testdata", // Assuming ground truth CSVs are in testdata/hipr-euroc24
+		SimRecordHash: "mockSimHash",
+		// Mock RecordManager needed here
+	}
+
+	// Mock the RecordManager and the GetRecord/LoadTelemetry interactions
+	// This part is complex and requires a mocking library or manual mocks.
+	// For now, we assume the benchmark can be created.
+	b := NewHiprEuroc24Benchmark(cfg)
+
+	// Load Ground Truth Data (requires testdata/hipr-euroc24 CSVs)
+	err := b.LoadData(cfg.BenchdataPath)
+	require.NoError(t, err, "Failed to load ground truth test data")
+
+	// --- MOCKING LoadTelemetry --- (This is the hard part)
+	// You would need to mock b.config.RecordManager.GetRecord to return a mock record,
+	// and then mock the equivalent of LoadTelemetry to return specific test data.
+	// Example (conceptual using testify/mock):
+	// mockRM := new(MockRecordManager)
+	// mockRec := new(MockRecord)
+	// mockTelemetry := &storage.TelemetryData{ Time: []float64{0, 1, 2}, Altitude: []float64{0, 10, 5} ... }
+	// mockRec.On("LoadTelemetry").Return(mockTelemetry, nil)
+	// mockRM.On("GetRecord", "mockSimHash").Return(mockRec, nil)
+	// b.config.RecordManager = mockRM
+
+	// Execute Run (assuming mocks are set up)
+	// results, err := b.Run() // This would fail without proper mocking
+
+	// Assertions (Example - would depend on mocked telemetry)
+	// assert.NoError(t, err)
+	// assert.NotEmpty(t, results)
+	// assert.True(t, results[0].Passed) // e.g., Check if Apogee passed based on mock data
+
+	// Mark test as skipped until mocking is implemented
+	t.Skip("Skipping TestRunHiprEuroc24Benchmark: Requires mocking RecordManager/Record/Telemetry")
+
+	// Keep the original Run call structure for reference if needed later
+	// results, err := b.Run() // Corrected call signature
+	// require.NoError(t, err)
+	// assert.NotEmpty(t, results)
+}

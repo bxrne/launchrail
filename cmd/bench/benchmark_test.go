@@ -18,7 +18,6 @@ type MockBenchmark struct {
 	LoadDataCalled bool
 	SetupCalled   bool
 	RunCalled     bool
-	SimDataPassed interface{}
 }
 
 func (m *MockBenchmark) Name() string {
@@ -37,9 +36,8 @@ func (m *MockBenchmark) Setup() error {
 	return m.MockSetupErr
 }
 
-func (m *MockBenchmark) Run(simData interface{}) ([]BenchmarkResult, error) {
+func (m *MockBenchmark) Run() ([]BenchmarkResult, error) {
 	m.RunCalled = true
-	m.SimDataPassed = simData
 	return m.MockResults, m.MockRunErr
 }
 
