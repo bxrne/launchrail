@@ -253,7 +253,6 @@ func main() {
 		fmt.Printf("Failed to load config: %v\n", err)
 		return
 	}
-	// Initialize GetLogger
 	log := logger.GetLogger(cfg.Setup.Logging.Level)
 	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
 
@@ -297,7 +296,11 @@ func main() {
 	}
 
 	// API endpoints group with version from config
-	apiVersion := fmt.Sprintf("/api/v%s", strings.Split(cfg.Setup.App.Version, ".")[0])
+	majorVersion := "0" // Default if split fails or version is invalid
+	if parts := strings.Split(cfg.Setup.App.Version, "."); len(parts) > 0 {
+		majorVersion = parts[0]
+	}
+	apiVersion := fmt.Sprintf("/api/v%s", majorVersion)
 	api := r.Group(apiVersion)
 	{
 		api.POST("/run", dataHandler.handleSimRun)
@@ -427,7 +430,7 @@ func main() {
 	r.GET("/api", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"version": cfg.Setup.App.Version,
-			"apiPath": fmt.Sprintf("/api/v%s", strings.Split(cfg.Setup.App.Version, ".")[0]),
+			"apiPath": apiVersion,
 		})
 	})
 
