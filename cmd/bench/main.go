@@ -124,11 +124,13 @@ func formatResultsToMarkdown(results map[string][]BenchmarkResult) string {
 			diffStr := fmt.Sprintf("%.3f", res.Difference)
 			toleranceStr := fmt.Sprintf("%.3f", res.Tolerance)
 
-			// Escape pipe characters in description if any
+			// Escape pipe characters in description AND metric if any
+			metric := strings.ReplaceAll(res.Metric, "|", "\\|") // <-- Added escaping for Metric
 			description := strings.ReplaceAll(res.Description, "|", "\\|")
 
 			markdown.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s | %s |\n",
-				res.Metric, description, expectedStr, actualStr, diffStr, toleranceStr, res.ToleranceType, status))
+				metric, // Use escaped metric
+				description, expectedStr, actualStr, diffStr, toleranceStr, res.ToleranceType, status))
 		}
 		markdown.WriteString("\n") // Add space between benchmarks
 	}
