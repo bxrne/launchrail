@@ -19,14 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Helper function to create a temporary directory for testing storage
-func setupTestStorage(t *testing.T) string {
-	tempDir, err := os.MkdirTemp("", "launchrail-test-*")
-	require.NoError(t, err, "Failed to create temp dir")
-	// RecordManager operates directly in the baseDir, no need for subdirs here.
-	return tempDir
-}
-
 // createMockRecord creates a dummy record directory and metadata file using RecordManager
 func createMockRecord(rm *storage.RecordManager, baseDir, hash string, creationTime time.Time) (*storage.Record, error) {
 	// Explicitly create the record directory structure first
@@ -402,6 +394,6 @@ func TestListRecordsAPIPagination(t *testing.T) {
 
 // Helper struct to decode the JSON response from ListRecordsAPI
 type ListRecordsAPIResponse struct {
-	Total   int                `json:"total"` // Add Total field
+	Total   int               `json:"total"` // Add Total field
 	Records []*storage.Record `json:"records"`
 }
