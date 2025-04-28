@@ -1,6 +1,7 @@
 package openrocket_test
 
 import (
+	"encoding/xml"
 	"github.com/bxrne/launchrail/pkg/openrocket"
 	"testing"
 )
@@ -64,10 +65,19 @@ func TestSchemaNoseconeString(t *testing.T) {
 		AftShoulderThickness: 0.0,
 		AftShoulderCapped:    false,
 		IsFlipped:            false,
-		Subcomponents:        openrocket.NoseSubcomponents{},
+		Subcomponents: openrocket.NoseSubcomponents{
+			XMLName: xml.Name{Local: "subcomponents"},
+			MassComponent: openrocket.MassComponent{
+				XMLName:     xml.Name{Local: "masscomponent"},
+				Name:        "Payload",
+				ID:          "masscomp-1",
+				Mass:        0.1,
+				Type:        "part",
+			},
+		},
 	}
 
-	expected := "Nosecone{Name=name, ID=id, Finish=finish, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Shape=shape, ShapeClipped=false, ShapeParameter=0.00, AftRadius=0.00, AftShoulderRadius=0.00, AftShoulderLength=0.00, AftShoulderThickness=0.00, AftShoulderCapped=false, IsFlipped=false, Subcomponents=NestedSubcomponents{CenteringRing=CenteringRing{Name=, ID=, InstanceCount=0, InstanceSeparation=0.00, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, RadialPosition=0.00, OuterRadius=, InnerRadius=}, MassComponent=MassComponent{Name=, ID=, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, PackedLength=0.00, PackedRadius=0.00, RadialPosition=0.00, RadialDirection=0.00, Mass=0.00, Type=}}}"
+	expected := "Nosecone{Name=name, ID=id, Finish=finish, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, Thickness=0.00, Shape=shape, ShapeClipped=false, ShapeParameter=0.00, AftRadius=0.00, AftShoulderRadius=0.00, AftShoulderLength=0.00, AftShoulderThickness=0.00, AftShoulderCapped=false, IsFlipped=false, Subcomponents=NoseSubcomponents{MassComponent=MassComponent{Name=Payload, ID=masscomp-1, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, PackedLength=0.00, PackedRadius=0.00, RadialPosition=0.00, RadialDirection=0.00, Mass=0.10, Type=part}}}"
 	if nc.String() != expected {
 		t.Errorf("Expected %s, got %s", expected, nc.String())
 	}
@@ -75,11 +85,13 @@ func TestSchemaNoseconeString(t *testing.T) {
 
 func TestSchemaNoseSubcomponentsString(t *testing.T) {
 	ns := &openrocket.NoseSubcomponents{
-		CenteringRing: openrocket.CenteringRing{},
-		MassComponent: openrocket.MassComponent{},
+		XMLName: xml.Name{Local: "subcomponents"},
+		MassComponent: openrocket.MassComponent{
+			XMLName: xml.Name{Local: "masscomponent"},
+		},
 	}
 
-	expected := "NestedSubcomponents{CenteringRing=CenteringRing{Name=, ID=, InstanceCount=0, InstanceSeparation=0.00, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, Material=Material{Type=, Density=0.00, Name=}, Length=0.00, RadialPosition=0.00, OuterRadius=, InnerRadius=}, MassComponent=MassComponent{Name=, ID=, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, PackedLength=0.00, PackedRadius=0.00, RadialPosition=0.00, RadialDirection=0.00, Mass=0.00, Type=}}"
+	expected := "NoseSubcomponents{MassComponent=MassComponent{Name=, ID=, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, PackedLength=0.00, PackedRadius=0.00, RadialPosition=0.00, RadialDirection=0.00, Mass=0.00, Type=}}"
 	if ns.String() != expected {
 		t.Errorf("Expected %s, got %s", expected, ns.String())
 	}

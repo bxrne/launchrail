@@ -4,8 +4,17 @@ import (
 	"encoding/xml"
 	"fmt"
 	"math"
+	"os"
 	"strconv"
+
+	"github.com/zerodha/logf"
 )
+
+// Package-level logger for openrocket parsing/calculation issues
+var pkgLogger = logf.New(logf.Opts{
+	Level:      logf.WarnLevel,
+	Writer:     os.Stderr,
+})
 
 // SustainerSubcomponents represents the sustainer subcomponents element of the XML document
 type SustainerSubcomponents struct {
@@ -33,6 +42,7 @@ type BodyTube struct {
 }
 
 // GetMass returns the mass of the bodytube material itself (excluding subcomponents).
+// It logs warnings if the mass cannot be calculated due to invalid radius or dimensions.
 func (b *BodyTube) GetMass() float64 {
 	// --- Input parameters ---
 	length := b.Length
@@ -45,14 +55,14 @@ func (b *BodyTube) GetMass() float64 {
 	if err != nil {
 		// Failed to parse - likely "auto" or invalid format.
 		// Cannot calculate mass without a numeric radius derived from context.
-		// TODO: Log a warning: "Cannot calculate BodyTube mass for ID=%s: Radius is '%s', requires numeric value."
+		pkgLogger.Warn(fmt.Sprintf("Cannot calculate BodyTube mass for ID=%s: Radius is '%s', requires numeric value.", b.ID, radiusStr))
 		return 0.0 // Return 0 mass, acknowledging incompleteness
 	}
 
 	// --- Validate inputs ---
 	if density <= 0 || length <= 0 || outerRadius <= 0 {
 		// Invalid dimensions or material
-		// TODO: Log a warning: "Invalid dimensions/material for BodyTube ID=%s"
+		pkgLogger.Warn(fmt.Sprintf("Invalid dimensions/material for BodyTube ID=%s: density=%.4f, length=%.4f, outerRadius=%.4f", b.ID, density, length, outerRadius))
 		return 0.0
 	}
 
@@ -104,22 +114,22 @@ func (b *BodyTubeSubcomponents) String() string {
 
 // InnerTube represents the inner tube element of the XML document
 type InnerTube struct {
-	XMLName              xml.Name          `xml:"innertube"`
-	Name                 string            `xml:"name"`
-	ID                   string            `xml:"id"`
-	AxialOffset          AxialOffset       `xml:"axialoffset"`
-	Position             Position          `xml:"position"`
-	Material             Material          `xml:"material"`
-	Length               float64           `xml:"length"`
-	RadialPosition       float64           `xml:"radialposition"`
-	RadialDirection      float64           `xml:"radialdirection"`
-	OuterRadius          float64           `xml:"outerradius"`
-	Thickness            float64           `xml:"thickness"`
-	ClusterConfiguration string            `xml:"clusterconfiguration"`
-	ClusterScale         float64           `xml:"clusterscale"`
-	ClusterRotation      float64           `xml:"clusterrotation"`
-	MotorMount           MotorMount        `xml:"motormount"`
-	Subcomponents        NoseSubcomponents `xml:"subcomponents"` // TODO: Refactor naming here
+	XMLName              xml.Name             `xml:"innertube"`
+	Name                 string               `xml:"name"`
+	ID                   string               `xml:"id"`
+	AxialOffset          AxialOffset          `xml:"axialoffset"`
+	Position             Position             `xml:"position"`
+	Material             Material             `xml:"material"`
+	Length               float64              `xml:"length"`
+	RadialPosition       float64              `xml:"radialposition"`
+	RadialDirection      float64              `xml:"radialdirection"`
+	OuterRadius          float64              `xml:"outerradius"`
+	Thickness            float64              `xml:"thickness"`
+	ClusterConfiguration string               `xml:"clusterconfiguration"`
+	ClusterScale         float64              `xml:"clusterscale"`
+	ClusterRotation      float64              `xml:"clusterrotation"`
+	MotorMount           MotorMount           `xml:"motormount"` // Direct motor mount info
+	Subcomponents        InnerTubeSubcomponents `xml:"subcomponents"` // Contains nested components like another motor mount? (Schema unclear)
 }
 
 // GetMass calculates the mass of the inner tube material itself (excluding subcomponents like motor).
@@ -132,7 +142,7 @@ func (i *InnerTube) GetMass() float64 {
 
 	if density <= 0 || length <= 0 || outerRadius <= 0 || thickness <= 0 || thickness >= outerRadius {
 		// Invalid dimensions or material
-		// fmt.Printf("Warning: Invalid dimensions or material for InnerTube '%s', cannot calculate material mass.\n", i.Name)
+		pkgLogger.Warn(fmt.Sprintf("Invalid dimensions/material for InnerTube ID=%s: density=%.4f, length=%.4f, outerRadius=%.4f", i.ID, density, length, outerRadius))
 		return 0.0
 	}
 
@@ -154,7 +164,20 @@ func (i *InnerTube) GetMass() float64 {
 	return materialMass
 }
 
-// String returns full string representation of the innertube
+// String returns full string representation of the InnerTube
 func (i *InnerTube) String() string {
 	return fmt.Sprintf("InnerTube{Name=%s, ID=%s, AxialOffset=%s, Position=%s, Material=%s, Length=%.2f, RadialPosition=%.2f, RadialDirection=%.2f, OuterRadius=%.2f, Thickness=%.2f, ClusterConfiguration=%s, ClusterScale=%.2f, ClusterRotation=%.2f, MotorMount=%s, Subcomponents=%s}", i.Name, i.ID, i.AxialOffset.String(), i.Position.String(), i.Material.String(), i.Length, i.RadialPosition, i.RadialDirection, i.OuterRadius, i.Thickness, i.ClusterConfiguration, i.ClusterScale, i.ClusterRotation, i.MotorMount.String(), i.Subcomponents.String())
+}
+
+// InnerTubeSubcomponents represents the nested subcomponents for an InnerTube.
+// Note: The exact structure and purpose within InnerTube needs clarification from OR schema/usage.
+// It seems redundant with the direct MotorMount field.
+type InnerTubeSubcomponents struct {
+	XMLName    xml.Name   `xml:"subcomponents"`
+	MotorMount MotorMount `xml:"motormount"` // Often empty if motor is directly in InnerTube?
+}
+
+// String returns a string representation of InnerTubeSubcomponents.
+func (s *InnerTubeSubcomponents) String() string {
+	return fmt.Sprintf("InnerTubeSubcomponents{MotorMount=%s}", s.MotorMount.String())
 }

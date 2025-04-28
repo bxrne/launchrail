@@ -8,22 +8,22 @@ import (
 
 // Nosecone represents the nosecone element of the XML document
 type Nosecone struct {
-	XMLName              xml.Name          `xml:"nosecone"`
-	Name                 string            `xml:"name"`
-	ID                   string            `xml:"id"`
-	Finish               string            `xml:"finish"`
-	Material             Material          `xml:"material"`
-	Length               float64           `xml:"length"`
-	Thickness            float64           `xml:"thickness"`
-	Shape                string            `xml:"shape"`
-	ShapeClipped         bool              `xml:"shapeclipped"`
-	ShapeParameter       float64           `xml:"shapeparameter"`
-	AftRadius            float64           `xml:"aftradius"`
-	AftShoulderRadius    float64           `xml:"aftshoulderradius"`
-	AftShoulderLength    float64           `xml:"aftshoulderlength"`
-	AftShoulderThickness float64           `xml:"aftshoulderthickness"`
-	AftShoulderCapped    bool              `xml:"aftshouldercapped"`
-	IsFlipped            bool              `xml:"isflipped"`
+	XMLName              xml.Name              `xml:"nosecone"`
+	Name                 string                `xml:"name"`
+	ID                   string                `xml:"id"`
+	Finish               string                `xml:"finish"`
+	Material             Material              `xml:"material"`
+	Length               float64               `xml:"length"`
+	Thickness            float64               `xml:"thickness"`
+	Shape                string                `xml:"shape"`
+	ShapeClipped         bool                  `xml:"shapeclipped"`
+	ShapeParameter       float64               `xml:"shapeparameter"`
+	AftRadius            float64               `xml:"aftradius"`
+	AftShoulderRadius    float64               `xml:"aftshoulderradius"`
+	AftShoulderLength    float64               `xml:"aftshoulderlength"`
+	AftShoulderThickness float64               `xml:"aftshoulderthickness"`
+	AftShoulderCapped    bool                  `xml:"aftshouldercapped"`
+	IsFlipped            bool                  `xml:"isflipped"`
 	Subcomponents        NoseSubcomponents `xml:"subcomponents"`
 }
 
@@ -115,11 +115,10 @@ func (n *Nosecone) GetMass() float64 {
 // NoseSubcomponents represents the nested subcomponents element of the XML document
 type NoseSubcomponents struct {
 	XMLName       xml.Name      `xml:"subcomponents"`
-	CenteringRing CenteringRing `xml:"centeringring"`
 	MassComponent MassComponent `xml:"masscomponent"`
 }
 
 // String returns full string representation of the NoseSubcomponents
 func (n *NoseSubcomponents) String() string {
-	return fmt.Sprintf("NestedSubcomponents{CenteringRing=%s, MassComponent=%s}", n.CenteringRing.String(), n.MassComponent.String())
+	return fmt.Sprintf("NoseSubcomponents{MassComponent=%s}", n.MassComponent.String())
 }

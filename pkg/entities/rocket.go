@@ -162,7 +162,6 @@ func sumStandardComponentMasses(
 	// Derive necessary sub-component structs from the sustainer
 	noseSubs := &sustainer.Nosecone.Subcomponents
 	bodyTubeSubs := &sustainer.BodyTube.Subcomponents
-	innerTubeSubs := &bodyTubeSubs.InnerTube.Subcomponents // InnerTube is within BodyTube
 
 	// --- Add mass for components with GetMass() ---
 	// Top-level components (accessed via sustainer)
@@ -179,9 +178,8 @@ func sumStandardComponentMasses(
 	}
 
 	// --- Add mass for explicit MassComponents ---
-	// (Using derived noseSubs and innerTubeSubs)
+	// (Using derived noseSubs)
 	addComponentMass(totalMass, "Nosecone.MassComponent", &noseSubs.MassComponent)
-	addComponentMass(totalMass, "InnerTube.MassComponent", &innerTubeSubs.MassComponent)
 }
 
 // addComponentMass validates and adds the mass of a single component to the total mass.
