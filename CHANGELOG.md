@@ -1,3 +1,9 @@
+## v0.3.4 (2025-04-28)
+
+### Refactor
+
+- **openrocket**: schema types and add logging for mass calculations
+
 ## v0.3.3 (2025-04-28)
 
 ### Fix
