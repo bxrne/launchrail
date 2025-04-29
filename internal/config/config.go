@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/viper"
 )
@@ -121,11 +122,20 @@ type Server struct {
 	Port int `mapstructure:"port"`
 }
 
+// BenchmarkEntry defines the configuration for a single benchmark.
+type BenchmarkEntry struct {
+	Name       string `mapstructure:"name" validate:"required"`
+	DesignFile string `mapstructure:"design_file" validate:"required,file"`
+	DataDir    string `mapstructure:"data_dir" validate:"required,dir"`
+	Enabled    bool   `mapstructure:"enabled" validate:"boolean"`
+}
+
 // Config represents the overall application configuration.
 type Config struct {
-	Setup  Setup  `mapstructure:"setup"`
-	Server Server `mapstructure:"server"`
-	Engine Engine `mapstructure:"engine"`
+	Setup    Setup  `mapstructure:"setup"`
+	Server   Server `mapstructure:"server"`
+	Engine   Engine `mapstructure:"engine"`
+	Benchmarks map[string]BenchmarkEntry `mapstructure:"benchmarks"` // Map of benchmark tag to its config
 }
 
 // String returns the configuration as a map of strings, useful for testing.
@@ -287,6 +297,44 @@ func (cfg *Config) Validate() error {
 	// Server
 	if cfg.Server.Port <= 0 || cfg.Server.Port > 65535 {
 		return fmt.Errorf("server.port must be between 1 and 65535")
+	}
+
+	// Benchmarks
+	for tag, benchmark := range cfg.Benchmarks {
+		if benchmark.Name == "" {
+			return fmt.Errorf("benchmark '%s': benchmark.name is required", tag)
+		}
+		if benchmark.DesignFile == "" {
+			return fmt.Errorf("benchmark '%s': benchmark.design_file is required", tag)
+		}
+		if _, err := os.Stat(benchmark.DesignFile); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("benchmark '%s' designFile is invalid: %s", tag, err)
+		}
+		if benchmark.DataDir == "" {
+			return fmt.Errorf("benchmark '%s': benchmark.data_dir is required", tag)
+		}
+
+		// Check if DesignFile exists (relative to BaseDir or absolute)
+		designFilePath := benchmark.DesignFile
+		if !filepath.IsAbs(designFilePath) {
+			designFilePath = filepath.Join(cfg.Setup.App.BaseDir, designFilePath)
+		}
+		if _, err := os.Stat(designFilePath); os.IsNotExist(err) {
+			return fmt.Errorf("benchmark '%s' designFile path does not exist: %s", tag, designFilePath)
+		} else if err != nil {
+			return fmt.Errorf("error checking benchmark '%s' designFile path '%s': %w", tag, designFilePath, err)
+		}
+
+		// Check if DataDir exists (relative to BaseDir or absolute)
+		dataDirPath := benchmark.DataDir
+		if !filepath.IsAbs(dataDirPath) {
+			dataDirPath = filepath.Join(cfg.Setup.App.BaseDir, dataDirPath)
+		}
+		if _, err := os.Stat(dataDirPath); os.IsNotExist(err) {
+			return fmt.Errorf("benchmark '%s' dataDir path does not exist: %s", tag, dataDirPath)
+		} else if err != nil {
+			return fmt.Errorf("error checking benchmark '%s' dataDir path '%s': %w", tag, dataDirPath, err)
+		}
 	}
 
 	return nil
