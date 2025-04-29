@@ -65,5 +65,5 @@ benchmarks:
 #-------------------------------------------------------------------------------
 benchmark:
   simulation_results_dir: "./testdata/results" # Directory containing ACTUAL simulation output (read by benchmark tool)
-  default_benchmark_tag: ""              # Run all enabled benchmarks if empty
+  default_benchmark_tag: "all"             # Set non-empty tag (e.g., "all") to satisfy validation. Empty string caused issues.
   markdown_output_path: "BENCHMARK.md"     # File path for markdown summary output
