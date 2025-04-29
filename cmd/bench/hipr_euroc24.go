@@ -250,17 +250,3 @@ func findSimEventTime(simEvents []EventInfo, eventName string) float64 {
 	}
 	return -1 // Indicate not found
 }
-
-// findSimStateTime finds the timestamp for a specific state from simulation state info.
-// Note: Matches state name string exactly.
-func findSimStateTime(simStates []FlightState, stateName string) float64 {
-	for _, s := range simStates {
-		if s.State == stateName {
-			return s.Timestamp
-		}
-	}
-	return -1 // Indicate not found
-}
-
-// compareFloat compares expected and actual float values within a tolerance.
-// Handles expected == 0 by using absolute difference.
