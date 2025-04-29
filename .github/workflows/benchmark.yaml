@@ -19,7 +19,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23' 
+          go-version: '1.23' # Use the Go version your project requires
+
+      - name: Run Simulation to Generate Results
+        run: |
+          echo "Running simulation to generate benchmark input data..."
+          go run ./cmd/launchrail --output-dir ./testdata/results
+          echo "Simulation finished. Results should be in ./testdata/results"
+          ls -l ./testdata/results # Verify files were created
 
       - name: Run Benchmarks and Capture Output
         id: run_bench
