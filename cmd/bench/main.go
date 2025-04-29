@@ -1,39 +1,30 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/bxrne/launchrail/internal/config" // Import config package
+	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
-	"github.com/bxrne/launchrail/internal/simulation"
-	"github.com/bxrne/launchrail/internal/storage"
+	logf "github.com/zerodha/logf"
 )
 
-// benchmarkRegistry maps benchmark tags/names to their constructor functions.
-// This allows dynamic instantiation based on config.
-var benchmarkRegistry = map[string]func(BenchmarkConfig) Benchmark{
-	"hipr-euroc24": func(config BenchmarkConfig) Benchmark { // Wrap the constructor
-		return NewHiprEuroc24Benchmark(config) // Return the concrete type which implements the interface
-	},
-	// Add other benchmarks here following the same pattern:
-	// "tag-name": func(config BenchmarkConfig) Benchmark { return NewOtherBenchmarkConstructor(config) },
-}
+// Global logger instance
+var benchLogger *logf.Logger
 
 func main() {
-	// --- Command Line Flags --- -> Replaced with tag flag
+	// --- Command Line Flags ---
 	benchmarkTag := flag.String("tag", "", "Tag of the specific benchmark to run (optional, runs all enabled if empty).")
+	resultsDir := flag.String("resultsdir", "", "Path to the directory containing simulation result files (e.g., MOTION.csv). Required.")
+	outputMarkdownPath := flag.String("outputmd", "", "Path to write the benchmark results in Markdown format (e.g., BENCHMARK.md). Optional.")
 	flag.Parse()
 
-	// --- Load Configuration --- (Moved earlier)
+	// --- Load Configuration ---
 	cfg, err := config.GetConfig()
 	if err != nil {
 		// Use a temporary basic logger for config loading errors
@@ -41,16 +32,29 @@ func main() {
 		basicLogger.Fatal("Failed to load configuration", "error", err)
 	}
 
-	// --- Initialize Logger with Config Level --- (Moved earlier)
-	benchLogger := logger.GetLogger(cfg.Setup.Logging.Level)
+	// --- Initialize Logger with Config Level ---
+	benchLogger = logger.GetLogger(cfg.Setup.Logging.Level)
 
-	// --- Initialize Overall Results --- 
+	// --- Validate Required Flags ---
+	if *resultsDir == "" {
+		benchLogger.Fatal("Missing required flag: --resultsdir")
+	}
+	absResultsDir, err := filepath.Abs(*resultsDir)
+	if err != nil {
+		benchLogger.Fatal("Failed to get absolute path for --resultsdir", "path", *resultsDir, "error", err)
+	}
+	if _, err := os.Stat(absResultsDir); os.IsNotExist(err) {
+		benchLogger.Fatal("Results directory specified by --resultsdir does not exist", "path", absResultsDir)
+	}
+	benchLogger.Info("Using simulation results directory", "path", absResultsDir)
+
+	// --- Initialize Overall Results ---
 	overallResults := make(map[string][]BenchmarkResult)
 	overallFailedCount := 0
 	overallPassedCount := 0
 	hasRunBenchmark := false // Track if any benchmark was actually selected and run
 
-	// --- Loop Through Configured Benchmarks --- 
+	// --- Loop Through Configured Benchmarks ---
 	benchLogger.Info("Processing configured benchmarks...", "requested_tag", *benchmarkTag)
 	for tag, benchmarkEntry := range cfg.Benchmarks {
 		// Skip if a specific tag is requested and it doesn't match
@@ -68,18 +72,7 @@ func main() {
 		benchLogger.Info("--- Starting Benchmark Run --- ", "tag", tag, "name", benchmarkEntry.Name)
 		hasRunBenchmark = true
 
-		// --- Validate and Resolve Paths from Config --- 
-		absDesignFilePath, err := filepath.Abs(benchmarkEntry.DesignFile)
-		if err != nil {
-			benchLogger.Error("Error getting absolute path for benchmark design file", "tag", tag, "path", benchmarkEntry.DesignFile, "error", err)
-			continue // Skip this benchmark
-		}
-		if _, err := os.Stat(absDesignFilePath); os.IsNotExist(err) {
-			benchLogger.Error("Benchmark design file not found", "tag", tag, "path", absDesignFilePath)
-			continue // Skip this benchmark
-		}
-		benchLogger.Info("Using design file for simulation", "tag", tag, "path", absDesignFilePath)
-
+		// --- Validate and Resolve Paths from Config ---
 		absBenchdataPath, err := filepath.Abs(benchmarkEntry.DataDir)
 		if err != nil {
 			benchLogger.Error("Error getting absolute path for benchmark data directory", "tag", tag, "path", benchmarkEntry.DataDir, "error", err)
@@ -90,225 +83,211 @@ func main() {
 			continue // Skip this benchmark
 		}
 		benchLogger.Info("Using benchmark data directory", "tag", tag, "path", absBenchdataPath)
-		
-		// --- Update Config with Current Benchmark's ORK File Path ---
-		// Create a copy of the engine config to avoid modifying the original for subsequent benchmarks
-		currentEngineConfig := cfg.Engine
-		currentEngineConfig.Options.OpenRocketFile = absDesignFilePath
-		benchLogger.Info("Updated engine config with benchmark ORK file path", "tag", tag)
 
-		// --- Initialize and Run Simulation for this Benchmark --- 
-		benchLogger.Info("Initializing simulation manager for benchmark...", "tag", tag)
-		// Create a temporary config with the updated engine settings for this run
-		tempCfg := *cfg // Shallow copy is okay here as we only change Engine
-		tempCfg.Engine = currentEngineConfig
-
-		simManager := simulation.NewManager(&tempCfg, *benchLogger)
-		if err := simManager.Initialize(); err != nil {
-			benchLogger.Error("Failed to initialize simulation manager for benchmark", "tag", tag, "error", err)
-			simManager.Close() // Attempt cleanup
-			continue // Skip this benchmark
+		// --- Setup Benchmark Suite for this Benchmark ---
+		benchConfig := BenchmarkConfig{
+			BenchdataPath: absBenchdataPath, // Path to EXPECTED data
+			ResultDirPath: absResultsDir,    // Path to ACTUAL data (from --resultsdir flag)
 		}
 
-		simHash := simManager.GetSimHash()
-		if simHash == "" {
-			benchLogger.Error("Failed to retrieve simulation hash after initialization", "tag", tag)
-			simManager.Close() // Attempt cleanup
-			continue // Skip this benchmark
-		}
-		benchLogger.Info("Simulation initialized for benchmark", "tag", tag, "recordHash", simHash)
+		suite := NewBenchmarkSuite(benchConfig)
 
-		benchLogger.Info("Running simulation for benchmark...", "tag", tag)
-		if err := simManager.Run(); err != nil {
-			benchLogger.Error("Simulation run failed for benchmark", "tag", tag, "error", err)
-			simManager.Close() // Attempt cleanup
-			continue // Skip this benchmark
+		// --- Register Specific Benchmark Implementation ---
+		// Use tag to select benchmark
+		var benchmarkToRun Benchmark
+		switch tag {
+		case "hipr-euroc24":
+			benchmarkToRun = NewHiprEuroc24Benchmark(benchConfig) // Use constructor
+		// Add cases for other benchmark tags here
+		// case "another-tag":
+		// 	benchmarkToRun = NewAnotherBenchmark(benchConfig)
+		default:
+			benchLogger.Warn("Skipping benchmark: Unknown benchmark tag in config", "tag", tag)
+			continue
 		}
-		benchLogger.Info("Simulation run completed successfully for benchmark", "tag", tag)
+		suite.AddBenchmark(benchmarkToRun) // Use AddBenchmark
 
-		// Close simulation manager before accessing results
-		if err := simManager.Close(); err != nil {
-			benchLogger.Error("Error closing simulation manager for benchmark", "tag", tag, "error", err)
-			// Continue, as simulation might have finished, but benchmark might fail
-		}
-
-		// --- Setup Benchmark Suite for this Single Benchmark ---
-		benchLogger.Info("Initializing record manager for benchmark results...", "tag", tag)
-		rm, err := storage.NewRecordManager(cfg.Setup.App.BaseDir)
+		// --- Run the Benchmark Suite ---
+		benchLogger.Info("Running benchmark comparisons...", "tag", tag)
+		// RunAll returns map[string][]BenchmarkResult, bool, error
+		resultsMap, suitePass, err := suite.RunAll()
 		if err != nil {
-			benchLogger.Error("Failed to initialize record manager for benchmark", "tag", tag, "error", err)
-			continue // Skip this benchmark
+			benchLogger.Error("Benchmark suite failed", "tag", tag, "error", err)
+			// Store a generic failure result for this benchmark
+			overallResults[benchmarkEntry.Name] = []BenchmarkResult{ // Use benchmarkEntry.Name as key
+				{
+					Metric:      "Suite Error",
+					Description: err.Error(),
+					Passed:      false, // Mark as failed
+					// Other fields default to zero/empty
+				},
+			}
+			overallFailedCount++
+			continue // Move to the next benchmark
 		}
+		benchLogger.Debug("Benchmark suite run completed", "tag", tag, "overall_suite_pass", suitePass) // Log the returned status
 
-		benchmarkConfig := BenchmarkConfig{
-			BenchdataPath: absBenchdataPath,
-			SimRecordHash: simHash,
-			RecordManager: rm,
-		}
-		suite := NewBenchmarkSuite(benchmarkConfig) // Suite for just this one benchmark run
-
-		// Get the correct benchmark constructor from the registry
-		constructor, exists := benchmarkRegistry[tag]
-		if !exists {
-			benchLogger.Error("No benchmark implementation registered for tag", "tag", tag)
-			continue // Skip this benchmark
-		}
-		suite.AddBenchmark(constructor(benchmarkConfig))
-
-		// --- Run This Single Benchmark --- 
-		benchLogger.Info("Starting benchmark comparison...", "tag", tag)
-		results, _, err := suite.RunAll() // Run the suite containing only the current benchmark
-		if err != nil {
-			benchLogger.Error("Error running benchmark comparison", "tag", tag, "error", err)
-			// Don't exit immediately, record failure and continue if possible
-			overallFailedCount++ // Assume failure if the run errors out
+		// --- Store and Summarize Results for this Benchmark ---
+		// Since RunAll returns a map, and we added only one benchmark, get its results
+		var currentResults []BenchmarkResult
+		if res, ok := resultsMap[benchmarkEntry.Name]; ok { // Use Name from config entry for lookup
+			currentResults = res
+			overallResults[benchmarkEntry.Name] = currentResults // Store under Name
+		} else {
+			benchLogger.Warn("Did not find results for expected benchmark name in suite output", "tag", tag, "expectedName", benchmarkEntry.Name)
+			// Store a generic failure result?
+			overallResults[benchmarkEntry.Name] = []BenchmarkResult{
+				{Metric: "Result Mismatch", Description: "Results not found under expected name", Passed: false},
+			}
+			overallFailedCount++
 			continue
 		}
 
-		// --- Merge Results and Count Pass/Fail --- 
-		benchLogger.Info("--- Benchmark Results Summary --- ", "tag", tag, "name", benchmarkEntry.Name)
-		benchmarkFailed := false
-		for benchmarkName, benchmarkResults := range results { // Should only be one entry from the single-benchmark suite
-			overallResults[benchmarkName] = benchmarkResults // Add/overwrite in overall map
-			for _, res := range benchmarkResults {
-				if !res.Passed {
-					overallFailedCount++
-					benchmarkFailed = true
-				} else {
-					overallPassedCount++
-				}
-				// Log individual metric results here if desired (using benchLogger)
-				statusStr := "PASSED"
-				if !res.Passed { statusStr = "FAILED" }
-				benchLogger.Debug("Metric result", "tag", tag, "benchmark", benchmarkName, "metric", res.Metric, "status", statusStr)
+		passedCount := 0
+		failedCount := 0
+		for _, res := range currentResults {
+			if res.Passed { // Use 'Passed' field
+				passedCount++
+			} else {
+				failedCount++
 			}
 		}
-		if benchmarkFailed {
-			benchLogger.Error("Benchmark run finished with failed metrics", "tag", tag, "name", benchmarkEntry.Name)
-		} else {
-			benchLogger.Info("Benchmark run finished successfully", "tag", tag, "name", benchmarkEntry.Name)
-		}
+		overallPassedCount += passedCount
+		overallFailedCount += failedCount
 
-	} // End of benchmark loop
+		benchLogger.Info("--- Benchmark Run Finished --- ", "tag", tag, "name", benchmarkEntry.Name, "passed", passedCount, "failed", failedCount)
 
-	// --- Check if any benchmark was run --- 
-	// Restore this check before proceeding
+	} // End loop through configured benchmarks
+
+	// --- Final Summary ---
 	if !hasRunBenchmark {
-		if *benchmarkTag != "" {
-			benchLogger.Error("No enabled benchmark found matching the requested tag", "tag", *benchmarkTag)
-		} else {
-			benchLogger.Warn("No enabled benchmarks found in the configuration.")
+		benchLogger.Warn("No benchmarks were selected or enabled to run.")
+		// Decide exit code? Exit 0 for now if nothing ran.
+		os.Exit(0)
+	}
+
+	benchLogger.Info("--- Overall Benchmark Summary --- ")
+	for name, results := range overallResults { // Iterate over Name
+		passed := 0
+		failed := 0
+		for _, r := range results {
+			if r.Passed { // Use 'Passed' field
+				passed++
+			} else {
+				failed++
+			}
 		}
-		os.Exit(1) // Exit with error if no benchmarks were run
+		status := "PASS"
+		if failed > 0 {
+			status = "FAIL"
+		}
+		benchLogger.Info("Benchmark", "name", name, "status", status, "passed", passed, "failed", failed) // Log Name
+		// Print detailed results if needed (already printed during run?)
+		// for _, r := range results {
+		// 	benchLogger.Debug("Detail", "name", name, "metric", r.Metric, "status", r.Passed, "description", r.Description)
+		// }
+	}
+	benchLogger.Info("--------------------------------", "Total Passed", overallPassedCount, "Total Failed", overallFailedCount)
+
+	// --- Write Markdown Output (if requested) ---
+	if *outputMarkdownPath != "" {
+		markdownContent := formatResultsMarkdown(overallResults, cfg.Benchmarks)
+		absMarkdownPath, err := filepath.Abs(*outputMarkdownPath)
+		if err != nil {
+			benchLogger.Error("Failed to get absolute path for markdown output", "path", *outputMarkdownPath, "error", err)
+			// Continue to exit status, but log the error
+		} else {
+			err = os.WriteFile(absMarkdownPath, []byte(markdownContent), 0644)
+			if err != nil {
+				benchLogger.Error("Failed to write benchmark results to markdown file", "path", absMarkdownPath, "error", err)
+			} else {
+				benchLogger.Info("Benchmark results written to markdown file", "path", absMarkdownPath)
+			}
+		}
 	}
 
-	// --- Get Git Commit Hash --- 
-	commitHash := "N/A"
-	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err == nil {
-		commitHash = strings.TrimSpace(out.String())
-	} else {
-		benchLogger.Warn("Could not get git commit hash", "error", err)
-	}
-
-	// --- Format and Print Overall Results to Stdout --- 
-	markdownOutput := formatResultsToMarkdown(overallResults, commitHash, cfg) // Pass hash and cfg
-	fmt.Println("\n--- MARKDOWN OUTPUT START ---") // Marker for easy capture
-	fmt.Print(markdownOutput)
-	fmt.Println("--- MARKDOWN OUTPUT END ---")
-
-	// --- Print Overall Summary to Stdout/Logs --- 
-	benchLogger.Info("--- Overall Benchmark Suite Summary ---") // Log summary
-	fmt.Println("\n--- Overall Summary ---")                 // Stdout summary
-	fmt.Printf("Total Metrics Passed: %d\n", overallPassedCount)
-	fmt.Printf("Total Metrics Failed: %d\n", overallFailedCount)
-
+	// --- Exit with Status Code ---
 	if overallFailedCount > 0 {
-		benchLogger.Error("Benchmark suite finished with failed metrics", "count", overallFailedCount) // Log final status
-		fmt.Println("\nStatus: FAILED")
-		os.Exit(1) // Exit with non-zero status code if any metric failed
-	} else {
-		benchLogger.Info("Benchmark suite finished successfully.") // Log final status
-		fmt.Println("\nStatus: PASSED")
-		os.Exit(0) // Exit with zero status code if all metrics passed
+		benchLogger.Error("One or more benchmarks failed.")
+		os.Exit(1)
 	}
+
+	benchLogger.Info("All benchmarks passed.")
+	os.Exit(0)
 }
 
-// formatResultsToMarkdown formats the benchmark results into a Markdown string.
-// Includes commit hash and config info.
-func formatResultsToMarkdown(results map[string][]BenchmarkResult, commitHash string, cfg *config.Config) string {
-	var markdown bytes.Buffer
+// formatResultsMarkdown generates a markdown report from the benchmark results.
+func formatResultsMarkdown(results map[string][]BenchmarkResult, benchmarks map[string]config.BenchmarkEntry) string {
+	var builder strings.Builder
 
-	// --- Header --- 
-	now := time.Now().Format(time.RFC1123)
-	markdown.WriteString("# Benchmark Results\n\n")
-	markdown.WriteString(fmt.Sprintf("**Date:** %s\n", now))
-	markdown.WriteString(fmt.Sprintf("**Commit:** %s\n", commitHash))
-	if cfg != nil && len(cfg.Setup.Plugins.Paths) > 0 {
-		markdown.WriteString(fmt.Sprintf("**Plugins:** `%s`\n", strings.Join(cfg.Setup.Plugins.Paths, ", ")))
-	}
-	markdown.WriteString("\n")
+	// Timestamp
+	builder.WriteString(fmt.Sprintf("## Benchmark Results (%s)\n\n", time.Now().Format(time.RFC1123)))
 
-	// --- Table of Contents --- 
-	if len(results) > 1 { // Only show TOC if more than one benchmark
-		markdown.WriteString("## Table of Contents\n")
-		// Sort benchmark names for consistent TOC order
-		benchmarkNames := make([]string, 0, len(results))
-		for name := range results {
-			benchmarkNames = append(benchmarkNames, name)
-		}
-		sort.Strings(benchmarkNames) // Requires importing "sort"
-
-		for _, benchmarkName := range benchmarkNames {
-			// Generate GitHub-compatible anchor link (lowercase, spaces to dashes, remove non-alphanumeric)
-			anchor := strings.ToLower(benchmarkName)
-			anchor = strings.ReplaceAll(anchor, " ", "-")
-			// Basic alphanumeric filtering for anchor
-			reg := regexp.MustCompile(`[^a-z0-9-]`) // Requires importing "regexp"
-			anchor = reg.ReplaceAllString(anchor, "")
-			markdown.WriteString(fmt.Sprintf("- [%s](#%s)\n", benchmarkName, anchor))
-		}
-		markdown.WriteString("\n")
-	}
-
-	// --- Benchmark Details --- 
-	// Sort names again for consistent output order
-	benchmarkNames := make([]string, 0, len(results))
+	// Summary Table
+	builder.WriteString("### Summary\n\n")
+	builder.WriteString("| Name | Status | Passed | Failed |\n") // Use Name
+	builder.WriteString("|------|--------|--------|--------|\n")
+	overallPassed := 0
+	overallFailed := 0
+	// Need to iterate consistently, perhaps get keys and sort?
+	names := make([]string, 0, len(results))
 	for name := range results {
-		benchmarkNames = append(benchmarkNames, name)
+		names = append(names, name)
 	}
-	sort.Strings(benchmarkNames) // Requires importing "sort"
+	sort.Strings(names) // Need to import "sort"
 
-	for _, benchmarkName := range benchmarkNames {
-		benchmarkResults := results[benchmarkName]
-		markdown.WriteString(fmt.Sprintf("## %s\n\n", benchmarkName))
-		markdown.WriteString("| Metric        | Description   | Expected | Actual   | Diff     | Tolerance | Type     | Status |\n")
-		markdown.WriteString("|---------------|---------------|----------|----------|----------|-----------|----------|--------|\n")
-
-		for _, res := range benchmarkResults {
-			status := ":white_check_mark: PASSED"
-			if !res.Passed {
-				status = ":x: FAILED"
+	for _, name := range names {
+		resList := results[name]
+		passed := 0
+		failed := 0
+		for _, r := range resList {
+			if r.Passed { // Use 'Passed'
+				passed++
+			} else {
+				failed++
 			}
-			// Format floats for better readability
-			// Using %.3f for precision, adjust as needed
-			expectedStr := fmt.Sprintf("%.3f", res.Expected)
-			actualStr := fmt.Sprintf("%.3f", res.Actual)
-			diffStr := fmt.Sprintf("%.3f", res.Difference)
-			toleranceStr := fmt.Sprintf("%.3f", res.Tolerance)
-
-			// Escape pipe characters in description AND metric if any
-			metric := strings.ReplaceAll(res.Metric, "|", "\\|") // <-- Added escaping for Metric
-			description := strings.ReplaceAll(res.Description, "|", "\\|")
-
-			markdown.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s | %s |\n",
-				metric, // Use escaped metric
-				description, expectedStr, actualStr, diffStr, toleranceStr, res.ToleranceType, status))
 		}
-		markdown.WriteString("\n") // Add space between benchmarks
+		status := "PASS"
+		if failed > 0 {
+			status = "FAIL"
+		}
+		builder.WriteString(fmt.Sprintf("| %s | %s | %d | %d |\n", name, status, passed, failed))
+		overallPassed += passed
+		overallFailed += failed
+	}
+	status := "PASS"
+	if overallFailed > 0 {
+		status = "FAIL"
+	}
+	builder.WriteString(fmt.Sprintf("| **Overall** | **%s** | **%d** | **%d** |\n\n", status, overallPassed, overallFailed))
+
+	// Detailed Results per Benchmark
+	builder.WriteString("### Details\n\n")
+	for _, name := range names { // Iterate using sorted names
+		resList := results[name]
+		// Find the corresponding tag (less efficient, maybe restructure results map?)
+		var tag string
+		for t, entry := range benchmarks {
+			if entry.Name == name {
+				tag = t
+				break
+			}
+		}
+		builder.WriteString(fmt.Sprintf("#### %s (%s)\n\n", name, tag))                                      // Show Name and Tag
+		builder.WriteString("| Metric | Status | Expected | Actual | Diff | Tolerance | Type | Details |\n") // Restore columns
+		builder.WriteString("|--------|--------|----------|--------|------|-----------|------|---------|\n")
+		for _, r := range resList {
+			statusIcon := "PASS"
+			if !r.Passed { // Use 'Passed'
+				statusIcon = "FAIL"
+			}
+			// Escape potential pipe characters in the message for table rendering
+			safeDescription := strings.ReplaceAll(r.Description, "|", "\\")
+			builder.WriteString(fmt.Sprintf("| %s | %s | %.3f | %.3f | %.3f | %.3f | %s | %s |\n",
+				r.Metric, statusIcon, r.Expected, r.Actual, r.Difference, r.Tolerance, r.ToleranceType, safeDescription))
+		}
+		builder.WriteString("\n")
 	}
 
-	return markdown.String()
+	return builder.String()
 }

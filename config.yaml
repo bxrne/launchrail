@@ -44,6 +44,6 @@ engine:
 benchmarks:
   hipr-euroc24: 
     name: "HIPR EuroC 2024 Flight Comparison"
-    designFile: "./benchdata/hipr-euroc24/design.ork" 
-    dataDir: "./benchdata/hipr-euroc24"           
+    design_file: "/Users/adambyrne/code/fyp/launchrail/benchdata/hipr-euroc24/design.ork" 
+    data_dir: "/Users/adambyrne/code/fyp/launchrail/benchdata/hipr-euroc24"           
     enabled: true

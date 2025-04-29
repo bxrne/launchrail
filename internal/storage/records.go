@@ -36,18 +36,20 @@ type Metadata struct {
 
 // NewRecord creates a new simulation record with associated storage services
 func NewRecord(baseDir string, hash string) (*Record, error) {
-	motionStore, err := NewStorage(baseDir, hash, "motion")
+	recordDir := filepath.Join(baseDir, hash) // Construct the full path
+
+	motionStore, err := NewStorage(recordDir, "motion") // Use recordDir
 	if err != nil {
 		return nil, err
 	}
 
-	eventsStore, err := NewStorage(baseDir, hash, "events")
+	eventsStore, err := NewStorage(recordDir, "events") // Use recordDir
 	if err != nil {
 		motionStore.Close()
 		return nil, err
 	}
 
-	dynamicsStore, err := NewStorage(baseDir, hash, "dynamics")
+	dynamicsStore, err := NewStorage(recordDir, "dynamics") // Use recordDir
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close()
@@ -58,6 +60,7 @@ func NewRecord(baseDir string, hash string) (*Record, error) {
 		Hash:         hash,
 		Name:         hash,
 		LastModified: time.Now(),
+		Path:         recordDir, // Store the path
 		Motion:       motionStore,
 		Events:       eventsStore,
 		Dynamics:     dynamicsStore,
@@ -207,16 +210,16 @@ func (rm *RecordManager) loadRecord(hash string) (*Record, error) {
 	}
 
 	// Initialize storage handlers for the loaded record
-	motionStore, err := NewStorage(rm.baseDir, hash, "motion")
+	motionStore, err := NewStorage(recordPath, "motion") // Use recordPath
 	if err != nil {
 		return nil, fmt.Errorf("failed to init motion storage for %s: %w", hash, err)
 	}
-	eventsStore, err := NewStorage(rm.baseDir, hash, "events")
+	eventsStore, err := NewStorage(recordPath, "events") // Use recordPath
 	if err != nil {
 		motionStore.Close() // Close already opened store
 		return nil, fmt.Errorf("failed to init events storage for %s: %w", hash, err)
 	}
-	dynamicsStore, err := NewStorage(rm.baseDir, hash, "dynamics")
+	dynamicsStore, err := NewStorage(recordPath, "dynamics") // Use recordPath
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close()
@@ -228,6 +231,7 @@ func (rm *RecordManager) loadRecord(hash string) (*Record, error) {
 		Name:         hash, // Or potentially load from metadata if stored
 		LastModified: info.ModTime(), // Still store ModTime for potential other uses
 		CreationTime: creationTime, // Use the reliable timestamp
+		Path:         recordPath, // Store the path
 		Motion:       motionStore,
 		Events:       eventsStore,
 		Dynamics:     dynamicsStore,
@@ -321,18 +325,18 @@ func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 	}
 
 	// Initialize storage services for the record
-	motionStore, err := NewStorage(rm.baseDir, hash, "motion")
+	motionStore, err := NewStorage(recordPath, "motion") // Use recordPath
 	if err != nil {
 		return nil, err
 	}
 
-	eventsStore, err := NewStorage(rm.baseDir, hash, "events")
+	eventsStore, err := NewStorage(recordPath, "events") // Use recordPath
 	if err != nil {
 		motionStore.Close()
 		return nil, err
 	}
 
-	dynamicsStore, err := NewStorage(rm.baseDir, hash, "dynamics")
+	dynamicsStore, err := NewStorage(recordPath, "dynamics") // Use recordPath
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close()

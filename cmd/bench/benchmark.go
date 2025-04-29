@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/bxrne/launchrail/internal/logger" // Import custom logger
-	"github.com/bxrne/launchrail/internal/storage"
 )
 
 // BenchmarkResult holds the outcome of a single benchmark comparison.
@@ -35,11 +34,10 @@ type BenchmarkSuite struct {
 	Benchmarks []Benchmark
 }
 
-// BenchmarkConfig holds configuration for the suite.
+// BenchmarkConfig holds configuration for the benchmark suite.
 type BenchmarkConfig struct {
-	BenchdataPath string
-	SimRecordHash string             // Added: Hash of the simulation record to use
-	RecordManager *storage.RecordManager // Added: Record manager to load the sim record
+	BenchdataPath string // Path to the directory containing expected benchmark data CSVs
+	ResultDirPath string // Path to the directory containing the actual simulation result CSVs
 }
 
 // NewBenchmarkSuite creates a new benchmark suite.

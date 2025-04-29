@@ -18,14 +18,40 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// runSim starts the simulation with the given configuration
+// runSim takes the global config and a record manager and runs a simulation
 func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
-	var err error
 	log := logger.GetLogger(cfg.Setup.Logging.Level)
 	log.Info("Starting simulation run")
 
-	// Initialize the simulation manager
+	// Create simulation manager
 	simManager := simulation.NewManager(cfg, *log)
+
+	// Create a record for this simulation run *before* initializing the manager
+	record, err := recordManager.CreateRecord()
+	if err != nil {
+		log.Error("Failed to create simulation record", "Error", err)
+		return fmt.Errorf("failed to create simulation record: %w", err)
+	}
+	log.Info("Simulation record created", "path", record.Path)
+
+	// Create the Stores object from the record's initialized stores
+	stores := &storage.Stores{
+		Motion:   record.Motion,
+		Events:   record.Events,
+		Dynamics: record.Dynamics,
+	}
+
+	// Initialize the simulation manager with the stores from the record
+	if err := simManager.Initialize(stores); err != nil {
+		log.Error("Failed to initialize simulation manager", "Error", err)
+		// Attempt to clean up the created record directory if initialization fails
+		cleanupErr := os.RemoveAll(record.Path)
+		if cleanupErr != nil {
+			log.Error("Failed to cleanup record directory after init failure", "path", record.Path, "cleanupError", cleanupErr)
+		}
+		return fmt.Errorf("failed to initialize simulation manager: %w", err)
+	}
+
 	// Defer closing the manager
 	defer func() {
 		if cerr := simManager.Close(); cerr != nil {
@@ -37,17 +63,6 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
 		}
 	}()
 
-	if err = simManager.Initialize(); err != nil {
-		log.Error("Failed to initialize simulation manager", "Error", err)
-		return fmt.Errorf("failed to initialize simulation manager: %w", err)
-	}
-
-	// Only now create a new record for the simulation
-	record, err := recordManager.CreateRecord()
-	if err != nil {
-		log.Error("Failed to create record", "Error", err)
-		return fmt.Errorf("failed to create simulation record: %w", err)
-	}
 	// Defer closing the record only if creation succeeded
 	defer func() {
 		if cerr := record.Close(); cerr != nil {
@@ -210,13 +225,13 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, e
 		},
 	}
 
-	// After parsing POST data into newCfg, ensure consistency by calling Manager.Initialize():
-	m := simulation.NewManager(&simConfig, *logger.GetLogger(currentCfg.Setup.Logging.Level))
-	// Initialize the manager to set up stores & apply config consistently
-	if err := m.Initialize(); err != nil {
-		log.Error("Manager initialization failed within configFromCtx", "error", err)
-		return nil, fmt.Errorf("failed to initialize simulation manager: %w", err)
-	}
+	// We no longer need to initialize the manager here, as it's done
+	// with the correct storage.Stores instance inside runSim.
+	// m := simulation.NewManager(&simConfig, *logger.GetLogger(currentCfg.Setup.Logging.Level))
+	// if err := m.Initialize(); err != nil {
+	// 	log.Error("Manager initialization failed within configFromCtx", "error", err)
+	// 	return nil, fmt.Errorf("failed to initialize simulation manager: %w", err)
+	// }
 	log.Debug("Manager initialized successfully within configFromCtx")
 
 	// Validate the configuration
