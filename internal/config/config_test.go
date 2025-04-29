@@ -88,10 +88,12 @@ func createValidConfig() config.Config {
 	tmpDir := os.TempDir()
 	designFilePath := filepath.Join(tmpDir, "design.ork")
 	dataDirPath := filepath.Join(tmpDir, "bench_data")
+	simResultsDirPath := filepath.Join(tmpDir, "sim_results") // Dummy results dir
 
 	// Ensure dummy files/dirs exist for validation within this helper
 	_ = os.WriteFile(designFilePath, []byte("dummy"), 0644)
 	_ = os.Mkdir(dataDirPath, 0755)
+	_ = os.Mkdir(simResultsDirPath, 0755) // Create dummy results dir
 	// No need for explicit cleanup here if tests use t.TempDir() or handle it
 
 	return config.Config{
@@ -153,6 +155,11 @@ func createValidConfig() config.Config {
 				DataDir:    dataDirPath,
 				Enabled:    true,
 			},
+		},
+		Benchmark: config.BenchmarkConfig{
+			SimulationResultsDir: simResultsDirPath,
+			DefaultBenchmarkTag:  "test-tag", // Required non-empty string based on test errors
+			MarkdownOutputPath:   "BENCHMARK.md",
 		},
 	}
 }
@@ -272,14 +279,22 @@ func TestConfig_Validate_Valid(t *testing.T) {
 	tempDir := t.TempDir()
 	designFilePath := filepath.Join(tempDir, "design.ork")
 	dataDirPath := filepath.Join(tempDir, "bench_data")
+	simResultsDirPath := filepath.Join(tempDir, "results") // Directory for simulation results
 	require.NoError(t, os.WriteFile(designFilePath, []byte("dummy ork"), 0644), "Failed to create dummy design file")
 	require.NoError(t, os.Mkdir(dataDirPath, 0755), "Failed to create dummy data dir")
+	require.NoError(t, os.Mkdir(simResultsDirPath, 0755), "Failed to create dummy simulation results dir") // Create results dir
 
 	// Update the config to use these temporary paths
 	if bench, ok := cfg.Benchmarks["test-bench"]; ok {
 		bench.DesignFile = designFilePath
 		bench.DataDir = dataDirPath
 		cfg.Benchmarks["test-bench"] = bench
+	}
+	// Add required BenchmarkConfig settings
+	cfg.Benchmark = config.BenchmarkConfig{
+		SimulationResultsDir: simResultsDirPath,
+		DefaultBenchmarkTag:  "test-tag", // Set required tag
+		MarkdownOutputPath:   filepath.Join(tempDir, "BENCHMARK.md"), // Optional, provide a temp path
 	}
 	cfg.Setup.App.BaseDir = tempDir // Set base dir for relative path resolution if needed
 
@@ -315,12 +330,14 @@ func TestGetConfig_ValidConfig(t *testing.T) {
 	configFile := filepath.Join(tempDir, "config.yaml")
 	dummyORK := filepath.Join(tempDir, "dummy.ork")
 	dummyPluginDir := filepath.Join(tempDir, "plugins")
+	dummySimResultsDir := filepath.Join(tempDir, "results") // Directory for simulation results
 
 	// Create dummy files/dirs needed by the valid base config
 	require.NoError(t, os.WriteFile(dummyORK, []byte("dummy"), 0644))
 	require.NoError(t, os.Mkdir(dummyPluginDir, 0755))
+	require.NoError(t, os.Mkdir(dummySimResultsDir, 0755)) // Create results dir
 
-	// Minimal valid content + base requirements
+	// Minimal valid content + base requirements + benchmark config
 	validContent := fmt.Sprintf(`
 setup:
   app:
@@ -360,7 +377,11 @@ engine:
     step: 0.01
     max_time: 60
     ground_tolerance: 0.1
-`, tempDir, dummyPluginDir, dummyORK)
+benchmark:
+  simulation_results_dir: %q
+  default_benchmark_tag: "test-tag" # Set required tag
+  markdown_output_path: "BENCHMARK.md"
+`, tempDir, dummyPluginDir, dummyORK, dummySimResultsDir)
 
 	require.NoError(t, os.WriteFile(configFile, []byte(validContent), 0644))
 
@@ -489,11 +510,14 @@ func TestConfig_Validate_InvalidFields(t *testing.T) {
 
 // TEST: GIVEN a config with a valid benchmark WHEN Validate is called THEN does not return an error
 func TestConfig_Validate_ValidBenchmark(t *testing.T) {
-	cfg := createValidConfig()
+	cfg := createValidConfig() // createValidConfig now returns a fully valid config, including Benchmark section
+
+	// Additional setup for benchmark file paths might be needed if createValidConfig doesn't cover it
+	// Depending on how Validate checks paths, we might need t.TempDir() here too.
+	// For now, assume createValidConfig handles the necessary dummy files/dirs.
+
 	err := cfg.Validate()
-	if err != nil {
-		t.Errorf("Validate() should not return an error for valid benchmark: %v", err)
-	}
+	require.NoError(t, err, "Validate() should not return an error for valid benchmark") // Use require instead of Errorf
 }
 
 // TEST: GIVEN a config with an invalid benchmark WHEN Validate is called THEN returns an error
