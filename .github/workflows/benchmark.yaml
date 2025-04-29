@@ -25,7 +25,8 @@ jobs:
         id: run_bench
         run: |
           # Run from project root to find config.yaml, ignore exit code
-          output=$(go run ./cmd/bench --benchdata ./testdata/benchmarks || true)
+          # The --benchdata flag was removed as the path comes from config.yaml
+          output=$(go run ./cmd/bench --resultsdir ./testdata/results || true)
           echo "Captured output:" # Debugging line
           echo "$output" # Debugging line
           # Extract content between markers
