@@ -337,33 +337,27 @@ func (cfg *Config) Validate() error {
 		if benchmark.DesignFile == "" {
 			return fmt.Errorf("benchmark '%s': benchmark.design_file is required", tag)
 		}
-		if _, err := os.Stat(benchmark.DesignFile); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("benchmark '%s' designFile is invalid: %s", tag, err)
-		}
+		// Removed os.Stat check that incorrectly used BaseDir here
 		if benchmark.DataDir == "" {
 			return fmt.Errorf("benchmark '%s': benchmark.data_dir is required", tag)
 		}
 
-		// Check if DesignFile exists (relative to BaseDir or absolute)
-		designFilePath := benchmark.DesignFile
-		if !filepath.IsAbs(designFilePath) {
-			designFilePath = filepath.Join(cfg.Setup.App.BaseDir, designFilePath)
-		}
-		if _, err := os.Stat(designFilePath); os.IsNotExist(err) {
-			return fmt.Errorf("benchmark '%s' designFile path does not exist: %s", tag, designFilePath)
+		// Check if DesignFile exists (relative to project root or absolute)
+		// Use the path directly as specified in config.yaml
+		if _, err := os.Stat(benchmark.DesignFile); os.IsNotExist(err) {
+			return fmt.Errorf("benchmark '%s' designFile path does not exist: %s", tag, benchmark.DesignFile)
 		} else if err != nil {
-			return fmt.Errorf("error checking benchmark '%s' designFile path '%s': %w", tag, designFilePath, err)
+			return fmt.Errorf("error checking benchmark '%s' designFile path '%s': %w", tag, benchmark.DesignFile, err)
 		}
 
-		// Check if DataDir exists (relative to BaseDir or absolute)
-		dataDirPath := benchmark.DataDir
-		if !filepath.IsAbs(dataDirPath) {
-			dataDirPath = filepath.Join(cfg.Setup.App.BaseDir, dataDirPath)
-		}
-		if _, err := os.Stat(dataDirPath); os.IsNotExist(err) {
-			return fmt.Errorf("benchmark '%s' dataDir path does not exist: %s", tag, dataDirPath)
+		// Check if DataDir exists (relative to project root or absolute)
+		// Use the path directly as specified in config.yaml
+		if stat, err := os.Stat(benchmark.DataDir); os.IsNotExist(err) {
+			return fmt.Errorf("benchmark '%s' dataDir path does not exist: %s", tag, benchmark.DataDir)
 		} else if err != nil {
-			return fmt.Errorf("error checking benchmark '%s' dataDir path '%s': %w", tag, dataDirPath, err)
+			return fmt.Errorf("error checking benchmark '%s' dataDir path '%s': %w", tag, benchmark.DataDir, err)
+		} else if !stat.IsDir() {
+			return fmt.Errorf("benchmark '%s' dataDir path is not a directory: %s", tag, benchmark.DataDir)
 		}
 	}
 
