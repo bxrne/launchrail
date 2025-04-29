@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21' # Use the Go version your project requires
+          go-version: '1.23' 
 
       - name: Run Benchmarks and Capture Output
         id: run_bench
