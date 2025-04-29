@@ -2,24 +2,24 @@ package logger
 
 import (
 	"sync"
-	"time"
 
 	"github.com/zerodha/logf"
 )
 
 var (
-	once   sync.Once
 	logger logf.Logger
-	opts   logf.Opts = logf.Opts{
+	once   sync.Once
+	opts   = logf.Opts{
+		EnableCaller:    true,
+		TimestampFormat: "15:04:05",
 		EnableColor:     true,
-		EnableCaller:    false,
-		TimestampFormat: time.RFC3339Nano,
-		Level:           logf.DebugLevel,
+		Level:           logf.InfoLevel,
 	}
 )
 
 // GetLogger returns the singleton instance of the logger.
 func GetLogger(level string) *logf.Logger {
+
 	var logLevel logf.Level
 	switch level {
 	case "debug":
@@ -46,7 +46,6 @@ func GetLogger(level string) *logf.Logger {
 }
 
 // Reset is for testing so that we can reset the logger singleton
-// and create a new instance.
 func Reset() {
 	once = sync.Once{}
 	logger = logf.Logger{}
