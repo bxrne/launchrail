@@ -22,7 +22,7 @@ engine:
     openrocket_version: "23.09"
   options:
     motor_designation: "269H110-14A"
-    openrocket_file: "./testdata/openrocket/l1.ork"
+    openrocket_file: "../testdata/openrocket/l1.ork"
     launchrail:
       length: 4
       angle: 5.0
