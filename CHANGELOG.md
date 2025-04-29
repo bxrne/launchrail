@@ -1,3 +1,13 @@
+## v0.3.5 (2025-04-29)
+
+### Fix
+
+- **bench**: Add CLI flags and integrate simulation with benchmark comparison
+
+### Refactor
+
+- improve benchmark config and add multi-benchmark support with result formatting
+
 ## v0.3.4 (2025-04-28)
 
 ### Refactor
