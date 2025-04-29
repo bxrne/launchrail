@@ -178,13 +178,13 @@ func TestManager_Initialize(t *testing.T) {
 			recordDir := filepath.Join(tempDir, "init_test_record")
 			motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
 			require.NoError(t, err)
-			defer motionStore.Close()
+			// defer motionStore.Close() // Manager is responsible for closing
 			eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
 			require.NoError(t, err)
-			defer eventsStore.Close()
+			// defer eventsStore.Close() // Manager is responsible for closing
 			dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
 			require.NoError(t, err)
-			defer dynamicsStore.Close()
+			// defer dynamicsStore.Close() // Manager is responsible for closing
 			stores := &storage.Stores{
 				Motion:   motionStore,
 				Events:   eventsStore,
@@ -194,13 +194,16 @@ func TestManager_Initialize(t *testing.T) {
 			manager := simulation.NewManager(cfg, log)
 			err = manager.Initialize(stores)
 
+			// Check error and status based on whether an error was expected
 			if tt.expectedError {
-				assert.Error(t, err)
+				assert.Error(t, err) // Error should be present
+				require.NotNil(t, manager)
+				require.Equal(t, simulation.StatusFailed, manager.GetStatus(), "Expected status to be Failed when initialization returns an error")
 			} else {
-				assert.NoError(t, err)
+				assert.NoError(t, err) // No error should be present
+				require.NotNil(t, manager)
+				require.Equal(t, simulation.StatusIdle, manager.GetStatus(), "Expected status to be Idle after successful initialization")
 			}
-			require.NotNil(t, manager)
-			require.Equal(t, simulation.StatusIdle, manager.GetStatus())
 		})
 	}
 }
@@ -241,13 +244,13 @@ func TestManager_Run(t *testing.T) {
 				recordDir := filepath.Join(tempDir, "run_test_record")
 				motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
 				require.NoError(t, err)
-				defer motionStore.Close()
+				// defer motionStore.Close() // Manager is responsible for closing
 				eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
 				require.NoError(t, err)
-				defer eventsStore.Close()
+				// defer eventsStore.Close() // Manager is responsible for closing
 				dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
 				require.NoError(t, err)
-				defer dynamicsStore.Close()
+				// defer dynamicsStore.Close() // Manager is responsible for closing
 				stores := &storage.Stores{
 					Motion:   motionStore,
 					Events:   eventsStore,
@@ -316,7 +319,7 @@ func TestManager_Close(t *testing.T) {
 	recordDir := filepath.Join(tempDir, "close_test_record")
 	motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
 	require.NoError(t, err)
-	// Don't defer close here, we want manager.Close to handle it
+	// Don't defer close here; manager.Close() should handle it.
 	eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
 	require.NoError(t, err)
 	dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)

@@ -75,79 +75,88 @@ func (b *HiprEuroc24Benchmark) LoadData(benchDataDir string) error {
 // Run performs the comparison between simulation results and ground truth data.
 func (b *HiprEuroc24Benchmark) Run() ([]BenchmarkResult, error) {
 	benchLogger := logger.GetLogger("info") // Get logger instance
-	results := []BenchmarkResult{}
+	var results []BenchmarkResult
 
-	benchLogger.Info("Running benchmark comparison", "name", b.Name(), "simRecordHash", b.config.SimRecordHash)
-
-	// --- Load SIMULATION Data from Record --- // NEW LOGIC
-	simRecord, err := b.config.RecordManager.GetRecord(b.config.SimRecordHash)
+	benchLogger.Info("Loading expected data", "path", b.config.BenchdataPath)
+	expectedMotionPath := filepath.Join(b.config.BenchdataPath, "MOTION.csv")
+	expectedMotionData, err := LoadFlightInfo(expectedMotionPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get simulation record '%s': %w", b.config.SimRecordHash, err)
+		return nil, fmt.Errorf("failed to load expected motion data '%s': %w", expectedMotionPath, err)
 	}
-	benchLogger.Info("Loaded simulation record", "hash", simRecord.Hash, "path", simRecord.Path)
+	benchLogger.Debug("Loaded expected motion data", "count", len(expectedMotionData))
 
-	// Construct paths to simulation CSVs within the record's directory
-	simFlightInfoPath := filepath.Join(simRecord.Path, "flight_info.csv")
-	simEventInfoPath := filepath.Join(simRecord.Path, "events.csv")           // Assuming standard name
-	simFlightStatesPath := filepath.Join(simRecord.Path, "flight_states.csv") // Assuming standard name
-
-	// Load simulation data using existing loaders
-	simFlightInfo, err := LoadFlightInfo(simFlightInfoPath)
+	expectedEventsPath := filepath.Join(b.config.BenchdataPath, "EVENTS.csv")
+	expectedEventsData, err := LoadEventInfo(expectedEventsPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load simulation flight info from %s: %w", simFlightInfoPath, err)
+		return nil, fmt.Errorf("failed to load expected event data '%s': %w", expectedEventsPath, err)
 	}
-	benchLogger.Info("Loaded simulation flight info", "count", len(simFlightInfo))
+	benchLogger.Debug("Loaded expected event data", "count", len(expectedEventsData))
 
-	simEventInfo, err := LoadEventInfo(simEventInfoPath)
+	expectedDynamicsPath := filepath.Join(b.config.BenchdataPath, "DYNAMICS.csv")
+	expectedDynamicsData, err := LoadFlightStates(expectedDynamicsPath)
 	if err != nil {
-		// Note: Allow missing events file for now? Or return error?
-		benchLogger.Warn("Failed to load simulation event info, continuing without event comparison", "file", simEventInfoPath, "error", err)
-		// return nil, fmt.Errorf("failed to load simulation event info from %s: %w", simEventInfoPath, err)
+		return nil, fmt.Errorf("failed to load expected dynamics data '%s': %w", expectedDynamicsPath, err)
 	}
-	benchLogger.Info("Loaded simulation event info", "count", len(simEventInfo))
+	benchLogger.Debug("Loaded expected dynamics data", "count", len(expectedDynamicsData))
 
-	simFlightStates, err := LoadFlightStates(simFlightStatesPath)
+	// --- Load Actual Simulation Data ---
+	benchLogger.Info("Loading actual simulation results", "path", b.config.ResultDirPath)
+	actualMotionPath := filepath.Join(b.config.ResultDirPath, "MOTION.csv")
+	actualEventsPath := filepath.Join(b.config.ResultDirPath, "EVENTS.csv")
+	actualDynamicsPath := filepath.Join(b.config.ResultDirPath, "DYNAMICS.csv")
+
+	benchLogger.Info("Actual data paths", "motion", actualMotionPath, "events", actualEventsPath, "dynamics", actualDynamicsPath)
+
+	actualMotionData, err := LoadFlightInfo(actualMotionPath)
 	if err != nil {
-		// Note: Allow missing states file for now? Or return error?
-		benchLogger.Warn("Failed to load simulation flight states, continuing without state comparison", "file", simFlightStatesPath, "error", err)
-		// return nil, fmt.Errorf("failed to load simulation flight states from %s: %w", simFlightStatesPath, err)
+		return nil, fmt.Errorf("failed to load actual motion data from record '%s': %w", actualMotionPath, err)
 	}
-	benchLogger.Info("Loaded simulation flight states", "count", len(simFlightStates))
+	benchLogger.Debug("Loaded actual motion data", "count", len(actualMotionData))
 
-	// --- Define Ground Truth Expected Values (from loaded CSVs) ---
-	expectedApogeeGroundTruth, _ := b.findGroundTruthApogee()
-	expectedMaxVGroundTruth, _ := b.findGroundTruthMaxVelocity()
-	expectedLiftoffTimeGroundTruth := b.findGroundTruthEventTime("EV_LIFTOFF")
-	expectedApogeeEventTimeGroundTruth := b.findGroundTruthEventTime("EV_APOGEE")
-	expectedTouchdownTimeGroundTruth := b.findGroundTruthStateTime("TOUCHDOWN")
+	actualEventsData, err := LoadEventInfo(actualEventsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load actual event data from record '%s': %w", actualEventsPath, err)
+	}
+	benchLogger.Debug("Loaded actual event data", "count", len(actualEventsData))
 
-	// --- Calculate Actual Values from SIMULATION Data --- // UPDATED with sim data
-	actualApogeeFromSim, _ := findSimApogee(simFlightInfo)
-	actualMaxVFromSim, _ := findSimMaxVelocity(simFlightInfo)
-	actualLiftoffTimeFromSim := findSimEventTime(simEventInfo, "Liftoff")            // Use names from dummy data
-	actualApogeeEventTimeFromSim := findSimEventTime(simEventInfo, "ApogeeDetected") // Use names from dummy data
-	// actualTouchdownTimeFromSim := findSimStateTime(simFlightStates, "???") // Need the correct state name from sim output
-	actualTouchdownTimeFromSim := 0.0 // Placeholder until state name is known
+	actualDynamicsData, err := LoadFlightStates(actualDynamicsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load actual dynamics data from record '%s': %w", actualDynamicsPath, err)
+	}
+	benchLogger.Debug("Loaded actual dynamics data", "count", len(actualDynamicsData))
+
+	// --- Perform Comparisons ---
+	benchLogger.Info("Performing comparisons...")
+
+	// --- Define Ground Truth Expected Values (from loaded CSVs) --- 
+	expectedApogeeGroundTruth, _ := findSimApogee(expectedMotionData) 
+	expectedMaxVGroundTruth, _ := findSimMaxVelocity(expectedMotionData) 
+	expectedLiftoffTimeGroundTruth := findSimEventTime(expectedEventsData, "LIFTOFF") 
+	expectedApogeeEventTimeGroundTruth := findSimEventTime(expectedEventsData, "APOGEE") 
+	expectedTouchdownTimeGroundTruth := 0.0 
+	benchLogger.Warn("Touchdown time ground truth determination skipped: findSimStateTime needs verification")
+
+	// --- Calculate Actual Values from SIMULATION Data --- 
+	actualApogeeFromSim, _ := findSimApogee(actualMotionData)
+	actualMaxVFromSim, _ := findSimMaxVelocity(actualMotionData)
+	actualLiftoffTimeFromSim := findSimEventTime(actualEventsData, "Liftoff")            
+	actualApogeeEventTimeFromSim := findSimEventTime(actualEventsData, "ApogeeDetected") 
+	actualTouchdownTimeFromSim := 0.0 
 	benchLogger.Warn("Touchdown time comparison skipped: Unknown state name in simulation output CSV")
 
-	// --- Perform Comparisons --- // UPDATED: Compare sim actual vs ground truth expected
-
-	// 1. Apogee Comparison
+	// --- Compare Metrics ---
 	apogeeTolerance := 0.05 // 5% tolerance
 	results = append(results, compareFloat("Apogee Altitude", "Compare simulation apogee vs ground truth", expectedApogeeGroundTruth, actualApogeeFromSim, apogeeTolerance))
 
-	// 2. Max Velocity Comparison
 	maxVTolerance := 0.05 // 5% tolerance
 	results = append(results, compareFloat("Max Velocity", "Compare simulation max velocity vs ground truth", expectedMaxVGroundTruth, actualMaxVFromSim, maxVTolerance))
 
-	// 3. Event Timing Comparisons
 	liftoffTolerance := 0.1 // 100ms tolerance
 	results = append(results, compareFloat("Liftoff Time", "Compare sim liftoff event time vs ground truth", expectedLiftoffTimeGroundTruth, actualLiftoffTimeFromSim, liftoffTolerance))
 
 	apogeeTimeTolerance := 0.5 // 500ms tolerance
 	results = append(results, compareFloat("Apogee Event Time", "Compare sim apogee event time vs ground truth", expectedApogeeEventTimeGroundTruth, actualApogeeEventTimeFromSim, apogeeTimeTolerance))
 
-	// 4. State Timing Comparison (Placeholder)
 	touchdownTolerance := 1.0 // 1s tolerance
 	results = append(results, compareFloat("Touchdown Time", "Compare sim touchdown state time vs ground truth", expectedTouchdownTimeGroundTruth, actualTouchdownTimeFromSim, touchdownTolerance))
 

@@ -104,24 +104,50 @@ func main() {
 		tempCfg.Engine = currentEngineConfig
 
 		simManager := simulation.NewManager(&tempCfg, *benchLogger)
-		if err := simManager.Initialize(); err != nil {
-			benchLogger.Error("Failed to initialize simulation manager for benchmark", "tag", tag, "error", err)
-			simManager.Close() // Attempt cleanup
+
+		// Create unique temporary storage for this benchmark run
+		benchRecordDir, err := os.MkdirTemp("", fmt.Sprintf("launchrail_bench_%s_", tag))
+		if err != nil {
+			benchLogger.Error("Failed to create temp dir for benchmark", "benchmark", tag, "error", err)
 			continue // Skip this benchmark
 		}
+		defer os.RemoveAll(benchRecordDir) // Clean up afterwards
+		benchLogger.Info("Created temp storage for benchmark", "path", benchRecordDir)
 
-		simHash := simManager.GetSimHash()
-		if simHash == "" {
-			benchLogger.Error("Failed to retrieve simulation hash after initialization", "tag", tag)
-			simManager.Close() // Attempt cleanup
-			continue // Skip this benchmark
+		motionStore, err := storage.NewStorage(benchRecordDir, storage.MOTION)
+		if err != nil {
+			benchLogger.Error("Failed to create motion storage", "benchmark", tag, "error", err)
+			continue
 		}
-		benchLogger.Info("Simulation initialized for benchmark", "tag", tag, "recordHash", simHash)
+		eventsStore, err := storage.NewStorage(benchRecordDir, storage.EVENTS)
+		if err != nil {
+			motionStore.Close()
+			benchLogger.Error("Failed to create events storage", "benchmark", tag, "error", err)
+			continue
+		}
+		dynamicsStore, err := storage.NewStorage(benchRecordDir, storage.DYNAMICS)
+		if err != nil {
+			motionStore.Close()
+			eventsStore.Close()
+			benchLogger.Error("Failed to create dynamics storage", "benchmark", tag, "error", err)
+			continue
+		}
+		stores := &storage.Stores{
+			Motion:   motionStore,
+			Events:   eventsStore,
+			Dynamics: dynamicsStore,
+		}
 
+		// Initialize the manager with the temp stores
+		if err := simManager.Initialize(stores); err != nil {
+			benchLogger.Error("Failed to initialize sim manager for benchmark", "benchmark", tag, "error", err)
+			continue
+		}
+
+		// Run the simulation
 		benchLogger.Info("Running simulation for benchmark...", "tag", tag)
 		if err := simManager.Run(); err != nil {
 			benchLogger.Error("Simulation run failed for benchmark", "tag", tag, "error", err)
-			simManager.Close() // Attempt cleanup
 			continue // Skip this benchmark
 		}
 		benchLogger.Info("Simulation run completed successfully for benchmark", "tag", tag)
@@ -133,20 +159,21 @@ func main() {
 		}
 
 		// --- Setup Benchmark Suite for this Single Benchmark ---
-		benchLogger.Info("Initializing record manager for benchmark results...", "tag", tag)
-		rm, err := storage.NewRecordManager(cfg.Setup.App.BaseDir)
-		if err != nil {
-			benchLogger.Error("Failed to initialize record manager for benchmark", "tag", tag, "error", err)
-			continue // Skip this benchmark
-		}
+		benchLogger.Info("Initializing benchmark suite configuration...", "tag", tag)
+		// No longer need RecordManager here, we pass the direct result path
+		// rm, err := storage.NewRecordManager(cfg.Setup.App.BaseDir)
+		// if err != nil {
+		// 	benchLogger.Error("Failed to initialize record manager for benchmark", "tag", tag, "error", err)
+		// 	continue
+		// }
 
 		benchmarkConfig := BenchmarkConfig{
 			BenchdataPath: absBenchdataPath,
-			SimRecordHash: simHash,
-			RecordManager: rm,
+			ResultDirPath: benchRecordDir, // Pass the specific directory for this run's results
 		}
 		suite := NewBenchmarkSuite(benchmarkConfig) // Suite for just this one benchmark run
 
+		// --- Register Benchmarks --- 
 		// Get the correct benchmark constructor from the registry
 		constructor, exists := benchmarkRegistry[tag]
 		if !exists {
@@ -157,7 +184,7 @@ func main() {
 
 		// --- Run This Single Benchmark --- 
 		benchLogger.Info("Starting benchmark comparison...", "tag", tag)
-		results, _, err := suite.RunAll() // Run the suite containing only the current benchmark
+		benchmarkResults, _, err := suite.RunAll() // Run the suite containing only the current benchmark
 		if err != nil {
 			benchLogger.Error("Error running benchmark comparison", "tag", tag, "error", err)
 			// Don't exit immediately, record failure and continue if possible
@@ -168,7 +195,7 @@ func main() {
 		// --- Merge Results and Count Pass/Fail --- 
 		benchLogger.Info("--- Benchmark Results Summary --- ", "tag", tag, "name", benchmarkEntry.Name)
 		benchmarkFailed := false
-		for benchmarkName, benchmarkResults := range results { // Should only be one entry from the single-benchmark suite
+		for benchmarkName, benchmarkResults := range benchmarkResults { // Should only be one entry from the single-benchmark suite
 			overallResults[benchmarkName] = benchmarkResults // Add/overwrite in overall map
 			for _, res := range benchmarkResults {
 				if !res.Passed {
