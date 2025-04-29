@@ -177,3 +177,9 @@ func (m *Manager) Close() error {
 func (m *Manager) GetStatus() SimulationStatus {
 	return m.status
 }
+
+// GetSimHash returns the hash calculated for the current simulation configuration and design file.
+// It's available after Initialize() has been called.
+func (m *Manager) GetSimHash() string {
+	return m.simHash
+}

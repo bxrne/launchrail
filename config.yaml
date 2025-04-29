@@ -40,3 +40,10 @@ engine:
           sea_level_pressure: 101325.0
           ratio_specific_heats: 1.4
           temperature_lapse_rate: 0.0065
+
+benchmarks:
+  hipr-euroc24: 
+    name: "HIPR EuroC 2024 Flight Comparison"
+    designFile: "./benchdata/hipr-euroc24/design.ork" 
+    dataDir: "./benchdata/hipr-euroc24"           
+    enabled: true

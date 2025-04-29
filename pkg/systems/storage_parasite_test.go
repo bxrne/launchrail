@@ -110,7 +110,7 @@ func newTestMotor(t *testing.T) *components.Motor {
 	return motor
 }
 
-func setupTest(t *testing.T, storeType storage.StorageType) (*systems.StorageParasiteSystem, *mockStorage, chan *states.PhysicsState) {
+func setupTest(t *testing.T, storeType storage.SimStorageType) (*systems.StorageParasiteSystem, *mockStorage, chan *states.PhysicsState) {
 	t.Helper()
 	world := &ecs.World{}
 	mock := &mockStorage{}

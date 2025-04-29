@@ -4,8 +4,23 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bxrne/launchrail/internal/config"
 	"github.com/stretchr/testify/assert"
 )
+
+func createTestConfig() *config.Config {
+	return &config.Config{
+		Setup: config.Setup{
+			App: config.App{
+				Name:    "TestApp",
+				Version: "1.0",
+				BaseDir: ".", // Assuming current dir is fine for test
+			},
+			Logging: config.Logging{Level: "debug"},
+			Plugins: config.Plugins{Paths: []string{"./test-plugins"}},
+		},
+	}
+}
 
 func TestFormatResultsToMarkdown(t *testing.T) {
 	results := map[string][]BenchmarkResult{
@@ -48,6 +63,11 @@ func TestFormatResultsToMarkdown(t *testing.T) {
 		},
 	}
 
+	commitHash := "testhash"
+	testCfg := createTestConfig()
+
+	markdown := formatResultsToMarkdown(results, commitHash, testCfg)
+
 	expectedHeader := "# Benchmark Results"
 	expectedBenchmarkAHeader := "## BenchmarkA"
 	expectedBenchmarkBHeader := "## BenchmarkB"
@@ -56,8 +76,6 @@ func TestFormatResultsToMarkdown(t *testing.T) {
 	expectedRowA1 := "| Metric1 | Test metric one | 100.000 | 101.500 | 1.500 | 2.000 | Absolute | :white_check_mark: PASSED |"
 	expectedRowA2 := "| Metric2\\|Pipe | Test metric two failed | 50.000 | 55.100 | 5.100 | 5.000 | Absolute | :x: FAILED |"
 	expectedRowB1 := "| Metric3 | Test metric three | 0.000 | 0.010 | 0.010 | 0.100 | Absolute | :white_check_mark: PASSED |"
-
-	markdown := formatResultsToMarkdown(results)
 
 	assert.True(t, strings.Contains(markdown, expectedHeader), "Markdown should contain the main header")
 	assert.True(t, strings.Contains(markdown, expectedBenchmarkAHeader), "Markdown should contain header for BenchmarkA")
@@ -79,4 +97,10 @@ func TestFormatResultsToMarkdown(t *testing.T) {
 	assert.True(t, idxA < idxA1 && idxA1 < idxA2, "Rows within BenchmarkA should be in order")
 	assert.True(t, idxB < idxB1, "Row within BenchmarkB should follow its header")
 
+	// Additional checks
+	assert.Contains(t, markdown, "**Commit:** testhash")
+	assert.Contains(t, markdown, "**Plugins:** `./test-plugins`")
+	assert.Contains(t, markdown, "## Table of Contents") // Check TOC exists
+	assert.Contains(t, markdown, "- [BenchmarkA](#benchmarka)") // Corrected TOC link assertion
+	assert.Contains(t, markdown, "- [BenchmarkB](#benchmarkb)")   // Corrected TOC link assertion
 }
