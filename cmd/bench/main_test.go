@@ -65,16 +65,30 @@ func TestFormatResultsMarkdown(t *testing.T) {
 
 	markdown := formatResultsMarkdown(mockResults, mockBenchmarkEntries)
 
+	// General Structure Assertions
 	assert.Contains(t, markdown, "# Benchmark Results")
-	assert.Contains(t, markdown, "Cool Rocket Test")
-	assert.Contains(t, markdown, "(hipr-euroc24)")
-	assert.Contains(t, markdown, "Another Test")
-	assert.Contains(t, markdown, "(simple-test)")
-	assert.Contains(t, markdown, "| Apogee | :white_check_mark: PASS |")
-	assert.Contains(t, markdown, "| Max Velocity | :x: FAIL |")
-	assert.Contains(t, markdown, "| **Overall** | **:x: FAIL** |")
-	assert.Contains(t, markdown, "**Plugins:** `./test-plugins`")
-	assert.Contains(t, markdown, "## Table of Contents")
-	assert.Contains(t, markdown, "- [Cool Rocket Test](#cool-rocket-test)")
-	assert.Contains(t, markdown, "- [Another Test](#another-test)")
+	assert.Contains(t, markdown, "### Summary")
+	assert.Contains(t, markdown, "| Name | Status | Passed | Failed |") // Summary header
+	assert.Contains(t, markdown, "### Details")
+
+	// Summary Content Assertions
+	assert.Contains(t, markdown, "| Cool Rocket Test | FAIL | 1 | 1 |")
+	assert.Contains(t, markdown, "| Another Test | PASS | 1 | 0 |")
+	assert.Contains(t, markdown, "| **Overall** | **FAIL** | **2** | **1** |") // Corrected assertion with bold counts
+
+	// Details Assertions
+	assert.Contains(t, markdown, "#### Cool Rocket Test (hipr-euroc24)")
+	assert.Contains(t, markdown, "| Apogee | PASS |")          // Plain PASS status
+	assert.Contains(t, markdown, "| Max Velocity | FAIL |")    // Plain FAIL status
+
+	assert.Contains(t, markdown, "#### Another Test (simple-test)")
+	assert.Contains(t, markdown, "| Burn Time | PASS |")       // Plain PASS status
+
+	// Ensure removed/never added elements are NOT present
+	assert.NotContains(t, markdown, ":white_check_mark:")
+	assert.NotContains(t, markdown, ":x:")
+	assert.NotContains(t, markdown, "## Table of Contents")
+	assert.NotContains(t, markdown, "- [Cool Rocket Test](#cool-rocket-test)")
+	assert.NotContains(t, markdown, "- [Another Test](#another-test)")
+	assert.NotContains(t, markdown, "**Plugins:**") // Plugin path is not part of this function's output
 }
