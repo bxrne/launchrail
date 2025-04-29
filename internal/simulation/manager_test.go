@@ -8,6 +8,7 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/plugin"
 	"github.com/bxrne/launchrail/internal/simulation"
+	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zerodha/logf"
@@ -46,7 +47,7 @@ func TestManager_Initialize(t *testing.T) {
 		name           string
 		setupConfig    func() *config.Config
 		expectedError  bool
-		expectedStatus simulation.SimulationStatus
+		expectedStatus simulation.ManagerStatus
 	}{
 		{
 			name: "successful initialization",
@@ -173,14 +174,33 @@ func TestManager_Initialize(t *testing.T) {
 			cfg := tt.setupConfig()
 			log := logf.New(logf.Opts{})
 
+			tempDir := t.TempDir()
+			recordDir := filepath.Join(tempDir, "init_test_record")
+			motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
+			require.NoError(t, err)
+			defer motionStore.Close()
+			eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
+			require.NoError(t, err)
+			defer eventsStore.Close()
+			dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
+			require.NoError(t, err)
+			defer dynamicsStore.Close()
+			stores := &storage.Stores{
+				Motion:   motionStore,
+				Events:   eventsStore,
+				Dynamics: dynamicsStore,
+			}
+
 			manager := simulation.NewManager(cfg, log)
-			err := manager.Initialize()
+			err = manager.Initialize(stores)
 
 			if tt.expectedError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
+			require.NotNil(t, manager)
+			require.Equal(t, simulation.StatusIdle, manager.GetStatus())
 		})
 	}
 }
@@ -192,7 +212,7 @@ func TestManager_Run(t *testing.T) {
 		name           string
 		setupManager   func() *simulation.Manager
 		expectedError  bool
-		expectedStatus simulation.SimulationStatus
+		expectedStatus simulation.ManagerStatus
 	}{
 		{
 			name: "successful run",
@@ -217,13 +237,30 @@ func TestManager_Run(t *testing.T) {
 						},
 					},
 				}
-				manager := simulation.NewManager(cfg, log)
-				err := manager.Initialize()
+				tempDir := t.TempDir()
+				recordDir := filepath.Join(tempDir, "run_test_record")
+				motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
 				require.NoError(t, err)
+				defer motionStore.Close()
+				eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
+				require.NoError(t, err)
+				defer eventsStore.Close()
+				dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
+				require.NoError(t, err)
+				defer dynamicsStore.Close()
+				stores := &storage.Stores{
+					Motion:   motionStore,
+					Events:   eventsStore,
+					Dynamics: dynamicsStore,
+				}
+
+				manager := simulation.NewManager(cfg, log)
+				err = manager.Initialize(stores)
+				require.NoError(t, err, "Initialize should not fail for run test")
 				return manager
 			},
 			expectedError:  false,
-			expectedStatus: simulation.StatusComplete,
+			expectedStatus: simulation.StatusCompleted,
 		},
 	}
 
@@ -235,9 +272,11 @@ func TestManager_Run(t *testing.T) {
 			if tt.expectedError {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				assert.NoError(t, err, "Run should not return an error")
 			}
 
+			require.NotNil(t, manager)
+			require.Equal(t, simulation.StatusCompleted, manager.GetStatus())
 		})
 	}
 }
@@ -273,9 +312,26 @@ func TestManager_Close(t *testing.T) {
 		},
 	}
 
-	manager := simulation.NewManager(cfg, log)
-	err = manager.Initialize()
+	tempDir = t.TempDir()
+	recordDir := filepath.Join(tempDir, "close_test_record")
+	motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
 	require.NoError(t, err)
+	// Don't defer close here, we want manager.Close to handle it
+	eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
+	require.NoError(t, err)
+	dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
+	require.NoError(t, err)
+	stores := &storage.Stores{
+		Motion:   motionStore,
+		Events:   eventsStore,
+		Dynamics: dynamicsStore,
+	}
+
+	manager := simulation.NewManager(cfg, log)
+	err = manager.Initialize(stores)
+	require.NoError(t, err)
+
+	// Simulate some activity (optional, but good practice)
 
 	err = manager.Close()
 	assert.NoError(t, err)

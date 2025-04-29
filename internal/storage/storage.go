@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 )
 
@@ -36,8 +35,7 @@ var StorageHeaders = map[SimStorageType][]string{
 
 // Storage is a service that writes csv's to disk
 type Storage struct {
-	baseDir  string
-	dir      string
+	recordDir string
 	store    SimStorageType
 	mu       sync.RWMutex
 	filePath string
@@ -52,53 +50,30 @@ type Stores struct {
 	Dynamics *Storage
 }
 
-// NewStorage creates a new storage service.
-// If the provided baseDir is not absolute, it is prepended with the user's home directory.
-func NewStorage(baseDir string, dir string, store SimStorageType) (*Storage, error) {
-	// Validate the dir to ensure it is a valid directory name
-	if strings.Contains(dir, "/") || strings.Contains(dir, "\\") || strings.Contains(dir, "..") {
-		return nil, fmt.Errorf("invalid directory name")
-	}
-
-	// If baseDir is not absolute, prepend the user's home directory.
-	if !filepath.IsAbs(baseDir) {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
-		}
-		baseDir = filepath.Join(homeDir, baseDir)
-	}
-
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
-		return nil, err
-	}
-
-	// Resolve the absolute path of the dir parameter relative to baseDir
-	absDir, err := filepath.Abs(filepath.Join(baseDir, dir))
+// NewStorage creates a new storage service for a specific store type within a given record directory.
+func NewStorage(recordDir string, store SimStorageType) (*Storage, error) {
+	// Ensure the record directory path is absolute
+	absRecordDir, err := filepath.Abs(recordDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve directory: %v", err)
+		return nil, fmt.Errorf("failed to resolve absolute path for record directory %s: %w", recordDir, err)
 	}
 
-	// Ensure the resolved path is within the baseDir
-	if !strings.HasPrefix(absDir, filepath.Clean(baseDir)+string(os.PathSeparator)) {
-		return nil, fmt.Errorf("invalid directory: %s", dir)
+	// Ensure the record directory exists
+	if err := os.MkdirAll(absRecordDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create record directory %s: %w", absRecordDir, err)
 	}
 
-	if err := os.MkdirAll(absDir, 0755); err != nil {
-		return nil, err
-	}
-
-	filePath := filepath.Join(absDir, fmt.Sprintf("%s.csv", store))
+	// Construct the specific file path within the record directory
+	filePath := filepath.Join(absRecordDir, fmt.Sprintf("%s.csv", store))
 
 	// Open file in read/write mode with append flag.
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create/open file: %v", err)
+		return nil, fmt.Errorf("failed to create/open file %s: %w", filePath, err)
 	}
 
 	return &Storage{
-		baseDir:  baseDir,
-		dir:      dir,
+		recordDir: absRecordDir,
 		store:    store,
 		filePath: filePath,
 		file:     file,
@@ -106,7 +81,7 @@ func NewStorage(baseDir string, dir string, store SimStorageType) (*Storage, err
 	}, nil
 }
 
-// Init initializes the storage service with headers.
+// Init ensures the header row is written if the file is new/empty.
 func (s *Storage) Init() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

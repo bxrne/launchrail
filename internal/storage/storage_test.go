@@ -26,17 +26,18 @@ func setupTest(t *testing.T) (string, string, func()) {
 
 // TEST: GIVEN a base dir WHEN creating MOTION storage THEN no error is returned
 func TestNewStorageMotion(t *testing.T) {
-	baseDir, dir, cleanup := setupTest(t)
+	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
 
-	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	recordDir := filepath.Join(baseDir, "test_record")
+	s, err := storage.NewStorage(recordDir, storage.MOTION)
 	require.NoError(t, err)
 
 	// Close the storage before cleanup
 	require.NoError(t, s.Close())
 
 	expectedBaseDir := baseDir // baseDir is already absolute.
-	expectedDir := filepath.Join(expectedBaseDir, dir)
+	expectedDir := filepath.Join(expectedBaseDir, "test_record")
 
 	_, err = os.Stat(expectedBaseDir)
 	assert.NoError(t, err)
@@ -46,17 +47,18 @@ func TestNewStorageMotion(t *testing.T) {
 
 // TEST: GIVEN a base dir WHEN creating EVENTS storage THEN no error is returned
 func TestNewStorageEvents(t *testing.T) {
-	baseDir, dir, cleanup := setupTest(t)
+	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
 
-	s, err := storage.NewStorage(baseDir, dir, storage.EVENTS)
+	recordDir := filepath.Join(baseDir, "test_record")
+	s, err := storage.NewStorage(recordDir, storage.EVENTS)
 	require.NoError(t, err)
 
 	// Close the storage before cleanup
 	require.NoError(t, s.Close())
 
 	expectedBaseDir := baseDir
-	expectedDir := filepath.Join(expectedBaseDir, dir)
+	expectedDir := filepath.Join(expectedBaseDir, "test_record")
 
 	_, err = os.Stat(expectedBaseDir)
 	assert.NoError(t, err)
@@ -66,10 +68,11 @@ func TestNewStorageEvents(t *testing.T) {
 
 // TEST: GIVEN a storage WHEN calling Init THEN the CSV file is created with headers
 func TestInit(t *testing.T) {
-	baseDir, dir, cleanup := setupTest(t)
+	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
 
-	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	recordDir := filepath.Join(baseDir, "test_init")
+	s, err := storage.NewStorage(recordDir, storage.MOTION)
 	require.NoError(t, err)
 
 	err = s.Init()
@@ -79,7 +82,7 @@ func TestInit(t *testing.T) {
 	require.NoError(t, s.Close())
 
 	// Remove sleep as it's no longer needed since we properly close the file
-	fullDir := filepath.Join(baseDir, dir)
+	fullDir := recordDir
 	files, err := os.ReadDir(fullDir)
 	require.NoError(t, err)
 	require.NotEmpty(t, files, "expected at least one file in %s", fullDir)
@@ -97,10 +100,11 @@ func TestInit(t *testing.T) {
 
 // TEST: GIVEN a storage WHEN writing valid data THEN data is appended
 func TestWrite(t *testing.T) {
-	baseDir, dir, cleanup := setupTest(t)
+	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
 
-	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	recordDir := filepath.Join(baseDir, "test_write")
+	s, err := storage.NewStorage(recordDir, storage.MOTION)
 	require.NoError(t, err)
 
 	err = s.Init()
@@ -113,7 +117,7 @@ func TestWrite(t *testing.T) {
 	require.NoError(t, s.Close())
 
 	// Remove sleep as it's no longer needed
-	fullDir := filepath.Join(baseDir, dir)
+	fullDir := recordDir
 	files, err := os.ReadDir(fullDir)
 	require.NoError(t, err)
 	require.NotEmpty(t, files, "expected at least one file in %s", fullDir)
@@ -134,10 +138,11 @@ func TestWrite(t *testing.T) {
 
 // TEST: GIVEN a storage WHEN writing invalid data THEN an error is returned
 func TestWriteInvalidData(t *testing.T) {
-	baseDir, dir, cleanup := setupTest(t)
+	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
 
-	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	recordDir := filepath.Join(baseDir, "test_invalid_data")
+	s, err := storage.NewStorage(recordDir, storage.MOTION)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, s.Close())
@@ -154,10 +159,11 @@ func TestWriteInvalidData(t *testing.T) {
 
 // TEST: GIVEN a storage with data WHEN calling ReadAll THEN data is returned
 func TestReadAll(t *testing.T) {
-	baseDir, dir, cleanup := setupTest(t)
+	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
 
-	s, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	recordDir := filepath.Join(baseDir, "test_read_all")
+	s, err := storage.NewStorage(recordDir, storage.MOTION)
 	require.NoError(t, err)
 	require.NoError(t, s.Init())
 
@@ -165,7 +171,7 @@ func TestReadAll(t *testing.T) {
 	require.NoError(t, s.Write(data))
 	require.NoError(t, s.Close())
 
-	s2, err := storage.NewStorage(baseDir, dir, storage.MOTION)
+	s2, err := storage.NewStorage(recordDir, storage.MOTION)
 	require.NoError(t, err)
 	defer s2.Close()
 
@@ -176,10 +182,11 @@ func TestReadAll(t *testing.T) {
 
 // TEST: GIVEN a storage with data WHEN calling ReadHeadersAndData THEN headers and rows are returned
 func TestReadHeadersAndData(t *testing.T) {
-	baseDir, dir, cleanup := setupTest(t)
+	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
 
-	s, err := storage.NewStorage(baseDir, dir, storage.EVENTS)
+	recordDir := filepath.Join(baseDir, "test_read_headers_and_data")
+	s, err := storage.NewStorage(recordDir, storage.EVENTS)
 	require.NoError(t, err)
 	require.NoError(t, s.Init())
 
@@ -187,7 +194,7 @@ func TestReadHeadersAndData(t *testing.T) {
 	require.NoError(t, s.Write(data))
 	require.NoError(t, s.Close())
 
-	s2, err := storage.NewStorage(baseDir, dir, storage.EVENTS)
+	s2, err := storage.NewStorage(recordDir, storage.EVENTS)
 	require.NoError(t, err)
 	defer s2.Close()
 
@@ -199,10 +206,11 @@ func TestReadHeadersAndData(t *testing.T) {
 
 // TEST: GIVEN a storage WHEN calling GetFilePath THEN the correct path is returned
 func TestGetFilePath(t *testing.T) {
-	baseDir, dir, cleanup := setupTest(t)
+	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
 
-	s, err := storage.NewStorage(baseDir, dir, storage.DYNAMICS)
+	recordDir := filepath.Join(baseDir, "test_get_file_path")
+	s, err := storage.NewStorage(recordDir, storage.DYNAMICS)
 	require.NoError(t, err)
 	assert.Contains(t, s.GetFilePath(), "DYNAMICS.csv")
 	require.NoError(t, s.Close())

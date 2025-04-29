@@ -2,36 +2,41 @@ package simulation
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/internal/plugin"
 	"github.com/bxrne/launchrail/internal/storage"
-	"github.com/bxrne/launchrail/pkg/diff"
 	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/simulation"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
-	"github.com/zerodha/logf"
+	logf "github.com/zerodha/logf"
 )
 
-type Manager struct {
-	cfg     *config.Config
-	log     logf.Logger
-	sim     *simulation.Simulation
-	status  SimulationStatus
-	simHash string
-	stores  *storage.Stores
-}
-
-type SimulationStatus string
+// ManagerStatus represents the status of the simulation manager.
+type ManagerStatus string
 
 const (
-	StatusIdle     SimulationStatus = "idle"
-	StatusRunning  SimulationStatus = "running"
-	StatusComplete SimulationStatus = "complete"
-	StatusError    SimulationStatus = "error"
+	StatusIdle       ManagerStatus = "idle"
+	StatusInitializing ManagerStatus = "initializing"
+	StatusRunning      ManagerStatus = "running"
+	StatusCompleted    ManagerStatus = "completed"
+	StatusFailed       ManagerStatus = "failed"
+	StatusClosed       ManagerStatus = "closed"
 )
 
+// Manager handles the overall simulation lifecycle.
+type Manager struct {
+	cfg    *config.Config
+	log    logf.Logger
+	mu     sync.Mutex
+	status ManagerStatus
+	sim    *simulation.Simulation
+	stores *storage.Stores // Store the passed-in stores
+}
+
+// NewManager creates a new simulation manager.
 func NewManager(cfg *config.Config, log logf.Logger) *Manager {
 	return &Manager{
 		cfg:    cfg,
@@ -40,13 +45,23 @@ func NewManager(cfg *config.Config, log logf.Logger) *Manager {
 	}
 }
 
-func (m *Manager) Initialize() error {
+// Initialize sets up the simulation manager.
+// It now accepts the storage.Stores instance created externally.
+func (m *Manager) Initialize(stores *storage.Stores) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.status = StatusInitializing
+
+	// Store the provided stores
+	m.stores = stores
+
 	// Compile plugins first
 	m.log.Info("Compiling external plugins...")
 	if err := plugin.CompilePlugins("./plugins", "./plugins", m.log); err != nil {
 		m.log.Error("Failed to compile one or more plugins", "error", err)
 		// Depending on requirements, we might want to allow proceeding even if some plugins fail.
 		// For now, treat compilation failure as a fatal initialization error.
+		m.status = StatusFailed
 		return fmt.Errorf("plugin compilation failed: %w", err)
 	}
 	m.log.Info("Plugin compilation finished.")
@@ -55,15 +70,18 @@ func (m *Manager) Initialize() error {
 	simStep := m.cfg.Engine.Simulation.Step
 	simMax := m.cfg.Engine.Simulation.MaxTime
 	if simStep <= 0 || simStep > 0.1 {
+		m.status = StatusFailed
 		return fmt.Errorf("invalid simulation step: must be >0 and <=0.1")
 	}
 	if simMax <= 0 {
+		m.status = StatusFailed
 		return fmt.Errorf("invalid simulation max_time: must be >0")
 	}
 
 	// Load motor data
 	motorData, err := thrustcurves.Load(m.cfg.Engine.Options.MotorDesignation, http_client.NewHTTPClient())
 	if err != nil {
+		m.status = StatusFailed
 		return err
 	}
 	m.log.Debug("Motor data loaded", "Designation", motorData.Designation)
@@ -71,115 +89,91 @@ func (m *Manager) Initialize() error {
 	// Load OpenRocket data
 	orkData, err := openrocket.Load(m.cfg.Engine.Options.OpenRocketFile, m.cfg.Engine.External.OpenRocketVersion)
 	if err != nil {
+		m.status = StatusFailed
 		return err
 	}
 	m.log.Debug("OpenRocket data loaded", "Version", orkData.Version)
 
-	// Generate simulation hash
-	m.simHash = diff.CombinedHash(orkData.Bytes(), m.cfg.Bytes())
+	// NOTE: Hash generation removed from here.
+	// It should be handled by the storage.RecordManager.
 
-	// Initialize storages
-	if err := m.initializeStorages(); err != nil {
-		return err
-	}
+	// NOTE: Storage initialization removed from here.
+	// Stores are now passed in as an argument.
 
-	// Create simulation
+	// Create simulation, passing the provided stores
 	m.sim, err = simulation.NewSimulation(m.cfg, m.log, m.stores)
 	if err != nil {
+		m.status = StatusFailed
 		return err
 	}
 
 	// Load rocket data
 	if err := m.sim.LoadRocket(&orkData.Rocket, motorData); err != nil {
+		m.status = StatusFailed
 		return err
 	}
 
-	m.status = StatusIdle
-	return nil
-}
-
-func (m *Manager) initializeStorages() error {
-	// Initialize motion storage
-	motionStorage, err := storage.NewStorage(m.cfg.Setup.App.BaseDir, m.simHash, storage.MOTION)
-	if err != nil {
-		return err
-	}
-
-	if err := motionStorage.Init(); err != nil {
-		return err
-	}
-
-	// Initialize events storage
-	eventsStorage, err := storage.NewStorage(m.cfg.Setup.App.BaseDir, m.simHash, storage.EVENTS)
-	if err != nil {
-		return err
-	}
-
-	if err := eventsStorage.Init(); err != nil {
-		return err
-	}
-
-	dynamicsStorage, err := storage.NewStorage(m.cfg.Setup.App.BaseDir, m.simHash, storage.DYNAMICS)
-	if err != nil {
-		return err
-	}
-
-	if err := dynamicsStorage.Init(); err != nil {
-		return err
-	}
-
-	m.stores = &storage.Stores{
-		Motion:   motionStorage,
-		Events:   eventsStorage,
-		Dynamics: dynamicsStorage,
-	}
-
+	m.status = StatusIdle // Ready to run
 	return nil
 }
 
 func (m *Manager) Run() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.status = StatusRunning
 
 	if err := m.sim.Run(); err != nil {
-		m.status = StatusError
+		m.status = StatusFailed
 		return err
 	}
 
-	m.status = StatusComplete
+	m.status = StatusCompleted
 	m.log.Info("Simulation completed successfully")
 	return nil
 }
 
 func (m *Manager) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.status == StatusClosed {
+		return nil // Already closed
+	}
+
+	var firstErr error
+	// Close the stores that were passed during initialization
 	if m.stores != nil {
 		if m.stores.Motion != nil {
 			if err := m.stores.Motion.Close(); err != nil {
-				return err
+				m.log.Error("Failed to close motion storage", "Error", err)
+				if err != nil && firstErr == nil {
+					firstErr = err
+				}
 			}
 		}
 		if m.stores.Events != nil {
 			if err := m.stores.Events.Close(); err != nil {
-				return err
+				m.log.Error("Failed to close events storage", "Error", err)
+				if err != nil && firstErr == nil {
+					firstErr = err
+				}
 			}
 		}
 		if m.stores.Dynamics != nil {
 			if err := m.stores.Dynamics.Close(); err != nil {
-				return err
+				m.log.Error("Failed to close dynamics storage", "Error", err)
+				if err != nil && firstErr == nil {
+					firstErr = err
+				}
 			}
 		}
 	}
 
-	m.log.Info("Simulation manager closed", "hash", m.simHash)
-
-	return nil
+	m.status = StatusClosed
+	m.log.Info("Simulation manager closed", "hash", "N/A - Hash now managed by storage.Record") // Update log message
+	return firstErr
 }
 
-func (m *Manager) GetStatus() SimulationStatus {
+func (m *Manager) GetStatus() ManagerStatus {
 	return m.status
-}
-
-// GetSimHash returns the hash calculated for the current simulation configuration and design file.
-// It's available after Initialize() has been called.
-func (m *Manager) GetSimHash() string {
-	return m.simHash
 }

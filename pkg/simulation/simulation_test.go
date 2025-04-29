@@ -16,17 +16,16 @@ import (
 )
 
 func setupTestStorage(t *testing.T) (*storage.Stores, func()) {
-	testDir := filepath.Join(os.TempDir(), "launchrail-test")
-	err := os.MkdirAll(testDir, 0755)
+	testDir := t.TempDir()
+	recordDir := filepath.Join(testDir, "launchrail-test")
+
+	motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
 	require.NoError(t, err)
 
-	motionStore, err := storage.NewStorage(testDir, "motion", storage.MOTION)
+	eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
 	require.NoError(t, err)
 
-	eventsStore, err := storage.NewStorage(testDir, "events", storage.EVENTS)
-	require.NoError(t, err)
-
-	dynamicsStore, err := storage.NewStorage(testDir, "dynamics", storage.DYNAMICS)
+	dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
 	require.NoError(t, err)
 
 	stores := &storage.Stores{
