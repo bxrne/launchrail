@@ -1,3 +1,9 @@
+## v0.3.6 (2025-04-29)
+
+### Fix
+
+- **benchmark.yaml**: Update bench CLI flag from --benchdata to --resultsdir in benchmark workflow
+
 ## v0.3.5 (2025-04-29)
 
 ### Fix
