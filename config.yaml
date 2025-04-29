@@ -43,9 +43,26 @@ engine:
           ratio_specific_heats: 1.4
           temperature_lapse_rate: 0.0065
 
+#-------------------------------------------------------------------------------
+# Benchmarks Configuration
+#-------------------------------------------------------------------------------
 benchmarks:
-  hipr-euroc24: 
+  hipr-euroc24:
     name: "HIPR EuroC 2024 Flight Comparison"
-    design_file: "./benchdata/hipr-euroc24/design.ork" 
-    data_dir: "./benchdata/hipr-euroc24"           
+    description: "Compares simulation results against ground truth data for the HIPR EuroC 2024 flight."
+    data_dir: "./benchdata/hipr-euroc24" # Path relative to project root
     enabled: true
+  # Add other benchmarks here following the same structure
+  # another-benchmark:
+  #   name: "Another Benchmark Example"
+  #   description: "Description for another benchmark."
+  #   data_dir: "./benchdata/another"
+  #   enabled: false
+
+#-------------------------------------------------------------------------------
+# Benchmark Tool Global Settings
+#-------------------------------------------------------------------------------
+benchmark:
+  simulation_results_dir: "./testdata/results" # Directory containing ACTUAL simulation output (read by benchmark tool)
+  default_benchmark_tag: ""              # Run all enabled benchmarks if empty
+  markdown_output_path: "BENCHMARK.md"     # File path for markdown summary output

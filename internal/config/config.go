@@ -160,12 +160,26 @@ type BenchmarkEntry struct {
 	Enabled    bool   `mapstructure:"enabled" validate:"boolean"`
 }
 
+// BenchmarkConfig holds global settings for the benchmark tool.
+type BenchmarkConfig struct {
+	// SimulationResultsDir specifies the directory containing the actual simulation output files.
+	// This is the directory the benchmark tool reads from.
+	SimulationResultsDir string `mapstructure:"simulation_results_dir"`
+	// DefaultBenchmarkTag specifies a tag to run if none is provided externally (e.g., via env var in future).
+	// If empty, all enabled benchmarks are run.
+	DefaultBenchmarkTag string `mapstructure:"default_benchmark_tag"`
+	// MarkdownOutputPath specifies the file path to write the benchmark summary in Markdown format.
+	// If empty, no Markdown file is written.
+	MarkdownOutputPath string `mapstructure:"markdown_output_path"`
+}
+
 // Config represents the overall application configuration.
 type Config struct {
-	Setup    Setup  `mapstructure:"setup"`
-	Server   Server `mapstructure:"server"`
-	Engine   Engine `mapstructure:"engine"`
-	Benchmarks map[string]BenchmarkEntry `mapstructure:"benchmarks"` // Map of benchmark tag to its config
+	Setup     Setup     `mapstructure:"setup"`
+	Server    Server    `mapstructure:"server"`
+	Engine    Engine    `mapstructure:"engine"`
+	Benchmarks map[string]BenchmarkEntry `mapstructure:"benchmarks"`
+	Benchmark BenchmarkConfig `mapstructure:"benchmark"` // New benchmark settings
 }
 
 // String returns the configuration as a map of strings, useful for testing.
@@ -219,6 +233,11 @@ func (c *Config) String() map[string]string {
 
 	// Server Port
 	marshalled["server.port"] = fmt.Sprintf("%d", c.Server.Port)
+
+	// Benchmark
+	marshalled["benchmark.simulation_results_dir"] = c.Benchmark.SimulationResultsDir
+	marshalled["benchmark.default_benchmark_tag"] = c.Benchmark.DefaultBenchmarkTag
+	marshalled["benchmark.markdown_output_path"] = c.Benchmark.MarkdownOutputPath
 
 	return marshalled
 }
@@ -359,6 +378,17 @@ func (cfg *Config) Validate() error {
 		} else if !stat.IsDir() {
 			return fmt.Errorf("benchmark '%s' dataDir path is not a directory: %s", tag, benchmark.DataDir)
 		}
+	}
+
+	// Benchmark
+	if cfg.Benchmark.SimulationResultsDir == "" {
+		return fmt.Errorf("benchmark.simulation_results_dir is required")
+	}
+	if cfg.Benchmark.DefaultBenchmarkTag == "" {
+		return fmt.Errorf("benchmark.default_benchmark_tag is required")
+	}
+	if cfg.Benchmark.MarkdownOutputPath == "" {
+		return fmt.Errorf("benchmark.markdown_output_path is required")
 	}
 
 	return nil

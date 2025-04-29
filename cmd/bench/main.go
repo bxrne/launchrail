@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,12 +17,6 @@ import (
 var benchLogger *logf.Logger
 
 func main() {
-	// --- Command Line Flags ---
-	benchmarkTag := flag.String("tag", "", "Tag of the specific benchmark to run (optional, runs all enabled if empty).")
-	resultsDir := flag.String("resultsdir", "", "Path to the directory containing simulation result files (e.g., MOTION.csv). Required.")
-	outputMarkdownPath := flag.String("outputmd", "", "Path to write the benchmark results in Markdown format (e.g., BENCHMARK.md). Optional.")
-	flag.Parse()
-
 	// --- Load Configuration ---
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -35,16 +28,23 @@ func main() {
 	// --- Initialize Logger with Config Level ---
 	benchLogger = logger.GetLogger(cfg.Setup.Logging.Level)
 
-	// --- Validate Required Flags ---
-	if *resultsDir == "" {
-		benchLogger.Fatal("Missing required flag: --resultsdir")
+	// --- Get Settings from Config --- 
+	benchmarkTagToRun := cfg.Benchmark.DefaultBenchmarkTag       // Get tag from config
+	resultsDir := cfg.Benchmark.SimulationResultsDir       // Get results dir from config
+	outputMarkdownPath := cfg.Benchmark.MarkdownOutputPath // Get markdown path from config
+
+	// --- Validate Required Settings from Config --- 
+	if resultsDir == "" {
+		benchLogger.Fatal("Missing required configuration: benchmark.simulation_results_dir")
 	}
-	absResultsDir, err := filepath.Abs(*resultsDir)
+	absResultsDir, err := filepath.Abs(resultsDir)
 	if err != nil {
-		benchLogger.Fatal("Failed to get absolute path for --resultsdir", "path", *resultsDir, "error", err)
+		benchLogger.Fatal("Failed to get absolute path for benchmark.simulation_results_dir", "path", resultsDir, "error", err)
 	}
 	if _, err := os.Stat(absResultsDir); os.IsNotExist(err) {
-		benchLogger.Fatal("Results directory specified by --resultsdir does not exist", "path", absResultsDir)
+		// Allow benchmark to run even if results dir doesn't exist initially, 
+		// individual benchmarks might fail gracefully later.
+		benchLogger.Warn("Simulation results directory does not exist yet, benchmarks might fail if they require it", "path", absResultsDir)
 	}
 	benchLogger.Info("Using simulation results directory", "path", absResultsDir)
 
@@ -55,11 +55,11 @@ func main() {
 	hasRunBenchmark := false // Track if any benchmark was actually selected and run
 
 	// --- Loop Through Configured Benchmarks ---
-	benchLogger.Info("Processing configured benchmarks...", "requested_tag", *benchmarkTag)
+	benchLogger.Info("Processing configured benchmarks...", "requested_tag", benchmarkTagToRun)
 	for tag, benchmarkEntry := range cfg.Benchmarks {
-		// Skip if a specific tag is requested and it doesn't match
-		if *benchmarkTag != "" && *benchmarkTag != tag {
-			benchLogger.Debug("Skipping benchmark: tag mismatch", "tag", tag, "requested_tag", *benchmarkTag)
+		// Skip if a specific tag is configured and it doesn't match
+		if benchmarkTagToRun != "" && benchmarkTagToRun != tag {
+			benchLogger.Debug("Skipping benchmark: tag mismatch", "tag", tag, "requested_tag", benchmarkTagToRun)
 			continue
 		}
 
@@ -87,7 +87,7 @@ func main() {
 		// --- Setup Benchmark Suite for this Benchmark ---
 		benchConfig := BenchmarkConfig{
 			BenchdataPath: absBenchdataPath, // Path to EXPECTED data
-			ResultDirPath: absResultsDir,    // Path to ACTUAL data (from --resultsdir flag)
+			ResultDirPath: absResultsDir,    // Path to ACTUAL data (from config)
 		}
 
 		suite := NewBenchmarkSuite(benchConfig)
@@ -189,12 +189,12 @@ func main() {
 	}
 	benchLogger.Info("--------------------------------", "Total Passed", overallPassedCount, "Total Failed", overallFailedCount)
 
-	// --- Write Markdown Output (if requested) ---
-	if *outputMarkdownPath != "" {
+	// --- Write Markdown Output (if path configured) --- 
+	if outputMarkdownPath != "" {
 		markdownContent := formatResultsMarkdown(overallResults, cfg.Benchmarks)
-		absMarkdownPath, err := filepath.Abs(*outputMarkdownPath)
+		absMarkdownPath, err := filepath.Abs(outputMarkdownPath)
 		if err != nil {
-			benchLogger.Error("Failed to get absolute path for markdown output", "path", *outputMarkdownPath, "error", err)
+			benchLogger.Error("Failed to get absolute path for markdown output", "path", outputMarkdownPath, "error", err)
 			// Continue to exit status, but log the error
 		} else {
 			err = os.WriteFile(absMarkdownPath, []byte(markdownContent), 0644)

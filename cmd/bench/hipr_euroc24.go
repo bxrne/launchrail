@@ -85,29 +85,27 @@ func (b *HiprEuroc24Benchmark) Run() ([]BenchmarkResult, error) {
 	// This part needs refinement based on how record IDs are associated with benchmarks.
 	// For hipr-euroc24, let's assume the record ID is 'rec001' or similar. 
 	// TODO: Implement a robust way to find the relevant record ID.
-	// Use the benchmark name (tag) as the subdirectory name for results.
-	recordID := b.Name() 
-	actualDataPath := filepath.Join(b.config.ResultDirPath, recordID) // CORRECT FIELD NAME
+	actualDataPath := b.config.ResultDirPath // Load directly from the results dir
 	benchLogger.Info("Loading actual simulation data", "recordPath", actualDataPath)
 
-	// Use specific filenames matching ground truth/expected simulation output format
-	actualMotionPath := filepath.Join(actualDataPath, "fl001 - flight_info_processed.csv") 
+	// Use generic filenames matching the actual simulation output
+	actualMotionPath := filepath.Join(actualDataPath, "MOTION.csv") 
 	actualMotionData, err := LoadFlightInfo(actualMotionPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load actual motion data from record '%s': %w", actualMotionPath, err)
 	}
 	benchLogger.Debug("Loaded actual motion data", "count", len(actualMotionData))
 
-	// Use specific filenames matching ground truth/expected simulation output format
-	actualEventsPath := filepath.Join(actualDataPath, "fl001 - event_info_processed.csv") 
+	// Use generic filenames matching the actual simulation output
+	actualEventsPath := filepath.Join(actualDataPath, "EVENTS.csv") 
 	actualEventsData, err := LoadEventInfo(actualEventsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load actual event data from record '%s': %w", actualEventsPath, err)
 	}
 	benchLogger.Debug("Loaded actual event data", "count", len(actualEventsData))
 
-	// Use specific filenames matching ground truth/expected simulation output format
-	actualDynamicsPath := filepath.Join(actualDataPath, "fl001 - flight_states_processed.csv") 
+	// Use generic filenames matching the actual simulation output
+	actualDynamicsPath := filepath.Join(actualDataPath, "DYNAMICS.csv") 
 	actualDynamicsData, err := LoadFlightStates(actualDynamicsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load actual dynamics data from record '%s': %w", actualDynamicsPath, err)
