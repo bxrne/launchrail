@@ -50,6 +50,7 @@ benchmarks:
   hipr-euroc24:
     name: "HIPR EuroC 2024 Flight Comparison"
     description: "Compares simulation results against ground truth data for the HIPR EuroC 2024 flight."
+    design_file: "./benchdata/hipr-euroc24/design.ork"
     data_dir: "./benchdata/hipr-euroc24" # Path relative to project root
     enabled: true
   # Add other benchmarks here following the same structure
