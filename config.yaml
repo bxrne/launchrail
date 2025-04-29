@@ -3,6 +3,8 @@ setup:
     name: "launchrail-dev"
     version: "0.0.1"
     base_dir: ".launchrail"
+    simulation_output_dir: "./testdata/results" 
+
   logging:
     level: "info"
   plugins:

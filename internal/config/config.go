@@ -12,24 +12,52 @@ var (
 	cfg *Config // Singleton instance of Config
 )
 
-// GetConfig returns the application configuration as a singleton
+// GetConfig reads configuration, validates it, resolves paths, and returns the singleton instance.
 func GetConfig() (*Config, error) {
-
 	v := viper.New()
+
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
-	v.AddConfigPath(".")
+	v.AddConfigPath(".") // Look for config in the current directory
 
+	// Attempt to find and read the config file
 	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("failed to read config file: %s", err)
+		// Config file MUST exist now if we rely on it solely for paths etc.
+		return nil, fmt.Errorf("failed to read mandatory config file: %w", err)
 	}
 
+	// Unmarshal the config read from the file into the cfg struct
 	if err := v.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %s", err)
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// --- Resolve Simulation Output Directory ---
+	// Precedence: Config File > Default (No flag consideration)
+	outputDir := ""
+	if cfg.Setup.App.SimulationOutputDir != "" {
+		// Use config file value
+		outputDir = cfg.Setup.App.SimulationOutputDir
+		fmt.Printf("Using simulation output directory from config file: %s\n", outputDir) // Debug/Info log
+	} else {
+		// Use default only if config file value wasn't set
+		outputDir = filepath.Join(cfg.Setup.App.BaseDir, "cli_run")
+		fmt.Printf("Simulation output directory not specified in config, using default: %s\n", outputDir) // Debug/Info log
+	}
+
+	// Ensure the path is absolute
+	absOutputDir, err := filepath.Abs(outputDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute path for output directory '%s': %w", outputDir, err)
+	}
+
+	// Store the resolved path
+	cfg.Setup.App.ResolvedSimulationOutputDir = absOutputDir
+	fmt.Printf("Resolved absolute output directory: %s\n", cfg.Setup.App.ResolvedSimulationOutputDir) // Debug/Info log
+    // --- End Resolve Simulation Output Directory ---
+
+	// Validate the configuration
 	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("failed to validate config: %s", err)
+		return nil, fmt.Errorf("failed to validate config: %w", err)
 	}
 
 	return cfg, nil
@@ -37,9 +65,11 @@ func GetConfig() (*Config, error) {
 
 // App represents the application configuration.
 type App struct {
-	Name    string `mapstructure:"name"`
-	Version string `mapstructure:"version"`
-	BaseDir string `mapstructure:"base_dir"`
+	Name                      string `mapstructure:"name"`
+	Version                   string `mapstructure:"version"`
+	BaseDir                   string `mapstructure:"base_dir"`
+	SimulationOutputDir       string `mapstructure:"simulation_output_dir,omitempty"` // Optional output dir from YAML
+	ResolvedSimulationOutputDir string `mapstructure:"-"`                         // Not from YAML, resolved absolute path
 }
 
 // Logging represents the logging configuration.

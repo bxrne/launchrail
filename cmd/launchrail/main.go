@@ -1,10 +1,8 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
@@ -13,37 +11,23 @@ import (
 )
 
 func main() {
-	// --- Command Line Flags ---
-	outputDirFlag := flag.String("output-dir", "", "Directory to save simulation output files (MOTION.csv, EVENTS.csv, etc.). Optional, defaults relative to config base_dir.")
-	flag.Parse()
-
-	// Load config
+	// Load config (which now handles flags and resolves output dir)
 	cfg, err := config.GetConfig()
 	if err != nil {
-		fmt.Printf("Failed to load config: %v\n", err)
-		os.Exit(1) // Exit if config fails
+		// Use a basic logger or fmt.Println if logger init depends on config
+		fmt.Printf("Critical error: Failed to load configuration: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Initialize logger
 	log := logger.GetLogger(cfg.Setup.Logging.Level)
 	log.Info("Logger initialized", "level", cfg.Setup.Logging.Level)
 
-	// Determine output directory
-	var outputDir string
-	if *outputDirFlag != "" {
-		// Use flag if provided
-		outputDir, err = filepath.Abs(*outputDirFlag)
-		if err != nil {
-			log.Fatal("Failed to get absolute path for --output-dir", "path", *outputDirFlag, "error", err)
-		}
-		log.Info("Using specified output directory", "path", outputDir)
-	} else {
-		// Default behavior: relative to config base dir
-		outputDir = filepath.Join(cfg.Setup.App.BaseDir, "cli_run")
-		log.Info("Using default output directory relative to config base_dir", "path", outputDir)
-	}
+	// Use the resolved path directly from config
+	outputDir := cfg.Setup.App.ResolvedSimulationOutputDir
+	log.Info("Using resolved simulation output directory", "path", outputDir)
 
-	// Ensure output directory exists
+	// Ensure output directory exists (Keep this here - app's responsibility)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		log.Fatal("Failed to create output directory", "path", outputDir, "error", err)
 	}
@@ -87,5 +71,5 @@ func main() {
 		log.Error("Failed to close simulation manager", "Error", err)
 	}
 
-	log.Info("Simulation completed successfully.", "output_dir", outputDir) // Log the actual output dir used
+	log.Info("Simulation completed successfully.", "output_dir", outputDir)
 }

@@ -24,15 +24,18 @@ jobs:
       - name: Run Simulation to Generate Results
         run: |
           echo "Running simulation to generate benchmark input data..."
-          go run ./cmd/launchrail --output-dir ./testdata/results
-          echo "Simulation finished. Results should be in ./testdata/results"
-          ls -l ./testdata/results # Verify files were created
+          # Removed --output-dir flag, relies on config.yaml's setup.app.simulation_output_dir
+          go run ./cmd/launchrail
+          echo "Simulation finished. Results should be in the directory specified in config.yaml (expecting ./testdata/results for CI)"
+          # Verify the expected dir exists and has content (adjust path if needed based on config)
+          ls -l ./testdata/results
 
       - name: Run Benchmarks and Capture Output
         id: run_bench
         run: |
           # Run from project root to find config.yaml, ignore exit code
           # The --benchdata flag was removed as the path comes from config.yaml
+          # Results dir must match where the simulation actually outputted based on config.yaml
           output=$(go run ./cmd/bench --resultsdir ./testdata/results || true)
           echo "Captured output:" # Debugging line
           echo "$output" # Debugging line
