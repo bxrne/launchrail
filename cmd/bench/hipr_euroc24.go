@@ -164,57 +164,6 @@ func (b *HiprEuroc24Benchmark) Run() ([]BenchmarkResult, error) {
 	return results, nil
 }
 
-// --- Helper methods for GROUND TRUTH data (from Benchmark struct fields) ---
-// findGroundTruthApogee finds max height from loaded ground truth flight info.
-func (b *HiprEuroc24Benchmark) findGroundTruthApogee() (maxHeight float64, timestamp float64) {
-	if len(b.flightInfoGroundTruth) == 0 {
-		return 0, 0
-	}
-	maxHeight = b.flightInfoGroundTruth[0].Height
-	timestamp = b.flightInfoGroundTruth[0].Timestamp
-	for _, p := range b.flightInfoGroundTruth {
-		if p.Height > maxHeight {
-			maxHeight = p.Height
-			timestamp = p.Timestamp
-		}
-	}
-	return maxHeight, timestamp
-}
-
-// findGroundTruthMaxVelocity finds max velocity from loaded ground truth flight info.
-func (b *HiprEuroc24Benchmark) findGroundTruthMaxVelocity() (maxVelocity float64, timestamp float64) {
-	if len(b.flightInfoGroundTruth) == 0 {
-		return 0, 0
-	}
-	maxVelocity = b.flightInfoGroundTruth[0].Velocity
-	timestamp = b.flightInfoGroundTruth[0].Timestamp
-	for _, p := range b.flightInfoGroundTruth {
-		if p.Velocity > maxVelocity {
-			maxVelocity = p.Velocity
-			timestamp = p.Timestamp
-		}
-	}
-	return maxVelocity, timestamp
-}
-
-func (b *HiprEuroc24Benchmark) findGroundTruthEventTime(eventName string) float64 {
-	for _, e := range b.eventInfoGroundTruth {
-		if e.Event == eventName {
-			return e.Timestamp // Return first occurrence
-		}
-	}
-	return -1 // Indicate not found
-}
-
-func (b *HiprEuroc24Benchmark) findGroundTruthStateTime(stateName string) float64 {
-	for _, s := range b.flightStateGroundTruth {
-		if s.State == stateName {
-			return s.Timestamp // Return first occurrence
-		}
-	}
-	return -1 // Indicate not found
-}
-
 // --- Helper methods for SIMULATION data (from loaded CSV structs) --- // NEW
 
 // findSimApogee finds the maximum altitude from simulation flight info.
