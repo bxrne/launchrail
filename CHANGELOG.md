@@ -1,3 +1,9 @@
+## v0.3.8 (2025-04-29)
+
+### Refactor
+
+- move simulation output path from CLI flag to config.yaml
+
 ## v0.3.7 (2025-04-29)
 
 ### Fix
