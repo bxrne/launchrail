@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/bxrne/launchrail/internal/logger"
 )
@@ -13,9 +11,9 @@ import (
 type HiprEuroc24Benchmark struct {
 	name string
 	// Ground truth data loaded from CSVs
-	flightInfoGroundTruth []FlightInfo // Renamed for clarity
-	// eventInfoGroundTruth  []EventInfo   // Renamed for clarity
-	// flightStateGroundTruth []FlightState // Renamed for clarity
+	flightInfoGroundTruth  []FlightInfo  // Renamed for clarity
+	eventInfoGroundTruth   []EventInfo   // Renamed for clarity
+	flightStateGroundTruth []FlightState // Renamed for clarity
 
 	config BenchmarkConfig // Added configuration
 }
@@ -46,7 +44,9 @@ func (b *HiprEuroc24Benchmark) LoadData(benchDataDir string) error {
 
 	benchLogger.Info("Loading GROUND TRUTH data for benchmark", "name", b.Name(), "sourceDir", benchDataDir)
 
-	basePath := filepath.Join(benchDataDir, b.Name()) // Use benchmark name to find subdir
+	// The benchDataDir argument already points to the specific benchmark's data directory.
+	// No need to join with b.Name() again.
+	basePath := benchDataDir // Use benchDataDir directly
 
 	flightInfoPath := filepath.Join(basePath, "fl001 - flight_info_processed.csv")
 	b.flightInfoGroundTruth, err = LoadFlightInfo(flightInfoPath) // Load into renamed field
@@ -55,95 +55,107 @@ func (b *HiprEuroc24Benchmark) LoadData(benchDataDir string) error {
 	}
 	benchLogger.Info("Loaded ground truth flight info", "count", len(b.flightInfoGroundTruth), "file", flightInfoPath)
 
-	// eventInfoPath := filepath.Join(basePath, "fl001 - event_info_processed.csv")
-	// b.eventInfoGroundTruth, err = LoadEventInfo(eventInfoPath)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to load ground truth event info: %w", err)
-	// }
-	// benchLogger.Info("Loaded ground truth event info", "count", len(b.eventInfoGroundTruth), "file", eventInfoPath)
+	eventInfoPath := filepath.Join(basePath, "fl001 - event_info_processed.csv")
+	b.eventInfoGroundTruth, err = LoadEventInfo(eventInfoPath)
+	if err != nil {
+		return fmt.Errorf("failed to load ground truth event info: %w", err)
+	}
+	benchLogger.Info("Loaded ground truth event info", "count", len(b.eventInfoGroundTruth), "file", eventInfoPath)
 
-	// flightStatePath := filepath.Join(basePath, "fl001 - flight_states_processed.csv")
-	// b.flightStateGroundTruth, err = LoadFlightStates(flightStatePath)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to load ground truth flight states: %w", err)
-	// }
-	// benchLogger.Info("Loaded ground truth flight states", "count", len(b.flightStateGroundTruth), "file", flightStatePath)
+	flightStatePath := filepath.Join(basePath, "fl001 - flight_states_processed.csv")
+	b.flightStateGroundTruth, err = LoadFlightStates(flightStatePath)
+	if err != nil {
+		return fmt.Errorf("failed to load ground truth flight states: %w", err)
+	}
+	benchLogger.Info("Loaded ground truth flight states", "count", len(b.flightStateGroundTruth), "file", flightStatePath)
 
 	return nil
 }
 
 // Run performs the comparison between simulation results and ground truth data.
 func (b *HiprEuroc24Benchmark) Run() ([]BenchmarkResult, error) {
-	results := []BenchmarkResult{}
 	benchLogger := logger.GetLogger("info") // Get logger instance
+	results := []BenchmarkResult{}
 
-	benchLogger.Info("Running benchmark comparison", "name", b.name, "simulationRecord", b.config.SimRecordHash)
+	benchLogger.Info("Running benchmark comparison", "name", b.Name(), "simRecordHash", b.config.SimRecordHash)
 
-	// --- Load Simulation Record Data --- // NEW
-	if b.config.RecordManager == nil {
-		return nil, fmt.Errorf("RecordManager is nil in benchmark config for '%s'", b.name)
-	}
-	if b.config.SimRecordHash == "" {
-		return nil, fmt.Errorf("SimRecordHash is empty in benchmark config for '%s'", b.name)
-	}
-
+	// --- Load SIMULATION Data from Record --- // NEW LOGIC
 	simRecord, err := b.config.RecordManager.GetRecord(b.config.SimRecordHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get simulation record '%s': %w", b.config.SimRecordHash, err)
 	}
-	defer simRecord.Close()
+	benchLogger.Info("Loaded simulation record", "hash", simRecord.Hash, "path", simRecord.Path)
 
-	// Load and parse motion data from the simulation record storage
-	headers, rawMotionData, err := simRecord.Motion.ReadHeadersAndData()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read simulation motion data: %w", err)
-	}
+	// Construct paths to simulation CSVs within the record's directory
+	simFlightInfoPath := filepath.Join(simRecord.Path, "flight_info.csv")
+	simEventInfoPath := filepath.Join(simRecord.Path, "events.csv")           // Assuming standard name
+	simFlightStatesPath := filepath.Join(simRecord.Path, "flight_states.csv") // Assuming standard name
 
-	simMotionData, err := parseMotionData(headers, rawMotionData)
+	// Load simulation data using existing loaders
+	simFlightInfo, err := LoadFlightInfo(simFlightInfoPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse simulation motion data: %w", err)
+		return nil, fmt.Errorf("failed to load simulation flight info from %s: %w", simFlightInfoPath, err)
 	}
+	benchLogger.Info("Loaded simulation flight info", "count", len(simFlightInfo))
+
+	simEventInfo, err := LoadEventInfo(simEventInfoPath)
+	if err != nil {
+		// Note: Allow missing events file for now? Or return error?
+		benchLogger.Warn("Failed to load simulation event info, continuing without event comparison", "file", simEventInfoPath, "error", err)
+		// return nil, fmt.Errorf("failed to load simulation event info from %s: %w", simEventInfoPath, err)
+	}
+	benchLogger.Info("Loaded simulation event info", "count", len(simEventInfo))
+
+	simFlightStates, err := LoadFlightStates(simFlightStatesPath)
+	if err != nil {
+		// Note: Allow missing states file for now? Or return error?
+		benchLogger.Warn("Failed to load simulation flight states, continuing without state comparison", "file", simFlightStatesPath, "error", err)
+		// return nil, fmt.Errorf("failed to load simulation flight states from %s: %w", simFlightStatesPath, err)
+	}
+	benchLogger.Info("Loaded simulation flight states", "count", len(simFlightStates))
 
 	// --- Define Ground Truth Expected Values (from loaded CSVs) ---
 	expectedApogeeGroundTruth, _ := b.findGroundTruthApogee()
 	expectedMaxVGroundTruth, _ := b.findGroundTruthMaxVelocity()
-	// expectedLiftoffTimeGroundTruth := b.findGroundTruthEventTime("EV_LIFTOFF") // Example if event data were loaded
-	// expectedApogeeEventTimeGroundTruth := b.findGroundTruthEventTime("EV_APOGEE") // Example if event data were loaded
-	// expectedTouchdownTimeGroundTruth := b.findGroundTruthStateTime("TOUCHDOWN") // Example if state data were loaded
+	expectedLiftoffTimeGroundTruth := b.findGroundTruthEventTime("EV_LIFTOFF")
+	expectedApogeeEventTimeGroundTruth := b.findGroundTruthEventTime("EV_APOGEE")
+	expectedTouchdownTimeGroundTruth := b.findGroundTruthStateTime("TOUCHDOWN")
 
-	// --- Calculate Actual Values from SIMULATION Data --- // NEW
-	actualApogeeFromSim, _ := findSimApogee(simMotionData)
-	actualMaxVFromSim, _ := findSimMaxVelocity(simMotionData)
-	// actualLiftoffTimeFromSim := findSimulationEventTime(telemetry, model.EventLiftoff) // Placeholder
-	// actualApogeeEventTimeFromSim := findSimulationEventTime(telemetry, model.EventApogee) // Placeholder
-	// actualTouchdownTimeFromSim := findSimulationStateTime(telemetry, model.StateTouchdown) // Placeholder
+	// --- Calculate Actual Values from SIMULATION Data --- // UPDATED with sim data
+	actualApogeeFromSim, _ := findSimApogee(simFlightInfo)
+	actualMaxVFromSim, _ := findSimMaxVelocity(simFlightInfo)
+	actualLiftoffTimeFromSim := findSimEventTime(simEventInfo, "Liftoff")            // Use names from dummy data
+	actualApogeeEventTimeFromSim := findSimEventTime(simEventInfo, "ApogeeDetected") // Use names from dummy data
+	// actualTouchdownTimeFromSim := findSimStateTime(simFlightStates, "???") // Need the correct state name from sim output
+	actualTouchdownTimeFromSim := 0.0 // Placeholder until state name is known
+	benchLogger.Warn("Touchdown time comparison skipped: Unknown state name in simulation output CSV")
 
 	// --- Perform Comparisons --- // UPDATED: Compare sim actual vs ground truth expected
 
 	// 1. Apogee Comparison
 	apogeeTolerance := 0.05 // 5% tolerance
-	results = append(results, compareFloat("Apogee", "Compare simulation apogee height vs ground truth", expectedApogeeGroundTruth, actualApogeeFromSim, apogeeTolerance))
+	results = append(results, compareFloat("Apogee Altitude", "Compare simulation apogee vs ground truth", expectedApogeeGroundTruth, actualApogeeFromSim, apogeeTolerance))
 
 	// 2. Max Velocity Comparison
 	maxVTolerance := 0.05 // 5% tolerance
 	results = append(results, compareFloat("Max Velocity", "Compare simulation max velocity vs ground truth", expectedMaxVGroundTruth, actualMaxVFromSim, maxVTolerance))
 
-	// 3. Event Timing Comparisons (Example - if implemented)
-	// liftoffTolerance := 0.1 // 100ms tolerance
-	// results = append(results, compareFloat("Liftoff Time", "Compare sim liftoff event time vs ground truth", expectedLiftoffTimeGroundTruth, actualLiftoffTimeFromSim, liftoffTolerance))
+	// 3. Event Timing Comparisons
+	liftoffTolerance := 0.1 // 100ms tolerance
+	results = append(results, compareFloat("Liftoff Time", "Compare sim liftoff event time vs ground truth", expectedLiftoffTimeGroundTruth, actualLiftoffTimeFromSim, liftoffTolerance))
 
-	// apogeeTimeTolerance := 0.5 // 500ms tolerance
-	// results = append(results, compareFloat("Apogee Event Time", "Compare sim apogee event time vs ground truth", expectedApogeeEventTimeGroundTruth, actualApogeeEventTimeFromSim, apogeeTimeTolerance))
+	apogeeTimeTolerance := 0.5 // 500ms tolerance
+	results = append(results, compareFloat("Apogee Event Time", "Compare sim apogee event time vs ground truth", expectedApogeeEventTimeGroundTruth, actualApogeeEventTimeFromSim, apogeeTimeTolerance))
 
-	// touchdownTolerance := 1.0 // 1s tolerance
-	// results = append(results, compareFloat("Touchdown Time", "Compare sim touchdown state time vs ground truth", expectedTouchdownTimeGroundTruth, actualTouchdownTimeFromSim, touchdownTolerance))
+	// 4. State Timing Comparison (Placeholder)
+	touchdownTolerance := 1.0 // 1s tolerance
+	results = append(results, compareFloat("Touchdown Time", "Compare sim touchdown state time vs ground truth", expectedTouchdownTimeGroundTruth, actualTouchdownTimeFromSim, touchdownTolerance))
 
 	benchLogger.Info("Comparison complete.")
 	return results, nil
 }
 
-// --- Helper methods for GROUND TRUTH data (from CSV) ---
-
+// --- Helper methods for GROUND TRUTH data (from Benchmark struct fields) ---
 // findGroundTruthApogee finds max height from loaded ground truth flight info.
 func (b *HiprEuroc24Benchmark) findGroundTruthApogee() (maxHeight float64, timestamp float64) {
 	if len(b.flightInfoGroundTruth) == 0 {
@@ -176,7 +188,6 @@ func (b *HiprEuroc24Benchmark) findGroundTruthMaxVelocity() (maxVelocity float64
 	return maxVelocity, timestamp
 }
 
-/* // Example if event/state ground truth data loading were enabled
 func (b *HiprEuroc24Benchmark) findGroundTruthEventTime(eventName string) float64 {
 	for _, e := range b.eventInfoGroundTruth {
 		if e.Event == eventName {
@@ -194,99 +205,62 @@ func (b *HiprEuroc24Benchmark) findGroundTruthStateTime(stateName string) float6
 	}
 	return -1 // Indicate not found
 }
-*/
 
-// --- Helper methods for SIMULATION data (from storage.TelemetryData) --- // NEW
+// --- Helper methods for SIMULATION data (from loaded CSV structs) --- // NEW
 
-type parsedMotionData struct {
-	time         []float64
-	altitude     []float64
-	velocity     []float64
-	acceleration []float64
-	thrust       []float64
-}
-
-// findSimApogee finds the maximum altitude from simulation data.
-func findSimApogee(simData *parsedMotionData) (maxHeight float64, maxHeightTime float64) {
-	if len(simData.altitude) == 0 {
+// findSimApogee finds the maximum altitude from simulation flight info.
+func findSimApogee(simData []FlightInfo) (float64, float64) {
+	if len(simData) == 0 {
 		return 0, 0
 	}
-	maxHeight = simData.altitude[0]
-	maxHeightTime = simData.time[0]
-	for i := 1; i < len(simData.altitude); i++ {
-		if simData.altitude[i] > maxHeight {
-			maxHeight = simData.altitude[i]
-			maxHeightTime = simData.time[i]
+	maxAltitude := simData[0].Height
+	timestamp := simData[0].Timestamp
+	for _, p := range simData {
+		if p.Height > maxAltitude {
+			maxAltitude = p.Height
+			timestamp = p.Timestamp
 		}
 	}
-	return maxHeight, maxHeightTime
+	return maxAltitude, timestamp
 }
 
-// findSimMaxVelocity finds the maximum velocity from simulation data.
-func findSimMaxVelocity(simData *parsedMotionData) (maxVelocity float64, maxVelocityTime float64) {
-	if len(simData.velocity) == 0 {
+// findSimMaxVelocity finds the maximum velocity from simulation flight info.
+func findSimMaxVelocity(simData []FlightInfo) (float64, float64) {
+	if len(simData) == 0 {
 		return 0, 0
 	}
-	maxVelocity = simData.velocity[0]
-	maxVelocityTime = simData.time[0]
-	for i := 1; i < len(simData.velocity); i++ {
-		if simData.velocity[i] > maxVelocity {
-			maxVelocity = simData.velocity[i]
-			maxVelocityTime = simData.time[i]
+	maxVelocity := simData[0].Velocity
+	timestamp := simData[0].Timestamp
+	for _, p := range simData {
+		if p.Velocity > maxVelocity {
+			maxVelocity = p.Velocity
+			timestamp = p.Timestamp
 		}
 	}
-	return maxVelocity, maxVelocityTime
+	return maxVelocity, timestamp
 }
 
-// Helper function to parse motion data from CSV strings
-func parseMotionData(headers []string, data [][]string) (*parsedMotionData, error) {
-	colIndices := make(map[string]int)
-	for i, h := range headers {
-		colIndices[strings.ToLower(strings.TrimSpace(h))] = i
-	}
-
-	requiredCols := []string{"time", "altitude", "velocity", "acceleration", "thrust"}
-	for _, col := range requiredCols {
-		if _, ok := colIndices[col]; !ok {
-			return nil, fmt.Errorf("required motion column '%s' not found in headers", col)
+// findSimEventTime finds the timestamp for a specific event from simulation event info.
+// Note: Matches event name string exactly.
+func findSimEventTime(simEvents []EventInfo, eventName string) float64 {
+	for _, e := range simEvents {
+		if e.Event == eventName {
+			return e.Timestamp
 		}
 	}
-
-	parsed := &parsedMotionData{
-		time:         make([]float64, len(data)),
-		altitude:     make([]float64, len(data)),
-		velocity:     make([]float64, len(data)),
-		acceleration: make([]float64, len(data)),
-		thrust:       make([]float64, len(data)),
-	}
-
-	var err error
-	for i, row := range data {
-		parsed.time[i], err = strconv.ParseFloat(row[colIndices["time"]], 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse time at row %d: %v", i, err)
-		}
-
-		parsed.altitude[i], err = strconv.ParseFloat(row[colIndices["altitude"]], 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse altitude at row %d: %v", i, err)
-		}
-
-		parsed.velocity[i], err = strconv.ParseFloat(row[colIndices["velocity"]], 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse velocity at row %d: %v", i, err)
-		}
-
-		parsed.acceleration[i], err = strconv.ParseFloat(row[colIndices["acceleration"]], 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse acceleration at row %d: %v", i, err)
-		}
-
-		parsed.thrust[i], err = strconv.ParseFloat(row[colIndices["thrust"]], 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse thrust at row %d: %v", i, err)
-		}
-	}
-
-	return parsed, nil
+	return -1 // Indicate not found
 }
+
+// findSimStateTime finds the timestamp for a specific state from simulation state info.
+// Note: Matches state name string exactly.
+func findSimStateTime(simStates []FlightState, stateName string) float64 {
+	for _, s := range simStates {
+		if s.State == stateName {
+			return s.Timestamp
+		}
+	}
+	return -1 // Indicate not found
+}
+
+// compareFloat compares expected and actual float values within a tolerance.
+// Handles expected == 0 by using absolute difference.
