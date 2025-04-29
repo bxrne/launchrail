@@ -1,3 +1,9 @@
+## v0.3.7 (2025-04-29)
+
+### Fix
+
+- **config, benchmark.yaml**: Update paths to relative and bump Go version to 1.23 in CI workflow
+
 ## v0.3.6 (2025-04-29)
 
 ### Fix
