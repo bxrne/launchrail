@@ -77,48 +77,37 @@ func (b *HiprEuroc24Benchmark) Run() ([]BenchmarkResult, error) {
 	benchLogger := logger.GetLogger("info") // Get logger instance
 	var results []BenchmarkResult
 
-	benchLogger.Info("Loading expected data", "path", b.config.BenchdataPath)
-	expectedMotionPath := filepath.Join(b.config.BenchdataPath, "MOTION.csv")
-	expectedMotionData, err := LoadFlightInfo(expectedMotionPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load expected motion data '%s': %w", expectedMotionPath, err)
-	}
-	benchLogger.Debug("Loaded expected motion data", "count", len(expectedMotionData))
-
-	expectedEventsPath := filepath.Join(b.config.BenchdataPath, "EVENTS.csv")
-	expectedEventsData, err := LoadEventInfo(expectedEventsPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load expected event data '%s': %w", expectedEventsPath, err)
-	}
-	benchLogger.Debug("Loaded expected event data", "count", len(expectedEventsData))
-
-	expectedDynamicsPath := filepath.Join(b.config.BenchdataPath, "DYNAMICS.csv")
-	expectedDynamicsData, err := LoadFlightStates(expectedDynamicsPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load expected dynamics data '%s': %w", expectedDynamicsPath, err)
-	}
-	benchLogger.Debug("Loaded expected dynamics data", "count", len(expectedDynamicsData))
-
 	// --- Load Actual Simulation Data ---
-	benchLogger.Info("Loading actual simulation results", "path", b.config.ResultDirPath)
-	actualMotionPath := filepath.Join(b.config.ResultDirPath, "MOTION.csv")
-	actualEventsPath := filepath.Join(b.config.ResultDirPath, "EVENTS.csv")
-	actualDynamicsPath := filepath.Join(b.config.ResultDirPath, "DYNAMICS.csv")
+	// Construct paths based on the SimulationResultsDir from config
+	// Assuming a single record ID for now, needs generalization later.
+	// We need to determine the record ID to load. For now, hardcoding or simple logic.
+	// Let's assume the benchmark name maps to a record ID or pattern.
+	// This part needs refinement based on how record IDs are associated with benchmarks.
+	// For hipr-euroc24, let's assume the record ID is 'rec001' or similar. 
+	// TODO: Implement a robust way to find the relevant record ID.
+	// Use the benchmark name (tag) as the subdirectory name for results.
+	recordID := b.Name() 
+	actualDataPath := filepath.Join(b.config.ResultDirPath, recordID) // CORRECT FIELD NAME
+	benchLogger.Info("Loading actual simulation data", "recordPath", actualDataPath)
 
-	benchLogger.Info("Actual data paths", "motion", actualMotionPath, "events", actualEventsPath, "dynamics", actualDynamicsPath)
-
+	// Use specific filenames matching ground truth/expected simulation output format
+	actualMotionPath := filepath.Join(actualDataPath, "fl001 - flight_info_processed.csv") 
 	actualMotionData, err := LoadFlightInfo(actualMotionPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load actual motion data from record '%s': %w", actualMotionPath, err)
 	}
 	benchLogger.Debug("Loaded actual motion data", "count", len(actualMotionData))
 
+	// Use specific filenames matching ground truth/expected simulation output format
+	actualEventsPath := filepath.Join(actualDataPath, "fl001 - event_info_processed.csv") 
 	actualEventsData, err := LoadEventInfo(actualEventsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load actual event data from record '%s': %w", actualEventsPath, err)
 	}
 	benchLogger.Debug("Loaded actual event data", "count", len(actualEventsData))
 
+	// Use specific filenames matching ground truth/expected simulation output format
+	actualDynamicsPath := filepath.Join(actualDataPath, "fl001 - flight_states_processed.csv") 
 	actualDynamicsData, err := LoadFlightStates(actualDynamicsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load actual dynamics data from record '%s': %w", actualDynamicsPath, err)
@@ -129,11 +118,12 @@ func (b *HiprEuroc24Benchmark) Run() ([]BenchmarkResult, error) {
 	benchLogger.Info("Performing comparisons...")
 
 	// --- Define Ground Truth Expected Values (from loaded CSVs) --- 
-	expectedApogeeGroundTruth, _ := findSimApogee(expectedMotionData) 
-	expectedMaxVGroundTruth, _ := findSimMaxVelocity(expectedMotionData) 
-	expectedLiftoffTimeGroundTruth := findSimEventTime(expectedEventsData, "LIFTOFF") 
-	expectedApogeeEventTimeGroundTruth := findSimEventTime(expectedEventsData, "APOGEE") 
-	expectedTouchdownTimeGroundTruth := 0.0 
+	// Use the data loaded by LoadData method
+	expectedApogeeGroundTruth, _ := findSimApogee(b.flightInfoGroundTruth) 
+	expectedMaxVGroundTruth, _ := findSimMaxVelocity(b.flightInfoGroundTruth) 
+	expectedLiftoffTimeGroundTruth := findSimEventTime(b.eventInfoGroundTruth, "LIFTOFF") 
+	expectedApogeeEventTimeGroundTruth := findSimEventTime(b.eventInfoGroundTruth, "APOGEE") 
+	expectedTouchdownTimeGroundTruth := 0.0 // findSimStateTime(b.flightStateGroundTruth, "TOUCHDOWN")
 	benchLogger.Warn("Touchdown time ground truth determination skipped: findSimStateTime needs verification")
 
 	// --- Calculate Actual Values from SIMULATION Data --- 
