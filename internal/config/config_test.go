@@ -233,75 +233,6 @@ func createInvalidConfig(invalidField string) *config.Config {
 	return &cfg
 }
 
-// createConfigYaml creates a sample config.yaml file for testing GetConfig
-// Uses paths relative to the test's temp directory.
-func createConfigYaml(t *testing.T) string {
-	t.Helper()
-	tempDir := t.TempDir()
-
-	designFileName := "design_yaml.ork"
-	dataDirName := "bench_data_yaml"
-	designFilePath := filepath.Join(tempDir, designFileName)
-	dataDirPath := filepath.Join(tempDir, dataDirName)
-
-	// Create the dummy files/dirs needed by the YAML content
-	require.NoError(t, os.WriteFile(designFilePath, []byte("dummy ork"), 0644), "Failed to create dummy design file")
-	require.NoError(t, os.Mkdir(dataDirPath, 0755), "Failed to create dummy data dir")
-
-	configContent := fmt.Sprintf(`
-setup:
-  app:
-    name: TestAppFromYaml
-    version: 1.1.0
-    base_dir: %s
-  logging:
-    level: info
-  plugins:
-    paths:
-      - /opt/plugins_yaml
-server:
-  port: 9090
-engine:
-  external:
-    openrocket_version: "24.0"
-  options:
-    motor_designation: B6-4
-    openrocket_file: %s
-    launchrail:
-      length: 1.5
-      angle: 4.0
-      orientation: 80.0
-    launchsite:
-      latitude: 35.0
-      longitude: -119.0
-      altitude: 150.0
-      atmosphere:
-        isa_configuration:
-          specific_gas_constant: 287.0
-          gravitational_accel: 9.8
-          sea_level_density: 1.2
-          sea_level_temperature: 10.0
-          sea_level_pressure: 101000.0
-          ratio_specific_heats: 1.3
-          temperature_lapse_rate: 0.006
-  simulation:
-    step: 0.02
-    max_time: 15.0
-    ground_tolerance: 0.2
-# Add benchmarks section for the test
-benchmarks:
-  test-bench-yaml:
-    name: "Test Benchmark From YAML"
-    design_file: %s # Use path within t.TempDir()
-    data_dir: %s
-    enabled: true
-`, tempDir, designFilePath, designFilePath, dataDirPath)
-
-	configFile := filepath.Join(tempDir, "config.yaml")
-	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644), "Failed to write temp config yaml")
-	return configFile
-}
-
 // createInvalidConfigYaml creates an invalid YAML file for testing error paths
 func createInvalidConfigYaml() error {
 	configContent := `
@@ -538,9 +469,9 @@ func TestConfig_Validate_InvalidFields(t *testing.T) {
 		{"InvalidGroundTolerance", "simulation.ground_tolerance"},
 		{"EmptyPluginsPaths", "plugins.paths"},
 		{"InvalidServerPort", "server.port"},
-		{"MissingBenchmarkName", "benchmarks.test-bench.name"},         // Test missing required field in map
+		{"MissingBenchmarkName", "benchmarks.test-bench.name"},              // Test missing required field in map
 		{"MissingBenchmarkDesignFile", "benchmarks.test-bench.design_file"}, // Test missing required field in map
-		{"MissingBenchmarkDataDir", "benchmarks.test-bench.data_dir"},      // Test missing required field in map
+		{"MissingBenchmarkDataDir", "benchmarks.test-bench.data_dir"},       // Test missing required field in map
 	}
 
 	for _, tc := range testCases {
@@ -568,8 +499,8 @@ func TestConfig_Validate_ValidBenchmark(t *testing.T) {
 // TEST: GIVEN a config with an invalid benchmark WHEN Validate is called THEN returns an error
 func TestConfig_Validate_InvalidBenchmark(t *testing.T) {
 	tests := []struct {
-		name         string
-		content      string
+		name          string
+		content       string
 		expectedError string
 	}{
 		{
@@ -661,8 +592,8 @@ benchmarks:
 // TEST: GIVEN a config with a valid benchmark WHEN Validate is called THEN does not return an error
 func TestConfig_Validate_ValidBenchmarkNonExistentPaths(t *testing.T) {
 	tests := []struct {
-		name         string
-		content      string
+		name          string
+		content       string
 		expectedError string
 	}{
 		{
@@ -728,7 +659,7 @@ benchmarks:
 			_ = os.WriteFile(filepath.Join(tempDir, "existing_design.ork"), []byte("dummy"), 0644)
 			_ = os.Mkdir(filepath.Join(tempDir, "existing_data_dir"), 0755)
 			_ = os.WriteFile(filepath.Join(tempDir, "dummy.ork"), []byte("dummy"), 0644) // For base config
-			_ = os.Mkdir(filepath.Join(tempDir, "plugins"), 0755)                   // For base config plugins
+			_ = os.Mkdir(filepath.Join(tempDir, "plugins"), 0755)                        // For base config plugins
 
 			v := viper.New()
 			v.SetConfigFile(cfgFile.Name())
