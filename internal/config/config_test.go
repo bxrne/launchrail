@@ -88,12 +88,12 @@ func createValidConfig() config.Config {
 	tmpDir := os.TempDir()
 	designFilePath := filepath.Join(tmpDir, "design.ork")
 	dataDirPath := filepath.Join(tmpDir, "bench_data")
-	simResultsDirPath := filepath.Join(tmpDir, "sim_results") // Dummy results dir
+	benchmarkDataDirPath := filepath.Join(tmpDir, "benchdata") // Directory for benchmark data
 
 	// Ensure dummy files/dirs exist for validation within this helper
 	_ = os.WriteFile(designFilePath, []byte("dummy"), 0644)
 	_ = os.Mkdir(dataDirPath, 0755)
-	_ = os.Mkdir(simResultsDirPath, 0755) // Create dummy results dir
+	_ = os.Mkdir(benchmarkDataDirPath, 0755) // Create dummy benchmark data dir
 	// No need for explicit cleanup here if tests use t.TempDir() or handle it
 
 	return config.Config{
@@ -156,11 +156,7 @@ func createValidConfig() config.Config {
 				Enabled:    true,
 			},
 		},
-		Benchmark: config.BenchmarkConfig{
-			SimulationResultsDir: simResultsDirPath,
-			DefaultBenchmarkTag:  "test-tag", // Required non-empty string based on test errors
-			MarkdownOutputPath:   "BENCHMARK.md",
-		},
+		BenchmarkDataDir: benchmarkDataDirPath, // Use new field
 	}
 }
 
@@ -279,10 +275,10 @@ func TestConfig_Validate_Valid(t *testing.T) {
 	tempDir := t.TempDir()
 	designFilePath := filepath.Join(tempDir, "design.ork")
 	dataDirPath := filepath.Join(tempDir, "bench_data")
-	simResultsDirPath := filepath.Join(tempDir, "results") // Directory for simulation results
+	benchmarkDataDirPath := filepath.Join(tempDir, "benchdata") // Directory for benchmark data
 	require.NoError(t, os.WriteFile(designFilePath, []byte("dummy ork"), 0644), "Failed to create dummy design file")
 	require.NoError(t, os.Mkdir(dataDirPath, 0755), "Failed to create dummy data dir")
-	require.NoError(t, os.Mkdir(simResultsDirPath, 0755), "Failed to create dummy simulation results dir") // Create results dir
+	require.NoError(t, os.Mkdir(benchmarkDataDirPath, 0755), "Failed to create dummy benchmark data dir") // Create benchmark data dir
 
 	// Update the config to use these temporary paths
 	if bench, ok := cfg.Benchmarks["test-bench"]; ok {
@@ -290,12 +286,7 @@ func TestConfig_Validate_Valid(t *testing.T) {
 		bench.DataDir = dataDirPath
 		cfg.Benchmarks["test-bench"] = bench
 	}
-	// Add required BenchmarkConfig settings
-	cfg.Benchmark = config.BenchmarkConfig{
-		SimulationResultsDir: simResultsDirPath,
-		DefaultBenchmarkTag:  "test-tag", // Set required tag
-		MarkdownOutputPath:   filepath.Join(tempDir, "BENCHMARK.md"), // Optional, provide a temp path
-	}
+	cfg.BenchmarkDataDir = benchmarkDataDirPath // Set the new benchmark data dir path
 	cfg.Setup.App.BaseDir = tempDir // Set base dir for relative path resolution if needed
 
 	err := cfg.Validate()
@@ -330,12 +321,12 @@ func TestGetConfig_ValidConfig(t *testing.T) {
 	configFile := filepath.Join(tempDir, "config.yaml")
 	dummyORK := filepath.Join(tempDir, "dummy.ork")
 	dummyPluginDir := filepath.Join(tempDir, "plugins")
-	dummySimResultsDir := filepath.Join(tempDir, "results") // Directory for simulation results
+	dummyBenchmarkDataDir := filepath.Join(tempDir, "benchdata") // Directory for benchmark data
 
 	// Create dummy files/dirs needed by the valid base config
 	require.NoError(t, os.WriteFile(dummyORK, []byte("dummy"), 0644))
 	require.NoError(t, os.Mkdir(dummyPluginDir, 0755))
-	require.NoError(t, os.Mkdir(dummySimResultsDir, 0755)) // Create results dir
+	require.NoError(t, os.Mkdir(dummyBenchmarkDataDir, 0755)) // Create benchmark data dir
 
 	// Minimal valid content + base requirements + benchmark config
 	validContent := fmt.Sprintf(`
@@ -377,11 +368,8 @@ engine:
     step: 0.01
     max_time: 60
     ground_tolerance: 0.1
-benchmark:
-  simulation_results_dir: %q
-  default_benchmark_tag: "test-tag" # Set required tag
-  markdown_output_path: "BENCHMARK.md"
-`, tempDir, dummyPluginDir, dummyORK, dummySimResultsDir)
+benchmark_data_dir: %q
+`, tempDir, dummyPluginDir, dummyORK, dummyBenchmarkDataDir)
 
 	require.NoError(t, os.WriteFile(configFile, []byte(validContent), 0644))
 

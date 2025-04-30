@@ -3,7 +3,6 @@ setup:
     name: "launchrail-dev"
     version: "0.0.1"
     base_dir: ".launchrail"
-    simulation_output_dir: "./testdata/results" 
 
   logging:
     level: "info"
@@ -61,9 +60,6 @@ benchmarks:
   #   enabled: false
 
 #-------------------------------------------------------------------------------
-# Benchmark Tool Global Settings
+# Benchmark Data Directory
 #-------------------------------------------------------------------------------
-benchmark:
-  simulation_results_dir: "./testdata/results" # Directory containing ACTUAL simulation output (read by benchmark tool)
-  default_benchmark_tag: "all"             # Set non-empty tag (e.g., "all") to satisfy validation. Empty string caused issues.
-  markdown_output_path: "BENCHMARK.md"     # File path for markdown summary output
+benchmark_data_dir: "./benchdata" # Directory containing subfolders for each benchmark tag

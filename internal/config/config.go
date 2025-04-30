@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/viper"
 )
@@ -31,30 +30,6 @@ func GetConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	// --- Resolve Simulation Output Directory ---
-	// Precedence: Config File > Default (No flag consideration)
-	outputDir := ""
-	if cfg.Setup.App.SimulationOutputDir != "" {
-		// Use config file value
-		outputDir = cfg.Setup.App.SimulationOutputDir
-		fmt.Printf("Using simulation output directory from config file: %s\n", outputDir) // Debug/Info log
-	} else {
-		// Use default only if config file value wasn't set
-		outputDir = filepath.Join(cfg.Setup.App.BaseDir, "cli_run")
-		fmt.Printf("Simulation output directory not specified in config, using default: %s\n", outputDir) // Debug/Info log
-	}
-
-	// Ensure the path is absolute
-	absOutputDir, err := filepath.Abs(outputDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get absolute path for output directory '%s': %w", outputDir, err)
-	}
-
-	// Store the resolved path
-	cfg.Setup.App.ResolvedSimulationOutputDir = absOutputDir
-	fmt.Printf("Resolved absolute output directory: %s\n", cfg.Setup.App.ResolvedSimulationOutputDir) // Debug/Info log
-    // --- End Resolve Simulation Output Directory ---
-
 	// Validate the configuration
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate config: %w", err)
@@ -65,11 +40,9 @@ func GetConfig() (*Config, error) {
 
 // App represents the application configuration.
 type App struct {
-	Name                      string `mapstructure:"name"`
-	Version                   string `mapstructure:"version"`
-	BaseDir                   string `mapstructure:"base_dir"`
-	SimulationOutputDir       string `mapstructure:"simulation_output_dir,omitempty"` // Optional output dir from YAML
-	ResolvedSimulationOutputDir string `mapstructure:"-"`                         // Not from YAML, resolved absolute path
+	Name    string `mapstructure:"name"`
+	Version string `mapstructure:"version"`
+	BaseDir string `mapstructure:"base_dir"`
 }
 
 // Logging represents the logging configuration.
@@ -160,26 +133,13 @@ type BenchmarkEntry struct {
 	Enabled    bool   `mapstructure:"enabled" validate:"boolean"`
 }
 
-// BenchmarkConfig holds global settings for the benchmark tool.
-type BenchmarkConfig struct {
-	// SimulationResultsDir specifies the directory containing the actual simulation output files.
-	// This is the directory the benchmark tool reads from.
-	SimulationResultsDir string `mapstructure:"simulation_results_dir"`
-	// DefaultBenchmarkTag specifies a tag to run if none is provided externally (e.g., via env var in future).
-	// If empty, all enabled benchmarks are run.
-	DefaultBenchmarkTag string `mapstructure:"default_benchmark_tag"`
-	// MarkdownOutputPath specifies the file path to write the benchmark summary in Markdown format.
-	// If empty, no Markdown file is written.
-	MarkdownOutputPath string `mapstructure:"markdown_output_path"`
-}
-
 // Config represents the overall application configuration.
 type Config struct {
-	Setup     Setup     `mapstructure:"setup"`
-	Server    Server    `mapstructure:"server"`
-	Engine    Engine    `mapstructure:"engine"`
-	Benchmarks map[string]BenchmarkEntry `mapstructure:"benchmarks"`
-	Benchmark BenchmarkConfig `mapstructure:"benchmark"` // New benchmark settings
+	Setup           Setup                   `mapstructure:"setup"`
+	Server          Server                  `mapstructure:"server"`
+	Engine          Engine                  `mapstructure:"engine"`
+	Benchmarks      map[string]BenchmarkEntry `mapstructure:"benchmarks"`
+	BenchmarkDataDir string                  `mapstructure:"benchmark_data_dir"` // New directory for all benchmark data
 }
 
 // String returns the configuration as a map of strings, useful for testing.
@@ -235,9 +195,7 @@ func (c *Config) String() map[string]string {
 	marshalled["server.port"] = fmt.Sprintf("%d", c.Server.Port)
 
 	// Benchmark
-	marshalled["benchmark.simulation_results_dir"] = c.Benchmark.SimulationResultsDir
-	marshalled["benchmark.default_benchmark_tag"] = c.Benchmark.DefaultBenchmarkTag
-	marshalled["benchmark.markdown_output_path"] = c.Benchmark.MarkdownOutputPath
+	marshalled["benchmark_data_dir"] = c.BenchmarkDataDir
 
 	return marshalled
 }
@@ -381,14 +339,8 @@ func (cfg *Config) Validate() error {
 	}
 
 	// Benchmark
-	if cfg.Benchmark.SimulationResultsDir == "" {
-		return fmt.Errorf("benchmark.simulation_results_dir is required")
-	}
-	if cfg.Benchmark.DefaultBenchmarkTag == "" {
-		return fmt.Errorf("benchmark.default_benchmark_tag is required")
-	}
-	if cfg.Benchmark.MarkdownOutputPath == "" {
-		return fmt.Errorf("benchmark.markdown_output_path is required")
+	if cfg.BenchmarkDataDir == "" {
+		return fmt.Errorf("benchmark_data_dir is required")
 	}
 
 	return nil

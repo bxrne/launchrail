@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
@@ -23,9 +24,9 @@ func main() {
 	log := logger.GetLogger(cfg.Setup.Logging.Level)
 	log.Info("Logger initialized", "level", cfg.Setup.Logging.Level)
 
-	// Use the resolved path directly from config
-	outputDir := cfg.Setup.App.ResolvedSimulationOutputDir
-	log.Info("Using resolved simulation output directory", "path", outputDir)
+	// Construct simulation output directory path
+	outputDir := filepath.Join(cfg.Setup.App.BaseDir, "results")
+	log.Info("Using simulation output directory", "path", outputDir)
 
 	// Ensure output directory exists (Keep this here - app's responsibility)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
