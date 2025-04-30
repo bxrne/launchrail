@@ -12,7 +12,11 @@ import (
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/stretchr/testify/assert"
 	"github.com/zerodha/logf"
+	"io"
 )
+
+// Create a logger that discards output for tests
+var testLogger = logf.New(logf.Opts{Writer: io.Discard})
 
 // TEST: GIVEN a new physics system WHEN initialized THEN has correct default values
 func TestNewPhysicsSystem(t *testing.T) {
@@ -31,7 +35,7 @@ func TestNewPhysicsSystem(t *testing.T) {
 		},
 	}
 
-	system := systems.NewPhysicsSystem(&ecs.World{}, cfg)
+	system := systems.NewPhysicsSystem(&ecs.World{}, cfg, testLogger)
 	assert.NotNil(t, system)
 	assert.Equal(t, "PhysicsSystem", system.String())
 }
@@ -50,7 +54,7 @@ func TestCalculateNetForce_InvalidMass(t *testing.T) {
 		},
 	}
 
-	system := systems.NewPhysicsSystem(&ecs.World{}, cfg)
+	system := systems.NewPhysicsSystem(&ecs.World{}, cfg, testLogger)
 	entity := &states.PhysicsState{
 		Mass:         &types.Mass{Value: 0},
 		Position:     &types.Position{},
@@ -66,7 +70,7 @@ func TestCalculateNetForce_InvalidMass(t *testing.T) {
 
 // TEST: GIVEN an entity with rotation WHEN updating THEN updates angular state
 func TestUpdate_AngularMotion(t *testing.T) {
-	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Engine{})
+	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Engine{}, testLogger)
 
 	// Create minimal valid motor data
 	logger := logf.New(logf.Opts{})
@@ -99,14 +103,14 @@ func TestUpdate_AngularMotion(t *testing.T) {
 
 // TEST: GIVEN an entity with invalid timestep WHEN updating THEN returns error
 func TestUpdate_InvalidTimestep(t *testing.T) {
-	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Engine{})
+	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Engine{}, testLogger)
 	err := system.Update(0)
 	assert.Error(t, err)
 }
 
 // TEST: GIVEN a system with invalid entity WHEN updating THEN returns error
 func TestUpdate_InvalidEntity(t *testing.T) {
-	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Engine{})
+	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Engine{}, testLogger)
 	entity := &states.PhysicsState{
 		// Missing required fields
 	}
@@ -119,7 +123,7 @@ func TestUpdate_InvalidEntity(t *testing.T) {
 
 // TEST: GIVEN a system with entity WHEN removing entity THEN entity is removed
 func TestRemoveEntity(t *testing.T) {
-	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Engine{})
+	system := systems.NewPhysicsSystem(&ecs.World{}, &config.Engine{}, testLogger)
 	entity := &states.PhysicsState{
 		Entity: &ecs.BasicEntity{},
 		Mass:   &types.Mass{Value: 1.0},

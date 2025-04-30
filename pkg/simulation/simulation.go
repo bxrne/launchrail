@@ -62,7 +62,7 @@ func NewSimulation(cfg *config.Config, log logf.Logger, stores *storage.Stores) 
 	}
 
 	// Initialize systems with optimized worker counts
-	sim.physicsSystem = systems.NewPhysicsSystem(world, &cfg.Engine)
+	sim.physicsSystem = systems.NewPhysicsSystem(world, &cfg.Engine, sim.logger)
 	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, 4, &cfg.Engine)
 	rules := systems.NewRulesSystem(world, &cfg.Engine)
 

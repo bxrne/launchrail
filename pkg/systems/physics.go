@@ -10,6 +10,7 @@ import (
 	"github.com/bxrne/launchrail/pkg/barrowman"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
+	"github.com/zerodha/logf"
 )
 
 // Use object pools for vectors and matrices
@@ -31,6 +32,7 @@ type PhysicsSystem struct {
 	resultChan      chan types.Vector3
 	gravity         float64
 	groundTolerance float64
+	logger          logf.Logger // Use non-pointer interface type
 }
 
 // Remove removes an entity from the system
@@ -46,17 +48,14 @@ func (s *PhysicsSystem) Remove(basic ecs.BasicEntity) {
 }
 
 // NewPhysicsSystem creates a new PhysicsSystem
-func NewPhysicsSystem(world *ecs.World, cfg *config.Engine) *PhysicsSystem {
-	workers := 4
+func NewPhysicsSystem(world *ecs.World, cfg *config.Engine, logger logf.Logger) *PhysicsSystem {
 	return &PhysicsSystem{
 		world:           world,
 		entities:        make([]*states.PhysicsState, 0),
-		workers:         workers,
-		workChan:        make(chan states.PhysicsState, workers),
-		resultChan:      make(chan types.Vector3, workers),
 		cpCalculator:    barrowman.NewCPCalculator(), // Initialize calculator
 		gravity:         cfg.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel,
 		groundTolerance: cfg.Simulation.GroundTolerance,
+		logger:          logger, // Use logger directly
 	}
 }
 
@@ -172,11 +171,28 @@ func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce 
 
 	// Calculate acceleration
 	if entity.Mass == nil || entity.Mass.Value <= 0 {
+		s.logger.Error("Invalid mass, skipping update", "entity_id", entity.Entity.ID(), "mass", entity.Mass)
 		entity.Acceleration.Vec.Y = 0
 		return
 	}
+
+	s.logger.Debug("Pre-acceleration calculation",
+		"entity_id", entity.Entity.ID(),
+		"net_force", netForce,
+		"mass", entity.Mass.Value)
+
 	newAcceleration := netForce / entity.Mass.Value
+
+	s.logger.Debug("Post-acceleration calculation",
+		"entity_id", entity.Entity.ID(),
+		"new_acceleration", newAcceleration)
+
 	if math.IsNaN(newAcceleration) || math.IsInf(newAcceleration, 0) {
+		s.logger.Error("Calculated invalid acceleration (NaN/Inf), skipping update",
+			"entity_id", entity.Entity.ID(),
+			"net_force", netForce,
+			"mass", entity.Mass.Value,
+			"calculated_accel", newAcceleration)
 		entity.Acceleration.Vec.Y = 0
 		return
 	}
