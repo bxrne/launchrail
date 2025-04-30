@@ -50,16 +50,31 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to create motion storage", "error", err)
 	}
+	if err := motionStore.Init(); err != nil {
+		motionStore.Close()
+		log.Fatal("Failed to initialize motion storage headers", "error", err)
+	}
 	eventsStore, err := storage.NewStorage(outputDir, storage.EVENTS)
 	if err != nil {
 		motionStore.Close() // Clean up previously opened store
 		log.Fatal("Failed to create events storage", "error", err)
+	}
+	if err := eventsStore.Init(); err != nil {
+		motionStore.Close()
+		eventsStore.Close()
+		log.Fatal("Failed to initialize events storage headers", "error", err)
 	}
 	dynamicsStore, err := storage.NewStorage(outputDir, storage.DYNAMICS)
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close()
 		log.Fatal("Failed to create dynamics storage", "error", err)
+	}
+	if err := dynamicsStore.Init(); err != nil {
+		motionStore.Close()
+		eventsStore.Close()
+		dynamicsStore.Close()
+		log.Fatal("Failed to initialize dynamics storage headers", "error", err)
 	}
 	stores := &storage.Stores{
 		Motion:   motionStore,

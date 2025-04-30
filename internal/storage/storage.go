@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/csv"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -98,6 +99,7 @@ func (s *Storage) Init() error {
 
 	// Write headers
 	headers := StorageHeaders[s.store]
+	log.Printf("[DEBUG] Initializing storage headers for %s: headers=%v", s.filePath, headers)
 	if err := s.writer.Write(headers); err != nil {
 		return fmt.Errorf("failed to write headers: %v", err)
 	}
@@ -114,8 +116,10 @@ func (s *Storage) Write(data []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if len(data) != len(StorageHeaders[s.store]) {
-		return fmt.Errorf("data length (%d) does not match headers length (%d)", len(data), len(StorageHeaders[s.store]))
+	headers := StorageHeaders[s.store]
+	log.Printf("[DEBUG] Writing to %s: headers=%v, data=%v", s.filePath, headers, data)
+	if len(data) != len(headers) {
+		return fmt.Errorf("data length (%d) does not match headers length (%d)", len(data), len(headers))
 	}
 
 	if err := s.writer.Write(data); err != nil {
