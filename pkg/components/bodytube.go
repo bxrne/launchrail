@@ -2,7 +2,6 @@ package components
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -59,19 +58,15 @@ func NewBodytubeFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument) 
 		trimmed := strings.TrimSpace(strings.TrimPrefix(radiusStr, "auto"))
 		parsed, err := strconv.ParseFloat(trimmed, 64)
 		if err != nil {
-			log.Printf("Warning: Could not parse BodyTube radius from '%s': %v", radiusStr, err)
-			radius = 0
-		} else {
-			radius = parsed
+			return nil, fmt.Errorf("invalid BodyTube radius '%s': %v", radiusStr, err)
 		}
+		radius = parsed
 	} else {
 		parsed, err := strconv.ParseFloat(radiusStr, 64)
 		if err != nil {
-			log.Printf("Warning: Could not parse BodyTube radius from '%s': %v", radiusStr, err)
-			radius = 0
-		} else {
-			radius = parsed
+			return nil, fmt.Errorf("invalid BodyTube radius '%s': %v", radiusStr, err)
 		}
+		radius = parsed
 	}
 
 	// Calculate areas and volume
