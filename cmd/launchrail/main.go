@@ -34,13 +34,13 @@ func main() {
 	baseDir := filepath.Join(usr.HomeDir, ".launchrail") // Use ~/.launchrail
 
 	// Construct simulation output directory path using the new baseDir
-	outputDir := filepath.Join(baseDir, "results")
+	outputDir := baseDir
 	log.Info("Using simulation output directory", "path", outputDir)
 
 	// Ensure output directory exists (Keep this here - app's responsibility)
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		log.Fatal("Failed to create output directory", "path", outputDir, "error", err)
-	}
+	//if err := os.MkdirAll(outputDir, 0755); err != nil {
+	//	log.Fatal("Failed to create output directory", "path", outputDir, "error", err)
+	//}
 
 	// Create and initialize simulation manager
 	simManager := simulation.NewManager(cfg, *log) // Dereference pointer to pass interface value

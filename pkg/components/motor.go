@@ -139,13 +139,17 @@ func (m *Motor) interpolateThrust(totalDt float64) float64 {
 		if totalDt >= t1 && totalDt <= t2 {
 			// Linear interpolation
 			ratio := (totalDt - t1) / (t2 - t1)
-			return thrust1 + (ratio * (thrust2 - thrust1))
+			thrust := thrust1 + (ratio * (thrust2 - thrust1))
+			m.logger.Debug("interpolateThrust", "totalDt", totalDt, "t1", t1, "t2", t2, "thrust1", thrust1, "thrust2", thrust2, "thrust", thrust)
+			return thrust
 		}
 	}
 
 	// If we're between last data point and burn time
 	// Use the last thrust value
-	return m.Thrustcurve[len(m.Thrustcurve)-1][1]
+	thrust := m.Thrustcurve[len(m.Thrustcurve)-1][1]
+	m.logger.Debug("interpolateThrust (last value)", "totalDt", totalDt, "thrust", thrust)
+	return thrust
 }
 
 func (m *Motor) GetThrust() float64 {
