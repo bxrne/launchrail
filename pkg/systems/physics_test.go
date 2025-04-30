@@ -66,8 +66,8 @@ func TestCalculateNetForce_InvalidMass(t *testing.T) {
 
 	system.Add(entity)
 	err := system.Update(0.01)
-	assert.NoError(t, err)
-	assert.Equal(t, 0.0, entity.Acceleration.Vec.Y)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid entity or mass")
 }
 
 // TEST: GIVEN an entity with rotation WHEN updating THEN updates angular state
@@ -170,6 +170,10 @@ func TestUpdate_MissingComponents(t *testing.T) {
 	}
 	system.Remove(e) // Remove the previous invalid entity before adding a new one
 	system.Add(entityWithMass)
+	// Set nonzero velocity to trigger drag/geometry checks
+	if entityWithMass.Velocity != nil {
+		entityWithMass.Velocity.Vec.Y = 1
+	}
 	// NOTE: calculateReferenceArea inside physics.go *will* panic if Nosecone or Bodytube are nil.
 	// This test case reveals that calculateNetForce/calculateReferenceArea needs nil checks.
 	// For now, we expect a panic. We should fix this in physics.go later.

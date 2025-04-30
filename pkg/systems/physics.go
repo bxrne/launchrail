@@ -28,8 +28,6 @@ type PhysicsSystem struct {
 	entities        []*states.PhysicsState // Changed to store pointers
 	cpCalculator    *barrowman.CPCalculator
 	workers         int
-	workChan        chan states.PhysicsState
-	resultChan      chan types.Vector3
 	gravity         float64
 	groundTolerance float64
 	logger          logf.Logger // Use non-pointer interface type
@@ -57,8 +55,6 @@ func NewPhysicsSystem(world *ecs.World, cfg *config.Engine, logger logf.Logger, 
 		entities:        make([]*states.PhysicsState, 0),
 		cpCalculator:    barrowman.NewCPCalculator(), // Initialize calculator
 		workers:         workers,
-		workChan:        make(chan states.PhysicsState, workers*2),
-		resultChan:      make(chan types.Vector3, workers*2),
 		gravity:         cfg.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel,
 		groundTolerance: cfg.Simulation.GroundTolerance,
 		logger:          logger, // Use logger directly
@@ -75,6 +71,7 @@ func (s *PhysicsSystem) Update(dt float64) error {
 		err error
 	}
 
+	workChan := make(chan *states.PhysicsState)
 	results := make(chan result, len(s.entities))
 	var wg sync.WaitGroup
 
@@ -83,8 +80,8 @@ func (s *PhysicsSystem) Update(dt float64) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for entity := range s.workChan {
-				if err := s.validateEntity(&entity); err != nil {
+			for entity := range workChan {
+				if err := s.validateEntity(entity); err != nil {
 					results <- result{err: err}
 					continue
 				}
@@ -94,12 +91,12 @@ func (s *PhysicsSystem) Update(dt float64) error {
 						continue
 					}
 				}
-				netForce, err := s.calculateNetForce(&entity, types.Vector3{})
+				netForce, err := s.calculateNetForce(entity, types.Vector3{})
 				if err != nil {
 					results <- result{err: err}
 					continue
 				}
-				s.updateEntityState(&entity, netForce, dt)
+				s.updateEntityState(entity, netForce, dt)
 				results <- result{err: nil}
 			}
 		}()
@@ -107,9 +104,9 @@ func (s *PhysicsSystem) Update(dt float64) error {
 
 	// Send all entities to workChan
 	for _, entity := range s.entities {
-		s.workChan <- *entity
+		workChan <- entity
 	}
-	close(s.workChan)
+	close(workChan)
 
 	// Wait for all workers to finish in a separate goroutine
 	go func() {
