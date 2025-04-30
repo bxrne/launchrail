@@ -41,8 +41,6 @@ func TestMain(m *testing.M) {
 }
 
 func TestManager_Initialize(t *testing.T) {
-	tempDir := t.TempDir()
-
 	tests := []struct {
 		name           string
 		setupConfig    func() *config.Config
@@ -55,7 +53,8 @@ func TestManager_Initialize(t *testing.T) {
 				return &config.Config{
 					Setup: config.Setup{
 						App: config.App{
-							BaseDir: tempDir,
+							Name:    "TestApp",
+							Version: "0.0.1",
 						},
 					},
 					Engine: config.Engine{
@@ -82,7 +81,8 @@ func TestManager_Initialize(t *testing.T) {
 				return &config.Config{
 					Setup: config.Setup{
 						App: config.App{
-							BaseDir: tempDir,
+							Name:    "TestApp",
+							Version: "0.0.1",
 						},
 					},
 					Engine: config.Engine{
@@ -102,7 +102,8 @@ func TestManager_Initialize(t *testing.T) {
 				return &config.Config{
 					Setup: config.Setup{
 						App: config.App{
-							BaseDir: tempDir,
+							Name:    "TestApp",
+							Version: "0.0.1",
 						},
 					},
 					Engine: config.Engine{
@@ -120,9 +121,17 @@ func TestManager_Initialize(t *testing.T) {
 			name: "invalid simulation step (too low)",
 			setupConfig: func() *config.Config {
 				return &config.Config{
-					Setup: config.Setup{App: config.App{BaseDir: tempDir}},
+					Setup: config.Setup{
+						App: config.App{
+							Name:    "TestApp",
+							Version: "0.0.1",
+						},
+					},
 					Engine: config.Engine{
-						Options: config.Options{MotorDesignation: "269H110-14A", OpenRocketFile: "../../testdata/openrocket/l1.ork"},
+						Options: config.Options{
+							MotorDesignation: "269H110-14A",
+							OpenRocketFile:   "../../testdata/openrocket/l1.ork",
+						},
 						Simulation: config.Simulation{
 							Step:    0,
 							MaxTime: 10,
@@ -137,9 +146,17 @@ func TestManager_Initialize(t *testing.T) {
 			name: "invalid simulation step (too high)",
 			setupConfig: func() *config.Config {
 				return &config.Config{
-					Setup: config.Setup{App: config.App{BaseDir: tempDir}},
+					Setup: config.Setup{
+						App: config.App{
+							Name:    "TestApp",
+							Version: "0.0.1",
+						},
+					},
 					Engine: config.Engine{
-						Options: config.Options{MotorDesignation: "269H110-14A", OpenRocketFile: "../../testdata/openrocket/l1.ork"},
+						Options: config.Options{
+							MotorDesignation: "269H110-14A",
+							OpenRocketFile:   "../../testdata/openrocket/l1.ork",
+						},
 						Simulation: config.Simulation{
 							Step:    0.2,
 							MaxTime: 10,
@@ -154,9 +171,17 @@ func TestManager_Initialize(t *testing.T) {
 			name: "invalid simulation max time",
 			setupConfig: func() *config.Config {
 				return &config.Config{
-					Setup: config.Setup{App: config.App{BaseDir: tempDir}},
+					Setup: config.Setup{
+						App: config.App{
+							Name:    "TestApp",
+							Version: "0.0.1",
+						},
+					},
 					Engine: config.Engine{
-						Options: config.Options{MotorDesignation: "269H110-14A", OpenRocketFile: "../../testdata/openrocket/l1.ork"},
+						Options: config.Options{
+							MotorDesignation: "269H110-14A",
+							OpenRocketFile:   "../../testdata/openrocket/l1.ork",
+						},
 						Simulation: config.Simulation{
 							Step:    0.01,
 							MaxTime: -5,
@@ -174,8 +199,7 @@ func TestManager_Initialize(t *testing.T) {
 			cfg := tt.setupConfig()
 			log := logf.New(logf.Opts{})
 
-			tempDir := t.TempDir()
-			recordDir := filepath.Join(tempDir, "init_test_record")
+			recordDir := t.TempDir()
 			motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
 			require.NoError(t, err)
 			// defer motionStore.Close() // Manager is responsible for closing
@@ -209,7 +233,6 @@ func TestManager_Initialize(t *testing.T) {
 }
 
 func TestManager_Run(t *testing.T) {
-	tempDir := t.TempDir()
 	log := logf.New(logf.Opts{})
 	tests := []struct {
 		name           string
@@ -223,7 +246,8 @@ func TestManager_Run(t *testing.T) {
 				cfg := &config.Config{
 					Setup: config.Setup{
 						App: config.App{
-							BaseDir: tempDir,
+							Name:    "TestApp",
+							Version: "0.0.1",
 						},
 					},
 					Engine: config.Engine{
@@ -240,8 +264,7 @@ func TestManager_Run(t *testing.T) {
 						},
 					},
 				}
-				tempDir := t.TempDir()
-				recordDir := filepath.Join(tempDir, "run_test_record")
+				recordDir := t.TempDir()
 				motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
 				require.NoError(t, err)
 				// defer motionStore.Close() // Manager is responsible for closing
@@ -285,8 +308,7 @@ func TestManager_Run(t *testing.T) {
 }
 
 func TestManager_Close(t *testing.T) {
-	tempDir := t.TempDir()
-	dataFile := filepath.Join(tempDir, "motion.csv")
+	dataFile := filepath.Join(t.TempDir(), "motion.csv")
 	log := logf.New(logf.Opts{})
 
 	// Create a test file to verify it gets closed
@@ -297,7 +319,8 @@ func TestManager_Close(t *testing.T) {
 	cfg := &config.Config{
 		Setup: config.Setup{
 			App: config.App{
-				BaseDir: tempDir,
+				Name:    "TestApp",
+				Version: "0.0.1",
 			},
 		},
 		Engine: config.Engine{
@@ -315,8 +338,7 @@ func TestManager_Close(t *testing.T) {
 		},
 	}
 
-	tempDir = t.TempDir()
-	recordDir := filepath.Join(tempDir, "close_test_record")
+	recordDir := t.TempDir()
 	motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
 	require.NoError(t, err)
 	// Don't defer close here; manager.Close() should handle it.

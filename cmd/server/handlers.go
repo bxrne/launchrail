@@ -21,14 +21,6 @@ type DataHandler struct {
 	Cfg     *config.Config
 }
 
-func NewDataHandler(cfg *config.Config) (*DataHandler, error) {
-	rm, err := storage.NewRecordManager(cfg.Setup.App.BaseDir)
-	if err != nil {
-		return nil, err
-	}
-	return &DataHandler{records: rm, Cfg: cfg}, nil
-}
-
 // Helper function to render templ components
 func renderTempl(c *gin.Context, component templ.Component) {
 	err := component.Render(c.Request.Context(), c.Writer)
@@ -579,4 +571,11 @@ func parseInt(valueStr string, fieldName string) (int, error) {
 		return 0, fmt.Errorf("invalid %s: %w", fieldName, err)
 	}
 	return value, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

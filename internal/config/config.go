@@ -42,7 +42,6 @@ func GetConfig() (*Config, error) {
 type App struct {
 	Name    string `mapstructure:"name"`
 	Version string `mapstructure:"version"`
-	BaseDir string `mapstructure:"base_dir"`
 }
 
 // Logging represents the logging configuration.
@@ -127,10 +126,11 @@ type Server struct {
 
 // BenchmarkEntry defines the configuration for a single benchmark.
 type BenchmarkEntry struct {
-	Name       string `mapstructure:"name" validate:"required"`
-	DesignFile string `mapstructure:"design_file" validate:"required,file"`
-	DataDir    string `mapstructure:"data_dir" validate:"required,dir"`
-	Enabled    bool   `mapstructure:"enabled" validate:"boolean"`
+	Name        string `mapstructure:"name" validate:"required"`
+	Description string `mapstructure:"description"` // Added missing field
+	DesignFile  string `mapstructure:"design_file" validate:"required,file"`
+	DataDir     string `mapstructure:"data_dir" validate:"required,dir"`
+	Enabled     bool   `mapstructure:"enabled" validate:"boolean"`
 }
 
 // Config represents the overall application configuration.
@@ -139,7 +139,6 @@ type Config struct {
 	Server          Server                  `mapstructure:"server"`
 	Engine          Engine                  `mapstructure:"engine"`
 	Benchmarks      map[string]BenchmarkEntry `mapstructure:"benchmarks"`
-	BenchmarkDataDir string                  `mapstructure:"benchmark_data_dir"` // New directory for all benchmark data
 }
 
 // String returns the configuration as a map of strings, useful for testing.
@@ -149,7 +148,6 @@ func (c *Config) String() map[string]string {
 	// Setup Config
 	marshalled["app.name"] = c.Setup.App.Name
 	marshalled["app.version"] = c.Setup.App.Version
-	marshalled["app.base_dir"] = c.Setup.App.BaseDir
 	marshalled["logging.level"] = c.Setup.Logging.Level
 
 	// Engine -> External
@@ -194,8 +192,13 @@ func (c *Config) String() map[string]string {
 	// Server Port
 	marshalled["server.port"] = fmt.Sprintf("%d", c.Server.Port)
 
-	// Benchmark
-	marshalled["benchmark_data_dir"] = c.BenchmarkDataDir
+	for tag, benchmark := range c.Benchmarks {
+		marshalled["benchmarks."+tag+".name"] = benchmark.Name
+		marshalled["benchmarks."+tag+".description"] = benchmark.Description
+		marshalled["benchmarks."+tag+".design_file"] = benchmark.DesignFile
+		marshalled["benchmarks."+tag+".data_dir"] = benchmark.DataDir
+		marshalled["benchmarks."+tag+".enabled"] = fmt.Sprintf("%v", benchmark.Enabled)
+	}
 
 	return marshalled
 }
@@ -213,9 +216,6 @@ func (cfg *Config) Validate() error {
 	}
 	if cfg.Setup.App.Version == "" {
 		return fmt.Errorf("app.version is required")
-	}
-	if cfg.Setup.App.BaseDir == "" {
-		return fmt.Errorf("app.base_dir is required")
 	}
 
 	// Logging
@@ -336,11 +336,6 @@ func (cfg *Config) Validate() error {
 		} else if !stat.IsDir() {
 			return fmt.Errorf("benchmark '%s' dataDir path is not a directory: %s", tag, benchmark.DataDir)
 		}
-	}
-
-	// Benchmark
-	if cfg.BenchmarkDataDir == "" {
-		return fmt.Errorf("benchmark_data_dir is required")
 	}
 
 	return nil

@@ -55,23 +55,27 @@ func createMockRecord(rm *storage.RecordManager, baseDir, hash string, creationT
 	}, nil
 }
 
-// setupTestEngine initializes a test Gin engine and DataHandler for HTML template tests
-func setupTestEngine(t *testing.T) (*gin.Engine, *DataHandler) {
-	// Create a minimal config with a temporary directory for this test run
+// setupTestEngine initializes a test Gin engine and DataHandler using a specific storage path.
+func setupTestEngine(t *testing.T, storagePath string) (*gin.Engine, *DataHandler) {
+	t.Helper()
+	// Minimal config needed for DataHandler initialization
 	cfg := &config.Config{
 		Setup: config.Setup{
 			App: config.App{
 				Version: "0.0.1",
-				BaseDir: t.TempDir(), // Use a temp dir for storage
 			},
 		},
 	}
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
-	// NewDataHandler now only needs the config
-	dataHandler, err := NewDataHandler(cfg)
+	// Initialize RecordManager for the test
+	// Use the provided storagePath
+	recordManager, err := storage.NewRecordManager(storagePath)
 	require.NoError(t, err)
+
+	// Initialize DataHandler directly
+	dataHandler := &DataHandler{records: recordManager, Cfg: cfg}
 
 	// Setup only the routes needed for TestListRecords (HTML handler)
 	r.GET("/data", dataHandler.ListRecords)
@@ -92,7 +96,6 @@ func setupTestAPIServer(t *testing.T) (*httptest.Server, *DataHandler, string) {
 		Setup: config.Setup{
 			App: config.App{
 				Version: "0.0.1",
-				BaseDir: t.TempDir(), // Use a temp dir for storage
 			},
 		},
 		Server: config.Server{
@@ -100,19 +103,19 @@ func setupTestAPIServer(t *testing.T) (*httptest.Server, *DataHandler, string) {
 		},
 	}
 
-	// No need to create rm explicitly, NewDataHandler does it
-	// rm, err := storage.NewRecordManager(cfg.Setup.App.BaseDir)
-	// require.NoError(t, err)
-
-	// Initialize the DataHandler with the config
-	dataHandler, err := NewDataHandler(cfg)
+	// Initialize RecordManager for the test
+	tempDir := t.TempDir()
+	recordManager, err := storage.NewRecordManager(tempDir)
 	require.NoError(t, err)
+
+	// Initialize DataHandler directly
+	dataHandler := &DataHandler{records: recordManager, Cfg: cfg}
 
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
 
 	// *** ADD: Create mock records in the handler's BaseDir ***
-	storageDir := dataHandler.Cfg.Setup.App.BaseDir // Get the correct temp dir
+	storageDir := tempDir // Get the correct temp dir
 	// Create a temporary RM pointing to the same dir for setup purposes
 	setupRM, err := storage.NewRecordManager(storageDir)
 	require.NoError(t, err, "Failed to create setup RecordManager")
@@ -160,7 +163,7 @@ func setupTestAPIServer(t *testing.T) (*httptest.Server, *DataHandler, string) {
 
 func TestListRecords_Empty(t *testing.T) {
 	// Use setupTestEngine as this tests the HTML rendering handler
-	r, _ := setupTestEngine(t) // No storage path needed anymore
+	r, _ := setupTestEngine(t, t.TempDir()) // No storage path needed anymore
 
 	req, _ := http.NewRequest("GET", "/data", nil)
 	w := httptest.NewRecorder()
@@ -173,9 +176,15 @@ func TestListRecords_Empty(t *testing.T) {
 
 func TestListRecords_WithData(t *testing.T) {
 	// Use setupTestEngine for HTML handler test
-	r, handler := setupTestEngine(t) // No storage path needed
+
+	// Create a single temp directory for this test
+	tempDir := t.TempDir()
+
+	// Pass the tempDir to the test engine setup
+	r, _ := setupTestEngine(t, tempDir)
 	// Create a temp RM linked to the handler's storage dir
-	rm, err := storage.NewRecordManager(handler.Cfg.Setup.App.BaseDir)
+	// Use the same tempDir for the record creation RM
+	rm, err := storage.NewRecordManager(tempDir)
 	require.NoError(t, err)
 
 	// Create mock records in the temp directory used by the handler
@@ -185,7 +194,8 @@ func TestListRecords_WithData(t *testing.T) {
 		creationTime := baseTime.Add(time.Duration(i) * time.Minute)
 		recordHash := fmt.Sprintf("hash%d", i)
 		// Pass baseDir to createMockRecord
-		_, err = createMockRecord(rm, handler.Cfg.Setup.App.BaseDir, recordHash, creationTime) // Use rm
+		// Use the same tempDir here as well
+		_, err = createMockRecord(rm, tempDir, recordHash, creationTime) // Use rm
 		require.NoError(t, err)
 	}
 
@@ -241,7 +251,7 @@ func TestListRecords_WithData(t *testing.T) {
 			creationTime := baseTime.Add(time.Duration(i) * time.Minute)
 			recordHash := fmt.Sprintf("hash%d", i)
 			// Pass baseDir to createMockRecord
-			_, err = createMockRecord(rm, handler.Cfg.Setup.App.BaseDir, recordHash, creationTime) // Use rm
+			_, err = createMockRecord(rm, tempDir, recordHash, creationTime) // Use rm
 			require.NoError(t, err)
 		}
 
@@ -249,7 +259,7 @@ func TestListRecords_WithData(t *testing.T) {
 		for i := 6; i <= 16; i++ {
 			// Add a slight offset to ensure distinct creation times
 			// Pass baseDir to createMockRecord
-			_, err = createMockRecord(rm, handler.Cfg.Setup.App.BaseDir, fmt.Sprintf("page-hash%d", i), now.Add(time.Duration(i)*time.Second)) // Use rm
+			_, err = createMockRecord(rm, tempDir, fmt.Sprintf("page-hash%d", i), now.Add(time.Duration(i)*time.Second)) // Use rm
 			require.NoError(t, err)
 		}
 

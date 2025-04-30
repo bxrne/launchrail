@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/user"
 	"path/filepath"
 
 	"github.com/bxrne/launchrail/internal/config"
@@ -25,7 +26,7 @@ func main() {
 
 	// --- Determine Paths ---
 	// Simulation results are expected here (consistent with launchrail main)
-	simulationResultsDir := filepath.Join(cfg.Setup.App.BaseDir, "results")
+	simulationResultsDir := filepath.Join("benchmarks", "results")
 	absSimulationResultsDir, err := filepath.Abs(simulationResultsDir)
 	if err != nil {
 		benchLogger.Fatal("Failed to get absolute path for simulation results directory", "path", simulationResultsDir, "error", err)
@@ -36,19 +37,13 @@ func main() {
 		benchLogger.Info("Using simulation results directory", "path", absSimulationResultsDir)
 	}
 
-	// Base directory for finding benchmark data subdirectories
-	benchmarkDataDir := cfg.BenchmarkDataDir
-	if benchmarkDataDir == "" {
-		benchLogger.Fatal("Missing required configuration: benchmark_data_dir")
-	}
-	absBenchmarkDataDir, err := filepath.Abs(benchmarkDataDir)
+	// Get user's home directory
+	usr, err := user.Current()
 	if err != nil {
-		benchLogger.Fatal("Failed to get absolute path for benchmark_data_dir", "path", benchmarkDataDir, "error", err)
+		benchLogger.Fatal("Failed to get user's home directory", "error", err)
 	}
-	if _, err := os.Stat(absBenchmarkDataDir); os.IsNotExist(err) {
-		benchLogger.Fatal("Benchmark data directory not found", "path", absBenchmarkDataDir)
-	}
-	benchLogger.Info("Using benchmark data directory", "path", absBenchmarkDataDir)
+	baseBenchmarksDir := filepath.Join(usr.HomeDir, ".launchrail", "benchmarks")
+	benchLogger.Info("Using base benchmarks directory", "path", baseBenchmarksDir)
 
 	// Markdown output path (hardcoded for now)
 	outputMarkdownPath := "BENCHMARK.md"
@@ -56,9 +51,9 @@ func main() {
 
 	// --- Discover Benchmarks (Subdirectories in benchmarkDataDir) ---
 	discoveredTags := []string{}
-	files, err := os.ReadDir(absBenchmarkDataDir)
+	files, err := os.ReadDir(baseBenchmarksDir)
 	if err != nil {
-		benchLogger.Fatal("Failed to read benchmark data directory", "path", absBenchmarkDataDir, "error", err)
+		benchLogger.Fatal("Failed to read benchmark data directory", "path", baseBenchmarksDir, "error", err)
 	}
 	for _, file := range files {
 		if file.IsDir() {
@@ -68,7 +63,7 @@ func main() {
 	//sort.Strings(discoveredTags) // Process in alphabetical order
 
 	if len(discoveredTags) == 0 {
-		benchLogger.Warn("No benchmark subdirectories found in benchmark_data_dir", "path", absBenchmarkDataDir)
+		benchLogger.Warn("No benchmark subdirectories found in benchmark_data_dir", "path", baseBenchmarksDir)
 		os.Exit(0) // Exit cleanly if no benchmarks found
 	}
 	benchLogger.Info("Discovered benchmark tags", "tags", discoveredTags)
@@ -83,7 +78,7 @@ func main() {
 		benchLogger.Info("--- Starting Benchmark Run --- ", "tag", tag)
 
 		// --- Determine Paths for this Benchmark ---
-		currentBenchmarkDataPath := filepath.Join(absBenchmarkDataDir, tag)
+		currentBenchmarkDataPath := filepath.Join(baseBenchmarksDir, tag)
 		benchLogger.Info("Using benchmark data path for tag", "tag", tag, "path", currentBenchmarkDataPath)
 
 		// Validate specific benchmark data path existence

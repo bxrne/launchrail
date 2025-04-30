@@ -2,7 +2,6 @@ setup:
   app:
     name: "launchrail-dev"
     version: "0.0.1"
-    base_dir: ".launchrail"
 
   logging:
     level: "info"
@@ -58,8 +57,3 @@ benchmarks:
   #   description: "Description for another benchmark."
   #   data_dir: "./benchdata/another"
   #   enabled: false
-
-#-------------------------------------------------------------------------------
-# Benchmark Data Directory
-#-------------------------------------------------------------------------------
-benchmark_data_dir: "./benchdata" # Directory containing subfolders for each benchmark tag

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 
 	"github.com/bxrne/launchrail/internal/config"
@@ -25,7 +26,15 @@ func main() {
 	log.Info("Logger initialized", "level", cfg.Setup.Logging.Level)
 
 	// Construct simulation output directory path
-	outputDir := filepath.Join(cfg.Setup.App.BaseDir, "results")
+	// Get user's home directory
+	usr, err := user.Current()
+	if err != nil {
+		log.Fatal("Failed to get user's home directory", "error", err)
+	}
+	baseDir := filepath.Join(usr.HomeDir, ".launchrail") // Use ~/.launchrail
+
+	// Construct simulation output directory path using the new baseDir
+	outputDir := filepath.Join(baseDir, "results")
 	log.Info("Using simulation output directory", "path", outputDir)
 
 	// Ensure output directory exists (Keep this here - app's responsibility)

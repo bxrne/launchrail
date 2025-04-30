@@ -5,6 +5,8 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"os/user"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -245,13 +247,6 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, e
 	return &simConfig, nil
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func render(c *gin.Context, component templ.Component) {
 	err := component.Render(c.Request.Context(), c.Writer)
 	if err != nil {
@@ -277,13 +272,31 @@ func main() {
 		log.Fatal("Failed to set trusted proxies", "Error", err)
 	}
 
-	dataHandler, err := NewDataHandler(cfg)
+	// Get user's home directory
+	usr, err := user.Current()
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("Failed to get user's home directory", "error", err)
+	}
+	baseDir := filepath.Join(usr.HomeDir, ".launchrail") // Use ~/.launchrail
+
+	// Construct results directory path
+	resultsDir := filepath.Join(baseDir, "results")
+	log.Info("Using results directory", "path", resultsDir)
+
+	// Ensure results directory exists
+	if err := os.MkdirAll(resultsDir, 0755); err != nil {
+		log.Fatal("Failed to create results directory", "path", resultsDir, "error", err)
 	}
 
-	// Serve static files
-	r.Static("/static", "./static")
+	// Initialize RecordManager
+	recordManager, err := storage.NewRecordManager(resultsDir)
+	if err != nil {
+		log.Fatal("Failed to initialize record manager", "error", err)
+	}
+	dataHandler := &DataHandler{records: recordManager, Cfg: cfg} // Pass cfg here
+
+	// Serve static files (CSS, JS)
+	r.Static("/static", "./templates/static")
 
 	// Documentation & API spec routes
 	docs := r.Group("/docs")
@@ -318,7 +331,7 @@ func main() {
 	apiVersion := fmt.Sprintf("/api/v%s", majorVersion)
 	api := r.Group(apiVersion)
 	{
-		api.POST("/run", dataHandler.handleSimRun)
+		api.POST("/run", dataHandler.handleSimRun) // handleSimRun uses dataHandler.records
 		api.GET("/data", dataHandler.ListRecordsAPI)
 		api.GET("/explore/:hash", dataHandler.GetExplorerData)
 		api.GET("/spec", func(c *gin.Context) {
@@ -326,23 +339,19 @@ func main() {
 		})
 	}
 
-	// Data routes
+	// Web routes
 	r.GET("/data", dataHandler.ListRecords)
 	r.GET("/data/:hash/:type", dataHandler.GetRecordData)
 	r.DELETE("/data/:hash", dataHandler.DeleteRecord)
-
-	// Landing page
 	r.GET("/", func(c *gin.Context) {
 		render(c, pages.Index(cfg.Setup.App.Version))
 	})
-
 	r.GET("/explore/:hash", func(c *gin.Context) {
 		hash := c.Param("hash")
 		table := c.Query("table")
 		if table == "" {
 			table = "motion" // Default to motion table
 		}
-
 		record, err := dataHandler.records.GetRecord(hash)
 		if err != nil {
 			render(c, pages.ErrorPage("Record not found"))
@@ -400,9 +409,7 @@ func main() {
 
 		render(c, pages.Explorer(explorerData, cfg.Setup.App.Version))
 	})
-
 	r.GET("/explore/:hash/json", dataHandler.GetExplorerData)
-
 	r.POST("/plot", func(c *gin.Context) {
 		hash := c.PostForm("hash")
 		source := c.PostForm("source")
@@ -410,6 +417,7 @@ func main() {
 		yAxis := c.PostForm("yAxis")
 		zAxis := c.PostForm("zAxis")
 
+		// ... logic to get record using dataHandler.records.GetRecord(hash) ...
 		record, err := dataHandler.records.GetRecord(hash)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found"})
@@ -460,20 +468,16 @@ func main() {
 func (h *DataHandler) handleSimRun(c *gin.Context) {
 	log := logger.GetLogger("") // Use default or global log level if not available
 	log.Info("handleSimRun invoked", "time", time.Now().Format(time.RFC3339), "remote_addr", c.ClientIP())
-	cfg, err := config.GetConfig()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to load config: %v", err)})
-		return
-	}
 
-	simConfig, err := configFromCtx(c, cfg)
+	// Pass the handler's config (h.Cfg) to configFromCtx
+	simConfig, err := configFromCtx(c, h.Cfg)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// Use the existing record manager from the DataHandler instance (h.records)
-	if err := runSim(simConfig, h.records); err != nil {
+	if err := runSim(simConfig, h.records); err != nil { // runSim now defined globally or passed needed dependencies
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

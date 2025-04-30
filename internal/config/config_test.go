@@ -101,7 +101,6 @@ func createValidConfig() config.Config {
 			App: config.App{
 				Name:    "TestApp",
 				Version: "1.0.0",
-				BaseDir: tmpDir,
 			},
 			Logging: config.Logging{
 				Level: "debug",
@@ -156,7 +155,6 @@ func createValidConfig() config.Config {
 				Enabled:    true,
 			},
 		},
-		BenchmarkDataDir: benchmarkDataDirPath, // Use new field
 	}
 }
 
@@ -169,8 +167,6 @@ func createInvalidConfig(invalidField string) *config.Config {
 		cfg.Setup.App.Name = ""
 	case "app.version":
 		cfg.Setup.App.Version = ""
-	case "app.base_dir":
-		cfg.Setup.App.BaseDir = ""
 	case "logging.level":
 		cfg.Setup.Logging.Level = ""
 	case "external.openrocket_version":
@@ -286,8 +282,6 @@ func TestConfig_Validate_Valid(t *testing.T) {
 		bench.DataDir = dataDirPath
 		cfg.Benchmarks["test-bench"] = bench
 	}
-	cfg.BenchmarkDataDir = benchmarkDataDirPath // Set the new benchmark data dir path
-	cfg.Setup.App.BaseDir = tempDir // Set base dir for relative path resolution if needed
 
 	err := cfg.Validate()
 	require.NoError(t, err, "Validate() should not return an error for valid config") // Use require
@@ -368,8 +362,8 @@ engine:
     step: 0.01
     max_time: 60
     ground_tolerance: 0.1
-benchmark_data_dir: %q
-`, tempDir, dummyPluginDir, dummyORK, dummyBenchmarkDataDir)
+`,
+		tempDir, dummyPluginDir, dummyORK)
 
 	require.NoError(t, os.WriteFile(configFile, []byte(validContent), 0644))
 
@@ -384,9 +378,6 @@ benchmark_data_dir: %q
 	err = v.Unmarshal(&cfg)
 	require.NoError(t, err, "Unmarshal failed")
 
-	// Manually set BaseDir *after* unmarshal if needed for Validate, mimicking GetConfig behavior
-	cfg.Setup.App.BaseDir = tempDir
-
 	err = cfg.Validate()
 	require.NoError(t, err, "Validate failed")
 
@@ -394,7 +385,6 @@ benchmark_data_dir: %q
 	assert.Equal(t, "TestAppFromGetConfig", cfg.Setup.App.Name)
 	assert.Equal(t, "1.1", cfg.Setup.App.Version)
 	assert.Equal(t, 9999, cfg.Server.Port)
-	assert.Equal(t, tempDir, cfg.Setup.App.BaseDir)
 }
 
 // TEST: GIVEN an invalid config file path WHEN GetConfig is called THEN returns an error
@@ -455,7 +445,6 @@ func TestConfig_Validate_InvalidFields(t *testing.T) {
 	}{
 		{"MissingAppName", "app.name"},
 		{"MissingAppVersion", "app.version"},
-		{"MissingBaseDir", "app.base_dir"},
 		{"MissingLoggingLevel", "logging.level"},
 		{"MissingOpenrocketVersion", "external.openrocket_version"},
 		{"MissingMotorDesignation", "options.motor_designation"},
@@ -592,7 +581,6 @@ benchmarks:
 			// For other test cases, Unmarshal MUST succeed
 			require.NoError(t, err, "Unmarshal failed unexpectedly for test case [%s]: %v", tc.name, err)
 
-			cfg.Setup.App.BaseDir = filepath.Dir(cfgFile.Name())
 			t.Logf("Config struct before Validate for [%s]: %+v", tc.name, cfg)
 			err = cfg.Validate() // Now validate the loaded config
 			require.Error(t, err, "Validate should return an error")
@@ -691,7 +679,6 @@ benchmarks:
 			// For other test cases, Unmarshal MUST succeed
 			require.NoError(t, err, "Unmarshal failed unexpectedly for test case [%s]: %v", tc.name, err)
 
-			cfg.Setup.App.BaseDir = tempDir // Set BaseDir for validation
 			t.Logf("Config struct before Validate for [%s]: %+v", tc.name, cfg)
 			err = cfg.Validate() // Now validate the loaded config
 			require.Error(t, err, "Validate should return an error")
