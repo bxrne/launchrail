@@ -48,11 +48,17 @@ func (s *PhysicsSystem) Remove(basic ecs.BasicEntity) {
 }
 
 // NewPhysicsSystem creates a new PhysicsSystem
-func NewPhysicsSystem(world *ecs.World, cfg *config.Engine, logger logf.Logger) *PhysicsSystem {
+func NewPhysicsSystem(world *ecs.World, cfg *config.Engine, logger logf.Logger, workers int) *PhysicsSystem {
+	if workers <= 0 {
+		workers = 4 // Default number of workers
+	}
 	return &PhysicsSystem{
 		world:           world,
 		entities:        make([]*states.PhysicsState, 0),
 		cpCalculator:    barrowman.NewCPCalculator(), // Initialize calculator
+		workers:         workers,
+		workChan:        make(chan states.PhysicsState, workers*2),
+		resultChan:      make(chan types.Vector3, workers*2),
 		gravity:         cfg.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel,
 		groundTolerance: cfg.Simulation.GroundTolerance,
 		logger:          logger, // Use logger directly
@@ -65,23 +71,57 @@ func (s *PhysicsSystem) Update(dt float64) error {
 		return fmt.Errorf("invalid timestep: %v", dt)
 	}
 
-	for _, entity := range s.entities {
-		if err := s.validateEntity(entity); err != nil {
-			return err
-		}
+	type result struct {
+		err error
+	}
 
-		// Update motor state first
-		if entity.Motor != nil {
-			if err := entity.Motor.Update(dt); err != nil {
-				return err
+	results := make(chan result, len(s.entities))
+	var wg sync.WaitGroup
+
+	// Start worker goroutines
+	for i := 0; i < s.workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for entity := range s.workChan {
+				if err := s.validateEntity(&entity); err != nil {
+					results <- result{err: err}
+					continue
+				}
+				if entity.Motor != nil {
+					if err := entity.Motor.Update(dt); err != nil {
+						results <- result{err: err}
+						continue
+					}
+				}
+				netForce, err := s.calculateNetForce(&entity, types.Vector3{})
+				if err != nil {
+					results <- result{err: err}
+					continue
+				}
+				s.updateEntityState(&entity, netForce, dt)
+				results <- result{err: nil}
 			}
+		}()
+	}
+
+	// Send all entities to workChan
+	for _, entity := range s.entities {
+		s.workChan <- *entity
+	}
+	close(s.workChan)
+
+	// Wait for all workers to finish in a separate goroutine
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect the first error encountered
+	for res := range results {
+		if res.err != nil {
+			return res.err
 		}
-
-		// Calculate forces
-		netForce := s.calculateNetForce(entity, types.Vector3{})
-
-		// Update state
-		s.updateEntityState(entity, netForce, dt)
 	}
 
 	return nil
@@ -110,9 +150,9 @@ func (s *PhysicsSystem) handleGroundCollision(entity *states.PhysicsState) bool 
 	return false
 }
 
-func (s *PhysicsSystem) calculateNetForce(entity *states.PhysicsState, force types.Vector3) float64 {
+func (s *PhysicsSystem) calculateNetForce(entity *states.PhysicsState, force types.Vector3) (float64, error) {
 	if entity == nil || entity.Mass == nil || entity.Mass.Value <= 0 {
-		return 0
+		return 0, fmt.Errorf("invalid entity or mass")
 	}
 
 	var netForce float64 = -s.gravity * entity.Mass.Value // Start with gravity
@@ -133,6 +173,9 @@ func (s *PhysicsSystem) calculateNetForce(entity *states.PhysicsState, force typ
 	if velocity > 0 && !math.IsNaN(velocity) {
 		rho := getAtmosphericDensity(entity.Position.Vec.Y)
 		if !math.IsNaN(rho) && rho > 0 {
+			if entity.Nosecone == nil || entity.Bodytube == nil {
+				return 0, fmt.Errorf("missing geometry components: Nosecone or Bodytube is nil")
+			}
 			area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
 			cd := 0.3 // Base drag coefficient
 			if velocity > 100 {
@@ -148,7 +191,7 @@ func (s *PhysicsSystem) calculateNetForce(entity *states.PhysicsState, force typ
 		netForce += force.Y
 	}
 
-	return netForce
+	return netForce, nil
 }
 
 func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce float64, dt float64) {

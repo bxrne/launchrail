@@ -35,7 +35,7 @@ func TestNewPhysicsSystem(t *testing.T) {
 		},
 	}
 
-	system := systems.NewPhysicsSystem(&ecs.World{}, cfg, testLogger)
+	system := systems.NewPhysicsSystem(&ecs.World{}, cfg, testLogger, 1)
 	assert.NotNil(t, system)
 	assert.Equal(t, "PhysicsSystem", system.String())
 }
@@ -54,7 +54,7 @@ func TestCalculateNetForce_InvalidMass(t *testing.T) {
 		},
 	}
 
-	system := systems.NewPhysicsSystem(&ecs.World{}, cfg, testLogger)
+	system := systems.NewPhysicsSystem(&ecs.World{}, cfg, testLogger, 1)
 	entity := &states.PhysicsState{
 		Mass:         &types.Mass{Value: 0},
 		Position:     &types.Position{},
@@ -73,7 +73,7 @@ func TestCalculateNetForce_InvalidMass(t *testing.T) {
 // TEST: GIVEN an entity with rotation WHEN updating THEN updates angular state
 func TestUpdate_AngularMotion(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger)
+	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger, 1)
 
 	// Create minimal valid motor data
 	md := &thrustcurves.MotorData{
@@ -118,7 +118,7 @@ func TestUpdate_AngularMotion(t *testing.T) {
 // TEST: GIVEN an entity with invalid timestep WHEN updating THEN returns error
 func TestUpdate_InvalidTimestep(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger)
+	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger, 1)
 	err := system.Update(0)
 	assert.Error(t, err)
 }
@@ -126,7 +126,7 @@ func TestUpdate_InvalidTimestep(t *testing.T) {
 // TEST: GIVEN a system with invalid entity WHEN updating THEN returns error
 func TestUpdate_InvalidEntity(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger)
+	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger, 1)
 	entity := &states.PhysicsState{
 		// Missing required fields
 	}
@@ -140,7 +140,7 @@ func TestUpdate_InvalidEntity(t *testing.T) {
 // TEST: GIVEN a system with entity WHEN removing entity THEN entity is removed
 func TestRemoveEntity(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger)
+	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger, 1)
 	e := ecs.NewBasic()
 	entity := &states.PhysicsState{
 		Entity: &e,
@@ -154,7 +154,7 @@ func TestRemoveEntity(t *testing.T) {
 // TEST: GIVEN an entity with missing components WHEN updating THEN returns error
 func TestUpdate_MissingComponents(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger)
+	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger, 1)
 	e := ecs.NewBasic()
 	entity := &states.PhysicsState{Entity: &e} // Missing Mass, Position etc.
 	system.Add(entity)
@@ -173,13 +173,14 @@ func TestUpdate_MissingComponents(t *testing.T) {
 	// NOTE: calculateReferenceArea inside physics.go *will* panic if Nosecone or Bodytube are nil.
 	// This test case reveals that calculateNetForce/calculateReferenceArea needs nil checks.
 	// For now, we expect a panic. We should fix this in physics.go later.
-	assert.Panics(t, func() { _ = system.Update(0.01) }, "Update should panic if geometry components needed for drag are missing")
+	err = system.Update(0.01)
+	assert.Error(t, err, "Update should error if geometry components needed for drag are missing")
 }
 
 // TEST: GIVEN an entity at ground level WHEN updating THEN ground collision handled
 func TestUpdate_GroundCollision(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger)
+	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger, 1)
 	e := ecs.NewBasic()
 	entity := &states.PhysicsState{
 		Entity:       &e,

@@ -153,6 +153,10 @@ func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vect
 
 // calculateReferenceArea calculates the reference area for drag calculations
 func calculateReferenceArea(nosecone *components.Nosecone, bodytube *components.Bodytube) float64 {
+	if nosecone == nil || bodytube == nil {
+		panic("missing geometry components: Nosecone or Bodytube is nil")
+	}
+
 	// Use the largest cross-sectional area
 	noseArea := math.Pi * nosecone.Radius * nosecone.Radius
 	tubeArea := math.Pi * bodytube.Radius * bodytube.Radius
