@@ -10,7 +10,7 @@ import (
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/entities"
-	"github.com/bxrne/launchrail/pkg/openrocket"
+	openrocket "github.com/bxrne/launchrail/pkg/openrocket"
 	pluginapi "github.com/bxrne/launchrail/pkg/plugin"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"

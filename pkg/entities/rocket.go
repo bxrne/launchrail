@@ -7,9 +7,9 @@ import (
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/pkg/components"
-	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
+	openrocket "github.com/bxrne/launchrail/pkg/openrocket"
 )
 
 // RocketEntity represents a complete rocket with all its components
@@ -28,29 +28,65 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 		return nil
 	}
 
-	// Validate motor first (needs mass)
-	// GetMass() returns the *current* mass. For initial mass, this is fine.
+	// --- 1. Create Components First ---
+	createdComponents := make(map[string]interface{}) // Use interface{} for flexibility
+
+	// Motor (already created, just validate and add)
 	if motor.GetMass() <= 0 {
-		// Use Designation for motor name if Props is not nil and Designation is not empty
 		motorName := "unknown"
-		if motor.Props != nil && motor.Props.Designation != "" { // Check if empty string
-			motorName = string(motor.Props.Designation) // It's already a string (or string alias)
+		if motor.Props != nil && motor.Props.Designation != "" { 
+			motorName = string(motor.Props.Designation)
 		}
 		fmt.Printf("Error: Cannot create RocketEntity, motor '%s' has invalid initial mass.\n", motorName)
 		return nil
 	}
+	createdComponents["motor"] = motor // Add validated motor
 
-	initialMass := calculateTotalMass(orkData, motor) // Pass motor here
+	// Bodytube
+	bodytube, err := components.NewBodytubeFromORK(ecs.NewBasic(), orkData)
+	if err != nil {
+		fmt.Printf("Error creating Bodytube from ORK: %v\n", err) // Log error
+		return nil
+	}
+	createdComponents["bodytube"] = bodytube
+
+	// Nosecone
+	nosecone := components.NewNoseconeFromORK(ecs.NewBasic(), orkData)
+	if nosecone == nil {
+		fmt.Println("Error creating Nosecone from ORK.")
+		return nil
+	}
+	createdComponents["nosecone"] = nosecone
+
+	// Finset
+	finset := components.NewTrapezoidFinsetFromORK(ecs.NewBasic(), orkData)
+	if finset == nil {
+		fmt.Println("Error creating Finset from ORK.")
+		return nil
+	}
+	createdComponents["finset"] = finset
+
+	// Parachute
+	parachute, err := components.NewParachuteFromORK(ecs.NewBasic(), orkData)
+	if err != nil {
+		fmt.Printf("Error creating Parachute from ORK: %v\n", err)
+		// Decide if this is fatal - maybe return nil or proceed without parachute?
+		// For now, let's treat it as fatal for safety.
+		return nil
+	}
+	createdComponents["parachute"] = parachute
+
+	// --- 2. Calculate Total Mass from Created Components ---
+	initialMass := calculateTotalMassFromComponents(createdComponents)
 
 	// Validate mass before creating entity
 	if initialMass <= 0 {
-		fmt.Printf("Error: Cannot create RocketEntity, calculated initial mass is invalid (%.4f).\n", initialMass)
+		fmt.Printf("Error: Cannot create RocketEntity, calculated initial mass from components is invalid (%.4f).\n", initialMass)
 		return nil
 	}
 
+	// --- 3. Create Rocket Entity ---
 	basic := ecs.NewBasic()
-
-	// Create base rocket entity with non-zero initial values
 	rocket := &RocketEntity{
 		BasicEntity: &basic,
 		PhysicsState: &states.PhysicsState{
@@ -68,157 +104,59 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 			},
 			Orientation: &types.Orientation{
 				BasicEntity: basic,
-				Quat:        *types.IdentityQuaternion(), // Initialize with identity quaternion
+				Quat:        *types.IdentityQuaternion(),
 			},
-			AngularAcceleration: &types.Vector3{}, // Initialize angular acceleration
-			AngularVelocity:     &types.Vector3{}, // Initialize angular velocity
+			AngularAcceleration: &types.Vector3{},
+			AngularVelocity:     &types.Vector3{},
 		},
 		Mass: &types.Mass{
 			BasicEntity: basic,
-			Value:       initialMass, // Set mass first
+			Value:       initialMass, // Set mass using calculated value
 		},
-		components: make(map[string]interface{}),
+		components: createdComponents, // Assign the map of created components
 	}
 
-	// Store components with proper error handling
-	rocket.components["motor"] = motor
-
-	bodytube, err := components.NewBodytubeFromORK(ecs.NewBasic(), orkData)
-	if err != nil {
-		return nil
-	}
-	rocket.components["bodytube"] = bodytube
-
-	nosecone := components.NewNoseconeFromORK(ecs.NewBasic(), orkData)
-	if nosecone == nil {
-		return nil
-	}
-	rocket.components["nosecone"] = nosecone
-
-	finset := components.NewTrapezoidFinsetFromORK(ecs.NewBasic(), orkData)
-	if finset == nil {
-		return nil
-	}
-	rocket.components["finset"] = finset
-
-	parachute, err := components.NewParachuteFromORK(ecs.NewBasic(), orkData)
-	if err != nil {
-		panic(err)
-	}
-	rocket.components["parachute"] = parachute
+	// Assign components to PhysicsState *after* creating PhysicsState
+	rocket.PhysicsState.Motor = motor // Assign directly for physics system access
+	rocket.PhysicsState.Bodytube = bodytube
+	rocket.PhysicsState.Nosecone = nosecone
+	// ... assign other relevant components like finset if needed by physics/aero ...
 
 	return rocket
 }
 
-// calculateTotalMass sums masses of all components from OpenRocket data.
-// It attempts to calculate material mass where possible and adds explicit MassComponent masses.
-// Motor mass is handled separately via the components.Motor struct passed to NewRocketEntity.
-func calculateTotalMass(orkData *openrocket.RocketDocument, motor *components.Motor) float64 {
-	// Access the Rocket document within the OpenrocketDocument
-	// The schema confirmed orkData.Rocket exists.
-	// Reverting explicit dereference.
+// --- Mass Calculation Helpers ---
 
-	if orkData == nil || len(orkData.Subcomponents.Stages) == 0 {
-		fmt.Println("Warning: Cannot calculate mass, OpenRocket data or stages missing.")
-		return 0.0
-	}
-
-	if motor == nil {
-		fmt.Println("Warning: Cannot calculate total mass, motor component is nil.")
-		return 0.0
-	}
-
-	var totalMass float64
-	// Assuming single stage - previously validated
-	stage := orkData.Subcomponents.Stages[0]       // Standard access
-	sustainerSubs := &stage.SustainerSubcomponents // Pass pointer to avoid copying large struct
-
-	// --- Add mass for standard components --- (Extracted to helper)
-	sumStandardComponentMasses(&totalMass, sustainerSubs)
-
-	// --- Add Motor Mass --- (Extracted to helper)
-	totalMass += getValidMotorMass(motor)
-
-	// --- Final Validation ---
-	if math.IsNaN(totalMass) || totalMass <= 0 {
-		fmt.Printf("Warning: Final calculated total mass is invalid or zero (%.4f). Returning 0.\n", totalMass)
-		return 0.0
-	}
-	// fmt.Printf("Final Calculated Total Mass: %.4f\n", totalMass) // Debug
-	return totalMass
-}
-
-// massProvider defines the interface for components that can provide their mass.
-// This allows calculateTotalMass to work with any component implementing GetMass().
+// Interface to get mass from a component
 type massProvider interface {
 	GetMass() float64
 }
 
-// sumStandardComponentMasses iterates through standard components and adds their mass.
-func sumStandardComponentMasses(
-	totalMass *float64,
-	sustainer *openrocket.SustainerSubcomponents, // Pass pointer to sustainer subcomponents
-) {
-	// Derive necessary sub-component structs from the sustainer
-	noseSubs := &sustainer.Nosecone.Subcomponents
-	bodyTubeSubs := &sustainer.BodyTube.Subcomponents
-
-	// --- Add mass for components with GetMass() ---
-	// Top-level components (accessed via sustainer)
-	addComponentMass(totalMass, "Nosecone", &sustainer.Nosecone)
-	addComponentMass(totalMass, "BodyTube", &sustainer.BodyTube) // Tube material mass
-	// Components nested within BodyTube (accessed via bodyTubeSubs)
-	addComponentMass(totalMass, "TrapezoidFinset", &bodyTubeSubs.TrapezoidFinset)
-	addComponentMass(totalMass, "Parachute", &bodyTubeSubs.Parachute)
-	addComponentMass(totalMass, "Shockcord", &bodyTubeSubs.Shockcord)
-	addComponentMass(totalMass, "InnerTube", &bodyTubeSubs.InnerTube) // Inner tube material mass
-	// CenteringRings (Iterate via bodyTubeSubs)
-	for i := range bodyTubeSubs.CenteringRings {
-		addComponentMass(totalMass, fmt.Sprintf("CenteringRing[%d]", i), &bodyTubeSubs.CenteringRings[i])
+// calculateTotalMassFromComponents sums masses from a map of created components.
+func calculateTotalMassFromComponents(components map[string]interface{}) float64 {
+	var totalMass float64
+	for name, comp := range components {
+		if provider, ok := comp.(massProvider); ok {
+			mass := provider.GetMass()
+			if math.IsNaN(mass) || mass < 0 {
+				fmt.Printf("Warning: Invalid mass (%.4f) from component '%s' (%T), skipping.\n", mass, name, comp)
+				continue // Skip this component's mass
+			}
+			totalMass += mass
+		} else {
+			// This component doesn't provide mass via GetMass()
+			// fmt.Printf("Info: Component '%s' (%T) does not provide mass via GetMass().\n", name, comp) 
+		}
 	}
 
-	// --- Add mass for explicit MassComponents ---
-	// (Using derived noseSubs)
-	addComponentMass(totalMass, "Nosecone.MassComponent", &noseSubs.MassComponent)
-}
-
-// addComponentMass validates and adds the mass of a single component to the total mass.
-func addComponentMass(totalMass *float64, compName string, comp massProvider) {
-	if comp == nil { // Check if the component itself is nil
-		// fmt.Printf("Info: Skipping mass for nil component '%s'\n", compName)
-		return
-	}
-	mass := comp.GetMass()
-	if math.IsNaN(mass) || mass < 0 {
-		fmt.Printf("Warning: Invalid mass (%.4f) calculated for component '%s' (%T), skipping.\n", mass, compName, comp)
-		return
-	}
-	// fmt.Printf("Adding mass for %s (%T): %.4f\n", compName, comp, mass) // Debug
-	*totalMass += mass
-}
-
-// getValidMotorMass calculates and validates the motor's initial mass.
-// It returns the valid mass or 0.0 if invalid, logging a warning.
-func getValidMotorMass(motor *components.Motor) float64 {
-	if motor == nil {
-		fmt.Println("Warning: Motor component is nil in getValidMotorMass.")
+	if math.IsNaN(totalMass) || totalMass <= 0 {
+		fmt.Printf("Warning: Final calculated total mass from components is invalid or zero (%.4f). Returning 0.\n", totalMass)
 		return 0.0
 	}
-
-	motorMass := motor.GetMass() // GetMass() returns the current mass (initial mass at t=0)
-
-	if math.IsNaN(motorMass) || motorMass < 0 {
-		motorName := "unknown"
-		if motor.Props != nil && motor.Props.Designation != "" { // Check if empty string
-			motorName = string(motor.Props.Designation)
-		}
-		fmt.Printf("Warning: Invalid initial mass (%.4f) obtained from motor component '%s', skipping motor mass.\n", motorMass, motorName)
-		return 0.0 // Return 0 if mass is invalid
-	}
-
-	// fmt.Printf("Adding mass for Motor '%s': %.4f\n", string(motor.Props.Designation), motorMass) // Debug
-	return motorMass // Return the valid mass
+	return totalMass
 }
+
+// Removed deprecated functions: calculateTotalMass, sumStandardComponentMasses, addComponentMass, getValidMotorMass
 
 // AddComponent adds a component to the entity
 func (r *RocketEntity) GetComponent(name string) interface{} {

@@ -218,11 +218,23 @@ func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce 
 		return
 	}
 
-	s.logger.Debug("Pre-acceleration calculation",
-		"entity_id", entity.Entity.ID(),
-		"net_force", netForce,
-		"mass", entity.Mass.Value)
+	s.logger.Debug("Physics Update @ t=%.4f: TotalForce=%.4f, Mass=%.4f",
+		0.0,      // Simulation time is not available in this context
+		netForce, // Log the force vector (consider logging components X,Y,Z separately if needed)
+		entity.Mass.Value)
 
+	if entity.Mass.Value <= 1e-6 { // Avoid division by zero or near-zero mass
+		s.logger.Debug("Skipping acceleration update: Mass near zero",
+			"time", 0.0, // Simulation time is not available in this context
+			"mass", entity.Mass.Value,
+		)
+		return // Skip update for this entity if mass is too small
+	}
+
+	s.logger.Debug("Calculating acceleration inputs",
+		"netForceY", netForce,
+		"mass", entity.Mass.Value,
+	)
 	newAcceleration := netForce / entity.Mass.Value
 
 	s.logger.Debug("Post-acceleration calculation",

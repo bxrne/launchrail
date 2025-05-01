@@ -56,6 +56,8 @@ func NewBodytubeFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument) 
 	if strings.HasPrefix(radiusStr, "auto") {
 		// Remove 'auto' and any whitespace
 		trimmed := strings.TrimSpace(strings.TrimPrefix(radiusStr, "auto"))
+		// Trim surrounding quotes if present
+		trimmed = strings.Trim(trimmed, "\"")
 		parsed, err := strconv.ParseFloat(trimmed, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid BodyTube radius '%s': %v", radiusStr, err)

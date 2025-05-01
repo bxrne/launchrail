@@ -5,9 +5,9 @@ import (
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/pkg/components"
+	openrocket "github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/designation"
 	"github.com/bxrne/launchrail/pkg/entities"
-	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/stretchr/testify/assert"
 )
