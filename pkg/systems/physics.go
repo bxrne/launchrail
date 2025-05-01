@@ -167,6 +167,7 @@ func (s *PhysicsSystem) calculateNetForce(entity *states.PhysicsState, force typ
 		entity.Velocity.Vec.X*entity.Velocity.Vec.X +
 			entity.Velocity.Vec.Y*entity.Velocity.Vec.Y)
 
+	dragForceY := 0.0
 	if velocity > 0 && !math.IsNaN(velocity) {
 		rho := getAtmosphericDensity(entity.Position.Vec.Y)
 		if !math.IsNaN(rho) && rho > 0 {
@@ -178,8 +179,9 @@ func (s *PhysicsSystem) calculateNetForce(entity *states.PhysicsState, force typ
 			if velocity > 100 {
 				cd = 0.5
 			}
-			dragForce := 0.5 * rho * cd * area * velocity * velocity
-			netForce += -math.Copysign(dragForce, entity.Velocity.Vec.Y)
+			// Calculate drag force components
+			dragForceY = -0.5 * rho * cd * area * velocity * entity.Velocity.Vec.Y
+			netForce += dragForceY
 		}
 	}
 

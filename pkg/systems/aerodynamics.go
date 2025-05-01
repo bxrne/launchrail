@@ -288,6 +288,11 @@ func getAtmosphericDensity(altitude float64) float64 {
 		R    = 287.05287 // specific gas constant for air in J/(kg·K)
 	)
 
+	// Limit altitude to avoid numerical instability
+	if altitude > 80000 {
+		return 0
+	}
+
 	if altitude < 11000 { // troposphere
 		return rho0 * math.Pow(1-(L*altitude)/T0, g/(R*L)-1)
 	}

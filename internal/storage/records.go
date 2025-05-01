@@ -2,7 +2,6 @@ package storage
 
 import (
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,10 +13,7 @@ import (
 	"github.com/bxrne/launchrail/internal/logger"
 )
 
-const (
-	MetadataFileName = "record_meta.json" // File to store reliable timestamp
-	DataFileName     = "SIMULATION.json"  // Core data file for a record
-)
+// No JSON metadata or data files are produced per record; only CSVs
 
 type Record struct {
 	Name         string    `json:"name"`
@@ -30,35 +26,31 @@ type Record struct {
 	Dynamics     *Storage
 }
 
-type Metadata struct {
-	CreationTime time.Time `json:"creationTime"`
-}
-
 // NewRecord creates a new simulation record with associated storage services
 func NewRecord(baseDir string, hash string) (*Record, error) {
 	recordDir := filepath.Join(baseDir, hash) // Construct the full path
 
-	motionStore, err := NewStorage(recordDir, "motion") // Use recordDir
+	motionStore, err := NewStorage(recordDir, MOTION) // Use recordDir
 	if err != nil {
-	return nil, err
+		return nil, err
 	}
 	if err := motionStore.Init(); err != nil {
-	 motionStore.Close()
-	 return nil, fmt.Errorf("failed to initialize motion storage: %w", err)
+		motionStore.Close()
+		return nil, fmt.Errorf("failed to initialize motion storage: %w", err)
 	}
 
-	eventsStore, err := NewStorage(recordDir, "events") // Use recordDir
+	eventsStore, err := NewStorage(recordDir, EVENTS) // Use recordDir
 	if err != nil {
 		motionStore.Close()
-	 return nil, err
+		return nil, err
 	}
 	if err := eventsStore.Init(); err != nil {
-	motionStore.Close()
-	 eventsStore.Close()
+		motionStore.Close()
+		eventsStore.Close()
 		return nil, fmt.Errorf("failed to initialize events storage: %w", err)
 	}
 
-dynamicsStore, err := NewStorage(recordDir, "dynamics") // Use recordDir
+	dynamicsStore, err := NewStorage(recordDir, DYNAMICS) // Use recordDir
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close()
@@ -135,7 +127,25 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 	// Generate unique hash
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(time.Now().String())))
 
-	record, err := NewRecord(rm.baseDir, hash)
+	// Ensure .launchrail directory exists
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	launchrailDir := filepath.Join(homeDir, ".launchrail")
+	err = os.MkdirAll(launchrailDir, 0755)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create .launchrail directory: %w", err)
+	}
+
+	// Create hash-named directory inside .launchrail
+	hashDir := filepath.Join(launchrailDir, hash)
+	err = os.MkdirAll(hashDir, 0755)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create hash directory: %w", err)
+	}
+
+	record, err := NewRecord(hashDir, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -154,32 +164,6 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 		return nil, err
 	}
 
-	// Create metadata file with creation time
-	meta := Metadata{CreationTime: time.Now()}
-	metaFilePath := filepath.Join(rm.baseDir, hash, MetadataFileName)
-	metaFile, err := os.Create(metaFilePath)
-	if err != nil {
-		// Attempt cleanup if metadata creation fails
-		_ = os.RemoveAll(filepath.Join(rm.baseDir, hash))
-		return nil, fmt.Errorf("failed to create metadata file %s: %w", metaFilePath, err)
-	}
-	defer metaFile.Close()
-
-	if err := json.NewEncoder(metaFile).Encode(meta); err != nil {
-		// Attempt cleanup if encoding fails
-		_ = os.RemoveAll(filepath.Join(rm.baseDir, hash))
-		return nil, fmt.Errorf("failed to encode metadata to %s: %w", metaFilePath, err)
-	}
-
-	// Create an empty data file to mark the record as structurally valid initially
-	dataFilePath := filepath.Join(rm.baseDir, hash, DataFileName)
-	dataFile, err := os.Create(dataFilePath)
-	if err != nil {
-		_ = os.RemoveAll(filepath.Join(rm.baseDir, hash)) // Attempt cleanup
-		return nil, fmt.Errorf("failed to create empty data file %s: %w", dataFilePath, err)
-	}
-	dataFile.Close()
-
 	// Load the newly created record information
 	newRecord, err := rm.loadRecord(hash)
 	if err != nil {
@@ -189,76 +173,17 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 	return newRecord, nil
 }
 
-// loadRecord loads record details from disk.
-// Assumes the caller holds the appropriate lock.
-func (rm *RecordManager) loadRecord(hash string) (*Record, error) {
-	recordPath := filepath.Join(rm.baseDir, hash)
-	info, err := os.Stat(recordPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("record %s not found", hash)
-		}
-		return nil, fmt.Errorf("failed to stat record directory %s: %w", recordPath, err)
-	}
-
-	if !info.IsDir() {
-		return nil, fmt.Errorf("path %s is not a directory", recordPath)
-	}
-
-	// Prioritize reading CreationTime from metadata file
-	creationTime := info.ModTime() // Fallback to directory ModTime
-	metaFilePath := filepath.Join(recordPath, MetadataFileName)
-	metaFile, err := os.Open(metaFilePath)
-	if err == nil { // If metadata file exists and is readable
-		var meta Metadata
-		if json.NewDecoder(metaFile).Decode(&meta) == nil {
-			creationTime = meta.CreationTime // Use timestamp from file
-		}
-		metaFile.Close()
-	} // Ignore errors reading metadata, just use fallback
-
-	// Check for the existence of core data files
-	dataPath := filepath.Join(recordPath, DataFileName)
-	_, err = os.Stat(dataPath)
-	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("record %s is incomplete: missing %s", hash, DataFileName)
-	}
-
-	// Initialize storage handlers for the loaded record
-	motionStore, err := NewStorage(recordPath, "motion") // Use recordPath
-	if err != nil {
-		return nil, fmt.Errorf("failed to init motion storage for %s: %w", hash, err)
-	}
-	eventsStore, err := NewStorage(recordPath, "events") // Use recordPath
-	if err != nil {
-		motionStore.Close() // Close already opened store
-		return nil, fmt.Errorf("failed to init events storage for %s: %w", hash, err)
-	}
-	dynamicsStore, err := NewStorage(recordPath, "dynamics") // Use recordPath
-	if err != nil {
-		motionStore.Close()
-		eventsStore.Close()
-		return nil, fmt.Errorf("failed to init dynamics storage for %s: %w", hash, err)
-	}
-
-	return &Record{
-		Hash:         hash,
-		Name:         hash, // Or potentially load from metadata if stored
-		LastModified: info.ModTime(), // Still store ModTime for potential other uses
-		CreationTime: creationTime, // Use the reliable timestamp
-		Path:         recordPath, // Store the path
-		Motion:       motionStore,
-		Events:       eventsStore,
-		Dynamics:     dynamicsStore,
-	}, nil
-}
-
 // DeleteRecord deletes a record by Hash
 func (rm *RecordManager) DeleteRecord(hash string) error {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
-	recordPath := filepath.Join(rm.baseDir, hash)
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	launchrailDir := filepath.Join(homeDir, ".launchrail")
+	recordPath := filepath.Join(launchrailDir, hash)
 	if err := os.RemoveAll(recordPath); err != nil {
 		return fmt.Errorf("failed to delete record: %v", err)
 	}
@@ -271,7 +196,12 @@ func (rm *RecordManager) ListRecords() ([]*Record, error) {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 
-	entries, err := os.ReadDir(rm.baseDir)
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	launchrailDir := filepath.Join(homeDir, ".launchrail")
+	entries, err := os.ReadDir(launchrailDir)
 	if err != nil {
 		return nil, err
 	}
@@ -282,37 +212,19 @@ func (rm *RecordManager) ListRecords() ([]*Record, error) {
 			continue
 		}
 
-		recordPath := filepath.Join(rm.baseDir, entry.Name())
+		recordPath := filepath.Join(launchrailDir, entry.Name())
 		info, err := os.Stat(recordPath)
 		if err != nil {
 			continue // Skip invalid records
 		}
 
-		// Prioritize reading CreationTime from metadata file
-		creationTime := info.ModTime() // Fallback to directory ModTime
-		lastModified := info.ModTime()
-		metaFilePath := filepath.Join(recordPath, MetadataFileName)
-		metaFile, err := os.Open(metaFilePath)
-		if err == nil { // If metadata file exists and is readable
-			var meta Metadata
-			if json.NewDecoder(metaFile).Decode(&meta) == nil {
-				creationTime = meta.CreationTime // Use timestamp from file
-			}
-			metaFile.Close()
-		} // Ignore errors reading metadata, just use fallback
-
-		// Check if core data file exists to consider the record valid
-		dataPath := filepath.Join(recordPath, DataFileName)
-		_, dataStatErr := os.Stat(dataPath)
-		if dataStatErr != nil {
-			continue // Skip incomplete records
-		}
+		creationTime := info.ModTime()
 
 		// Load the record without creating a new one
 		record := &Record{
 			Hash:         entry.Name(),
 			Name:         entry.Name(), // Or potentially load from metadata if stored
-			LastModified: lastModified,
+			LastModified: info.ModTime(),
 			CreationTime: creationTime,
 			Motion:       nil,
 			Events:       nil,
@@ -334,33 +246,41 @@ func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 
-	recordPath := filepath.Join(rm.baseDir, hash)
-	if _, err := os.Stat(recordPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("record not found")
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	launchrailDir := filepath.Join(homeDir, ".launchrail")
+	recordPath := filepath.Join(launchrailDir, hash)
+	if _, err := os.Stat(recordPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("record not found")
+		}
+		return nil, fmt.Errorf("failed to stat record path: %w", err)
 	}
 
 	// Initialize storage services for the record
-	motionStore, err := NewStorage(recordPath, "motion") // Use recordPath
+	motionStore, err := NewStorage(recordPath, MOTION) // Use recordPath
 	if err != nil {
-	return nil, err
+		return nil, err
 	}
 	if err := motionStore.Init(); err != nil {
-	 motionStore.Close()
-	 return nil, fmt.Errorf("failed to initialize motion storage: %w", err)
+		motionStore.Close()
+		return nil, fmt.Errorf("failed to initialize motion storage: %w", err)
 	}
 
-	eventsStore, err := NewStorage(recordPath, "events") // Use recordPath
+	eventsStore, err := NewStorage(recordPath, EVENTS) // Use recordPath
 	if err != nil {
 		motionStore.Close()
-	 return nil, err
+		return nil, err
 	}
 	if err := eventsStore.Init(); err != nil {
-	motionStore.Close()
-	 eventsStore.Close()
+		motionStore.Close()
+		eventsStore.Close()
 		return nil, fmt.Errorf("failed to initialize events storage: %w", err)
 	}
 
-dynamicsStore, err := NewStorage(recordPath, "dynamics") // Use recordPath
+	dynamicsStore, err := NewStorage(recordPath, DYNAMICS) // Use recordPath
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close()
@@ -382,23 +302,58 @@ dynamicsStore, err := NewStorage(recordPath, "dynamics") // Use recordPath
 		return nil, err
 	}
 
-	// Prioritize reading CreationTime from metadata file
-	creationTime := info.ModTime() // Fallback to directory ModTime
-	metaFilePath := filepath.Join(recordPath, MetadataFileName)
-	metaFile, err := os.Open(metaFilePath)
-	if err == nil { // If metadata file exists and is readable
-		var meta Metadata
-		if json.NewDecoder(metaFile).Decode(&meta) == nil {
-			creationTime = meta.CreationTime // Use timestamp from file
-		}
-		metaFile.Close()
-	} // Ignore errors reading metadata, just use fallback
+	creationTime := info.ModTime()
 
 	return &Record{
 		Hash:         hash,
 		Name:         hash,
 		LastModified: info.ModTime(),
 		CreationTime: creationTime,
+		Motion:       motionStore,
+		Events:       eventsStore,
+		Dynamics:     dynamicsStore,
+	}, nil
+}
+
+// loadRecord loads a record by hash and initializes its CSV stores.
+func (rm *RecordManager) loadRecord(hash string) (*Record, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	recordPath := filepath.Join(homeDir, ".launchrail", hash)
+	info, err := os.Stat(recordPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("record %s not found", hash)
+		}
+		return nil, fmt.Errorf("failed to stat record directory %s: %w", recordPath, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("path %s is not a directory", recordPath)
+	}
+	creationTime := info.ModTime()
+	motionStore, err := NewStorage(recordPath, MOTION)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init motion storage for %s: %w", hash, err)
+	}
+	eventsStore, err := NewStorage(recordPath, EVENTS)
+	if err != nil {
+		motionStore.Close()
+		return nil, fmt.Errorf("failed to init events storage for %s: %w", hash, err)
+	}
+	dynamicsStore, err := NewStorage(recordPath, DYNAMICS)
+	if err != nil {
+		motionStore.Close()
+		eventsStore.Close()
+		return nil, fmt.Errorf("failed to init dynamics storage for %s: %w", hash, err)
+	}
+	return &Record{
+		Hash:         hash,
+		Name:         hash,
+		LastModified: info.ModTime(),
+		CreationTime: creationTime,
+		Path:         recordPath,
 		Motion:       motionStore,
 		Events:       eventsStore,
 		Dynamics:     dynamicsStore,

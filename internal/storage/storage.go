@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -65,7 +66,8 @@ func NewStorage(recordDir string, store SimStorageType) (*Storage, error) {
 	}
 
 	// Construct the specific file path within the record directory
-	filePath := filepath.Join(absRecordDir, fmt.Sprintf("%s.csv", store))
+	// Always use uppercase for consistency with SimStorageType constants
+	filePath := filepath.Join(absRecordDir, fmt.Sprintf("%s.csv", strings.ToUpper(string(store))))
 
 	// Open file in read/write mode with append flag.
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)

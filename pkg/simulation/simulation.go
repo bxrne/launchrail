@@ -308,15 +308,6 @@ func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass
 	}
 }
 
-// zeroKinematicsIfNoMotor forcibly zeroes kinematic state if the motor is nil.
-func zeroKinematicsIfNoMotor(state *states.PhysicsState) {
-	if state.Motor == nil {
-		state.Acceleration.Vec.Y = 0
-		state.Velocity.Vec.Y = 0
-		state.Position.Vec.Y = 0
-	}
-}
-
 // runPlugins executes plugin hooks and returns error if any fail.
 func runPlugins(plugins []pluginapi.SimulationPlugin, hook func(pluginapi.SimulationPlugin) error) error {
 	for _, p := range plugins {
@@ -352,7 +343,6 @@ func (s *Simulation) updateSystems() error {
 		if err := system.Update(s.config.Engine.Simulation.Step); err != nil {
 			return fmt.Errorf("system %T update error: %w", system, err)
 		}
-		zeroKinematicsIfNoMotor(state)
 	}
 
 	if err := runPlugins(s.pluginManager.GetPlugins(), func(p pluginapi.SimulationPlugin) error {

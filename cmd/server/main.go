@@ -54,21 +54,21 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
 		return fmt.Errorf("failed to initialize simulation manager: %w", err)
 	}
 
-	// Defer closing the manager
+	// Defer closing the record only if creation succeeded
 	defer func() {
-		if cerr := simManager.Close(); cerr != nil {
-			log.Error("Failed to close simulation manager", "Error", cerr)
-			// Don't overwrite the original error if there was one
+		if cerr := record.Close(); cerr != nil {
+			log.Error("Failed to close simulation record", "Error", cerr)
 			if err == nil {
 				err = cerr
 			}
 		}
 	}()
 
-	// Defer closing the record only if creation succeeded
+	// Defer closing the manager
 	defer func() {
-		if cerr := record.Close(); cerr != nil {
-			log.Error("Failed to close simulation record", "Error", cerr)
+		if cerr := simManager.Close(); cerr != nil {
+			log.Error("Failed to close simulation manager", "Error", cerr)
+			// Don't overwrite the original error if there was one
 			if err == nil {
 				err = cerr
 			}
@@ -266,6 +266,10 @@ func main() {
 	log := logger.GetLogger(cfg.Setup.Logging.Level)
 	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
 
+	// Bind the port flag to the server.port configuration key
+	// flag.IntVar(&cfg.Server.Port, "port", cfg.Server.Port, "Server port")
+	// flag.Parse()
+
 	r := gin.Default()
 	err = r.SetTrustedProxies(nil)
 	if err != nil {
@@ -296,7 +300,7 @@ func main() {
 	dataHandler := &DataHandler{records: recordManager, Cfg: cfg} // Pass cfg here
 
 	// Serve static files (CSS, JS)
-	r.Static("/static", "./templates/static")
+	r.Static("/static", "./static")
 
 	// Documentation & API spec routes
 	docs := r.Group("/docs")

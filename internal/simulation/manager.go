@@ -140,38 +140,9 @@ func (m *Manager) Close() error {
 		return nil // Already closed
 	}
 
-	var firstErr error
-	// Close the stores that were passed during initialization
-	if m.stores != nil {
-		if m.stores.Motion != nil {
-			if err := m.stores.Motion.Close(); err != nil {
-				m.log.Error("Failed to close motion storage", "Error", err)
-				if err != nil && firstErr == nil {
-					firstErr = err
-				}
-			}
-		}
-		if m.stores.Events != nil {
-			if err := m.stores.Events.Close(); err != nil {
-				m.log.Error("Failed to close events storage", "Error", err)
-				if err != nil && firstErr == nil {
-					firstErr = err
-				}
-			}
-		}
-		if m.stores.Dynamics != nil {
-			if err := m.stores.Dynamics.Close(); err != nil {
-				m.log.Error("Failed to close dynamics storage", "Error", err)
-				if err != nil && firstErr == nil {
-					firstErr = err
-				}
-			}
-		}
-	}
-
 	m.status = StatusClosed
 	m.log.Info("Simulation manager closed", "hash", "N/A - Hash now managed by storage.Record") // Update log message
-	return firstErr
+	return nil
 }
 
 func (m *Manager) GetStatus() ManagerStatus {
