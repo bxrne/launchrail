@@ -174,11 +174,11 @@ func (h *TestDataHandler) ListRecords(c *gin.Context) {
 	}
 
 	// Render simple HTML for testing
-	c.Writer.WriteString("<html><body>")
+	_, _ = c.Writer.WriteString("<html><body>")
 	for _, record := range records {
-		c.Writer.WriteString("<div>" + record.Hash + "</div>")
+		_, _ = c.Writer.WriteString("<div>" + record.Hash + "</div>")
 	}
-	c.Writer.WriteString("</body></html>")
+	_, _ = c.Writer.WriteString("</body></html>")
 }
 
 // TestEmptyRecordsAPI verifies that the API handles empty record sets correctly
