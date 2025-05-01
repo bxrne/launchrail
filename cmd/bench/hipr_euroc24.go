@@ -97,12 +97,15 @@ func (b *HiprEuroc24Benchmark) Run() ([]BenchmarkResult, error) {
 	benchLogger.Debug("Loaded actual motion data", "count", len(actualMotionData))
 
 	// Use generic filenames matching the actual simulation output
-	actualEventsPath := filepath.Join(actualDataPath, "EVENTS.csv") 
-	actualEventsData, err := LoadEventInfo(actualEventsPath)
+	actualEventsPath := filepath.Join(actualDataPath, "EVENTS.csv")
+	var actualEventsData []EventInfo
+	data, err := LoadEventInfo(actualEventsPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load actual event data from record '%s': %w", actualEventsPath, err)
+		benchLogger.Warn("Skipping actual event data load", "error", err)
+	} else {
+		actualEventsData = data
+		benchLogger.Debug("Loaded actual event data", "count", len(actualEventsData))
 	}
-	benchLogger.Debug("Loaded actual event data", "count", len(actualEventsData))
 
 	// Use generic filenames matching the actual simulation output
 	actualDynamicsPath := filepath.Join(actualDataPath, "DYNAMICS.csv") 

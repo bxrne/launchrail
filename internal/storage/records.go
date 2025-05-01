@@ -28,7 +28,7 @@ type Record struct {
 
 // NewRecord creates a new simulation record with associated storage services
 func NewRecord(baseDir string, hash string) (*Record, error) {
-	recordDir := filepath.Join(baseDir, hash) // Construct the full path
+	recordDir := baseDir // Use the baseDir directly as it already includes the hash
 
 	motionStore, err := NewStorage(recordDir, MOTION) // Use recordDir
 	if err != nil {
@@ -264,20 +264,11 @@ func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := motionStore.Init(); err != nil {
-		motionStore.Close()
-		return nil, fmt.Errorf("failed to initialize motion storage: %w", err)
-	}
 
 	eventsStore, err := NewStorage(recordPath, EVENTS) // Use recordPath
 	if err != nil {
 		motionStore.Close()
 		return nil, err
-	}
-	if err := eventsStore.Init(); err != nil {
-		motionStore.Close()
-		eventsStore.Close()
-		return nil, fmt.Errorf("failed to initialize events storage: %w", err)
 	}
 
 	dynamicsStore, err := NewStorage(recordPath, DYNAMICS) // Use recordPath
@@ -285,12 +276,6 @@ func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 		motionStore.Close()
 		eventsStore.Close()
 		return nil, err
-	}
-	if err := dynamicsStore.Init(); err != nil {
-		motionStore.Close()
-		eventsStore.Close()
-		dynamicsStore.Close()
-		return nil, fmt.Errorf("failed to initialize dynamics storage: %w", err)
 	}
 
 	// Get last modified time
