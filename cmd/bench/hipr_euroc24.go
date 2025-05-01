@@ -77,63 +77,54 @@ func (b *HiprEuroc24Benchmark) Run() ([]BenchmarkResult, error) {
 	benchLogger := logger.GetLogger("info") // Get logger instance
 	var results []BenchmarkResult
 
-	// --- Load Actual Simulation Data ---
-	// Construct paths based on the SimulationResultsDir from config
-	// Assuming a single record ID for now, needs generalization later.
-	// We need to determine the record ID to load. For now, hardcoding or simple logic.
-	// Let's assume the benchmark name maps to a record ID or pattern.
-	// This part needs refinement based on how record IDs are associated with benchmarks.
-	// For hipr-euroc24, let's assume the record ID is 'rec001' or similar. 
-	// TODO: Implement a robust way to find the relevant record ID.
+	// --- Load Actual Simulation Data --- // UPDATED
 	actualDataPath := b.config.ResultDirPath // Load directly from the results dir
 	benchLogger.Info("Loading actual simulation data", "recordPath", actualDataPath)
 
-	// Use generic filenames matching the actual simulation output
-	actualMotionPath := filepath.Join(actualDataPath, "MOTION.csv") 
-	actualMotionData, err := LoadFlightInfo(actualMotionPath)
+	actualMotionPath := filepath.Join(actualDataPath, "MOTION.csv")
+	actualMotionData, err := LoadSimMotionData(actualMotionPath) // USE NEW LOADER
 	if err != nil {
-		return nil, fmt.Errorf("failed to load actual motion data from record '%s': %w", actualMotionPath, err)
+		return nil, fmt.Errorf("failed to load actual motion data from '%s': %w", actualMotionPath, err)
 	}
 	benchLogger.Debug("Loaded actual motion data", "count", len(actualMotionData))
 
-	// Use generic filenames matching the actual simulation output
 	actualEventsPath := filepath.Join(actualDataPath, "EVENTS.csv")
-	var actualEventsData []EventInfo
-	data, err := LoadEventInfo(actualEventsPath)
+	actualEventsData, err := LoadSimEventData(actualEventsPath) // USE NEW LOADER
 	if err != nil {
-		benchLogger.Warn("Skipping actual event data load", "error", err)
-	} else {
-		actualEventsData = data
-		benchLogger.Debug("Loaded actual event data", "count", len(actualEventsData))
+		return nil, fmt.Errorf("failed to load actual event data from '%s': %w", actualEventsPath, err)
 	}
+	benchLogger.Debug("Loaded actual event data", "count", len(actualEventsData))
 
-	// Use generic filenames matching the actual simulation output
-	actualDynamicsPath := filepath.Join(actualDataPath, "DYNAMICS.csv") 
-	actualDynamicsData, err := LoadFlightStates(actualDynamicsPath)
+	// Load dynamics data, although it's not used in comparisons yet
+	actualDynamicsPath := filepath.Join(actualDataPath, "DYNAMICS.csv")
+	actualDynamicsData, err := LoadSimDynamicsData(actualDynamicsPath) // USE NEW LOADER
 	if err != nil {
-		return nil, fmt.Errorf("failed to load actual dynamics data from record '%s': %w", actualDynamicsPath, err)
+		// Log warning instead of error? Or keep error if dynamics are essential later?
+		benchLogger.Warn("Failed to load actual dynamics data, comparisons using it will fail/be skipped", "file", actualDynamicsPath, "error", err)
+		// return nil, fmt.Errorf("failed to load actual dynamics data from '%s': %w", actualDynamicsPath, err)
 	}
 	benchLogger.Debug("Loaded actual dynamics data", "count", len(actualDynamicsData))
 
 	// --- Perform Comparisons ---
 	benchLogger.Info("Performing comparisons...")
 
-	// --- Define Ground Truth Expected Values (from loaded CSVs) --- 
-	// Use the data loaded by LoadData method
-	expectedApogeeGroundTruth, _ := findSimApogee(b.flightInfoGroundTruth) 
-	expectedMaxVGroundTruth, _ := findSimMaxVelocity(b.flightInfoGroundTruth) 
-	expectedLiftoffTimeGroundTruth := findSimEventTime(b.eventInfoGroundTruth, "LIFTOFF") 
-	expectedApogeeEventTimeGroundTruth := findSimEventTime(b.eventInfoGroundTruth, "APOGEE") 
-	expectedTouchdownTimeGroundTruth := 0.0 // findSimStateTime(b.flightStateGroundTruth, "TOUCHDOWN")
-	benchLogger.Warn("Touchdown time ground truth determination skipped: findSimStateTime needs verification")
+	// --- Define Ground Truth Expected Values (from ground truth CSVs) --- // UPDATED HELPER CALLS
+	// Note: We still use the ground truth helpers (findGroundTruth*) for ground truth data.
+	expectedApogeeGroundTruth, _ := findGroundTruthApogee(b.flightInfoGroundTruth)
+	expectedMaxVGroundTruth, _ := findGroundTruthMaxVelocity(b.flightInfoGroundTruth)
+	expectedLiftoffTimeGroundTruth := findGroundTruthEventTime(b.eventInfoGroundTruth, "LIFTOFF")
+	expectedApogeeEventTimeGroundTruth := findGroundTruthEventTime(b.eventInfoGroundTruth, "APOGEE")
+	// expectedTouchdownTimeGroundTruth := findGroundTruthStateTime(b.flightStateGroundTruth, "TOUCHDOWN") // Assuming a helper for states exists
+	expectedTouchdownTimeGroundTruth := 0.0
+	benchLogger.Warn("Touchdown time ground truth determination skipped: findGroundTruthStateTime needs implementation/verification")
 
-	// --- Calculate Actual Values from SIMULATION Data --- 
-	actualApogeeFromSim, _ := findSimApogee(actualMotionData)
-	actualMaxVFromSim, _ := findSimMaxVelocity(actualMotionData)
-	actualLiftoffTimeFromSim := findSimEventTime(actualEventsData, "Liftoff")            
-	actualApogeeEventTimeFromSim := findSimEventTime(actualEventsData, "ApogeeDetected") 
-	actualTouchdownTimeFromSim := 0.0 
-	benchLogger.Warn("Touchdown time comparison skipped: Unknown state name in simulation output CSV")
+	// --- Calculate Actual Values from SIMULATION Data --- // UPDATED HELPER CALLS
+	actualApogeeFromSim, _ := findSimApogee(actualMotionData)             // Use sim helper
+	actualMaxVFromSim, _ := findSimMaxVelocity(actualMotionData)        // Use sim helper
+	actualLiftoffTimeFromSim := findSimEventTime(actualEventsData, "Liftoff") // Use sim helper
+	actualApogeeEventTimeFromSim := findSimEventTime(actualEventsData, "ApogeeDetected") // Use sim helper
+	actualTouchdownTimeFromSim := 0.0
+	benchLogger.Warn("Touchdown time comparison skipped: Need logic to find touchdown in sim data")
 
 	// --- Compare Metrics ---
 	apogeeTolerance := 0.05 // 5% tolerance
@@ -158,15 +149,15 @@ func (b *HiprEuroc24Benchmark) Run() ([]BenchmarkResult, error) {
 // --- Helper methods for SIMULATION data (from loaded CSV structs) --- // NEW
 
 // findSimApogee finds the maximum altitude from simulation flight info.
-func findSimApogee(simData []FlightInfo) (float64, float64) {
+func findSimApogee(simData []SimMotionData) (float64, float64) { // UPDATED TYPE
 	if len(simData) == 0 {
 		return 0, 0
 	}
-	maxAltitude := simData[0].Height
+	maxAltitude := simData[0].Altitude // UPDATED FIELD
 	timestamp := simData[0].Timestamp
 	for _, p := range simData {
-		if p.Height > maxAltitude {
-			maxAltitude = p.Height
+		if p.Altitude > maxAltitude { // UPDATED FIELD
+			maxAltitude = p.Altitude // UPDATED FIELD
 			timestamp = p.Timestamp
 		}
 	}
@@ -174,15 +165,15 @@ func findSimApogee(simData []FlightInfo) (float64, float64) {
 }
 
 // findSimMaxVelocity finds the maximum velocity from simulation flight info.
-func findSimMaxVelocity(simData []FlightInfo) (float64, float64) {
+func findSimMaxVelocity(simData []SimMotionData) (float64, float64) { // UPDATED TYPE
 	if len(simData) == 0 {
 		return 0, 0
 	}
-	maxVelocity := simData[0].Velocity
+	maxVelocity := simData[0].Velocity // UPDATED FIELD
 	timestamp := simData[0].Timestamp
 	for _, p := range simData {
-		if p.Velocity > maxVelocity {
-			maxVelocity = p.Velocity
+		if p.Velocity > maxVelocity { // UPDATED FIELD
+			maxVelocity = p.Velocity // UPDATED FIELD
 			timestamp = p.Timestamp
 		}
 	}
@@ -191,11 +182,87 @@ func findSimMaxVelocity(simData []FlightInfo) (float64, float64) {
 
 // findSimEventTime finds the timestamp for a specific event from simulation event info.
 // Note: Matches event name string exactly.
-func findSimEventTime(simEvents []EventInfo, eventName string) float64 {
-	for _, e := range simEvents {
+func findSimEventTime(simEvents []SimEventData, eventName string) float64 { // UPDATED TYPE
+	// The actual EVENTS.csv has status strings, not event names like the ground truth.
+	// We need to infer events from status changes.
+	benchLogger := logger.GetLogger("debug") // Use debug for potentially verbose logging
+
+	if eventName == "Liftoff" {
+		// Assumption: Liftoff occurs when motor status transitions from IDLE to BURNING.
+		var prevMotorStatus string = ""
+		if len(simEvents) > 0 {
+			prevMotorStatus = simEvents[0].MotorStatus // Initialize with first status
+		}
+		for i := 1; i < len(simEvents); i++ { // Start from second record
+			current := simEvents[i]
+			if prevMotorStatus == "IDLE" && current.MotorStatus == "BURNING" {
+				benchLogger.Debug("Found Liftoff event", "timestamp", current.Timestamp, "prevStatus", prevMotorStatus, "currentStatus", current.MotorStatus)
+				return current.Timestamp
+			}
+			prevMotorStatus = current.MotorStatus
+		}
+		benchLogger.Warn("Liftoff event (IDLE -> BURNING transition) not found in sim data")
+		return -1 // Not found
+
+	} else if eventName == "ApogeeDetected" {
+		// Assumption: ApogeeDetected corresponds to the first time ParachuteStatus is DEPLOYED.
+		for _, e := range simEvents {
+			if e.ParachuteStatus == "DEPLOYED" {
+				benchLogger.Debug("Found ApogeeDetected event", "timestamp", e.Timestamp, "parachuteStatus", e.ParachuteStatus)
+				return e.Timestamp
+			}
+		}
+		benchLogger.Warn("ApogeeDetected event (ParachuteStatus == DEPLOYED) not found in sim data")
+		return -1 // Not found
+
+	} else {
+		benchLogger.Warn("Unsupported event name for findSimEventTime", "targetEvent", eventName)
+		return -1 // Unsupported event
+	}
+}
+
+// --- Helper methods for GROUND TRUTH data --- // NEW SECTION
+
+// findGroundTruthApogee finds the maximum altitude from ground truth flight info.
+func findGroundTruthApogee(gtData []FlightInfo) (float64, float64) {
+	if len(gtData) == 0 {
+		return 0, 0
+	}
+	maxAltitude := gtData[0].Height
+	timestamp := gtData[0].Timestamp
+	for _, p := range gtData {
+		if p.Height > maxAltitude {
+			maxAltitude = p.Height
+			timestamp = p.Timestamp
+		}
+	}
+	return maxAltitude, timestamp
+}
+
+// findGroundTruthMaxVelocity finds the maximum velocity from ground truth flight info.
+func findGroundTruthMaxVelocity(gtData []FlightInfo) (float64, float64) {
+	if len(gtData) == 0 {
+		return 0, 0
+	}
+	maxVelocity := gtData[0].Velocity
+	timestamp := gtData[0].Timestamp
+	for _, p := range gtData {
+		if p.Velocity > maxVelocity {
+			maxVelocity = p.Velocity
+			timestamp = p.Timestamp
+		}
+	}
+	return maxVelocity, timestamp
+}
+
+// findGroundTruthEventTime finds the timestamp for a specific event from ground truth event info.
+func findGroundTruthEventTime(gtEvents []EventInfo, eventName string) float64 {
+	for _, e := range gtEvents {
 		if e.Event == eventName {
 			return e.Timestamp
 		}
 	}
 	return -1 // Indicate not found
 }
+
+// TODO: Add findGroundTruthStateTime if needed for FlightState data comparisons

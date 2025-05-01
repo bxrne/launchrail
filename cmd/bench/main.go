@@ -1,22 +1,88 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"text/template"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/pkg/diff"
-	"github.com/olekukonko/tablewriter"
 	logf "github.com/zerodha/logf"
 )
 
 // Global logger instance
 var benchLogger *logf.Logger
+
+const reportTemplate = `
+# Benchmark Results: {{.Tag}}
+
+**Status:** {{.OverallStatus}} (Passed: {{.PassedCount}}, Failed: {{.FailedCount}})
+
+| Metric | Expected | Actual | Difference | Tolerance | Tol Type | Status |
+|---|---|---|---|---|---|---|{{range .Results}}
+| {{.Metric}} | {{printf "%.4f" .Expected}} | {{printf "%.4f" .Actual}} | {{printf "%.4f" .Difference}} | {{printf "%.4f" .Tolerance}} | {{.ToleranceType}} | {{if .Passed}}PASS{{else}}FAIL{{end}} |{{end}}
+`
+
+type reportData struct {
+	Tag           string
+	OverallStatus string
+	PassedCount   int
+	FailedCount   int
+	Results       []BenchmarkResult
+}
+
+// writeMarkdownReport generates a markdown report file in the specified run directory.
+func writeMarkdownReport(runDir, tag string, results []BenchmarkResult) error {
+	passedCount := 0
+	failedCount := 0
+	for _, r := range results {
+		if r.Passed {
+			passedCount++
+		} else {
+			failedCount++
+		}
+	}
+
+	status := "PASS"
+	if failedCount > 0 {
+		status = "FAIL"
+	}
+
+	data := reportData{
+		Tag:           tag,
+		OverallStatus: status,
+		PassedCount:   passedCount,
+		FailedCount:   failedCount,
+		Results:       results,
+	}
+
+	tmpl, err := template.New("report").Parse(reportTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to parse markdown template: %w", err)
+	}
+
+	var reportBuf bytes.Buffer
+	if err := tmpl.Execute(&reportBuf, data); err != nil {
+		return fmt.Errorf("failed to execute markdown template: %w", err)
+	}
+
+	// Trim leading/trailing whitespace potentially added by template
+	reportContent := bytes.TrimSpace(reportBuf.Bytes())
+
+	reportPath := filepath.Join(runDir, "result.md")
+	if err := os.WriteFile(reportPath, reportContent, 0o644); err != nil {
+		return fmt.Errorf("failed to write markdown report to %s: %w", reportPath, err)
+	}
+
+	benchLogger.Info("Markdown report written successfully", "path", reportPath)
+	return nil
+}
 
 func main() {
 	// --- Load Configuration ---
@@ -181,6 +247,13 @@ func main() {
 			continue
 		}
 
+		// --- Write Markdown Report ---
+		if err := writeMarkdownReport(runDir, tag, currentResults); err != nil {
+			benchLogger.Error("Failed to write markdown report", "tag", tag, "runDir", runDir, "error", err)
+			// Optionally, treat this as a benchmark failure?
+			// overallFailedCount++ // Uncomment if report writing failure should fail the benchmark run
+		}
+
 		passedCount := 0
 		failedCount := 0
 		for _, res := range currentResults {
@@ -206,59 +279,6 @@ func main() {
 	}
 	sort.Strings(benchmarkNames)
 
-	for _, name := range benchmarkNames {
-		results := overallResults[name]
-		if len(results) == 0 {
-			fmt.Printf("\nBenchmark: %s - No results found.\n", name)
-			continue // Skip if no results
-		}
-
-		// Determine overall status for this benchmark tag
-		passedCount := 0
-		failedCount := 0
-		for _, r := range results {
-			if r.Passed {
-				passedCount++
-			} else {
-				failedCount++
-			}
-		}
-		status := "PASS"
-		if failedCount > 0 {
-			status = "FAIL"
-		}
-
-		// Print Benchmark Header
-		fmt.Printf("\nBenchmark: %s [%s] (Passed: %d, Failed: %d)\n", name, status, passedCount, failedCount)
-
-		// Setup Table Writer
-		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"Metric", "Expected", "Actual", "Difference", "Tolerance", "Tol Type", "Status"})
-		table.SetBorder(true)         // Set table border
-		table.SetRowLine(true)        // Enable row line
-		table.SetCenterSeparator("|") // Use | for center separator
-		table.SetColumnSeparator("|") // Use | for column separator
-
-		// Populate Table
-		for _, r := range results {
-			statusStr := "PASS"
-			if !r.Passed {
-				statusStr = "FAIL"
-			}
-			table.Append([]string{
-				r.Metric,
-				fmt.Sprintf("%.4f", r.Expected),
-				fmt.Sprintf("%.4f", r.Actual),
-				fmt.Sprintf("%.4f", r.Difference),
-				fmt.Sprintf("%.4f", r.Tolerance),
-				r.ToleranceType,
-				statusStr,
-			})
-		}
-
-		// Render Table
-		table.Render()
-	}
 	fmt.Println("--------------------------------") // Separator
 	fmt.Printf("Total Passed: %d, Total Failed: %d\n", overallPassedCount, overallFailedCount)
 	fmt.Println("--------------------------------") // Footer separator

@@ -123,8 +123,6 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 	log.Info("CreateRecord called", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-
-	// Generate unique hash
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(time.Now().String())))
 
 	// Ensure .launchrail directory exists

@@ -1,17 +1,15 @@
 package main
 
 import (
-	"crypto/sha1"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/pkg/diff"
 )
 
 func main() {
@@ -37,12 +35,13 @@ func main() {
 	}
 
 	// Generate unique run ID based on timestamp
-	ts := time.Now().UTC().Format(time.RFC3339Nano)
-	sum := sha1.Sum([]byte(ts))
-	runID := hex.EncodeToString(sum[:])[:8] // short hash
-	// Create run-specific directory
-	runDir := filepath.Join(outputBase, runID)
-	log.Info("Creating simulation run directory", "runID", runID, "path", runDir)
+	ork_file_bytes, err := os.ReadFile(cfg.Engine.Options.OpenRocketFile)
+	if err != nil {
+		log.Fatal("Failed to read openrocket file", "path", cfg.Engine.Options.OpenRocketFile, "error", err)
+	}
+	hash := diff.CombinedHash(cfg.Bytes(), ork_file_bytes)
+	runDir := filepath.Join(outputBase, hash)
+	log.Info("Creating simulation run directory", "runID", hash, "path", runDir)
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		log.Fatal("Failed to create simulation run directory", "path", runDir, "error", err)
 	}
