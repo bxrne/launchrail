@@ -1,12 +1,16 @@
 package main
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"os"
-	"os/user"
 	"path/filepath"
+	"time"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/internal/simulation"
+	"github.com/bxrne/launchrail/internal/storage"
 	logf "github.com/zerodha/logf"
 )
 
@@ -14,6 +18,9 @@ import (
 var benchLogger *logf.Logger
 
 func main() {
+	// Markdown output path
+	outputMarkdownPath := "BENCHMARK.md"
+
 	// --- Load Configuration ---
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -25,11 +32,14 @@ func main() {
 	benchLogger = logger.GetLogger(cfg.Setup.Logging.Level)
 
 	// --- Determine Paths ---
-	// Simulation results are expected here (consistent with launchrail main)
-	simulationResultsDir := filepath.Join("benchmarks", "results")
-	absSimulationResultsDir, err := filepath.Abs(simulationResultsDir)
+	// Simulation results directory must be specified in config
+	simOutDir := os.ExpandEnv(cfg.Setup.App.SimulationOutputDir)
+	if simOutDir == "" {
+		benchLogger.Fatal("setup.app.simulation_output_dir must be set in config")
+	}
+	absSimulationResultsDir, err := filepath.Abs(simOutDir)
 	if err != nil {
-		benchLogger.Fatal("Failed to get absolute path for simulation results directory", "path", simulationResultsDir, "error", err)
+		benchLogger.Fatal("Failed to get absolute path for simulation results directory", "path", absSimulationResultsDir, "error", err)
 	}
 	if _, err := os.Stat(absSimulationResultsDir); os.IsNotExist(err) {
 		benchLogger.Warn("Simulation results directory does not exist yet, benchmarks might fail if they require it", "path", absSimulationResultsDir)
@@ -37,36 +47,23 @@ func main() {
 		benchLogger.Info("Using simulation results directory", "path", absSimulationResultsDir)
 	}
 
-	// Get user's home directory
-	usr, err := user.Current()
-	if err != nil {
-		benchLogger.Fatal("Failed to get user's home directory", "error", err)
+	// Ensure simulation results directory exists
+	if err := os.MkdirAll(absSimulationResultsDir, 0o755); err != nil {
+		benchLogger.Fatal("Failed to create simulation results directory", "path", absSimulationResultsDir, "error", err)
 	}
-	baseBenchmarksDir := filepath.Join(usr.HomeDir, ".launchrail", "benchmarks")
-	benchLogger.Info("Using base benchmarks directory", "path", baseBenchmarksDir)
 
-	// Markdown output path (hardcoded for now)
-	outputMarkdownPath := "BENCHMARK.md"
-	benchLogger.Info("Markdown output will be written to", "path", outputMarkdownPath)
-
-	// --- Discover Benchmarks (Subdirectories in benchmarkDataDir) ---
-	discoveredTags := []string{}
-	files, err := os.ReadDir(baseBenchmarksDir)
-	if err != nil {
-		benchLogger.Fatal("Failed to read benchmark data directory", "path", baseBenchmarksDir, "error", err)
-	}
-	for _, file := range files {
-		if file.IsDir() {
-			discoveredTags = append(discoveredTags, file.Name())
+	// Discover enabled benchmarks from config
+	var discoveredTags []string
+	for tag := range cfg.Benchmarks {
+		if cfg.Benchmarks[tag].Enabled {
+			discoveredTags = append(discoveredTags, tag)
 		}
 	}
-	//sort.Strings(discoveredTags) // Process in alphabetical order
-
 	if len(discoveredTags) == 0 {
-		benchLogger.Warn("No benchmark subdirectories found in benchmark_data_dir", "path", baseBenchmarksDir)
-		os.Exit(0) // Exit cleanly if no benchmarks found
+		benchLogger.Warn("No enabled benchmarks in config")
+		os.Exit(0)
 	}
-	benchLogger.Info("Discovered benchmark tags", "tags", discoveredTags)
+	benchLogger.Info("Discovered enabled benchmark tags", "tags", discoveredTags)
 
 	// --- Initialize Overall Results ---
 	overallResults := make(map[string][]BenchmarkResult)
@@ -75,14 +72,18 @@ func main() {
 
 	// --- Loop Through Discovered Benchmark Tags ---
 	for _, tag := range discoveredTags {
-		benchLogger.Info("--- Starting Benchmark Run --- ", "tag", tag)
+		benchLogger.Info("--- Starting Benchmark Run ---", "tag", tag)
 
-		// --- Determine Paths for this Benchmark ---
-		currentBenchmarkDataPath := filepath.Join(baseBenchmarksDir, tag)
+		// Determine benchmark data path from config
+		currentBenchmarkDataPath := cfg.Benchmarks[tag].DataDir
 		benchLogger.Info("Using benchmark data path for tag", "tag", tag, "path", currentBenchmarkDataPath)
 
-		// Validate specific benchmark data path existence
-		if _, err := os.Stat(currentBenchmarkDataPath); os.IsNotExist(err) {
+		// Validate benchmark data path exists
+		absBenchmarkDataPath, err := filepath.Abs(currentBenchmarkDataPath)
+		if err != nil {
+			benchLogger.Fatal("Failed to get absolute path for benchmark data directory", "path", currentBenchmarkDataPath, "error", err)
+		}
+		if _, err := os.Stat(absBenchmarkDataPath); os.IsNotExist(err) {
 			benchLogger.Error("Benchmark tag data directory not found, skipping", "tag", tag, "path", currentBenchmarkDataPath)
 			// Store a failure result
 			overallResults[tag] = []BenchmarkResult{
@@ -92,11 +93,49 @@ func main() {
 			continue
 		}
 
-		// --- Setup Benchmark Suite for this Benchmark ---
-		benchConfig := BenchmarkConfig{
-			BenchdataPath: currentBenchmarkDataPath, // Path to EXPECTED data (tag specific)
-			ResultDirPath: absSimulationResultsDir,  // Path to ACTUAL data (shared)
+		// Run a simulation for this benchmark into its own run folder
+		baseDir := absSimulationResultsDir
+		// Generate unique run ID
+		ts := time.Now().UTC().Format(time.RFC3339Nano)
+		hash := sha1.Sum([]byte(tag + ts))
+		runID := hex.EncodeToString(hash[:])[:8]
+		runDir := filepath.Join(baseDir, runID)
+		// Create run directory
+		if err := os.MkdirAll(runDir, 0o755); err != nil {
+			benchLogger.Fatal("Failed to create run directory", "path", runDir, "error", err)
 		}
+		benchLogger.Info("Simulation run directory created", "tag", tag, "runID", runID)
+
+		// Setup simulation storage and manager
+		motionStore, err := storage.NewStorage(runDir, storage.MOTION)
+		if err != nil {
+			benchLogger.Fatal("Failed to create motion storage", "error", err)
+		}
+		eventsStore, err := storage.NewStorage(runDir, storage.EVENTS)
+		if err != nil {
+			motionStore.Close()
+			benchLogger.Fatal("Failed to create events storage", "error", err)
+		}
+		dynamicsStore, err := storage.NewStorage(runDir, storage.DYNAMICS)
+		if err != nil {
+			motionStore.Close()
+			eventsStore.Close()
+			benchLogger.Fatal("Failed to create dynamics storage", "error", err)
+		}
+		stores := &storage.Stores{Motion: motionStore, Events: eventsStore, Dynamics: dynamicsStore}
+		simManager := simulation.NewManager(cfg, *benchLogger)
+		if err := simManager.Initialize(stores); err != nil {
+			benchLogger.Fatal("Simulation initialization failed", "error", err)
+		}
+		if err := simManager.Run(); err != nil {
+			benchLogger.Fatal("Simulation run failed", "error", err)
+		}
+		if err := simManager.Close(); err != nil {
+			benchLogger.Warn("Simulation close error", "error", err)
+		}
+
+		// --- Setup Benchmark Suite for this Benchmark ---
+		benchConfig := BenchmarkConfig{BenchdataPath: currentBenchmarkDataPath, ResultDirPath: runDir}
 
 		suite := NewBenchmarkSuite(benchConfig)
 

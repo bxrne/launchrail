@@ -40,8 +40,9 @@ func GetConfig() (*Config, error) {
 
 // App represents the application configuration.
 type App struct {
-	Name    string `mapstructure:"name"`
-	Version string `mapstructure:"version"`
+	Name                string `mapstructure:"name"`
+	Version             string `mapstructure:"version"`
+	SimulationOutputDir string `mapstructure:"simulation_output_dir"`
 }
 
 // Logging represents the logging configuration.
@@ -148,6 +149,7 @@ func (c *Config) String() map[string]string {
 	// Setup Config
 	marshalled["app.name"] = c.Setup.App.Name
 	marshalled["app.version"] = c.Setup.App.Version
+	marshalled["app.simulation_output_dir"] = c.Setup.App.SimulationOutputDir
 	marshalled["logging.level"] = c.Setup.Logging.Level
 
 	// Engine -> External

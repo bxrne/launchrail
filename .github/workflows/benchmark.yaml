@@ -24,18 +24,18 @@ jobs:
       - name: Run Simulation to Generate Results
         run: |
           echo "Running simulation to generate benchmark input data..."
-          # Removed --output-dir flag, relies on config.yaml's setup.app.simulation_output_dir
+          # Simulation writes to setup.app.simulation_output_dir in config.yaml (base benchmarks dir)
           go run ./cmd/launchrail
-          echo "Simulation finished. Results should be in the directory specified in config.yaml (expecting ./testdata/results for CI)"
-          # Verify the expected dir exists and has content (adjust path if needed based on config)
-          ls -l ./testdata/results
+          echo "Simulation finished. Results should be in the configured benchmarks directory."
+          # Verify the benchmarks directories exist
+          ls -l "$HOME/.launchrail/benchmarks"
 
       - name: Run Benchmarks
         id: run_bench # Keep id for potential future status checks
         run: |
           # Run from project root to find config.yaml
-          # Flags are removed; configuration is read from config.yaml
-          go run ./cmd/bench || true # Ignore exit code for workflow continuation
+          # Configuration is read from config.yaml (no flags needed)
+          go run ./cmd/bench/... || true # Ignore exit code for workflow continuation
           echo "Benchmark run finished. Markdown file generation is handled internally based on config."
           # Removed stdout capture and processing logic
 

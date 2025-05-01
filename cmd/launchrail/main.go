@@ -1,10 +1,12 @@
 package main
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"os"
-	"os/user"
 	"path/filepath"
+	"time"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
@@ -25,28 +27,30 @@ func main() {
 	log := logger.GetLogger(cfg.Setup.Logging.Level)
 	log.Info("Logger initialized", "level", cfg.Setup.Logging.Level)
 
-	// Construct simulation output directory path
-	// Get user's home directory
-	usr, err := user.Current()
-	if err != nil {
-		log.Fatal("Failed to get user's home directory", "error", err)
+	// Determine simulation base output directory from config (with env vars)
+	outputBase := os.ExpandEnv(cfg.Setup.App.SimulationOutputDir)
+	log.Info("Using simulation base output directory", "path", outputBase)
+	// Ensure base output directory exists
+	if err := os.MkdirAll(outputBase, 0o755); err != nil {
+		log.Fatal("Failed to create simulation base output directory", "path", outputBase, "error", err)
 	}
-	baseDir := filepath.Join(usr.HomeDir, ".launchrail") // Use ~/.launchrail
 
-	// Construct simulation output directory path using the new baseDir
-	outputDir := baseDir
-	log.Info("Using simulation output directory", "path", outputDir)
-
-	// Ensure output directory exists (Keep this here - app's responsibility)
-	//if err := os.MkdirAll(outputDir, 0755); err != nil {
-	//	log.Fatal("Failed to create output directory", "path", outputDir, "error", err)
-	//}
+	// Generate unique run ID based on timestamp
+	ts := time.Now().UTC().Format(time.RFC3339Nano)
+	sum := sha1.Sum([]byte(ts))
+	runID := hex.EncodeToString(sum[:])[:8] // short hash
+	// Create run-specific directory
+	runDir := filepath.Join(outputBase, runID)
+	log.Info("Creating simulation run directory", "runID", runID, "path", runDir)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		log.Fatal("Failed to create simulation run directory", "path", runDir, "error", err)
+	}
 
 	// Create and initialize simulation manager
 	simManager := simulation.NewManager(cfg, *log) // Dereference pointer to pass interface value
 
-	// Create storage for the run using the determined output directory
-	motionStore, err := storage.NewStorage(outputDir, storage.MOTION)
+	// Create storage for the run using the run-specific directory
+	motionStore, err := storage.NewStorage(runDir, storage.MOTION)
 	if err != nil {
 		log.Fatal("Failed to create motion storage", "error", err)
 	}
@@ -54,7 +58,7 @@ func main() {
 		motionStore.Close()
 		log.Fatal("Failed to initialize motion storage headers", "error", err)
 	}
-	eventsStore, err := storage.NewStorage(outputDir, storage.EVENTS)
+	eventsStore, err := storage.NewStorage(runDir, storage.EVENTS)
 	if err != nil {
 		motionStore.Close() // Clean up previously opened store
 		log.Fatal("Failed to create events storage", "error", err)
@@ -64,7 +68,7 @@ func main() {
 		eventsStore.Close()
 		log.Fatal("Failed to initialize events storage headers", "error", err)
 	}
-	dynamicsStore, err := storage.NewStorage(outputDir, storage.DYNAMICS)
+	dynamicsStore, err := storage.NewStorage(runDir, storage.DYNAMICS)
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close()
@@ -96,5 +100,5 @@ func main() {
 		log.Error("Failed to close simulation manager", "Error", err)
 	}
 
-	log.Info("Simulation completed successfully.", "output_dir", outputDir)
+	log.Info("Simulation completed successfully.", "output_dir", runDir)
 }
