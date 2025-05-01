@@ -28,7 +28,8 @@ func main() {
 	log.Info("Logger initialized", "level", cfg.Setup.Logging.Level)
 
 	// Determine simulation base output directory from config (with env vars)
-	outputBase := os.ExpandEnv(cfg.Setup.App.SimulationOutputDir)
+	homedir := os.Getenv("HOME")
+	outputBase := filepath.Join(homedir, ".launchrail")
 	log.Info("Using simulation base output directory", "path", outputBase)
 	// Ensure base output directory exists
 	if err := os.MkdirAll(outputBase, 0o755); err != nil {

@@ -1,14 +1,17 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/pkg/diff"
+	"github.com/olekukonko/tablewriter"
 	logf "github.com/zerodha/logf"
 )
 
@@ -16,9 +19,6 @@ import (
 var benchLogger *logf.Logger
 
 func main() {
-	// Markdown output path
-	outputMarkdownPath := "BENCHMARK.md"
-
 	// --- Load Configuration ---
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -31,11 +31,9 @@ func main() {
 
 	// --- Determine Paths ---
 	// Simulation results directory must be specified in config
-	simOutDir := cfg.Setup.App.SimulationOutputDir
-	if simOutDir == "" {
-		benchLogger.Fatal("setup.app.simulation_output_dir must be set in config")
-	}
-	absSimulationResultsDir, err := filepath.Abs(simOutDir)
+	homedir := os.Getenv("HOME")
+	absSimulationResultsDir := filepath.Join(homedir, ".launchrail", "benchmarks")
+	absSimulationResultsDir, err = filepath.Abs(absSimulationResultsDir)
 	if err != nil {
 		benchLogger.Fatal("Failed to get absolute path for simulation results directory", "path", absSimulationResultsDir, "error", err)
 	}
@@ -200,61 +198,70 @@ func main() {
 	} // End loop through discovered tags
 
 	// --- Final Summary ---
-	if len(discoveredTags) == 0 {
-		// This case is handled earlier, but kept for safety
-		benchLogger.Warn("No benchmarks were found or run.")
-		os.Exit(0)
-	}
-
-	benchLogger.Info("--- Overall Benchmark Summary --- ")
+	fmt.Println("\n--- Overall Benchmark Summary ---") // Print header to stdout
 	// Sort keys for consistent output order
 	benchmarkNames := make([]string, 0, len(overallResults))
 	for name := range overallResults {
 		benchmarkNames = append(benchmarkNames, name)
 	}
-	//sort.Strings(benchmarkNames)
+	sort.Strings(benchmarkNames)
 
 	for _, name := range benchmarkNames {
 		results := overallResults[name]
-		passed := 0
-		failed := 0
+		if len(results) == 0 {
+			fmt.Printf("\nBenchmark: %s - No results found.\n", name)
+			continue // Skip if no results
+		}
+
+		// Determine overall status for this benchmark tag
+		passedCount := 0
+		failedCount := 0
 		for _, r := range results {
 			if r.Passed {
-				passed++
+				passedCount++
 			} else {
-				failed++
+				failedCount++
 			}
 		}
 		status := "PASS"
-		if failed > 0 {
+		if failedCount > 0 {
 			status = "FAIL"
 		}
-		benchLogger.Info("Benchmark", "name", name, "status", status, "passed", passed, "failed", failed)
-	}
-	benchLogger.Info("--------------------------------", "Total Passed", overallPassedCount, "Total Failed", overallFailedCount)
 
-	// --- Write Markdown Output ---
-	if outputMarkdownPath != "" {
-		// TODO: Re-implement or adapt markdown generation if needed.
-		// The old formatResultsMarkdown likely relied on cfg.Benchmarks.
-		// We might need a new function taking overallResults and reconstructing names/descriptions.
-		// For now, commenting out the writing part to avoid errors.
-		/*
-			markdownContent := formatResultsMarkdown(overallResults) // Needs adaptation
-			absMarkdownPath, err := filepath.Abs(outputMarkdownPath)
-			if err != nil {
-				benchLogger.Error("Failed to get absolute path for markdown output", "path", outputMarkdownPath, "error", err)
-			} else {
-				err = os.WriteFile(absMarkdownPath, []byte(markdownContent), 0644)
-				if err != nil {
-					benchLogger.Error("Failed to write markdown output file", "path", absMarkdownPath, "error", err)
-				} else {
-					benchLogger.Info("Benchmark results written to", "path", absMarkdownPath)
-				}
+		// Print Benchmark Header
+		fmt.Printf("\nBenchmark: %s [%s] (Passed: %d, Failed: %d)\n", name, status, passedCount, failedCount)
+
+		// Setup Table Writer
+		table := tablewriter.NewWriter(os.Stdout)
+		table.SetHeader([]string{"Metric", "Expected", "Actual", "Difference", "Tolerance", "Tol Type", "Status"})
+		table.SetBorder(true)         // Set table border
+		table.SetRowLine(true)        // Enable row line
+		table.SetCenterSeparator("|") // Use | for center separator
+		table.SetColumnSeparator("|") // Use | for column separator
+
+		// Populate Table
+		for _, r := range results {
+			statusStr := "PASS"
+			if !r.Passed {
+				statusStr = "FAIL"
 			}
-		*/
-		benchLogger.Info("Markdown generation skipped (requires refactoring).")
+			table.Append([]string{
+				r.Metric,
+				fmt.Sprintf("%.4f", r.Expected),
+				fmt.Sprintf("%.4f", r.Actual),
+				fmt.Sprintf("%.4f", r.Difference),
+				fmt.Sprintf("%.4f", r.Tolerance),
+				r.ToleranceType,
+				statusStr,
+			})
+		}
+
+		// Render Table
+		table.Render()
 	}
+	fmt.Println("--------------------------------") // Separator
+	fmt.Printf("Total Passed: %d, Total Failed: %d\n", overallPassedCount, overallFailedCount)
+	fmt.Println("--------------------------------") // Footer separator
 
 	// --- Exit Status ---
 	if overallFailedCount > 0 {

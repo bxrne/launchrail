@@ -1,7 +1,5 @@
 setup:
   app:
-    # Directory where simulation writes results (absolute or with env vars)
-    simulation_output_dir: "$HOME/.launchrail/benchmarks"
     name: "launchrail-dev"
     version: "0.0.1"
 
