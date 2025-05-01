@@ -283,17 +283,8 @@ func main() {
 	}
 	baseDir := filepath.Join(usr.HomeDir, ".launchrail") // Use ~/.launchrail
 
-	// Construct results directory path
-	resultsDir := filepath.Join(baseDir, "results")
-	log.Info("Using results directory", "path", resultsDir)
-
-	// Ensure results directory exists
-	if err := os.MkdirAll(resultsDir, 0755); err != nil {
-		log.Fatal("Failed to create results directory", "path", resultsDir, "error", err)
-	}
-
 	// Initialize RecordManager
-	recordManager, err := storage.NewRecordManager(resultsDir)
+	recordManager, err := storage.NewRecordManager(baseDir)
 	if err != nil {
 		log.Fatal("Failed to initialize record manager", "error", err)
 	}
