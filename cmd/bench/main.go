@@ -1,16 +1,14 @@
 package main
 
 import (
-	"crypto/sha1"
-	"encoding/hex"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/pkg/diff"
 	logf "github.com/zerodha/logf"
 )
 
@@ -33,7 +31,7 @@ func main() {
 
 	// --- Determine Paths ---
 	// Simulation results directory must be specified in config
-	simOutDir := os.ExpandEnv(cfg.Setup.App.SimulationOutputDir)
+	simOutDir := cfg.Setup.App.SimulationOutputDir
 	if simOutDir == "" {
 		benchLogger.Fatal("setup.app.simulation_output_dir must be set in config")
 	}
@@ -96,15 +94,19 @@ func main() {
 		// Run a simulation for this benchmark into its own run folder
 		baseDir := absSimulationResultsDir
 		// Generate unique run ID
-		ts := time.Now().UTC().Format(time.RFC3339Nano)
-		hash := sha1.Sum([]byte(tag + ts))
-		runID := hex.EncodeToString(hash[:])[:8]
-		runDir := filepath.Join(baseDir, runID)
+		// Get associated design file
+		designFilePath := cfg.Benchmarks[tag].DesignFile
+		designFileBytes, err := os.ReadFile(designFilePath)
+		if err != nil {
+			benchLogger.Fatal("Failed to read design file", "path", designFilePath, "error", err)
+		}
+		hash := diff.CombinedHash(cfg.Bytes(), designFileBytes)
+		runDir := filepath.Join(baseDir, hash)
 		// Create run directory
 		if err := os.MkdirAll(runDir, 0o755); err != nil {
 			benchLogger.Fatal("Failed to create run directory", "path", runDir, "error", err)
 		}
-		benchLogger.Info("Simulation run directory created", "tag", tag, "runID", runID)
+		benchLogger.Info("Simulation run directory created", "tag", tag, "runID", hash)
 
 		// Setup simulation storage and manager
 		motionStore, err := storage.NewStorage(runDir, storage.MOTION)
