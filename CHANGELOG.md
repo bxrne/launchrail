@@ -1,3 +1,9 @@
+## v0.4.0 (2025-05-01)
+
+### Feat
+
+- **cmd/bench**: Benchmarking added
+
 ## v0.3.8 (2025-04-29)
 
 ### Refactor
