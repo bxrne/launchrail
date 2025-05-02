@@ -7,9 +7,9 @@ import (
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/pkg/components"
+	openrocket "github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
-	openrocket "github.com/bxrne/launchrail/pkg/openrocket"
 )
 
 // RocketEntity represents a complete rocket with all its components
@@ -34,7 +34,7 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 	// Motor (already created, just validate and add)
 	if motor.GetMass() <= 0 {
 		motorName := "unknown"
-		if motor.Props != nil && motor.Props.Designation != "" { 
+		if motor.Props != nil && motor.Props.Designation != "" {
 			motorName = string(motor.Props.Designation)
 		}
 		fmt.Printf("Error: Cannot create RocketEntity, motor '%s' has invalid initial mass.\n", motorName)
@@ -143,12 +143,8 @@ func calculateTotalMassFromComponents(components map[string]interface{}) float64
 				continue // Skip this component's mass
 			}
 			totalMass += mass
-		} else {
-			// This component doesn't provide mass via GetMass()
-			// fmt.Printf("Info: Component '%s' (%T) does not provide mass via GetMass().\n", name, comp) 
 		}
 	}
-
 	if math.IsNaN(totalMass) || totalMass <= 0 {
 		fmt.Printf("Warning: Final calculated total mass from components is invalid or zero (%.4f). Returning 0.\n", totalMass)
 		return 0.0
