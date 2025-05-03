@@ -1,3 +1,9 @@
+## v0.4.2 (2025-05-03)
+
+### Refactor
+
+- **entities**: Clean up rocket mass calculation and fix code formatting
+
 ## v0.4.1 (2025-05-01)
 
 ### Fix
