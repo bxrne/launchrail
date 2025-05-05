@@ -11,7 +11,7 @@ import (
 	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/simulation"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
-	logf "github.com/zerodha/logf"
+	"github.com/zerodha/logf"
 )
 
 // ManagerStatus represents the status of the simulation manager.
@@ -28,20 +28,23 @@ const (
 
 // Manager handles the overall simulation lifecycle.
 type Manager struct {
-	cfg    *config.Config
-	log    logf.Logger
-	mu     sync.Mutex
-	status ManagerStatus
-	sim    *simulation.Simulation
-	stores *storage.Stores // Store the passed-in stores
+	cfg           *config.Config
+	log           logf.Logger
+	mu            sync.Mutex
+	status        ManagerStatus
+	sim           *simulation.Simulation
+	stores        *storage.Stores // Store the passed-in stores
+	pluginManager *plugin.Manager // Add plugin manager
 }
 
 // NewManager creates a new simulation manager.
 func NewManager(cfg *config.Config, log logf.Logger) *Manager {
+	pm := plugin.NewManager(log, cfg) // Create plugin manager
 	return &Manager{
-		cfg:    cfg,
-		log:    log,
-		status: StatusIdle,
+		cfg:           cfg,
+		log:           log,
+		status:        StatusIdle,
+		pluginManager: pm, // Store plugin manager
 	}
 }
 
