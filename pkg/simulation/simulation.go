@@ -52,7 +52,7 @@ func NewSimulation(cfg *config.Config, log logf.Logger, stores *storage.Stores) 
 		updateChan:    make(chan struct{}),
 		doneChan:      make(chan struct{}),
 		stateChan:     make(chan *states.PhysicsState, 100),
-		pluginManager: plugin.NewManager(log),
+		pluginManager: plugin.NewManager(log, cfg), // Add cfg argument
 	}
 
 	for _, pluginPath := range cfg.Setup.Plugins.Paths {

@@ -78,6 +78,9 @@ type CenteringRing struct {
 // NOTE: Cannot calculate mass if OuterRadius or InnerRadius is "auto".
 // Returns 0 if radii are "auto" or invalid.
 func (c *CenteringRing) GetMass() float64 {
+	if c == nil {
+		return 0.0
+	}
 	if c.Material.Density <= 0 || c.Length <= 0 || c.InstanceCount <= 0 {
 		return 0.0
 	}
@@ -105,8 +108,8 @@ func (c *CenteringRing) GetMass() float64 {
 	totalMass := massPerRing * float64(c.InstanceCount)
 
 	if math.IsNaN(totalMass) || totalMass < 0 {
-		 fmt.Printf("Warning: Invalid mass (%.4f) calculated for CenteringRing '%s', returning 0.\n", totalMass, c.Name)
-		 return 0.0
+		fmt.Printf("Warning: Invalid mass (%.4f) calculated for CenteringRing '%s', returning 0.\n", totalMass, c.Name)
+		return 0.0
 	}
 
 	return totalMass
@@ -134,9 +137,11 @@ type MassComponent struct {
 
 // GetMass returns the pre-defined mass of the component.
 func (m *MassComponent) GetMass() float64 {
-	if m.Mass < 0 {
-		fmt.Printf("Warning: Negative mass (%.4f) specified for MassComponent '%s', returning 0.\n", m.Mass, m.Name)
+	if m == nil {
 		return 0.0
+	}
+	if m.Mass < 0 {
+		fmt.Printf("Warning: Negative mass (%.4f) specified for MassComponent '%s'.\n", m.Mass, m.Name)
 	}
 	return m.Mass
 }
@@ -165,6 +170,9 @@ type Shockcord struct {
 // NOTE: Assumes Material.Density is LINEAR density (e.g., kg/m).
 // If it's volumetric (kg/m^3), this calculation needs cord diameter.
 func (s *Shockcord) GetMass() float64 {
+	if s == nil { // Add nil check
+		return 0.0
+	}
 	if s.Material.Density <= 0 || s.CordLength <= 0 {
 		return 0.0
 	}

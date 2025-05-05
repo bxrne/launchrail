@@ -30,8 +30,8 @@ func TestCompareFloat(t *testing.T) {
 		{"Negative Values Outside Tolerance", "Metric11", "Desc11", -100.0, -103.0, 0.02, false},
 		{"Mixed Signs", "Metric12", "Desc12", -10.0, 10.0, 0.1, false},
 		{"Large Numbers Within Tolerance", "Metric16", "Desc16", 1e9, 1.01e9, 0.02, true},
-		{"NaN Expected", "Metric13", "Desc13", math.NaN(), 10.0, 0.1, false}, 
-		{"NaN Actual", "Metric14", "Desc14", 10.0, math.NaN(), 0.1, false}, 
+		{"NaN Expected", "Metric13", "Desc13", math.NaN(), 10.0, 0.1, false},
+		{"NaN Actual", "Metric14", "Desc14", 10.0, math.NaN(), 0.1, false},
 		{"NaN Both", "Metric15", "Desc15", math.NaN(), math.NaN(), 0.1, false},
 	}
 
@@ -50,8 +50,8 @@ func TestCompareFloat(t *testing.T) {
 
 func TestFindGroundTruthApogee(t *testing.T) {
 	tests := []struct {
-		name        string
-		data        []FlightInfo
+		name         string
+		data         []FlightInfo
 		wantAltitude float64
 		wantTime     float64
 	}{
@@ -73,8 +73,8 @@ func TestFindGroundTruthApogee(t *testing.T) {
 
 func TestFindGroundTruthMaxVelocity(t *testing.T) {
 	tests := []struct {
-		name        string
-		data        []FlightInfo
+		name         string
+		data         []FlightInfo
 		wantVelocity float64
 		wantTime     float64
 	}{

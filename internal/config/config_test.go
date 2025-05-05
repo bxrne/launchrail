@@ -149,11 +149,11 @@ func createValidConfig() config.Config {
 		},
 		Benchmarks: map[string]config.BenchmarkEntry{
 			"test-bench": {
-				Name:               "Test Benchmark",
-				DesignFile:         designFilePath,
-				DataDir:            dataDirPath,
-				Enabled:            true,
-				MotorDesignation:   "A8-3", // Added missing field
+				Name:             "Test Benchmark",
+				DesignFile:       designFilePath,
+				DataDir:          dataDirPath,
+				Enabled:          true,
+				MotorDesignation: "A8-3", // Added missing field
 			},
 		},
 	}

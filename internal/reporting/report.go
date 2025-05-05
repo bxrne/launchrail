@@ -13,7 +13,7 @@ import (
 // ReportData holds all the necessary data for generating the report.
 type ReportData struct {
 	// TODO: Define fields for simulation results, atmospheric data, motor data, etc.
-	Version string // Application version
+	Version  string // Application version
 	RecordID string
 	// ... add other fields like plot paths/data
 	AtmospherePlotPath string // Example placeholder

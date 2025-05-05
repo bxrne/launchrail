@@ -158,7 +158,7 @@ func TestNormalize(t *testing.T) {
 		q := &types.Quaternion{X: math.NaN(), Y: 1, Z: 1, W: 1}
 		expected := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 1} // Expect identity for invalid magnitude
 		got := q.Normalize()
-		if !compareQuaternions(*got, *expected) { 
+		if !compareQuaternions(*got, *expected) {
 			t.Errorf("Normalize NaN magnitude squared: got %v, expected %v", got, expected)
 		}
 	})
@@ -167,7 +167,7 @@ func TestNormalize(t *testing.T) {
 		q := &types.Quaternion{X: math.Inf(1), Y: 1, Z: 1, W: 1}
 		expected := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 1} // Expect identity for invalid magnitude
 		got := q.Normalize()
-		if !compareQuaternions(*got, *expected) { 
+		if !compareQuaternions(*got, *expected) {
 			t.Errorf("Normalize Inf magnitude squared: got %v, expected %v", got, expected)
 		}
 	})
@@ -188,7 +188,7 @@ func TestRotateVector(t *testing.T) {
 	t.Run("RotateVector with NaN Quaternion", func(t *testing.T) {
 		q := &types.Quaternion{X: math.NaN(), Y: 0, Z: 0, W: 1}
 		v := &types.Vector3{X: 1, Y: 0, Z: 0} // Use pointer
-		expected := v // Expect original vector (pointer)
+		expected := v                         // Expect original vector (pointer)
 		got := q.RotateVector(v)
 		if !vectorsEqual(*got, *expected) { // Dereference for comparison
 			t.Errorf("RotateVector with NaN quaternion: got %v, expected %v", got, expected)
@@ -198,7 +198,7 @@ func TestRotateVector(t *testing.T) {
 	t.Run("RotateVector with Inf Quaternion", func(t *testing.T) {
 		q := &types.Quaternion{X: math.Inf(1), Y: 0, Z: 0, W: 1}
 		v := &types.Vector3{X: 1, Y: 0, Z: 0} // Use pointer
-		expected := v // Expect original vector (pointer)
+		expected := v                         // Expect original vector (pointer)
 		got := q.RotateVector(v)
 		if !vectorsEqual(*got, *expected) { // Dereference for comparison
 			t.Errorf("RotateVector with Inf quaternion: got %v, expected %v", got, expected)
@@ -207,8 +207,8 @@ func TestRotateVector(t *testing.T) {
 
 	t.Run("RotateVector with Zero Quaternion", func(t *testing.T) {
 		q := &types.Quaternion{X: 0, Y: 0, Z: 0, W: 0} // Normalizes to identity
-		v := &types.Vector3{X: 1, Y: 2, Z: 3} // Use pointer
-		expected := v // Expect original vector (pointer)
+		v := &types.Vector3{X: 1, Y: 2, Z: 3}          // Use pointer
+		expected := v                                  // Expect original vector (pointer)
 		got := q.RotateVector(v)
 		if !vectorsEqual(*got, *expected) { // Dereference for comparison
 			t.Errorf("RotateVector with Zero quaternion: got %v, expected %v", got, expected)

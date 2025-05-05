@@ -82,7 +82,6 @@ func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime flo
 	return nil
 }
 
-
 // GetState returns the current state of the FSM
 func (fsm *MotorFSM) GetState() string {
 	return fsm.Current()

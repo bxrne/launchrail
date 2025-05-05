@@ -87,15 +87,21 @@ func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericDat
 		a.log.Warn("ISA model returned invalid temperature, using fallback", "altitude", altitude, "temp", temperature)
 		temperature = 288.15 // Fallback temperature (sea level)
 		// Invalidate related values that depend on temperature if they weren't already bad
-		if pressure > 0 { pressure = 101325 }
-		if soundSpeed > 0 { soundSpeed = 0 } // Mark sound speed for recalculation/fallback below
+		if pressure > 0 {
+			pressure = 101325
+		}
+		if soundSpeed > 0 {
+			soundSpeed = 0
+		} // Mark sound speed for recalculation/fallback below
 	}
 
 	// Validate Density - clamp to minimum, don't use sea level fallback
 	if density <= 0 || math.IsNaN(density) || math.IsInf(density, 0) {
 		a.log.Warn("ISA model returned invalid density, clamping to minimum", "altitude", altitude, "density", density)
 		density = minDensity // Clamp to small positive value
-		if pressure > 0 { pressure = 1e-5 } // Also adjust pressure if density was bad? Or leave it if T was okay?
+		if pressure > 0 {
+			pressure = 1e-5
+		} // Also adjust pressure if density was bad? Or leave it if T was okay?
 	}
 
 	// Validate Pressure (less critical for drag, but good practice)

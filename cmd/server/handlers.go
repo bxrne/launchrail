@@ -19,8 +19,6 @@ import (
 	"github.com/zerodha/logf"
 )
 
-
-
 type DataHandler struct {
 	records *storage.RecordManager
 	Cfg     *config.Config
@@ -88,7 +86,6 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 	totalPages := int(math.Ceil(float64(totalRecords) / float64(params.ItemsPerPage)))
 	startIndex := (params.Page - 1) * params.ItemsPerPage
 	endIndex := min(startIndex+params.ItemsPerPage, totalRecords)
-
 	if startIndex >= totalRecords {
 		startIndex = 0
 		endIndex = min(params.ItemsPerPage, totalRecords)
@@ -296,27 +293,21 @@ func (h *DataHandler) GetRecordData(c *gin.Context) {
 	defer record.Close()
 
 	var store *storage.Storage
-	var title string
 	switch dataType {
 	case "motion":
 		store = record.Motion
-		title = "Motion Data"
 	case "events":
 		store = record.Events
-		title = "Events Data"
 	case "dynamics":
 		store = record.Dynamics
-		title = "Dynamics Data"
 	default:
 		h.renderTempl(c, pages.ErrorPage("Invalid data type"), http.StatusBadRequest) // Pass status
 		return
 	}
 
-	headers, data, err := store.ReadHeadersAndData()
-	fmt.Println(headers, data, title)
+	_, _, err = store.ReadHeadersAndData() // Use '=' as err is already declared
 	if err != nil {
 		h.renderTempl(c, pages.ErrorPage("Failed to read data"), http.StatusInternalServerError) // Pass status
-
 		return
 	}
 
@@ -397,7 +388,7 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 		return
 	}
 
-	headers, data, err := storage.ReadHeadersAndData()
+	_, data, err := storage.ReadHeadersAndData() // Use blank identifier for headers as it's not directly used here
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read data"})
 		return
@@ -406,7 +397,24 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 	// Sort the data
 	// Find column index
 	colIndex := -1
-	for i, h := range headers {
+	var sortHeaders []string
+	if len(data) > 0 {
+		// Assuming the first row of data contains headers if headers aren't fetched separately
+		// This needs verification based on how storage.ReadHeadersAndData works.
+		// Let's assume for now we need to fetch headers properly if they aren't in data[0]
+		headers, _, err := storage.ReadHeadersAndData() // Fetch headers specifically for sorting
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read headers for sorting"})
+			return
+		}
+		sortHeaders = headers
+	} else {
+		// Handle case with no data? Or assume headers can still be fetched?
+		// For now, use an empty slice if no data.
+		sortHeaders = []string{}
+	}
+
+	for i, h := range sortHeaders { // Correct: Iterate over actual headers fetched for sorting
 		if h == column {
 			colIndex = i
 			break
@@ -470,19 +478,20 @@ func (h *DataHandler) GetTableRows(c *gin.Context) {
 	}
 
 	// Get data and paginate
-	_, data, err := store.ReadHeadersAndData()
+	headers, data, err := store.ReadHeadersAndData()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read data"})
 		return
 	}
 
-	itemsPerPage := 15 // Changed from 10 to 15
+	itemsPerPage := 15
 	startIndex := (page - 1) * itemsPerPage
 	endIndex := min(startIndex+itemsPerPage, len(data))
 
 	// Return only the table rows HTML
 	c.HTML(http.StatusOK, "table_rows.html", gin.H{
-		"rows": data[startIndex:endIndex],
+		"headers": headers,
+		"rows":    data[startIndex:endIndex],
 	})
 }
 
@@ -656,7 +665,7 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 		startIndex = totalRecords
 		endIndex = totalRecords
 	} else if startIndex < 0 { // Should not happen with default 0, but good practice
-	    startIndex = 0
+		startIndex = 0
 	}
 
 	// Return paginated records with total count

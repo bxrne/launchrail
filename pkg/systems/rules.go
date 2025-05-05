@@ -3,23 +3,23 @@ package systems
 import (
 	"math"
 
+	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
-	"github.com/EngoEngine/ecs"
 	"github.com/zerodha/logf"
 )
 
 // RulesSystem enforces rules of flight
 type RulesSystem struct {
-	world     *ecs.World
-	config    *config.Engine
-	entities  []*states.PhysicsState
+	world      *ecs.World
+	config     *config.Engine
+	entities   []*states.PhysicsState
 	hasLiftoff bool
-	hasApogee bool
-	hasLanded bool
-	logger    logf.Logger
+	hasApogee  bool
+	hasLanded  bool
+	logger     logf.Logger
 }
 
 // GetLastEvent returns the last event detected by the rules system
@@ -39,11 +39,11 @@ func (s *RulesSystem) GetLastEvent() types.Event {
 // NewRulesSystem creates a new RulesSystem
 func NewRulesSystem(world *ecs.World, config *config.Engine, logger logf.Logger) *RulesSystem {
 	return &RulesSystem{
-		world:     world,
-		config:    config,
-		entities:  make([]*states.PhysicsState, 0),
+		world:      world,
+		config:     config,
+		entities:   make([]*states.PhysicsState, 0),
 		hasLiftoff: false,
-		logger:    logger,
+		logger:     logger,
 	}
 }
 
