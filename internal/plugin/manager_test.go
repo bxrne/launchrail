@@ -12,7 +12,7 @@ import (
 // TEST: GIVEN a logger WHEN NewManager is called THEN a new Manager is returned
 func TestNewManager(t *testing.T) {
 	l := logger.GetLogger("debug")
-	m := plugin.NewManager(*l)
+	m := plugin.NewManager(*l, nil)
 	require.NotNil(t, m)
 	require.Empty(t, m.GetPlugins())
 }
@@ -20,7 +20,7 @@ func TestNewManager(t *testing.T) {
 // TEST: GIVEN a plugin manager WHEN LoadPlugin is called with an invalid path THEN the plugin manager returns an error
 func TestLoadPluginInvalidPath(t *testing.T) {
 	l := logger.GetLogger("debug")
-	m := plugin.NewManager(*l)
+	m := plugin.NewManager(*l, nil)
 	err := m.LoadPlugin("invalid/path/plugin.so")
 	require.Error(t, err)
 }
@@ -30,7 +30,7 @@ func TestLoadPluginInvalidPath(t *testing.T) {
 // 	l := logger.GetLogger("debug")
 
 // 	// INFO: Add any built-in plugins here for confidence
-// 	m := plugin.NewManager(*l)
+// 	m := plugin.NewManager(*l, nil)
 // 	err := m.LoadPlugin("../../plugins/windeffect.so")
 // 	require.NoError(t, err)
 // 	require.NotEmpty(t, m.GetPlugins())
@@ -43,6 +43,6 @@ func TestLoadPluginInvalidPath(t *testing.T) {
 // TEST: GIVEN a plugin manager WHEN GetPlugins is called THEN the plugin manager returns the loaded plugins
 func TestGetPlugins(t *testing.T) {
 	l := logger.GetLogger("debug")
-	m := plugin.NewManager(*l)
+	m := plugin.NewManager(*l, nil)
 	require.Empty(t, m.GetPlugins())
 }

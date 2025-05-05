@@ -30,7 +30,7 @@ func newTestPhysicsState(vx, vy, vz float64) *states.PhysicsState {
 func TestInitialize(t *testing.T) {
 	plugin := &BlackScholesPlugin{}
 	logger := newTestLogger()
-	err := plugin.Initialize(logger)
+	err := plugin.Initialize(logger, nil)
 
 	assert.NoError(t, err, "Initialize should not return an error")
 	assert.NotNil(t, plugin.log, "Logger should be initialized")
@@ -47,7 +47,7 @@ func TestNameVersion(t *testing.T) {
 func TestCleanup(t *testing.T) {
 	plugin := &BlackScholesPlugin{}
 	logger := newTestLogger()
-	_ = plugin.Initialize(logger) // Initialize first
+	_ = plugin.Initialize(logger, nil) // Initialize first
 	err := plugin.Cleanup()
 	assert.NoError(t, err, "Cleanup should not return an error")
 }
@@ -55,7 +55,7 @@ func TestCleanup(t *testing.T) {
 func TestAfterSimStep_ChangesState(t *testing.T) {
 	plugin := &BlackScholesPlugin{}
 	logger := newTestLogger()
-	_ = plugin.Initialize(logger)
+	_ = plugin.Initialize(logger, nil)
 	plugin.turbulenceIntensity = 0.1 // Ensure non-zero intensity
 
 	initialState := newTestPhysicsState(10.0, 20.0, 30.0)
@@ -71,7 +71,7 @@ func TestAfterSimStep_ChangesState(t *testing.T) {
 func TestAfterSimStep_IsRandom(t *testing.T) {
 	plugin := &BlackScholesPlugin{}
 	logger := newTestLogger()
-	_ = plugin.Initialize(logger)
+	_ = plugin.Initialize(logger, nil)
 	plugin.turbulenceIntensity = 0.1 // Ensure non-zero intensity
 
 	// Run 1
@@ -94,7 +94,7 @@ func TestAfterSimStep_IsRandom(t *testing.T) {
 func TestAfterSimStep_ZeroIntensity(t *testing.T) {
 	plugin := &BlackScholesPlugin{}
 	logger := newTestLogger()
-	_ = plugin.Initialize(logger)
+	_ = plugin.Initialize(logger, nil)
 	plugin.turbulenceIntensity = 0.0 // Set intensity to zero
 
 	initialState := newTestPhysicsState(10.0, 20.0, 30.0)
@@ -118,7 +118,7 @@ func TestAfterSimStep_IntensityScaling(t *testing.T) {
 
 	// Low intensity run
 	pluginLow := &BlackScholesPlugin{}
-	_ = pluginLow.Initialize(logger)
+	_ = pluginLow.Initialize(logger, nil)
 	pluginLow.turbulenceIntensity = 0.01
 	stateLow := newTestPhysicsState(100.0, 0.0, 0.0) // High initial speed for effect
 	initialVelocityLow := stateLow.Velocity.Vec
@@ -131,7 +131,7 @@ func TestAfterSimStep_IntensityScaling(t *testing.T) {
 	// High intensity run
 	// Re-initialize plugin to reset RNG sequence for a *comparable* (though not identical) draw
 	pluginHigh := &BlackScholesPlugin{}
-	_ = pluginHigh.Initialize(logger)                 // Needs a different seed ideally, but re-init is baseline
+	_ = pluginHigh.Initialize(logger, nil)            // Needs a different seed ideally, but re-init is baseline
 	pluginHigh.turbulenceIntensity = 0.5              // Much higher intensity
 	stateHigh := newTestPhysicsState(100.0, 0.0, 0.0) // Same initial state
 	initialVelocityHigh := stateHigh.Velocity.Vec

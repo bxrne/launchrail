@@ -7,9 +7,9 @@ import (
 	"time"
 )
 
-// openMeteoURL is the base URL for the weather API.
+// OpenMeteoURL is the base URL for the weather API.
 // It's a var so it can be overridden in tests.
-var openMeteoURL = "https://api.open-meteo.com/v1/forecast"
+var OpenMeteoURL = "https://api.open-meteo.com/v1/forecast"
 
 // Client handles communication with the weather API.
 type Client struct {
@@ -18,23 +18,23 @@ type Client struct {
 
 // OpenMeteoResponse defines the structure for the relevant parts of the API response.
 type OpenMeteoResponse struct {
-	Latitude  float64     `json:"latitude"`
-	Longitude float64     `json:"longitude"`
-	Hourly    HourlyUnits `json:"hourly_units"`
+	Latitude   float64     `json:"latitude"`
+	Longitude  float64     `json:"longitude"`
+	Hourly     HourlyUnits `json:"hourly_units"`
 	HourlyData HourlyData  `json:"hourly"`
 }
 
 // HourlyUnits defines the units for the hourly data.
 type HourlyUnits struct {
-	Time            string `json:"time"`
-	WindSpeed10m    string `json:"windspeed_10m"`    // e.g., "km/h"
+	Time             string `json:"time"`
+	WindSpeed10m     string `json:"windspeed_10m"`     // e.g., "km/h"
 	WindDirection10m string `json:"winddirection_10m"` // e.g., "°"
 }
 
 // HourlyData contains the arrays of hourly forecast data.
 type HourlyData struct {
-	Time            []string  `json:"time"`             // ISO8601 time strings
-	WindSpeed10m    []float64 `json:"windspeed_10m"`
+	Time             []string  `json:"time"` // ISO8601 time strings
+	WindSpeed10m     []float64 `json:"windspeed_10m"`
 	WindDirection10m []float64 `json:"winddirection_10m"`
 }
 
@@ -59,7 +59,7 @@ func (c *Client) GetWindData(latitude, longitude float64) (*WindInfo, error) {
 	// Construct the API request URL
 	// Requesting hourly wind speed and direction at 10m for the next day.
 	apiURL := fmt.Sprintf("%s?latitude=%.4f&longitude=%.4f&hourly=windspeed_10m,winddirection_10m&forecast_days=1",
-		openMeteoURL, latitude, longitude)
+		OpenMeteoURL, latitude, longitude)
 
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
