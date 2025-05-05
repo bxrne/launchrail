@@ -113,6 +113,7 @@ func TestSchemaCenteringRingGetMass(t *testing.T) {
 				r.OuterRadius = "0.05"
 				r.InnerRadius = "0.04"
 				r.Material = openrocket.Material{Density: 1200}
+				r.InstanceCount = 1
 				return r
 			}(),
 			want: 0.05 * math.Pi * (math.Pow(0.05, 2) - math.Pow(0.04, 2)) * 1200,
@@ -209,14 +210,15 @@ func TestSchemaCenteringRingGetMass(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		tc := tt // Capture range variable
+		t.Run(tc.name, func(t *testing.T) {
 			var got float64
-			if tt.ring != nil {
-				got = tt.ring.GetMass()
+			if tc.ring != nil {
+				got = tc.ring.GetMass()
 			} else {
-				got = tt.ring.GetMass()
+				got = 0.0
 			}
-			assert.InDelta(t, tt.want, got, 1e-9, "CenteringRing.GetMass() mismatch")
+			assert.InDelta(t, tc.want, got, 1e-9, "CenteringRing.GetMass() mismatch")
 		})
 	}
 }
@@ -267,9 +269,10 @@ func TestSchemaShockcordGetMass(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.cord.GetMass()
-			assert.InDelta(t, tt.want, got, 1e-9, "Shockcord.GetMass() mismatch")
+		tc := tt // Capture range variable
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.cord.GetMass()
+			assert.InDelta(t, tc.want, got, 1e-9, "Shockcord.GetMass() mismatch")
 		})
 	}
 }

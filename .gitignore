@@ -1,5 +1,5 @@
 *.so
 .DS_Store
 tmp/
-plots/
 vendor/
+__debug_bin*

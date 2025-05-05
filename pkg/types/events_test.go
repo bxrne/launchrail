@@ -6,11 +6,6 @@ import (
 	"github.com/bxrne/launchrail/pkg/types"
 )
 
-// Parameters for testing
-const (
-	testEvent types.Event = types.Liftoff
-)
-
 func TestEventString(t *testing.T) {
 	tests := []struct {
 		event types.Event

@@ -51,6 +51,25 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 		return nil
 	}
 	createdComponents["bodytube"] = bodytube
+	log.Info("Created BodyTube component", "id", bodytube.ID.ID(), "mass", bodytube.GetMass())
+
+	// Create Finset component if present in BodyTube subcomponents
+	var finset *components.TrapezoidFinset // Correct type
+	// Access stages via Subcomponents and check FinCount > 0
+	if len(orkData.Subcomponents.Stages) > 0 && orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinset.FinCount > 0 {
+		// Pass the whole document to the constructor, not just the finset part
+		createdFinset := components.NewTrapezoidFinsetFromORK(ecs.NewBasic(), orkData) // Correct constructor call
+
+		// Check if creation was successful (constructor might return nil on error)
+		if createdFinset == nil {
+			log.Error("Failed to create Finset component from ORK data", "finset_name", orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinset.Name)
+			// Decide if this is critical - maybe return nil or continue?
+		} else {
+			finset = createdFinset
+			createdComponents["finset"] = finset
+			log.Info("Created Finset component", "id", finset.ID(), "mass", finset.GetMass()) // Use ID()
+		}
+	}
 
 	// Nosecone
 	nosecone := components.NewNoseconeFromORK(ecs.NewBasic(), orkData)
@@ -58,13 +77,6 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 		return nil
 	}
 	createdComponents["nosecone"] = nosecone
-
-	// Finset
-	finset := components.NewTrapezoidFinsetFromORK(ecs.NewBasic(), orkData)
-	if finset == nil {
-		return nil
-	}
-	createdComponents["finset"] = finset
 
 	// Parachute
 	parachute, err := components.NewParachuteFromORK(ecs.NewBasic(), orkData)
@@ -118,6 +130,7 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 	rocket.PhysicsState.Motor = motor // Assign directly for physics system access
 	rocket.PhysicsState.Bodytube = bodytube
 	rocket.PhysicsState.Nosecone = nosecone
+	rocket.PhysicsState.Finset = finset // Assign finset if created
 	// ... assign other relevant components like finset if needed by physics/aero ...
 
 	return rocket
