@@ -86,7 +86,7 @@ func (s *PhysicsSystem) Update(dt float64) error {
 					continue
 				}
 
-				// --- Force Accumulation and State Update --- 
+				// --- Force Accumulation and State Update ---
 				// Reset forces for this physics update step
 				entity.AccumulatedForce = types.Vector3{}
 
@@ -127,7 +127,7 @@ func (s *PhysicsSystem) Update(dt float64) error {
 						area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
 						cd := 0.3 // Simplified constant drag coefficient for now
 						dragMagnitude := 0.5 * rho * velocityMag * velocityMag * cd * area
-						
+
 						// Drag force vector opposes velocity
 						dragDirection := entity.Velocity.Vec.Normalize().MultiplyScalar(-1)
 						dragForce := dragDirection.MultiplyScalar(dragMagnitude)
@@ -170,7 +170,6 @@ func (s *PhysicsSystem) validateEntity(entity *states.PhysicsState) error {
 	if entity != nil && entity.Entity != nil {
 		entityID = entity.Entity.ID()
 	}
-	s.logger.Debug("Entering validateEntity", "entity_id", entityID, "mass_is_nil", entity.Mass == nil)
 	if entity == nil {
 		return fmt.Errorf("nil entity")
 	}
@@ -202,79 +201,20 @@ func (s *PhysicsSystem) handleGroundCollision(entity *states.PhysicsState) bool 
 		entity.Velocity.Vec = types.Vector3{}
 		// Zero out all acceleration components
 		entity.Acceleration.Vec = types.Vector3{}
-
 		// Optionally, zero out angular velocity as well?
-		// if entity.AngularVelocity != nil {
-		// 	*entity.AngularVelocity = types.Vector3{}
-		// }
-		// if entity.AngularAcceleration != nil {
-		// 	*entity.AngularAcceleration = types.Vector3{}
-		// }
+		if entity.AngularVelocity != nil {
+			*entity.AngularVelocity = types.Vector3{}
+		}
+		if entity.AngularAcceleration != nil {
+			*entity.AngularAcceleration = types.Vector3{}
+		}
 
 		// TODO: Trigger LANDING event if not already landed
+		s.logger.Debug("Ground collision detected", "entity_id", entity.Entity.ID())
 
 		return true // Collision handled
 	}
 	return false // No collision detected or handled
-}
-
-func (s *PhysicsSystem) calculateNetForce(entity *states.PhysicsState, force types.Vector3) (types.Vector3, error) {
-	// --- DEBUG LOG --- Add logging to inspect the input
-	if entity != nil {
-		s.logger.Debug("Entering calculateNetForce", "entity_id", entity.Entity.ID(), "entity_mass_is_nil", entity.Mass == nil)
-	} else {
-		s.logger.Debug("Entering calculateNetForce with nil entity")
-	}
-	// --- END DEBUG LOG ---
-
-	// Check for invalid entity or mass *first*
-	if entity == nil || entity.Mass == nil || entity.Mass.Value <= 0 { // Check is here
-		return types.Vector3{}, fmt.Errorf("invalid entity or mass for force calculation")
-	}
-
-	var netForce types.Vector3 = types.Vector3{Y: -s.gravity * entity.Mass.Value} // Start with gravity
-
-	// Add thrust if motor is active
-	if entity.Motor != nil && !entity.Motor.IsCoasting() {
-		thrust := entity.Motor.GetThrust()
-		if !math.IsNaN(thrust) && !math.IsInf(thrust, 0) {
-			netForce.Y += thrust
-		}
-	}
-
-	// Add drag force
-	velocity := math.Sqrt(
-		entity.Velocity.Vec.X*entity.Velocity.Vec.X +
-			entity.Velocity.Vec.Y*entity.Velocity.Vec.Y)
-
-	dragForceY := 0.0
-	if velocity > 0 && !math.IsNaN(velocity) {
-		rho := getAtmosphericDensity(entity.Position.Vec.Y)
-		if !math.IsNaN(rho) && rho > 0 {
-			if entity.Nosecone == nil || entity.Bodytube == nil {
-				// Note: We already checked for invalid mass, but geometry might still be missing.
-				// Depending on desired behavior, we could return the netForce calculated so far (gravity + thrust)
-				// along with the error, or just the error.
-				return netForce, fmt.Errorf("missing geometry components for drag: Nosecone or Bodytube is nil")
-			}
-			area := calculateReferenceArea(entity.Nosecone, entity.Bodytube)
-			cd := 0.3 // Base drag coefficient
-			if velocity > 100 {
-				cd = 0.5
-			}
-			// Calculate drag force components
-			dragForceY = -0.5 * rho * cd * area * velocity * entity.Velocity.Vec.Y
-			netForce.Y += dragForceY
-		}
-	}
-
-	// Add external forces (already a Vector3)
-	// if !math.IsNaN(force.Y) && !math.IsInf(force.Y, 0) { // Check on vector components if needed
-	// 	netForce.Y += force.Y
-	// }
-	netForce = netForce.Add(force) // Add the full external force vector
-
-	return netForce, nil
 }
 
 func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce types.Vector3, dt float64) {
