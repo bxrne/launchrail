@@ -117,6 +117,7 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 
 // DeleteRecord handles the deletion of a specific simulation record.
 func (h *DataHandler) DeleteRecord(c *gin.Context) {
+	h.log.Debug("All request headers:", "headers", c.Request.Header) // Added for debugging
 	hash := c.Param("hash")
 	if hash == "" {
 		h.log.Warn("DeleteRecord request missing hash")

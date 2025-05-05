@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -420,20 +421,19 @@ func TestDownloadReport(t *testing.T) {
 
 	cfg := &config.Config{ // Minimal config needed
 		Setup: config.Setup{
-			App: config.App{Version: "test-report-v1"},
+			App:     config.App{Version: "test-report-v1"},
 			Logging: config.Logging{Level: "error"},
 		},
 	}
 
-	handler := &DataHandler{ // Use the actual DataHandler with the REAL manager
-		records: realManager,
-		Cfg:     cfg,
-	}
+	// Initialize DataHandler with a logger
+	log := logger.GetLogger("debug")
+	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(gin.Recovery()) // Add recovery middleware
-	router.GET("/explore/:hash/report", handler.DownloadReport)
+	router.GET("/explore/:hash/report", dataHandler.DownloadReport)
 
 	// Act
 	req := httptest.NewRequest(http.MethodGet, "/explore/"+recordHash+"/report", nil)
@@ -454,7 +454,7 @@ func TestDownloadReport(t *testing.T) {
 	body := w.Body.String()
 	assert.NotEmpty(t, body)
 	assert.Contains(t, body, "--- PDF Conversion Placeholder ---") // From reporting.convertMarkdownToPDF placeholder
-	assert.Contains(t, body, recordHash) // Check if hash from template is included
+	assert.Contains(t, body, recordHash)                           // Check if hash from template is included
 }
 
 func TestDownloadReport_NotFound(t *testing.T) {
@@ -470,20 +470,19 @@ func TestDownloadReport_NotFound(t *testing.T) {
 
 	cfg := &config.Config{ // Minimal config
 		Setup: config.Setup{
-			App: config.App{Version: "test-report-v1"},
+			App:     config.App{Version: "test-report-v1"},
 			Logging: config.Logging{Level: "error"},
 		},
 	}
 
-	handler := &DataHandler{ // Use the actual DataHandler with the REAL manager
-		records: realManager,
-		Cfg:     cfg,
-	}
+	// Initialize DataHandler with a logger
+	log := logger.GetLogger("debug")
+	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(gin.Recovery()) // Add recovery middleware
-	router.GET("/explore/:hash/report", handler.DownloadReport)
+	router.GET("/explore/:hash/report", dataHandler.DownloadReport)
 
 	// Act
 	req := httptest.NewRequest(http.MethodGet, "/explore/"+nonExistentHash+"/report", nil)
@@ -523,20 +522,19 @@ func TestListRecords_RealManager(t *testing.T) {
 
 	cfg := &config.Config{ // Minimal config
 		Setup: config.Setup{
-			App: config.App{Version: "test-list-v1"},
+			App:     config.App{Version: "test-list-v1"},
 			Logging: config.Logging{Level: "error"},
 		},
 	}
 
 	// 3. Setup real DataHandler and Router
-	handler := &DataHandler{
-		records: realManager,
-		Cfg:     cfg,
-	}
+	// Initialize DataHandler with a logger
+	log := logger.GetLogger("debug")
+	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/data", handler.ListRecords) // Use the HTML handler
+	router.GET("/data", dataHandler.ListRecords) // Use the HTML handler
 
 	// 4. Make GET request
 	req := httptest.NewRequest(http.MethodGet, "/data", nil)
@@ -581,22 +579,21 @@ func TestDeleteRecord(t *testing.T) {
 
 	cfg := &config.Config{ // Minimal config
 		Setup: config.Setup{
-			App: config.App{Version: "test-delete-v1"},
+			App:     config.App{Version: "test-delete-v1"},
 			Logging: config.Logging{Level: "error"},
 		},
 	}
 
 	// 3. Setup real DataHandler and Router
-	handler := &DataHandler{
-		records: realManager,
-		Cfg:     cfg,
-	}
+	// Initialize DataHandler with a logger
+	log := logger.GetLogger("debug")
+	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(gin.Recovery()) // Add recovery middleware
 	// Note the route path from main.go
-	router.DELETE("/data/:hash", handler.DeleteRecord)
+	router.DELETE("/data/:hash", dataHandler.DeleteRecord)
 
 	// 4. Make DELETE request
 	req := httptest.NewRequest(http.MethodDelete, "/data/"+hashToDelete, nil)
@@ -648,16 +645,15 @@ func TestDeleteRecordAPI(t *testing.T) {
 	}
 
 	// 3. Setup real DataHandler and Router
-	handler := &DataHandler{
-		records: realManager,
-		Cfg:     cfg,
-	}
+	// Initialize DataHandler with a logger
+	log := logger.GetLogger("debug")
+	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(gin.Recovery()) // Add recovery middleware
 	// Note the route path from main.go - the handler is DeleteRecord
-	router.DELETE("/api/data/:hash", handler.DeleteRecord)
+	router.DELETE("/api/data/:hash", dataHandler.DeleteRecord)
 
 	// --- Test Case 1: Delete Existing Record ---
 	// 4. Make DELETE request
