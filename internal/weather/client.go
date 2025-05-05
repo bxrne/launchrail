@@ -7,7 +7,9 @@ import (
 	"time"
 )
 
-const openMeteoURL = "https://api.open-meteo.com/v1/forecast"
+// openMeteoURL is the base URL for the weather API.
+// It's a var so it can be overridden in tests.
+var openMeteoURL = "https://api.open-meteo.com/v1/forecast"
 
 // Client handles communication with the weather API.
 type Client struct {
