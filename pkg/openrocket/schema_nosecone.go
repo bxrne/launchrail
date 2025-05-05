@@ -8,22 +8,22 @@ import (
 
 // Nosecone represents the nosecone element of the XML document
 type Nosecone struct {
-	XMLName              xml.Name              `xml:"nosecone"`
-	Name                 string                `xml:"name"`
-	ID                   string                `xml:"id"`
-	Finish               string                `xml:"finish"`
-	Material             Material              `xml:"material"`
-	Length               float64               `xml:"length"`
-	Thickness            float64               `xml:"thickness"`
-	Shape                string                `xml:"shape"`
-	ShapeClipped         bool                  `xml:"shapeclipped"`
-	ShapeParameter       float64               `xml:"shapeparameter"`
-	AftRadius            float64               `xml:"aftradius"`
-	AftShoulderRadius    float64               `xml:"aftshoulderradius"`
-	AftShoulderLength    float64               `xml:"aftshoulderlength"`
-	AftShoulderThickness float64               `xml:"aftshoulderthickness"`
-	AftShoulderCapped    bool                  `xml:"aftshouldercapped"`
-	IsFlipped            bool                  `xml:"isflipped"`
+	XMLName              xml.Name          `xml:"nosecone"`
+	Name                 string            `xml:"name"`
+	ID                   string            `xml:"id"`
+	Finish               string            `xml:"finish"`
+	Material             Material          `xml:"material"`
+	Length               float64           `xml:"length"`
+	Thickness            float64           `xml:"thickness"`
+	Shape                string            `xml:"shape"`
+	ShapeClipped         bool              `xml:"shapeclipped"`
+	ShapeParameter       float64           `xml:"shapeparameter"`
+	AftRadius            float64           `xml:"aftradius"`
+	AftShoulderRadius    float64           `xml:"aftshoulderradius"`
+	AftShoulderLength    float64           `xml:"aftshoulderlength"`
+	AftShoulderThickness float64           `xml:"aftshoulderthickness"`
+	AftShoulderCapped    bool              `xml:"aftshouldercapped"`
+	IsFlipped            bool              `xml:"isflipped"`
 	Subcomponents        NoseSubcomponents `xml:"subcomponents"`
 }
 
@@ -68,22 +68,22 @@ func (n *Nosecone) GetMass() float64 {
 			if radius <= 0 {
 				return 0 // Avoid division by zero and invalid geometry
 			}
-			r_sq := radius * radius
-			l_sq := length * length
+			radiusSquared := radius * radius
+			lengthSquared := length * length
 			// Avoid division by zero if radius is extremely small, though caught above.
 			// Check for length being zero as well.
 			if length == 0 {
-			    return 0
+				return 0
 			}
 
-			R := (r_sq + l_sq) / (2.0 * radius) // Ogive radius (rho)
-			h := (r_sq - l_sq) / (2.0 * radius) // x-offset of circle center
-			R_sq := R * R
+			R := (radiusSquared + lengthSquared) / (2.0 * radius) // Ogive radius (rho)
+			h := (radiusSquared - lengthSquared) / (2.0 * radius) // x-offset of circle center
+			rhoSquared := R * R
 
 			// arcsin argument must be between -1 and 1.
 			// Check for R being zero or very small, although unlikely with l > 0.
 			if R == 0 {
-			    return 0
+				return 0
 			}
 			asinArg := length / R
 			if asinArg > 1.0 {
@@ -100,7 +100,7 @@ func (n *Nosecone) GetMass() float64 {
 				return 0.0
 			}
 
-			volume := math.Pi * (R_sq*length - l_sq*length/3.0 + h*R_sq*math.Asin(asinArg))
+			volume := math.Pi * (rhoSquared*length - lengthSquared*length/3.0 + h*rhoSquared*math.Asin(asinArg))
 
 			// Final safety check for calculated volume
 			if math.IsNaN(volume) || volume < 0 {
