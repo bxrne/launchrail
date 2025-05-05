@@ -1,8 +1,11 @@
 package openrocket_test
 
 import (
-	"github.com/bxrne/launchrail/pkg/openrocket"
+	"math"
 	"testing"
+
+	"github.com/bxrne/launchrail/pkg/openrocket"
+	"github.com/stretchr/testify/assert"
 )
 
 // TEST: GIVEN a RadiusOffset struct WHEN calling the String method THEN return a string representation of the RadiusOffset struct
@@ -79,44 +82,200 @@ func TestSchemaCenteringRingString(t *testing.T) {
 	}
 }
 
-// TEST: GIVEN a MassComponent struct WHEN calling the String method THEN return a string representation of the MassComponent struct
-func TestSchemaMassComponentString(t *testing.T) {
-	m := &openrocket.MassComponent{
-		Name:            "name",
-		ID:              "id",
-		AxialOffset:     openrocket.AxialOffset{},
-		Position:        openrocket.Position{},
-		PackedLength:    1.0,
-		PackedRadius:    1.0,
-		RadialPosition:  1.0,
-		RadialDirection: 1.0,
-		Mass:            1.0,
-		Type:            "type1",
+// TEST: MassComponent GetMass
+func TestSchemaMassComponentGetMass(t *testing.T) {
+	// MassComponent directly contains Mass, no embedding involved for GetMass
+	mc := &openrocket.MassComponent{Mass: 5.67}
+	assert.Equal(t, 5.67, mc.GetMass(), "MassComponent GetMass should return the Mass field")
+
+	mcNil := (*openrocket.MassComponent)(nil)
+	assert.Equal(t, 0.0, mcNil.GetMass(), "Nil MassComponent GetMass should return 0.0")
+
+	mcZero := &openrocket.MassComponent{Mass: 0.0}
+	assert.Equal(t, 0.0, mcZero.GetMass(), "Zero MassComponent GetMass should return 0.0")
+
+	mcNeg := &openrocket.MassComponent{Mass: -1.0}
+	assert.Equal(t, -1.0, mcNeg.GetMass(), "Negative MassComponent GetMass should return negative value")
+}
+
+// TEST: CenteringRing GetMass
+func TestSchemaCenteringRingGetMass(t *testing.T) {
+	tests := []struct {
+		name string
+		ring *openrocket.CenteringRing
+		want float64
+	}{
+		{
+			name: "Valid Ring",
+			ring: func() *openrocket.CenteringRing {
+				r := &openrocket.CenteringRing{}
+				r.Length = 0.05
+				r.OuterRadius = "0.05"
+				r.InnerRadius = "0.04"
+				r.Material = openrocket.Material{Density: 1200}
+				return r
+			}(),
+			want: 0.05 * math.Pi * (math.Pow(0.05, 2) - math.Pow(0.04, 2)) * 1200,
+		},
+		{
+			name: "Zero Length",
+			ring: func() *openrocket.CenteringRing {
+				r := &openrocket.CenteringRing{}
+				r.Length = 0.0
+				r.OuterRadius = "0.05"
+				r.InnerRadius = "0.04"
+				r.Material = openrocket.Material{Density: 1200}
+				return r
+			}(),
+			want: 0.0,
+		},
+		{
+			name: "Zero Density",
+			ring: func() *openrocket.CenteringRing {
+				r := &openrocket.CenteringRing{}
+				r.Length = 0.05
+				r.OuterRadius = "0.05"
+				r.InnerRadius = "0.04"
+				r.Material = openrocket.Material{Density: 0.0}
+				return r
+			}(),
+			want: 0.0,
+		},
+		{
+			name: "OuterRadius Auto",
+			ring: func() *openrocket.CenteringRing {
+				r := &openrocket.CenteringRing{}
+				r.Length = 0.05
+				r.OuterRadius = "auto"
+				r.InnerRadius = "0.04"
+				r.Material = openrocket.Material{Density: 1200}
+				return r
+			}(),
+			want: 0.0,
+		},
+		{
+			name: "InnerRadius Auto",
+			ring: func() *openrocket.CenteringRing {
+				r := &openrocket.CenteringRing{}
+				r.Length = 0.05
+				r.OuterRadius = "0.05"
+				r.InnerRadius = "auto"
+				r.Material = openrocket.Material{Density: 1200}
+				return r
+			}(),
+			want: 0.0,
+		},
+		{
+			name: "OuterRadius Invalid",
+			ring: func() *openrocket.CenteringRing {
+				r := &openrocket.CenteringRing{}
+				r.Length = 0.05
+				r.OuterRadius = "invalid"
+				r.InnerRadius = "0.04"
+				r.Material = openrocket.Material{Density: 1200}
+				return r
+			}(),
+			want: 0.0,
+		},
+		{
+			name: "InnerRadius Invalid",
+			ring: func() *openrocket.CenteringRing {
+				r := &openrocket.CenteringRing{}
+				r.Length = 0.05
+				r.OuterRadius = "0.05"
+				r.InnerRadius = "invalid"
+				r.Material = openrocket.Material{Density: 1200}
+				return r
+			}(),
+			want: 0.0,
+		},
+		{
+			name: "InnerRadius >= OuterRadius",
+			ring: func() *openrocket.CenteringRing {
+				r := &openrocket.CenteringRing{}
+				r.Length = 0.05
+				r.OuterRadius = "0.04"
+				r.InnerRadius = "0.05"
+				r.Material = openrocket.Material{Density: 1200}
+				return r
+			}(),
+			want: 0.0,
+		},
+		{
+			name: "Nil Ring",
+			ring: nil,
+			want: 0.0,
+		},
 	}
 
-	expected := "MassComponent{Name=name, ID=id, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, PackedLength=1.00, PackedRadius=1.00, RadialPosition=1.00, RadialDirection=1.00, Mass=1.00, Type=type1}"
-	if m.String() != expected {
-		t.Errorf("Expected %s, got %s", expected, m.String())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got float64
+			if tt.ring != nil {
+				got = tt.ring.GetMass()
+			} else {
+				got = tt.ring.GetMass()
+			}
+			assert.InDelta(t, tt.want, got, 1e-9, "CenteringRing.GetMass() mismatch")
+		})
 	}
 }
 
-// TEST: GIVEN a Shockcord struct WHEN calling the String method THEN return a string representation of the Shockcord struct
-func TestSchemaShockcordString(t *testing.T) {
-	sc := &openrocket.Shockcord{
-		Name:            "name",
-		ID:              "id",
-		AxialOffset:     openrocket.AxialOffset{},
-		Position:        openrocket.Position{},
-		PackedLength:    1.0,
-		PackedRadius:    1.0,
-		RadialPosition:  1.0,
-		RadialDirection: 1.0,
-		CordLength:      1.0,
-		Material:        openrocket.Material{},
+// TEST: Shockcord GetMass
+func TestSchemaShockcordGetMass(t *testing.T) {
+	tests := []struct {
+		name string
+		cord *openrocket.Shockcord
+		want float64
+	}{
+		{
+			name: "Valid Cord",
+			cord: &openrocket.Shockcord{
+				CordLength: 3.0,
+				Material:   openrocket.Material{Density: 0.01},
+			},
+			want: 3.0 * 0.01,
+		},
+		{
+			name: "Zero Length",
+			cord: &openrocket.Shockcord{
+				CordLength: 0.0,
+				Material:   openrocket.Material{Density: 0.01},
+			},
+			want: 0.0,
+		},
+		{
+			name: "Zero Density",
+			cord: &openrocket.Shockcord{
+				CordLength: 3.0,
+				Material:   openrocket.Material{Density: 0.0},
+			},
+			want: 0.0,
+		},
+		{
+			name: "Negative Density",
+			cord: &openrocket.Shockcord{
+				CordLength: 3.0,
+				Material:   openrocket.Material{Density: -0.01},
+			},
+			want: 0.0,
+		},
+		{
+			name: "Nil Cord",
+			cord: nil,
+			want: 0.0,
+		},
 	}
-
-	expected := "Shockcord{Name=name, ID=id, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, PackedLength=1.00, PackedRadius=1.00, RadialPosition=1.00, RadialDirection=1.00, CordLength=1.00, Material=Material{Type=, Density=0.00, Name=}}"
-	if sc.String() != expected {
-		t.Errorf("Expected %s, got %s", expected, sc.String())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.cord.GetMass()
+			assert.InDelta(t, tt.want, got, 1e-9, "Shockcord.GetMass() mismatch")
+		})
 	}
 }
+
+// NOTE: parseRadius is not exported, so we can't test it directly.
+// Its functionality is implicitly tested via the GetMass methods that use it
+// (RingComponent, LaunchLug). If those tests pass with "auto" and invalid
+// radius inputs resulting in 0 mass, parseRadius is working as expected
+// within that context.
