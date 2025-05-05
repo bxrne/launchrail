@@ -85,12 +85,6 @@ func (s *PhysicsSystem) Update(dt float64) error {
 					results <- result{err: err}
 					continue
 				}
-				if entity.Motor != nil {
-					if err := entity.Motor.Update(dt); err != nil {
-						results <- result{err: err}
-						continue
-					}
-				}
 				netForce, err := s.calculateNetForce(entity, types.Vector3{})
 				if err != nil {
 					results <- result{err: err}
@@ -231,8 +225,10 @@ func (s *PhysicsSystem) updateEntityState(entity *states.PhysicsState, netForce 
 		return // Skip update for this entity if mass is too small
 	}
 
-	s.logger.Debug("Calculating acceleration inputs",
-		"netForceY", netForce,
+	// Reverted: Log inputs right before division using DEBUG level
+	s.logger.Debug("Calculating acceleration",
+		"entity_id", entity.Entity.ID(),
+		"net_force_Y", netForce,
 		"mass", entity.Mass.Value,
 	)
 	newAcceleration := netForce / entity.Mass.Value

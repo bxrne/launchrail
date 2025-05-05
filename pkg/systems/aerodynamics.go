@@ -10,6 +10,7 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
+	"github.com/zerodha/logf"
 )
 
 // atmosphericData stores atmospheric data at a given altitude
@@ -23,9 +24,10 @@ type atmosphericData struct {
 // AerodynamicSystem calculates aerodynamic forces on entities
 type AerodynamicSystem struct {
 	world    *ecs.World
-	entities []*states.PhysicsState // Change to pointer slice
+	entities []*states.PhysicsState
 	workers  int
 	isa      *atmosphere.ISAModel
+	log      logf.Logger
 }
 
 // GetAirDensity returns the air density at a given altitude
@@ -34,15 +36,15 @@ func (a *AerodynamicSystem) GetAirDensity(altitude float64) float64 {
 }
 
 // NewAerodynamicSystem creates a new AerodynamicSystem
-func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Engine) *AerodynamicSystem {
+func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Engine, log logf.Logger) *AerodynamicSystem {
 	if cfg == nil || cfg.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelDensity == 0 {
 		cfg = &config.Engine{
 			Options: config.Options{
 				Launchsite: config.Launchsite{
 					Atmosphere: config.Atmosphere{
 						ISAConfiguration: config.ISAConfiguration{
-							SeaLevelDensity: 1.225, // Default sea level density in kg/m³
-							SeaLevelPressure: 101325, // Default sea level pressure in Pa
+							SeaLevelDensity:     1.225,  // Default sea level density in kg/m³
+							SeaLevelPressure:    101325, // Default sea level pressure in Pa
 							SeaLevelTemperature: 288.15, // Default sea level temperature in K
 						},
 					},
@@ -55,6 +57,7 @@ func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Engine) *Ae
 		entities: make([]*states.PhysicsState, 0),
 		workers:  workers,
 		isa:      atmosphere.NewISAModel(&cfg.Options.Launchsite.Atmosphere.ISAConfiguration),
+		log:      log,
 	}
 }
 
@@ -69,7 +72,7 @@ func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericDat
 			soundSpeed:  340.29,
 		}
 	}
-	
+
 	isaData := a.isa.GetAtmosphere(altitude)
 	if isaData.Density <= 0 || isaData.Pressure <= 0 || isaData.Temperature <= 0 {
 		// Return standard values if ISA data is invalid
@@ -80,7 +83,7 @@ func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericDat
 			soundSpeed:  340.29,
 		}
 	}
-	
+
 	return &atmosphericData{
 		density:     isaData.Density,
 		pressure:    isaData.Pressure,
@@ -96,10 +99,10 @@ func (a *AerodynamicSystem) getTemperature(altitude float64) float64 {
 
 // CalculateDrag now handles atmospheric effects and Mach number
 func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vector3 {
-    // Validate inputs
-    if a == nil || a.isa == nil || entity.Position == nil || entity.Velocity == nil || entity.Nosecone == nil || entity.Bodytube == nil {
-        return types.Vector3{}
-    }
+	// Validate inputs
+	if a == nil || a.isa == nil || entity.Position == nil || entity.Velocity == nil || entity.Nosecone == nil || entity.Bodytube == nil {
+		return types.Vector3{}
+	}
 
 	if entity == (states.PhysicsState{}) {
 		return types.Vector3{}
@@ -214,11 +217,29 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 			globalForce = force // Use untransformed force if no valid orientation
 		}
 
+		a.log.Debug("Calculating aero acceleration entity_id=%v body_force=%v orientation=%v global_force=%v mass=%v",
+			entity.Entity.ID(),
+			force, // Log body-frame force from CalculateDrag
+			entity.Orientation.Quat,
+			globalForce, // Log force after rotation
+			entity.Mass.Value,
+		)
+
 		acc := globalForce.DivideScalar(entity.Mass.Value)
+
+		a.log.Debug("Calculated aero acceleration component entity_id=%v acc=%v",
+			entity.Entity.ID(),
+			acc,
+		)
 
 		entity.Acceleration.Vec.X += float64(acc.X)
 		entity.Acceleration.Vec.Y += float64(acc.Y)
 		entity.Acceleration.Vec.Z += float64(acc.Z)
+
+		a.log.Debug("Entity acceleration after aero update entity_id=%v final_acc=%v",
+			entity.Entity.ID(),
+			entity.Acceleration.Vec,
+		)
 
 		// Apply angular accelerations from moments
 		moment := <-momentChan
