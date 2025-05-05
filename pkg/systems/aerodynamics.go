@@ -166,8 +166,9 @@ func calculateReferenceArea(nosecone *components.Nosecone, bodytube *components.
 	return math.Max(noseArea, tubeArea)
 }
 
-// Update implements parallel force calculation and application
+// Update implements parallel force calculation and accumulation
 func (a *AerodynamicSystem) Update(dt float64) error {
+	a.log.Debug("AerodynamicSystem Update started", "entity_count", len(a.entities), "dt", dt)
 	workChan := make(chan *states.PhysicsState, len(a.entities))
 	resultChan := make(chan types.Vector3, len(a.entities))
 	momentChan := make(chan types.Vector3, len(a.entities))
@@ -175,18 +176,20 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 	var wg sync.WaitGroup
 	for i := 0; i < a.workers; i++ {
 		wg.Add(1)
-		go func() {
+		go func(workerID int) {
 			defer wg.Done()
 			for entity := range workChan {
 				if entity == nil {
 					continue
 				}
+				a.log.Debug("Worker processing entity", "worker_id", workerID, "entity_id", entity.Entity.ID())
 				force := a.CalculateDrag(*entity)
 				moment := a.CalculateAerodynamicMoment(*entity)
+				a.log.Debug("Worker calculated force/moment", "worker_id", workerID, "entity_id", entity.Entity.ID(), "force", force, "moment", moment)
 				resultChan <- force
 				momentChan <- moment
 			}
-		}()
+		}(i) // Pass worker ID
 	}
 
 	for _, entity := range a.entities {
@@ -217,46 +220,21 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 			globalForce = force // Use untransformed force if no valid orientation
 		}
 
-		a.log.Debug("Calculating aero acceleration entity_id=%v body_force=%v orientation=%v global_force=%v mass=%v",
-			entity.Entity.ID(),
-			force, // Log body-frame force from CalculateDrag
-			entity.Orientation.Quat,
-			globalForce, // Log force after rotation
-			entity.Mass.Value,
+		a.log.Debug("Calculating aero force",
+			"entity_id", entity.Entity.ID(),
+			"body_force", force,
+			"orientation", entity.Orientation.Quat,
+			"global_force", globalForce,
+			"mass", entity.Mass.Value,
 		)
 
-		acc := globalForce.DivideScalar(entity.Mass.Value)
-
-		a.log.Debug("Calculated aero acceleration component entity_id=%v acc=%v",
-			entity.Entity.ID(),
-			acc,
-		)
-
-		entity.Acceleration.Vec.X += float64(acc.X)
-		entity.Acceleration.Vec.Y += float64(acc.Y)
-		entity.Acceleration.Vec.Z += float64(acc.Z)
-
-		a.log.Debug("Entity acceleration after aero update entity_id=%v final_acc=%v",
-			entity.Entity.ID(),
-			entity.Acceleration.Vec,
-		)
+		// Add the calculated global force to the accumulator
+		entity.AccumulatedForce = entity.AccumulatedForce.Add(globalForce)
 
 		// Apply angular accelerations from moments
 		moment := <-momentChan
-		if entity.AngularAcceleration != nil {
-			inertia := CalculateInertia(entity)
-			var angAcc types.Vector3
-			if inertia != 0 {
-				angAcc = moment.DivideScalar(inertia)
-			} else {
-				// Inertia is zero, so angular acceleration is zero (or handle as error)
-				angAcc = types.Vector3{}
-			}
-
-			entity.AngularAcceleration.X = float64(angAcc.X)
-			entity.AngularAcceleration.Y = float64(angAcc.Y)
-			entity.AngularAcceleration.Z = float64(angAcc.Z)
-		}
+		// Add the calculated moment to the accumulator
+		entity.AccumulatedMoment = entity.AccumulatedMoment.Add(moment)
 
 		i++
 	}

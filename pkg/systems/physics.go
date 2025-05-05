@@ -85,13 +85,28 @@ func (s *PhysicsSystem) Update(dt float64) error {
 					results <- result{err: err}
 					continue
 				}
-				netForce, err := s.calculateNetForce(entity, types.Vector3{})
-				if err != nil {
-					results <- result{err: err}
-					continue
+
+				// Calculate Gravity Force (acts downwards in global frame)
+				gravityForce := types.Vector3{Y: -s.gravity * entity.Mass.Value}
+				entity.AccumulatedForce = entity.AccumulatedForce.Add(gravityForce)
+
+				// Calculate Thrust Force (acts along rocket body axis, rotated to global frame)
+				var thrustForce types.Vector3
+				if entity.Motor != nil && !entity.Motor.IsCoasting() && entity.Orientation != nil && entity.Orientation.Quat != (types.Quaternion{}) {
+					thrustMagnitude := entity.Motor.GetThrust()
+					// Assume thrust acts along the rocket's local +Y axis
+					localThrust := types.Vector3{Y: thrustMagnitude}
+					thrustForce = *entity.Orientation.Quat.RotateVector(&localThrust)
+					entity.AccumulatedForce = entity.AccumulatedForce.Add(thrustForce)
+				} else if entity.Motor != nil && !entity.Motor.IsCoasting() {
+					// Fallback if orientation is missing/invalid? Assume vertical thrust? Log warning?
+					s.logger.Warn("Calculating thrust without valid orientation, assuming vertical", "entity_id", entity.Entity.ID())
+					thrustMagnitude := entity.Motor.GetThrust()
+					thrustForce = types.Vector3{Y: thrustMagnitude} // Vertical thrust
+					entity.AccumulatedForce = entity.AccumulatedForce.Add(thrustForce)
 				}
-				s.updateEntityState(entity, netForce, dt)
-				results <- result{err: nil}
+
+				results <- result{err: nil} // Report success for this entity
 			}
 		}()
 	}

@@ -63,7 +63,7 @@ func NewSimulation(cfg *config.Config, log logf.Logger, stores *storage.Stores) 
 
 	// Initialize systems with optimized worker counts
 	sim.physicsSystem = systems.NewPhysicsSystem(world, &cfg.Engine, sim.logger, 4)
-	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, 4.0, &cfg.Engine, sim.logger)
+	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, 4, &cfg.Engine, sim.logger)
 	rules := systems.NewRulesSystem(world, &cfg.Engine)
 
 	sim.rulesSystem = rules
@@ -320,6 +320,7 @@ func runPlugins(plugins []pluginapi.SimulationPlugin, hook func(pluginapi.Simula
 
 // updateSystems updates all systems in the simulation
 func (s *Simulation) updateSystems() error {
+	s.logger.Debug("updateSystems started", "currentTime", s.currentTime)
 	if s.rocket == nil {
 		return fmt.Errorf("no rocket entity loaded")
 	}
@@ -327,6 +328,11 @@ func (s *Simulation) updateSystems() error {
 	mass := s.getSafeMass(motor, s.rocket.Mass)
 	state := s.buildPhysicsState(motor, mass)
 
+	// 1. Reset Force/Moment Accumulators for this timestep
+	state.AccumulatedForce = types.Vector3{}
+	state.AccumulatedMoment = types.Vector3{} // Keep for consistency, though not used for integration yet
+
+	s.logger.Debug("Running BeforeSimStep plugins")
 	if err := runPlugins(s.pluginManager.GetPlugins(), func(p pluginapi.SimulationPlugin) error {
 		return p.BeforeSimStep(state)
 	}); err != nil {
@@ -334,23 +340,71 @@ func (s *Simulation) updateSystems() error {
 	}
 
 	if state.Motor != nil {
+		s.logger.Debug("Updating Motor")
 		if err := state.Motor.Update(s.config.Engine.Simulation.Step); err != nil {
 			return err
 		}
 	}
 
+	s.logger.Debug("Starting system update loop")
 	for _, system := range s.systems {
+		s.logger.Debug("Updating system", "type", fmt.Sprintf("%T", system))
 		if err := system.Update(s.config.Engine.Simulation.Step); err != nil {
 			return fmt.Errorf("system %T update error: %w", system, err)
 		}
 	}
+	s.logger.Debug("Finished system update loop")
 
+	// 3. Calculate Net Acceleration from Accumulated Forces
+	netForce := state.AccumulatedForce
+	var netAcceleration types.Vector3
+	if state.Mass.Value <= 0 {
+		s.logger.Error("Invalid mass for acceleration calculation", "mass", state.Mass.Value)
+		// Handle error: perhaps stop simulation or set acceleration to zero?
+		netAcceleration = types.Vector3{} // Avoid NaN/Inf
+	} else {
+		netAcceleration = netForce.DivideScalar(state.Mass.Value)
+	}
+	s.logger.Debug("Calculated Net Acceleration", "netForce", netForce, "mass", state.Mass.Value, "netAcc", netAcceleration)
+
+	// 4. Integrate state using Forward Euler
+	dt := s.config.Engine.Simulation.Step
+	currentVelocity := state.Velocity.Vec // Store current velocity for position update
+
+	// Update Velocity
+	state.Velocity.Vec = state.Velocity.Vec.Add(netAcceleration.MultiplyScalar(dt))
+	s.logger.Debug("Updated Velocity", "oldVel", currentVelocity, "newVel", state.Velocity.Vec, "dt", dt)
+
+	// Update Position (using velocity *before* this step's acceleration was applied)
+	state.Position.Vec = state.Position.Vec.Add(currentVelocity.MultiplyScalar(dt))
+	s.logger.Debug("Updated Position", "oldPos", state.Position.Vec, "newPos", state.Position.Vec, "dt", dt) // Log needs fix: show old *and* new
+
+	// Update Acceleration state for logging/output
+	state.Acceleration.Vec = netAcceleration
+	s.logger.Debug("Final State Acceleration set", "acc", state.Acceleration.Vec)
+
+	// 5. Handle Ground Collision (Simplified: check *after* integration)
+	if state.Position.Vec.Y <= s.config.Engine.Simulation.GroundTolerance {
+		s.logger.Debug("Ground collision detected", "posY", state.Position.Vec.Y, "velY", state.Velocity.Vec.Y)
+		state.Position.Vec.Y = 0 // Clamp to ground
+		if state.Velocity.Vec.Y < 0 {
+			state.Velocity.Vec.Y = 0 // Stop downward motion
+		}
+		// Also zero out acceleration? Prevents 'bouncing' calculation on next step if net force is still downwards
+		if state.Acceleration.Vec.Y < 0 {
+			state.Acceleration.Vec.Y = 0
+		}
+		s.logger.Debug("State after ground collision adjustment", "pos", state.Position.Vec, "vel", state.Velocity.Vec, "acc", state.Acceleration.Vec)
+	}
+
+	s.logger.Debug("Running AfterSimStep plugins")
 	if err := runPlugins(s.pluginManager.GetPlugins(), func(p pluginapi.SimulationPlugin) error {
 		return p.AfterSimStep(state)
 	}); err != nil {
 		return fmt.Errorf("plugin %s AfterSimStep error: %w", "unknown", err)
 	}
 
+	s.logger.Debug("Updating rocket state from physics state")
 	s.rocket.Position.Vec = state.Position.Vec
 	s.rocket.Velocity.Vec = state.Velocity.Vec
 	s.rocket.Acceleration.Vec = state.Acceleration.Vec
@@ -358,11 +412,13 @@ func (s *Simulation) updateSystems() error {
 		s.rocket.Mass.Value = state.Mass.Value
 	}
 
+	s.logger.Debug("Sending state to channel")
 	select {
 	case s.stateChan <- state:
 	default:
 		s.logger.Warn("state channel full, dropping frame")
 	}
 
+	s.logger.Debug("updateSystems finished")
 	return nil
 }

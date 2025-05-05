@@ -14,6 +14,7 @@ type Event int
 
 const (
 	None Event = iota
+	Liftoff
 	Apogee
 	Land
 )
@@ -23,8 +24,9 @@ type RulesSystem struct {
 	world     *ecs.World
 	config    *config.Engine
 	entities  []*states.PhysicsState
+	hasLiftoff bool
 	hasApogee bool
-	hasLanded bool // Add this field
+	hasLanded bool
 }
 
 // GetLastEvent returns the last event detected by the rules system
@@ -35,6 +37,9 @@ func (s *RulesSystem) GetLastEvent() Event {
 	if s.hasApogee {
 		return Apogee
 	}
+	if s.hasLiftoff {
+		return Liftoff
+	}
 	return None
 }
 
@@ -44,7 +49,7 @@ func NewRulesSystem(world *ecs.World, config *config.Engine) *RulesSystem {
 		world:     world,
 		config:    config,
 		entities:  make([]*states.PhysicsState, 0),
-		hasApogee: false,
+		hasLiftoff: false,
 	}
 }
 
@@ -66,14 +71,22 @@ func (s *RulesSystem) ProcessRules(entity *states.PhysicsState) Event {
 		return None
 	}
 
+	// Check for Liftoff (Motor burning and off the ground/rail?)
+	if !s.hasLiftoff && entity.Motor.FSM.Current() == components.StateBurning && entity.Position.Vec.Y > 0.1 /* Small tolerance */ {
+		s.hasLiftoff = true
+		return Liftoff
+	}
+
 	// Check for apogee
-	if !s.hasApogee && s.DetectApogee(entity) {
+	// Only check for apogee *after* liftoff
+	if s.hasLiftoff && !s.hasApogee && s.DetectApogee(entity) {
 		s.hasApogee = true
 		return Apogee
 	}
 
 	// Check for landing after apogee using ground tolerance
 	groundTolerance := s.config.Simulation.GroundTolerance
+	// Only check for landing *after* apogee
 	if s.hasApogee && !s.hasLanded && entity.Position.Vec.Y <= groundTolerance {
 		entity.Position.Vec.Y = 0
 		entity.Velocity.Vec.Y = 0
