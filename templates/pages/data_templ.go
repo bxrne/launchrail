@@ -241,7 +241,8 @@ func Data(props DataProps, version string) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Base(layouts.BaseProps{
-			Title: "Simulation Records",
+			Title:   "Simulation Records",
+			Version: version,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var11), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

@@ -6,7 +6,8 @@ import (
 	"html/template"
 	"path/filepath"
 
-	// TODO: Add necessary imports for data loading, plotting, PDF generation
+	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/internal/storage"
 )
 
 // ReportData holds all the necessary data for generating the report.
@@ -20,6 +21,37 @@ type ReportData struct {
 	TrajectoryPlotPath string // Example placeholder
 	DynamicsPlotPath   string // Example placeholder
 	GPSMapImagePath    string // Path to generated GPS map image
+}
+
+// LoadSimulationData loads the necessary data for a report from storage.
+func LoadSimulationData(rm *storage.RecordManager, recordID string) (ReportData, error) {
+	log := logger.GetLogger("") // Consider passing logger or config
+
+	record, err := rm.GetRecord(recordID)
+	if err != nil {
+		log.Error("Failed to get record for report data", "recordID", recordID, "error", err)
+		return ReportData{}, fmt.Errorf("failed to load record %s: %w", recordID, err)
+	}
+
+	// TODO: Load actual data from record.Motion, record.Events, record.Dynamics
+	//       using record.Motion.ReadHeadersAndData(), etc.
+	// TODO: Generate plots/maps using the loaded data and store paths.
+
+	log.Info("Loaded record for report", "recordID", recordID, "creationTime", record.CreationTime)
+
+	// Populate ReportData with basic info and placeholders
+	data := ReportData{
+		RecordID: record.Hash,
+		// Version: Needs config access or to be passed in.
+		// Plot Paths - Keep as placeholders for now:
+		AtmospherePlotPath: "(Plot not generated)",
+		ThrustPlotPath:     "(Plot not generated)",
+		TrajectoryPlotPath: "(Plot not generated)",
+		DynamicsPlotPath:   "(Plot not generated)",
+		GPSMapImagePath:    "(Map not generated)",
+	}
+
+	return data, nil
 }
 
 // Generator handles report generation.
@@ -51,13 +83,6 @@ func (g *Generator) GenerateMarkdown(data ReportData) ([]byte, error) {
 
 // GeneratePDF generates the final PDF report.
 func (g *Generator) GeneratePDF(data ReportData) ([]byte, error) {
-	// 1. Load simulation data (Needs implementation)
-	// simData, err := LoadSimulationData(data.RecordID)
-	// if err != nil {
-	// 	 return nil, fmt.Errorf("failed to load simulation data: %w", err)
-	// }
-	// data = simData // Merge loaded data
-
 	// 2. Generate Plots (Needs implementation - create temporary image files)
 	// data.AtmospherePlotPath, err = generateAtmospherePlot(data) ...
 	// data.ThrustPlotPath, err = generateThrustPlot(data) ...
@@ -96,14 +121,3 @@ func convertMarkdownToPDF(md []byte) ([]byte, error) {
 // func generateAtmospherePlot(data ReportData) (string, error) { ... return plotFilePath, nil }
 // func generateThrustPlot(data ReportData) (string, error) { ... return plotFilePath, nil }
 // ... etc ...
-
-// LoadSimulationData placeholder function
-func LoadSimulationData(recordID string) (ReportData, error) {
-	// TODO: Implement logic to load actual simulation results based on recordID
-	// This will likely involve interacting with the storage system used by the server.
-	// It should return a populated ReportData struct.
-	return ReportData{
-		RecordID: recordID,
-		Version: "0.0.1-dev", // Placeholder version
-	}, fmt.Errorf("simulation data loading not yet implemented")
-}

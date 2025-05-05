@@ -12,29 +12,31 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
-	"github.com/bxrne/launchrail/internal/logger"
+	loggerpkg "github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/plot_transformer"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
+	"github.com/zerodha/logf"
 )
 
 // runSim takes the global config and a record manager and runs a simulation
-func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
-	log := logger.GetLogger(cfg.Setup.Logging.Level)
-	log.Info("Starting simulation run")
+func runSim(cfg *config.Config, recordManager *storage.RecordManager, log *logf.Logger) error {
+	// Use the old logger for the simulation package
+	oldLog := log
+	oldLog.Info("Starting simulation run")
 
-	// Create simulation manager
-	simManager := simulation.NewManager(cfg, *log)
+	// Create simulation manager using the old logger
+	simManager := simulation.NewManager(cfg, *oldLog)
 
 	// Create a record for this simulation run *before* initializing the manager
 	record, err := recordManager.CreateRecord()
 	if err != nil {
-		log.Error("Failed to create simulation record", "Error", err)
+		oldLog.Error("Failed to create simulation record", "Error", err)
 		return fmt.Errorf("failed to create simulation record: %w", err)
 	}
-	log.Info("Simulation record created", "path", record.Path)
+	oldLog.Info("Simulation record created", "path", record.Path)
 
 	// Create the Stores object from the record's initialized stores
 	stores := &storage.Stores{
@@ -45,11 +47,11 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
 
 	// Initialize the simulation manager with the stores from the record
 	if err := simManager.Initialize(stores); err != nil {
-		log.Error("Failed to initialize simulation manager", "Error", err)
+		oldLog.Error("Failed to initialize simulation manager", "Error", err)
 		// Attempt to clean up the created record directory if initialization fails
 		cleanupErr := os.RemoveAll(record.Path)
 		if cleanupErr != nil {
-			log.Error("Failed to cleanup record directory after init failure", "path", record.Path, "cleanupError", cleanupErr)
+			oldLog.Error("Failed to cleanup record directory after init failure", "path", record.Path, "cleanupError", cleanupErr)
 		}
 		return fmt.Errorf("failed to initialize simulation manager: %w", err)
 	}
@@ -57,7 +59,7 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
 	// Defer closing the record only if creation succeeded
 	defer func() {
 		if cerr := record.Close(); cerr != nil {
-			log.Error("Failed to close simulation record", "Error", cerr)
+			oldLog.Error("Failed to close simulation record", "Error", cerr)
 			if err == nil {
 				err = cerr
 			}
@@ -67,7 +69,7 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
 	// Defer closing the manager
 	defer func() {
 		if cerr := simManager.Close(); cerr != nil {
-			log.Error("Failed to close simulation manager", "Error", cerr)
+			oldLog.Error("Failed to close simulation manager", "Error", cerr)
 			// Don't overwrite the original error if there was one
 			if err == nil {
 				err = cerr
@@ -77,16 +79,16 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager) error {
 
 	// Run the simulation
 	if err = simManager.Run(); err != nil {
-		log.Error("Simulation run failed", "Error", err)
+		oldLog.Error("Simulation run failed", "Error", err)
 		return fmt.Errorf("simulation run failed: %w", err)
 	}
 
-	log.Info("Simulation run completed successfully")
+	oldLog.Info("Simulation run completed successfully")
 	return nil
 }
 
 // configFromCtx reads the request body and parses it into a config.Config and validates it
-func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, error) {
+func configFromCtx(c *gin.Context, currentCfg *config.Config, log *logf.Logger) (*config.Config, error) {
 	// Extracting form values
 	motorDesignation := c.PostForm("motor-designation")
 	openRocketFile := c.PostForm("openrocket-file")
@@ -109,7 +111,6 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, e
 	temperatureLapseRateStr := c.PostForm("temperature-lapse-rate")
 	pluginPaths := c.PostForm("plugin-paths")
 
-	log := logger.GetLogger(currentCfg.Setup.Logging.Level)
 	log.Debug("Received plugin-paths from form", "value", pluginPaths)
 
 	// Helper for checking parse errors
@@ -156,13 +157,13 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, e
 
 	// Return the first parsing error encountered
 	if firstParseErr != nil {
-		log.Error("Failed to parse numeric form field", "error", firstParseErr)
+		log.Warn("Failed to parse numeric form field", "error", firstParseErr)
 		return nil, firstParseErr
 	}
 
 	// Validate required fields
 	if motorDesignation == "" || openRocketFile == "" || openRocketVersion == "" {
-		log.Error("Validation failed: A required field is empty", "motorDesignation", motorDesignation, "openRocketFile", openRocketFile, "openRocketVersion", openRocketVersion)
+		log.Warn("Validation failed: A required field is empty", "motorDesignation", motorDesignation, "openRocketFile", openRocketFile, "openRocketVersion", openRocketVersion)
 		return nil, fmt.Errorf("required string fields (motor, ork file/version) cannot be empty")
 	}
 
@@ -231,7 +232,7 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, e
 	// with the correct storage.Stores instance inside runSim.
 	// m := simulation.NewManager(&simConfig, *logger.GetLogger(currentCfg.Setup.Logging.Level))
 	// if err := m.Initialize(); err != nil {
-	// 	log.Error("Manager initialization failed within configFromCtx", "error", err)
+	// 	log.Warn("Manager initialization failed within configFromCtx", "error", err)
 	// 	return nil, fmt.Errorf("failed to initialize simulation manager: %w", err)
 	// }
 	log.Debug("Manager initialized successfully within configFromCtx")
@@ -239,7 +240,7 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config) (*config.Config, e
 	// Validate the configuration
 	log.Debug("Attempting to validate simConfig")
 	if err := simConfig.Validate(); err != nil {
-		log.Error("simConfig.Validate() failed", "error", err)
+		log.Warn("simConfig.Validate() failed", "error", err)
 		return nil, fmt.Errorf("failed to validate config: %w", err)
 	}
 	log.Debug("simConfig.Validate() succeeded")
@@ -258,13 +259,12 @@ func render(c *gin.Context, component templ.Component) {
 }
 
 func main() {
+	log := loggerpkg.GetLogger("debug")
 	cfg, err := config.GetConfig()
 	if err != nil {
-		log := logger.GetLogger("")
-		log.Error("Failed to load config", "error", err)
+		log.Warn("Failed to load config", "error", err)
 		return
 	}
-	log := logger.GetLogger(cfg.Setup.Logging.Level)
 	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
 
 	// Bind the port flag to the server.port configuration key
@@ -274,22 +274,25 @@ func main() {
 	r := gin.Default()
 	err = r.SetTrustedProxies(nil)
 	if err != nil {
-		log.Fatal("Failed to set trusted proxies", "Error", err)
+		log.Warn("Failed to set trusted proxies", "Error", err)
+		os.Exit(1) // Exit on fatal error
 	}
 
 	// Get user's home directory
 	usr, err := user.Current()
 	if err != nil {
-		log.Fatal("Failed to get user's home directory", "error", err)
+		log.Warn("Failed to get user's home directory", "error", err)
+		os.Exit(1) // Exit on fatal error
 	}
 	baseDir := filepath.Join(usr.HomeDir, ".launchrail") // Use ~/.launchrail
 
 	// Initialize RecordManager
 	recordManager, err := storage.NewRecordManager(baseDir)
 	if err != nil {
-		log.Fatal("Failed to initialize record manager", "error", err)
+		log.Warn("Failed to initialize record manager", "error", err)
+		os.Exit(1) // Exit on fatal error
 	}
-	dataHandler := &DataHandler{records: recordManager, Cfg: cfg} // Pass cfg here
+	dataHandler := &DataHandler{records: recordManager, Cfg: cfg, log: log} // Pass cfg and logger here
 
 	// Serve static files (CSS, JS)
 	r.Static("/static", "./static")
@@ -457,24 +460,23 @@ func main() {
 	log.Info("Server started", "Port", cfg.Server.Port)
 	portStr := fmt.Sprintf(":%d", cfg.Server.Port)
 	if err := r.Run(portStr); err != nil {
-		log.Error("Failed to start server", "error", err)
+		log.Warn("Failed to start server", "error", err)
 	}
 }
 
 // handleSimRun handles API requests to start simulations (now a method of DataHandler)
 func (h *DataHandler) handleSimRun(c *gin.Context) {
-	log := logger.GetLogger("") // Use default or global log level if not available
-	log.Info("handleSimRun invoked", "time", time.Now().Format(time.RFC3339), "remote_addr", c.ClientIP())
+	h.log.Info("handleSimRun invoked", "time", time.Now().Format(time.RFC3339), "remote_addr", c.ClientIP())
 
 	// Pass the handler's config (h.Cfg) to configFromCtx
-	simConfig, err := configFromCtx(c, h.Cfg)
+	simConfig, err := configFromCtx(c, h.Cfg, h.log)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// Use the existing record manager from the DataHandler instance (h.records)
-	if err := runSim(simConfig, h.records); err != nil { // runSim now defined globally or passed needed dependencies
+	if err := runSim(simConfig, h.records, h.log); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

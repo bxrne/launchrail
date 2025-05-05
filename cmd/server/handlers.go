@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -10,26 +11,44 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
-	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/plot_transformer"
 	"github.com/bxrne/launchrail/internal/reporting"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
+	"github.com/zerodha/logf"
 )
+
+
 
 type DataHandler struct {
 	records *storage.RecordManager
 	Cfg     *config.Config
+	log     *logf.Logger
 }
 
-// Helper function to render templ components
-func renderTempl(c *gin.Context, component templ.Component) {
+// Helper method to render templ components
+// Accepts optional status codes. If provided and >= 400, sets the response status.
+// Defaults to 200 OK otherwise.
+func (h *DataHandler) renderTempl(c *gin.Context, component templ.Component, statusCodes ...int) {
+	// Determine the status code to set
+	statusCode := http.StatusOK // Default to 200 OK
+	setStatus := false
+	if len(statusCodes) > 0 && statusCodes[0] >= 400 {
+		statusCode = statusCodes[0]
+		setStatus = true // Mark that we intended to set a specific status
+	}
+	c.Status(statusCode) // Set the status code
+
 	err := component.Render(c.Request.Context(), c.Writer)
 	if err != nil {
-		err_err := c.AbortWithError(http.StatusInternalServerError, err)
-		if err_err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to render template"})
+		h.log.Error("Failed to render template", "intended_status", statusCode, "error", err)
+		// If we specifically set an error status code beforehand,
+		// don't overwrite it with a 500 just because rendering failed.
+		// Log the render error, but let the original status stand.
+		if !setStatus && !c.Writer.Written() {
+			// Only abort with 500 if we hadn't already set a specific error status
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to render template"})
 		}
 	}
 }
@@ -53,7 +72,8 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 
 	records, err := h.records.ListRecords()
 	if err != nil {
-		renderTempl(c, pages.ErrorPage(err.Error()))
+		c.Status(http.StatusInternalServerError)
+		h.renderTempl(c, pages.ErrorPage("Failed to list records"), http.StatusInternalServerError) // Pass status
 		return
 	}
 
@@ -86,25 +106,82 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 		}
 	}
 
-	renderTempl(c, pages.Data(pages.DataProps{
+	h.renderTempl(c, pages.Data(pages.DataProps{
 		Records: simRecords,
 		Pagination: pages.Pagination{
 			CurrentPage: params.Page,
 			TotalPages:  totalPages,
 		},
-	}, h.Cfg.Setup.App.Version))
+	}, h.Cfg.Setup.App.Version)) // No status needed for success
+}
+
+// DeleteRecord handles the deletion of a specific simulation record.
+func (h *DataHandler) DeleteRecord(c *gin.Context) {
+	hash := c.Param("hash")
+	if hash == "" {
+		h.log.Warn("DeleteRecord request missing hash")
+		// Assume API request for this path
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Record hash is required"})
+		return
+	}
+	h.log.Debug("Received API request to delete record", "hash", hash)
+
+	// Delete the record
+	err := h.records.DeleteRecord(hash)
+
+	// Handle response based on error and request type
+	if err != nil {
+		h.log.Error("Failed to delete record", "hash", hash, "error", err)
+		if errors.Is(err, storage.ErrRecordNotFound) { // Check for specific error
+			h.log.Warn("Attempted to delete non-existent record", "hash", hash)
+			// Assume API for this path
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		} else {
+			// Generic internal server error for other deletion failures
+			// Assume API for this path
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete record"})
+		}
+		return // Abort further processing
+	}
+
+	// Success
+	h.log.Info("Successfully deleted record via API", "hash", hash)
+	// HTMX requests expect 200 OK, API expects 204 No Content
+	hxHeader := c.Request.Header.Get("HX-Request")
+	h.log.Debug("DeleteRecord: HX-Request header", "value", hxHeader)
+	if hxHeader != "" {
+		c.AbortWithStatus(http.StatusOK)
+	} else {
+		c.AbortWithStatus(http.StatusNoContent)
+	}
 }
 
 // DeleteRecord handles the request to delete a specific record
-func (h *DataHandler) DeleteRecord(c *gin.Context) {
+func (h *DataHandler) DeleteRecordOld(c *gin.Context) {
 	hash := c.Param("hash")
 
 	// Delete the record
 	err := h.records.DeleteRecord(hash)
 	if err != nil {
-		renderTempl(c, pages.ErrorPage("Failed to delete record"))
+		// Handle errors first, regardless of request type
+		if strings.Contains(err.Error(), "not found") {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "record not found"})
+		} else {
+			// Log the unexpected error
+			h.log.Error("Failed to delete record", "error", err, "recordID", hash)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "failed to delete record"})
+		}
 		return
 	}
+
+	// Deletion successful, now determine response type
+	if !strings.Contains(c.GetHeader("Accept"), "text/html") {
+		// API request: Return No Content and stop processing
+		c.AbortWithStatus(http.StatusNoContent)
+		return
+	}
+
+	// --- HTMX Request: Proceed to render the updated list ---
 
 	// Prepare pagination parameters
 	params := ListParams{
@@ -121,7 +198,8 @@ func (h *DataHandler) DeleteRecord(c *gin.Context) {
 	// Retrieve and (re)sort records
 	records, err := h.records.ListRecords()
 	if err != nil {
-		renderTempl(c, pages.ErrorPage(err.Error()))
+		c.Status(http.StatusInternalServerError)
+		h.renderTempl(c, pages.ErrorPage("Failed to list records"), http.StatusInternalServerError) // Pass status
 		return
 	}
 
@@ -155,7 +233,7 @@ func (h *DataHandler) DeleteRecord(c *gin.Context) {
 	}
 
 	// Render only the updated record list (partial HTML) so htmx can swap it in-place
-	renderTempl(c, pages.RecordList(pages.DataProps{
+	h.renderTempl(c, pages.RecordList(pages.DataProps{
 		Records: simRecords,
 		Pagination: pages.Pagination{
 			CurrentPage: params.Page,
@@ -171,13 +249,13 @@ func (h *DataHandler) GetRecordData(c *gin.Context) {
 
 	// Validate the hash to ensure it is a single-component identifier
 	if strings.Contains(hash, "/") || strings.Contains(hash, "\\") || strings.Contains(hash, "..") {
-		renderTempl(c, pages.ErrorPage("Invalid record identifier"))
+		h.renderTempl(c, pages.ErrorPage("Invalid record identifier"), http.StatusBadRequest) // Pass status
 		return
 	}
 
 	record, err := h.records.GetRecord(hash)
 	if err != nil {
-		renderTempl(c, pages.ErrorPage("Record not found"))
+		h.renderTempl(c, pages.ErrorPage("Record not found"), http.StatusNotFound) // Pass status
 		return
 	}
 	defer record.Close()
@@ -195,14 +273,14 @@ func (h *DataHandler) GetRecordData(c *gin.Context) {
 		store = record.Dynamics
 		title = "Dynamics Data"
 	default:
-		renderTempl(c, pages.ErrorPage("Invalid data type"))
+		h.renderTempl(c, pages.ErrorPage("Invalid data type"), http.StatusBadRequest) // Pass status
 		return
 	}
 
 	headers, data, err := store.ReadHeadersAndData()
 	fmt.Println(headers, data, title)
 	if err != nil {
-		renderTempl(c, pages.ErrorPage("Failed to read data"))
+		h.renderTempl(c, pages.ErrorPage("Failed to read data"), http.StatusInternalServerError) // Pass status
 
 		return
 	}
@@ -582,76 +660,60 @@ func min(a, b int) int {
 	return b
 }
 
-// DownloadReport downloads a report for a specific record.
+// DownloadReport handles downloading the simulation report for a specific hash.
 func (h *DataHandler) DownloadReport(c *gin.Context) {
-	log := logger.GetLogger(h.Cfg.Setup.Logging.Level)
-	recordID := c.Param("hash") // Use "hash" as per the route definition
-	if recordID == "" {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Record hash/ID is required"})
+	hash := c.Param("hash")
+	if hash == "" {
+		h.log.Warn("DownloadReport request missing hash")
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Record hash is required"})
+		return
+	}
+	h.log.Debug("Received request to download report", "hash", hash)
+
+	// Load simulation data
+	reportData, err := reporting.LoadSimulationData(h.records, hash)
+	if err != nil {
+		h.log.Error("Failed to load simulation data for report", "hash", hash, "error", err)
+		if errors.Is(err, storage.ErrRecordNotFound) || strings.Contains(strings.ToLower(err.Error()), "not found") {
+			h.log.Warn("Report requested for non-existent record", "hash", hash)
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Failed to load data for report"})
+		} else {
+			h.renderTempl(c, pages.ErrorPage("Internal Server Error"), http.StatusInternalServerError)
+		}
 		return
 	}
 
-	log.Info("Generating report", "recordID", recordID)
-
-	// Assuming templates are relative to the executable or configured path
-	// TODO: Make template path configurable or determine relative path reliably
-	templateDir := "internal/reporting/templates" 
+	// Create the report
+	templateDir := "internal/reporting/templates"
 	reportGen, err := reporting.NewGenerator(templateDir)
 	if err != nil {
-		log.Error("Failed to create report generator", "error", err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize report generator"})
+		h.log.Error("Failed to create report generator", "error", err)
+		h.renderTempl(c, pages.ErrorPage("Report Generation Failed"), http.StatusInternalServerError) // Pass status
 		return
 	}
 
-	// --- Placeholder Data Loading & Plot Generation ---
-	// In a real implementation, load data from storage based on recordID
-	// and generate actual plots/maps.
-	reportData, err := reporting.LoadSimulationData(recordID) // Placeholder load
+	pdfBytes, err := reportGen.GeneratePDF(reportData) // Use GeneratePDF, pass by value
 	if err != nil {
-		log.Warn("Using placeholder report data due to load error", "recordID", recordID, "loadError", err) 
-		// Proceed with basic data if loading fails for now
-		reportData = reporting.ReportData{
-			RecordID: recordID,
-			Version: h.Cfg.Setup.App.Version, // Get version from config
-			// Add placeholder paths or indicate missing data
-			GPSMapImagePath: "(Map generation not implemented)", 
-		}
-	} else {
-		// Ensure version is set even if loading succeeds partially
-		reportData.Version = h.Cfg.Setup.App.Version 
-		// TODO: Add actual map generation logic here
-		reportData.GPSMapImagePath = "(Map generation not implemented)" // Placeholder path
+		h.log.Error("Failed to create PDF report", "hash", hash, "error", err)
+		h.renderTempl(c, pages.ErrorPage("Report Generation Failed"), http.StatusInternalServerError) // Pass status
+		return
 	}
 
-	// --- Generate PDF ---
-	pdfBytes, err := reportGen.GeneratePDF(reportData)
-	if err != nil {
-		// Log the detailed error
-		log.Error("Failed to generate PDF report", "recordID", recordID, "error", err)
-		
-		// Check if it's the placeholder error vs. a real generation error
-		if strings.Contains(err.Error(), "not yet implemented") || strings.Contains(err.Error(), "Placeholder") {
-			// If it's just a placeholder issue, maybe return the markdown or a simpler error?
-			// For now, return the placeholder PDF content which includes the markdown.
-			log.Warn("PDF generation using placeholder", "recordID", recordID)
-		} else {
-			// If it's a different error, return a generic server error
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate report"})
-			return
-		}
-		// If we logged a warning but decided to proceed with placeholder PDF bytes, continue here.
-	}
-
-	if pdfBytes == nil {
-	    log.Error("Generated PDF bytes are nil", "recordID", recordID)
-	    c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate report content"})
-        return
-	}
-
-
-	// --- Send Response ---
-	fileName := fmt.Sprintf("launch_report_%s.pdf", recordID)
+	// Set headers for file download
+	fileName := fmt.Sprintf("launch_report_%s.pdf", hash)
 	c.Header("Content-Disposition", "attachment; filename="+fileName)
-	c.Data(http.StatusOK, "application/pdf", pdfBytes)
-	log.Info("Report sent successfully", "recordID", recordID, "fileName", fileName, "sizeBytes", len(pdfBytes))
+	c.Header("Content-Type", "application/pdf")
+	c.Header("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
+
+	// Write the PDF content to the response
+	if _, err := c.Writer.Write(pdfBytes); err != nil {
+		h.log.Error("Failed to write PDF report to response", "hash", hash, "fileName", fileName, "error", err)
+		// Attempt to render an error page if possible, though headers might already be sent
+		if !c.Writer.Written() {
+			h.renderTempl(c, pages.ErrorPage("Download Failed"), http.StatusInternalServerError) // Pass status
+		}
+		return
+	}
+
+	h.log.Info("Report sent successfully", "hash", hash, "fileName", fileName, "sizeBytes", len(pdfBytes))
 }

@@ -79,6 +79,7 @@ templ RecordList(props DataProps) {
 templ Data(props DataProps, version string) {
     @layouts.Base(layouts.BaseProps{
         Title: "Simulation Records",
+        Version: version,
     }) {
         <div class="container-xl">
             <h1 class="h3 text-center p-4">Simulation Records</h1>
