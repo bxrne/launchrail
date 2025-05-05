@@ -260,7 +260,8 @@ func render(c *gin.Context, component templ.Component) {
 func main() {
 	cfg, err := config.GetConfig()
 	if err != nil {
-		fmt.Printf("Failed to load config: %v\n", err)
+		log := logger.GetLogger("")
+		log.Error("Failed to load config", "error", err)
 		return
 	}
 	log := logger.GetLogger(cfg.Setup.Logging.Level)
@@ -455,7 +456,7 @@ func main() {
 	log.Info("Server started", "Port", cfg.Server.Port)
 	portStr := fmt.Sprintf(":%d", cfg.Server.Port)
 	if err := r.Run(portStr); err != nil {
-		fmt.Printf("Failed to start server: %v\n", err)
+		log.Error("Failed to start server", "error", err)
 	}
 }
 
