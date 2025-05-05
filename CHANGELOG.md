@@ -1,3 +1,15 @@
+## v0.5.0 (2025-05-05)
+
+### Feat
+
+- **bench, storage, simulation, systems, types**: Add event tracking and simulation data output for rocket dynamics
+
+### Fix
+
+- **systems**: Remove debug logging and enable angular velocity reset in ground collisions
+- **systems**: Refactor physics system with improved force calculations and error handling
+- **systems, simulation**: Add logging to aerodynamics system and remove motor update from physics loop
+
 ## v0.4.2 (2025-05-03)
 
 ### Refactor
