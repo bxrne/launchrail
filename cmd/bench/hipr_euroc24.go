@@ -182,21 +182,42 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 	}
 
 	for gtEvent, simEvent := range eventMappings {
-		gtTime := findGroundTruthEventTime(eventInfoGroundTruth, gtEvent)
-		simTime := findSimEventTime(simEventInfo, simEvent, logger) // Pass logger
-		if gtTime != -1 && simTime != -1 {
-			logger.Debug("Event Time Comparison", "event", gtEvent, "ground_truth", gtTime, "sim", simTime)
-			results = append(results, compareFloat(fmt.Sprintf("%s Time", gtEvent), fmt.Sprintf("Time of %s event (s)", strings.ToLower(gtEvent)), gtTime, simTime, tolerance))
-		} else {
-			logger.Warn("Could not compare event time", "event", gtEvent, "ground_truth_found", gtTime != -1, "sim_found", simTime != -1)
-			// Optionally add a failed result
+		gtEventTime := findGroundTruthEventTime(eventInfoGroundTruth, gtEvent)
+		if gtEventTime < 0 {
+			logger.Warn("Target ground truth event not found in data", "event_name", gtEvent)
+			metricName := fmt.Sprintf("%s Time", gtEvent)
 			results = append(results, BenchmarkResult{
-				Name:        fmt.Sprintf("%s Time", gtEvent),
-				Description: fmt.Sprintf("Comparison failed: GroundTruthFound=%v, SimFound=%v", gtTime != -1, simTime != -1),
-				Metric:      fmt.Sprintf("%s Time", gtEvent),
-				Passed:      false, // Mark as failed if data is missing
+				Metric:        metricName,
+				Description:   fmt.Sprintf("Compare %s time", gtEvent),
+				Expected:      math.NaN(),
+				Actual:        findSimEventTime(simEventInfo, simEvent, logger),
+				Tolerance:     0.05, // Revert to hardcoded 5% tolerance
+				ToleranceType: "relative",
+				Passed:        false,
 			})
+			continue // Skip comparison if GT event is missing
 		}
+
+		// Find corresponding sim time
+		simEventTime := findSimEventTime(simEventInfo, simEvent, logger)
+		if simEventTime < 0 {
+			logger.Warn("Target sim event not found", "event_name", simEvent)
+			metricName := fmt.Sprintf("%s Time", gtEvent)
+			results = append(results, BenchmarkResult{
+				Metric:        metricName,
+				Description:   fmt.Sprintf("Compare %s time", gtEvent),
+				Expected:      gtEventTime,
+				Actual:        math.NaN(),
+				Tolerance:     0.05, // Revert to hardcoded 5% tolerance
+				ToleranceType: "relative",
+				Passed:        false,
+			})
+			continue // Skip comparison if sim event is missing
+		}
+
+		// Compare times
+		logger.Debug("Event Time Comparison", "event", gtEvent, "ground_truth", gtEventTime, "sim", simEventTime)
+		results = append(results, compareFloat(fmt.Sprintf("%s Time", gtEvent), fmt.Sprintf("Time of %s event (s)", strings.ToLower(gtEvent)), gtEventTime, simEventTime, tolerance))
 	}
 
 	logger.Info("Comparison finished")

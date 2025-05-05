@@ -97,8 +97,12 @@ func main() {
 	benchLogger.Info("--- Starting Benchmark Run --- ")
 
 	// --- Create Base Output Directory --- 
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		benchLogger.Fatal("Failed to get user home directory", "error", err)
+	}
 	timestamp := time.Now().Format("20060102-150405")
-	baseOutputDir := filepath.Join(".", "benchmark_results", timestamp)
+	baseOutputDir := filepath.Join(homeDir, ".launchrail", "benchmarks", timestamp)
 	if err := os.MkdirAll(baseOutputDir, 0755); err != nil {
 		benchLogger.Fatal("Failed to create base output directory", "path", baseOutputDir, "error", err)
 	}
