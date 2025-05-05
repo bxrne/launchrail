@@ -173,6 +173,11 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 
 // DeleteRecord deletes a record by Hash
 func (rm *RecordManager) DeleteRecord(hash string) error {
+	// Validate the hash to prevent directory traversal
+	if strings.Contains(hash, "/") || strings.Contains(hash, "\\") || strings.Contains(hash, "..") {
+		return fmt.Errorf("invalid hash: contains forbidden characters")
+	}
+
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
