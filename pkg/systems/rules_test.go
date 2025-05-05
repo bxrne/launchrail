@@ -20,7 +20,7 @@ import (
 func TestProcessRules_NilEntity(t *testing.T) {
 	rs := systems.NewRulesSystem(&ecs.World{}, &config.Engine{})
 	result := rs.ProcessRules(nil)
-	if result != systems.None {
+	if result != types.None {
 		t.Errorf("Expected None for nil entity, got %v", result)
 	}
 }
@@ -78,7 +78,7 @@ func TestApogeeDetection(t *testing.T) {
 
 	rs.Add(entity)
 	_ = rs.Update(0)
-	assert.Equal(t, systems.Apogee, rs.GetLastEvent())
+	assert.Equal(t, types.Apogee, rs.GetLastEvent())
 	assert.True(t, entity.Parachute.Deployed)
 }
 
@@ -105,13 +105,13 @@ func TestLandingDetection(t *testing.T) {
 
 	rs.Add(entity)
 	_ = rs.Update(0)
-	assert.Equal(t, systems.Apogee, rs.GetLastEvent())
+	assert.Equal(t, types.Apogee, rs.GetLastEvent())
 	assert.True(t, entity.Parachute.Deployed)
 
 	entity.Position.Vec.Y = 0.05
 	entity.Velocity.Vec.Y = -0.1
 	_ = rs.Update(0)
-	assert.Equal(t, systems.Land, rs.GetLastEvent())
+	assert.Equal(t, types.Land, rs.GetLastEvent())
 }
 
 func TestInvalidEntityHandling(t *testing.T) {
@@ -120,5 +120,5 @@ func TestInvalidEntityHandling(t *testing.T) {
 
 	rs.Add(entity)
 	_ = rs.Update(0)
-	assert.Equal(t, systems.None, rs.GetLastEvent())
+	assert.Equal(t, types.None, rs.GetLastEvent())
 }

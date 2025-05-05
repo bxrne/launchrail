@@ -23,6 +23,9 @@ type PhysicsState struct {
 	AccumulatedForce  types.Vector3
 	AccumulatedMoment types.Vector3
 
+	// Current event detected this timestep
+	CurrentEvent types.Event
+
 	// components
 	Motor     *components.Motor
 	Bodytube  *components.Bodytube

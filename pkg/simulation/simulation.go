@@ -224,7 +224,7 @@ func logPeriodicSimState(s *Simulation, state *entities.RocketEntity, hasMotor b
 
 // shouldStopSimulation checks if the simulation should stop and logs the reason.
 func (s *Simulation) shouldStopSimulation() bool {
-	if s.rulesSystem.GetLastEvent() == systems.Land {
+	if s.rulesSystem.GetLastEvent() == types.Land {
 		s.logger.Info("Rocket has landed; stopping simulation")
 		return true
 	}
@@ -354,6 +354,9 @@ func (s *Simulation) updateSystems() error {
 		}
 	}
 	s.logger.Debug("Finished system update loop")
+
+	// Capture the detected event *after* running rules system
+	state.CurrentEvent = s.rulesSystem.GetLastEvent()
 
 	// 3. Calculate Net Acceleration from Accumulated Forces
 	netForce := state.AccumulatedForce

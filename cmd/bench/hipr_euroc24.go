@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/bxrne/launchrail/internal/logger"
 )
@@ -89,7 +90,7 @@ func (b *HiprEuroc24Benchmark) Run() ([]BenchmarkResult, error) {
 	benchLogger.Debug("Loaded actual motion data", "count", len(actualMotionData))
 
 	actualEventsPath := filepath.Join(actualDataPath, "EVENTS.csv")
-	actualEventsData, err := LoadSimEventData(actualEventsPath) // USE NEW LOADER
+	actualEventsData, err := LoadSimEventData(actualEventsPath) // CORRECTED: Use LoadSimEventData
 	if err != nil {
 		return nil, fmt.Errorf("failed to load actual event data from '%s': %w", actualEventsPath, err)
 	}
@@ -181,44 +182,20 @@ func findSimMaxVelocity(simData []SimMotionData) (float64, float64) { // UPDATED
 }
 
 // findSimEventTime finds the timestamp for a specific event from simulation event info.
-// Note: Matches event name string exactly.
-func findSimEventTime(simEvents []SimEventData, eventName string) float64 { // UPDATED TYPE
-	// The actual EVENTS.csv has status strings, not event names like the ground truth.
-	// We need to infer events from status changes.
-	benchLogger := logger.GetLogger("debug") // Use debug for potentially verbose logging
+// Note: Matches event name string case-insensitively.
+func findSimEventTime(simEvents []SimEventInfo, targetEventName string) float64 {
+	benchLogger := logger.GetLogger("debug")
 
-	if eventName == "Liftoff" {
-		// Assumption: Liftoff occurs when motor status transitions from IDLE to BURNING.
-		var prevMotorStatus string = ""
-		if len(simEvents) > 0 {
-			prevMotorStatus = simEvents[0].MotorStatus // Initialize with first status
+	for _, e := range simEvents {
+		// Case-insensitive comparison
+		if strings.EqualFold(e.EventName, targetEventName) {
+			benchLogger.Debug("Found target sim event", "target", targetEventName, "foundEvent", e.EventName, "timestamp", e.Time)
+			return e.Time
 		}
-		for i := 1; i < len(simEvents); i++ { // Start from second record
-			current := simEvents[i]
-			if prevMotorStatus == "IDLE" && current.MotorStatus == "BURNING" {
-				benchLogger.Debug("Found Liftoff event", "timestamp", current.Timestamp, "prevStatus", prevMotorStatus, "currentStatus", current.MotorStatus)
-				return current.Timestamp
-			}
-			prevMotorStatus = current.MotorStatus
-		}
-		benchLogger.Warn("Liftoff event (IDLE -> BURNING transition) not found in sim data")
-		return -1 // Not found
-
-	} else if eventName == "ApogeeDetected" {
-		// Assumption: ApogeeDetected corresponds to the first time ParachuteStatus is DEPLOYED.
-		for _, e := range simEvents {
-			if e.ParachuteStatus == "DEPLOYED" {
-				benchLogger.Debug("Found ApogeeDetected event", "timestamp", e.Timestamp, "parachuteStatus", e.ParachuteStatus)
-				return e.Timestamp
-			}
-		}
-		benchLogger.Warn("ApogeeDetected event (ParachuteStatus == DEPLOYED) not found in sim data")
-		return -1 // Not found
-
-	} else {
-		benchLogger.Warn("Unsupported event name for findSimEventTime", "targetEvent", eventName)
-		return -1 // Unsupported event
 	}
+
+	benchLogger.Warn("Target sim event not found", "targetEvent", targetEventName)
+	return -1 // Not found
 }
 
 // --- Helper methods for GROUND TRUTH data --- // NEW SECTION

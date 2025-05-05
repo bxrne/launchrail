@@ -7,16 +7,7 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/states"
-)
-
-// Event represents a significant event in flight
-type Event int
-
-const (
-	None Event = iota
-	Liftoff
-	Apogee
-	Land
+	"github.com/bxrne/launchrail/pkg/types"
 )
 
 // RulesSystem enforces rules of flight
@@ -30,17 +21,17 @@ type RulesSystem struct {
 }
 
 // GetLastEvent returns the last event detected by the rules system
-func (s *RulesSystem) GetLastEvent() Event {
+func (s *RulesSystem) GetLastEvent() types.Event {
 	if s.hasLanded {
-		return Land
+		return types.Land
 	}
 	if s.hasApogee {
-		return Apogee
+		return types.Apogee
 	}
 	if s.hasLiftoff {
-		return Liftoff
+		return types.Liftoff
 	}
-	return None
+	return types.None
 }
 
 // NewRulesSystem creates a new RulesSystem
@@ -66,22 +57,22 @@ func (s *RulesSystem) Update(dt float64) error {
 	return nil
 }
 
-func (s *RulesSystem) ProcessRules(entity *states.PhysicsState) Event {
+func (s *RulesSystem) ProcessRules(entity *states.PhysicsState) types.Event {
 	if entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Motor == nil {
-		return None
+		return types.None
 	}
 
 	// Check for Liftoff (Motor burning and off the ground/rail?)
 	if !s.hasLiftoff && entity.Motor.FSM.Current() == components.StateBurning && entity.Position.Vec.Y > 0.1 /* Small tolerance */ {
 		s.hasLiftoff = true
-		return Liftoff
+		return types.Liftoff
 	}
 
 	// Check for apogee
 	// Only check for apogee *after* liftoff
 	if s.hasLiftoff && !s.hasApogee && s.DetectApogee(entity) {
 		s.hasApogee = true
-		return Apogee
+		return types.Apogee
 	}
 
 	// Check for landing after apogee using ground tolerance
@@ -92,10 +83,10 @@ func (s *RulesSystem) ProcessRules(entity *states.PhysicsState) Event {
 		entity.Velocity.Vec.Y = 0
 		entity.Acceleration.Vec.Y = 0
 		s.hasLanded = true
-		return Land
+		return types.Land
 	}
 
-	return None
+	return types.None
 }
 
 func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {

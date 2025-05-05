@@ -61,6 +61,8 @@ func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Engine, log
 	}
 }
 
+const minDensity = 1e-9 // Minimum physical density clamp
+
 // getAtmosphericData retrieves atmospheric data from cache or calculates it
 func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericData {
 	if a.isa == nil {
@@ -74,21 +76,54 @@ func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericDat
 	}
 
 	isaData := a.isa.GetAtmosphere(altitude)
-	if isaData.Density <= 0 || isaData.Pressure <= 0 || isaData.Temperature <= 0 {
-		// Return standard values if ISA data is invalid
-		return &atmosphericData{
-			density:     1.225,
-			pressure:    101325,
-			temperature: 288.15,
-			soundSpeed:  340.29,
+
+	density := isaData.Density
+	pressure := isaData.Pressure
+	temperature := isaData.Temperature
+	soundSpeed := isaData.SoundSpeed
+
+	// Validate Temperature
+	if temperature <= 0 || math.IsNaN(temperature) || math.IsInf(temperature, 0) {
+		a.log.Warn("ISA model returned invalid temperature, using fallback", "altitude", altitude, "temp", temperature)
+		temperature = 288.15 // Fallback temperature (sea level)
+		// Invalidate related values that depend on temperature if they weren't already bad
+		if pressure > 0 { pressure = 101325 }
+		if soundSpeed > 0 { soundSpeed = 0 } // Mark sound speed for recalculation/fallback below
+	}
+
+	// Validate Density - clamp to minimum, don't use sea level fallback
+	if density <= 0 || math.IsNaN(density) || math.IsInf(density, 0) {
+		a.log.Warn("ISA model returned invalid density, clamping to minimum", "altitude", altitude, "density", density)
+		density = minDensity // Clamp to small positive value
+		if pressure > 0 { pressure = 1e-5 } // Also adjust pressure if density was bad? Or leave it if T was okay?
+	}
+
+	// Validate Pressure (less critical for drag, but good practice)
+	if pressure <= 0 || math.IsNaN(pressure) || math.IsInf(pressure, 0) {
+		a.log.Warn("ISA model returned invalid pressure, using fallback", "altitude", altitude, "pressure", pressure)
+		pressure = 1e-5 // Fallback to a very small positive pressure
+	}
+
+	// Validate or Recalculate Sound Speed
+	if soundSpeed <= 0 || math.IsNaN(soundSpeed) || math.IsInf(soundSpeed, 0) {
+		// Try recalculating from validated temperature
+		// Using isa package constants (assuming they exist: Gamma=1.4, R=287.05)
+		recalcSoundSpeed := math.Sqrt(1.4 * 287.05 * temperature)
+		if !math.IsNaN(recalcSoundSpeed) && recalcSoundSpeed > 0 {
+			a.log.Warn("ISA model returned invalid sound speed, using recalculated value", "altitude", altitude, "isaSoundSpeed", isaData.SoundSpeed, "recalcSoundSpeed", recalcSoundSpeed)
+			soundSpeed = recalcSoundSpeed
+		} else {
+			// Final fallback if recalculation fails
+			a.log.Warn("ISA model returned invalid sound speed, recalculation failed, using sea level fallback", "altitude", altitude, "isaSoundSpeed", isaData.SoundSpeed)
+			soundSpeed = 340.29
 		}
 	}
 
 	return &atmosphericData{
-		density:     isaData.Density,
-		pressure:    isaData.Pressure,
-		temperature: isaData.Temperature,
-		soundSpeed:  isaData.SoundSpeed,
+		density:     density,
+		pressure:    pressure,
+		temperature: temperature,
+		soundSpeed:  soundSpeed,
 	}
 }
 
