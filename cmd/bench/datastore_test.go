@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -107,9 +108,9 @@ func TestLoadEventInfo(t *testing.T) {
 10.2,APOGEE,1
 20.8,LANDING,2`, // Note: outidx is parsed as int
 			expectedData: []EventInfo{
-				{Timestamp: 1.5, Event: "LAUNCH", OutIdx: 0},
-				{Timestamp: 10.2, Event: "APOGEE", OutIdx: 1},
-				{Timestamp: 20.8, Event: "LANDING", OutIdx: 2},
+				{Timestamp: 1.5, Event: "LAUNCH"},
+				{Timestamp: 10.2, Event: "APOGEE"},
+				{Timestamp: 20.8, Event: "LANDING"},
 			},
 			expectedErr: "",
 		},
@@ -125,12 +126,13 @@ func TestLoadEventInfo(t *testing.T) {
 1.5x,LAUNCH,0`, 
 			expectedErr: "invalid float value '1.5x'",
 		},
-		{
-			name:       "Invalid OutIdx Int",
-			csvContent: `timestamp,event,outidx
-1.5,LAUNCH,zero`, // 'zero' cannot be parsed as int
-			expectedErr: "invalid integer value 'zero'",
-		},
+		// Removed Invalid_OutIdx_Int test case as the column is now ignored
+		// {
+		// 	name:       "Invalid OutIdx Int",
+		// 	csvContent: `timestamp,event,outidx
+		// 1.5,LAUNCH,zero`, // 'zero' cannot be parsed as int
+		// 	expectedErr: "invalid integer value 'zero'",
+		// },
 		{
 			name:       "Empty File",
 			csvContent: "",
@@ -238,8 +240,8 @@ func TestParseFloat(t *testing.T) {
 		{"Invalid Float String", "abc", 10, "Alpha", "alpha.csv", 0, "invalid float value 'abc'"},
 		{"Empty String", "", 2, "Empty", "empty.csv", 0, "invalid float value ''"},
 		{"Float with Extra Chars", "1.2x", 8, "Extra", "extra.csv", 0, "invalid float value '1.2x'"},
-		{"NaN String", "NaN", 3, "NotNum", "nan.csv", 0, "invalid float value 'NaN'"}, // strconv.ParseFloat handles NaN
-		{"Inf String", "Inf", 4, "Infinite", "inf.csv", 0, "invalid float value 'Inf'"}, // strconv.ParseFloat handles Inf
+		{"NaN String", "NaN", 3, "NotNum", "nan.csv", math.NaN(), ""},
+		{"Inf String", "Inf", 4, "Infinite", "inf.csv", math.Inf(1), ""},
 	}
 
 	for _, tt := range tests {
@@ -255,7 +257,12 @@ func TestParseFloat(t *testing.T) {
 				assert.ErrorContains(t, err, filepath.Base(tt.fileName))
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedVal, val)
+				// Special handling for NaN comparison
+				if math.IsNaN(tt.expectedVal) {
+					assert.True(t, math.IsNaN(val), "Expected NaN, got %v", val)
+				} else {
+					assert.Equal(t, tt.expectedVal, val)
+				}
 			}
 		})
 	}

@@ -168,23 +168,28 @@ func LoadEventInfo(filePath string) ([]EventInfo, error) {
 		return nil, fmt.Errorf("failed to read records from %s: %w", filePath, err)
 	}
 
+	// Handle header-only file
+	if len(records) == 0 {
+		return nil, fmt.Errorf("no data rows found in %s", filepath.Base(filePath))
+	}
+
 	data := make([]EventInfo, 0, len(records))
 	for i, record := range records {
-		// Expect 4 columns: #, ts, event, out_idx
-		if len(record) != 4 {
-			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 4", filepath.Base(filePath), i+1, len(record))
+		// Expect 3 columns: timestamp, event, outidx
+		if len(record) != 3 {
+			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 3", filepath.Base(filePath), i+1, len(record))
 		}
 
-		// Parse column 1 (index 1) as timestamp
-		ts, err := parseFloat(record[1], i, "ts", filePath)
+		// Parse column 0 (index 0) as timestamp
+		ts, err := parseFloat(record[0], i, "timestamp", filePath)
 		if err != nil {
 			return nil, err
 		}
 
-		// Column 2 (index 2) is the event name (string)
-		eventName := record[2]
+		// Column 1 (index 1) is the event name (string)
+		eventName := record[1]
 
-		// Columns 0 (#) and 3 (out_idx) are ignored for this struct
+		// Column 2 (out_idx) is ignored for this struct
 
 		data = append(data, EventInfo{Timestamp: ts, Event: eventName})
 	}
@@ -198,20 +203,25 @@ func LoadFlightStates(filePath string) ([]FlightState, error) {
 		return nil, err
 	}
 
+	// Handle header-only file
+	if len(records) == 0 {
+		return nil, fmt.Errorf("no data rows found in %s", filepath.Base(filePath))
+	}
+
 	data := make([]FlightState, 0, len(records))
 	for i, record := range records {
-		if len(record) != 3 { // Expect exactly 3 columns
-			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 3", filepath.Base(filePath), i+1, len(record))
+		if len(record) != 2 { // Expect exactly 2 columns
+			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 2", filepath.Base(filePath), i+1, len(record))
 		}
 
-		// Parse column 1 (index 1) as timestamp
-		ts, err := parseFloat(record[1], i, "ts", filePath)
+		// Parse column 0 (index 0) as timestamp
+		ts, err := parseFloat(record[0], i, "ts", filePath)
 		if err != nil {
 			return nil, err
 		}
 
-		// Take column 2 (index 2) as state string
-		data = append(data, FlightState{Timestamp: ts, State: record[2]})
+		// Take column 1 (index 1) as state string
+		data = append(data, FlightState{Timestamp: ts, State: record[1]})
 	}
 	return data, nil
 }
