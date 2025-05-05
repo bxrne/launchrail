@@ -150,8 +150,43 @@ func (h *DataHandler) DeleteRecord(c *gin.Context) {
 	hxHeader := c.Request.Header.Get("Hx-Request")
 
 	if hxHeader != "" {
-		c.AbortWithStatus(http.StatusOK)
+		// HTMX request: Fetch updated records and render the list component
+		updatedRecords, err := h.records.ListRecords()
+		if err != nil {
+			h.log.Error("Failed to list records after deletion for HTMX response", "error", err)
+			// Send a generic error back to HTMX, or maybe an empty list with an error message?
+			// For now, send 500
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		// Map storage.Record to pages.SimulationRecord
+		pageRecords := make([]pages.SimulationRecord, 0, len(updatedRecords))
+		for _, rec := range updatedRecords {
+			pageRecords = append(pageRecords, pages.SimulationRecord{
+				Hash:         rec.Hash,
+				LastModified: rec.LastModified,
+			})
+		}
+
+		// Prepare props for the RecordList component (no pagination for this simple swap)
+		props := pages.DataProps{
+			Records: pageRecords,
+			// Pagination: pages.Pagination{}, // Omit pagination for now
+		}
+
+		// Set content type and render the component
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		err = pages.RecordList(props).Render(c.Request.Context(), c.Writer)
+		if err != nil {
+			h.log.Error("Failed to render RecordList component for HTMX response", "error", err)
+			// Abort if rendering fails, status code is already set potentially by Render
+			return
+		}
+		// Status OK is implicit on successful render without Abort
+
 	} else {
+		// API request: Respond with No Content
 		c.AbortWithStatus(http.StatusNoContent)
 	}
 }
