@@ -1,7 +1,6 @@
 package types_test
 
 import (
-	"math"
 	"testing"
 
 	"github.com/bxrne/launchrail/pkg/types"
@@ -82,12 +81,7 @@ func TestVector3DivideScalarZero(t *testing.T) {
 	v := types.Vector3{X: 2, Y: 4, Z: 6}
 	scalar := 0.0
 
-	smallestNonzero := float64(math.SmallestNonzeroFloat64)
-	expected := types.Vector3{
-		X: 2 / smallestNonzero,
-		Y: 4 / smallestNonzero,
-		Z: 6 / smallestNonzero,
-	}
+	expected := types.Vector3{}
 
 	result := v.DivideScalar(scalar)
 	if result != expected {

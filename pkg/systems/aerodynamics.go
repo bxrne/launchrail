@@ -10,6 +10,7 @@ import (
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
+	"github.com/zerodha/logf"
 )
 
 // atmosphericData stores atmospheric data at a given altitude
@@ -23,9 +24,10 @@ type atmosphericData struct {
 // AerodynamicSystem calculates aerodynamic forces on entities
 type AerodynamicSystem struct {
 	world    *ecs.World
-	entities []*states.PhysicsState // Change to pointer slice
+	entities []*states.PhysicsState
 	workers  int
 	isa      *atmosphere.ISAModel
+	log      logf.Logger
 }
 
 // GetAirDensity returns the air density at a given altitude
@@ -34,15 +36,15 @@ func (a *AerodynamicSystem) GetAirDensity(altitude float64) float64 {
 }
 
 // NewAerodynamicSystem creates a new AerodynamicSystem
-func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Engine) *AerodynamicSystem {
+func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Engine, log logf.Logger) *AerodynamicSystem {
 	if cfg == nil || cfg.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelDensity == 0 {
 		cfg = &config.Engine{
 			Options: config.Options{
 				Launchsite: config.Launchsite{
 					Atmosphere: config.Atmosphere{
 						ISAConfiguration: config.ISAConfiguration{
-							SeaLevelDensity: 1.225, // Default sea level density in kg/m³
-							SeaLevelPressure: 101325, // Default sea level pressure in Pa
+							SeaLevelDensity:     1.225,  // Default sea level density in kg/m³
+							SeaLevelPressure:    101325, // Default sea level pressure in Pa
 							SeaLevelTemperature: 288.15, // Default sea level temperature in K
 						},
 					},
@@ -55,8 +57,11 @@ func NewAerodynamicSystem(world *ecs.World, workers int, cfg *config.Engine) *Ae
 		entities: make([]*states.PhysicsState, 0),
 		workers:  workers,
 		isa:      atmosphere.NewISAModel(&cfg.Options.Launchsite.Atmosphere.ISAConfiguration),
+		log:      log,
 	}
 }
+
+const minDensity = 1e-9 // Minimum physical density clamp
 
 // getAtmosphericData retrieves atmospheric data from cache or calculates it
 func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericData {
@@ -69,23 +74,56 @@ func (a *AerodynamicSystem) getAtmosphericData(altitude float64) *atmosphericDat
 			soundSpeed:  340.29,
 		}
 	}
-	
+
 	isaData := a.isa.GetAtmosphere(altitude)
-	if isaData.Density <= 0 || isaData.Pressure <= 0 || isaData.Temperature <= 0 {
-		// Return standard values if ISA data is invalid
-		return &atmosphericData{
-			density:     1.225,
-			pressure:    101325,
-			temperature: 288.15,
-			soundSpeed:  340.29,
+
+	density := isaData.Density
+	pressure := isaData.Pressure
+	temperature := isaData.Temperature
+	soundSpeed := isaData.SoundSpeed
+
+	// Validate Temperature
+	if temperature <= 0 || math.IsNaN(temperature) || math.IsInf(temperature, 0) {
+		a.log.Warn("ISA model returned invalid temperature, using fallback", "altitude", altitude, "temp", temperature)
+		temperature = 288.15 // Fallback temperature (sea level)
+		// Invalidate related values that depend on temperature if they weren't already bad
+		if pressure > 0 { pressure = 101325 }
+		if soundSpeed > 0 { soundSpeed = 0 } // Mark sound speed for recalculation/fallback below
+	}
+
+	// Validate Density - clamp to minimum, don't use sea level fallback
+	if density <= 0 || math.IsNaN(density) || math.IsInf(density, 0) {
+		a.log.Warn("ISA model returned invalid density, clamping to minimum", "altitude", altitude, "density", density)
+		density = minDensity // Clamp to small positive value
+		if pressure > 0 { pressure = 1e-5 } // Also adjust pressure if density was bad? Or leave it if T was okay?
+	}
+
+	// Validate Pressure (less critical for drag, but good practice)
+	if pressure <= 0 || math.IsNaN(pressure) || math.IsInf(pressure, 0) {
+		a.log.Warn("ISA model returned invalid pressure, using fallback", "altitude", altitude, "pressure", pressure)
+		pressure = 1e-5 // Fallback to a very small positive pressure
+	}
+
+	// Validate or Recalculate Sound Speed
+	if soundSpeed <= 0 || math.IsNaN(soundSpeed) || math.IsInf(soundSpeed, 0) {
+		// Try recalculating from validated temperature
+		// Using isa package constants (assuming they exist: Gamma=1.4, R=287.05)
+		recalcSoundSpeed := math.Sqrt(1.4 * 287.05 * temperature)
+		if !math.IsNaN(recalcSoundSpeed) && recalcSoundSpeed > 0 {
+			a.log.Warn("ISA model returned invalid sound speed, using recalculated value", "altitude", altitude, "isaSoundSpeed", isaData.SoundSpeed, "recalcSoundSpeed", recalcSoundSpeed)
+			soundSpeed = recalcSoundSpeed
+		} else {
+			// Final fallback if recalculation fails
+			a.log.Warn("ISA model returned invalid sound speed, recalculation failed, using sea level fallback", "altitude", altitude, "isaSoundSpeed", isaData.SoundSpeed)
+			soundSpeed = 340.29
 		}
 	}
-	
+
 	return &atmosphericData{
-		density:     isaData.Density,
-		pressure:    isaData.Pressure,
-		temperature: isaData.Temperature,
-		soundSpeed:  isaData.SoundSpeed,
+		density:     density,
+		pressure:    pressure,
+		temperature: temperature,
+		soundSpeed:  soundSpeed,
 	}
 }
 
@@ -96,10 +134,10 @@ func (a *AerodynamicSystem) getTemperature(altitude float64) float64 {
 
 // CalculateDrag now handles atmospheric effects and Mach number
 func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vector3 {
-    // Validate inputs
-    if a == nil || a.isa == nil || entity.Position == nil || entity.Velocity == nil || entity.Nosecone == nil || entity.Bodytube == nil {
-        return types.Vector3{}
-    }
+	// Validate inputs
+	if a == nil || a.isa == nil || entity.Position == nil || entity.Velocity == nil || entity.Nosecone == nil || entity.Bodytube == nil {
+		return types.Vector3{}
+	}
 
 	if entity == (states.PhysicsState{}) {
 		return types.Vector3{}
@@ -163,8 +201,9 @@ func calculateReferenceArea(nosecone *components.Nosecone, bodytube *components.
 	return math.Max(noseArea, tubeArea)
 }
 
-// Update implements parallel force calculation and application
+// Update implements parallel force calculation and accumulation
 func (a *AerodynamicSystem) Update(dt float64) error {
+	a.log.Debug("AerodynamicSystem Update started", "entity_count", len(a.entities), "dt", dt)
 	workChan := make(chan *states.PhysicsState, len(a.entities))
 	resultChan := make(chan types.Vector3, len(a.entities))
 	momentChan := make(chan types.Vector3, len(a.entities))
@@ -172,18 +211,20 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 	var wg sync.WaitGroup
 	for i := 0; i < a.workers; i++ {
 		wg.Add(1)
-		go func() {
+		go func(workerID int) {
 			defer wg.Done()
 			for entity := range workChan {
 				if entity == nil {
 					continue
 				}
+				a.log.Debug("Worker processing entity", "worker_id", workerID, "entity_id", entity.Entity.ID())
 				force := a.CalculateDrag(*entity)
 				moment := a.CalculateAerodynamicMoment(*entity)
+				a.log.Debug("Worker calculated force/moment", "worker_id", workerID, "entity_id", entity.Entity.ID(), "force", force, "moment", moment)
 				resultChan <- force
 				momentChan <- moment
 			}
-		}()
+		}(i) // Pass worker ID
 	}
 
 	for _, entity := range a.entities {
@@ -214,28 +255,21 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 			globalForce = force // Use untransformed force if no valid orientation
 		}
 
-		acc := globalForce.DivideScalar(entity.Mass.Value)
+		a.log.Debug("Calculating aero force",
+			"entity_id", entity.Entity.ID(),
+			"body_force", force,
+			"orientation", entity.Orientation.Quat,
+			"global_force", globalForce,
+			"mass", entity.Mass.Value,
+		)
 
-		entity.Acceleration.Vec.X += float64(acc.X)
-		entity.Acceleration.Vec.Y += float64(acc.Y)
-		entity.Acceleration.Vec.Z += float64(acc.Z)
+		// Add the calculated global force to the accumulator
+		entity.AccumulatedForce = entity.AccumulatedForce.Add(globalForce)
 
 		// Apply angular accelerations from moments
 		moment := <-momentChan
-		if entity.AngularAcceleration != nil {
-			inertia := CalculateInertia(entity)
-			var angAcc types.Vector3
-			if inertia != 0 {
-				angAcc = moment.DivideScalar(inertia)
-			} else {
-				// Inertia is zero, so angular acceleration is zero (or handle as error)
-				angAcc = types.Vector3{}
-			}
-
-			entity.AngularAcceleration.X = float64(angAcc.X)
-			entity.AngularAcceleration.Y = float64(angAcc.Y)
-			entity.AngularAcceleration.Z = float64(angAcc.Z)
-		}
+		// Add the calculated moment to the accumulator
+		entity.AccumulatedMoment = entity.AccumulatedMoment.Add(moment)
 
 		i++
 	}

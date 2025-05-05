@@ -28,7 +28,7 @@ var StorageHeaders = map[SimStorageType][]string{
 		"time", "altitude", "velocity", "acceleration", "thrust",
 	},
 	EVENTS: {
-		"time", "motor_status", "parachute_status",
+		"time", "event_name", "motor_status", "parachute_status",
 	},
 	DYNAMICS: {
 		"time", "position_x", "position_y", "position_z", "velocity_x", "velocity_y", "velocity_z", "acceleration_x", "acceleration_y", "acceleration_z", "orientation_x", "orientation_y", "orientation_z", "orientation_w",
