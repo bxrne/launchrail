@@ -190,7 +190,7 @@ func TestReadHeadersAndData(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, s.Init())
 
-	data := []string{"val1", "val2", "val3"}
+	data := []string{"0.1", "Liftoff", "ACTIVE", "NONE"} // Provide 4 values
 	require.NoError(t, s.Write(data))
 	require.NoError(t, s.Close())
 

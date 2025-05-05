@@ -176,7 +176,7 @@ func TestStorageParasiteSystem_Events(t *testing.T) {
 
 	records := mock.getRecords()
 	require.Len(t, records, 1)
-	expectedRecord := []string{"2.500000", "IGNITED", "DEPLOYED"} // Updated expected state
+	expectedRecord := []string{"2.500000", "NONE", "IGNITED", "DEPLOYED"}
 	assert.Equal(t, expectedRecord, records[0])
 }
 

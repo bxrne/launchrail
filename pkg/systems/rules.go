@@ -3,11 +3,12 @@ package systems
 import (
 	"math"
 
-	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
+	"github.com/EngoEngine/ecs"
+	"github.com/zerodha/logf"
 )
 
 // RulesSystem enforces rules of flight
@@ -18,6 +19,7 @@ type RulesSystem struct {
 	hasLiftoff bool
 	hasApogee bool
 	hasLanded bool
+	logger    logf.Logger
 }
 
 // GetLastEvent returns the last event detected by the rules system
@@ -35,12 +37,13 @@ func (s *RulesSystem) GetLastEvent() types.Event {
 }
 
 // NewRulesSystem creates a new RulesSystem
-func NewRulesSystem(world *ecs.World, config *config.Engine) *RulesSystem {
+func NewRulesSystem(world *ecs.World, config *config.Engine, logger logf.Logger) *RulesSystem {
 	return &RulesSystem{
 		world:     world,
 		config:    config,
 		entities:  make([]*states.PhysicsState, 0),
 		hasLiftoff: false,
+		logger:    logger,
 	}
 }
 
@@ -93,25 +96,27 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 	const velocityWindow = 0.5 // m/s window to detect velocity near zero
 
 	// Must be near zero vertical velocity
-	if math.Abs(entity.Velocity.Vec.Y) > velocityWindow {
+	if math.Abs(entity.Velocity.Vec.Y) > velocityWindow { // Return false ONLY if velocity is OUTSIDE the window
 		return false
 	}
 
-	// Must be coasting (motor burned out)
-	if entity.Motor != nil && entity.Motor.FSM.Current() != components.StateIdle {
+	// Motor must be idle
+	if entity.Motor == nil || entity.Motor.FSM.Current() != components.StateIdle {
+		return false
+	}
+
+	// Check parachute status
+	if entity.Parachute == nil || entity.Parachute.Deployed {
 		return false
 	}
 
 	// Must be above ground
-	if entity.Position.Vec.Y <= s.config.Simulation.GroundTolerance {
+	if entity.Position == nil || entity.Position.Vec.Y <= 0 {
 		return false
 	}
 
-	// If we get here, we're at apogee
-	if entity.Parachute != nil && !entity.Parachute.IsDeployed() {
-		entity.Parachute.Deploy()
-		return true
-	}
+	// Deploy parachute if conditions met
+	entity.Parachute.Deploy()
 
-	return false
+	return true
 }
