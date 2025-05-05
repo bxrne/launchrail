@@ -6,11 +6,15 @@ import (
 
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/stretchr/testify/assert"
+	"github.com/zerodha/logf"
+	"io"
 )
 
 // TEST: GIVEN a new MotorFSM WHEN InitialState is called THEN the state is "idle"
 func TestMotorFSM_InitialState(t *testing.T) {
-	fsm := components.NewMotorFSM()
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	motor := &components.Motor{}
+	fsm := components.NewMotorFSM(motor, logger)
 	assert.Equal(t, components.StateIdle, fsm.GetState(), "FSM should start in 'idle' state")
 }
 
@@ -35,7 +39,9 @@ func TestMotorFSM_StateTransitions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fsm := components.NewMotorFSM()
+			logger := logf.New(logf.Opts{Writer: io.Discard})
+			motor := &components.Motor{}
+			fsm := components.NewMotorFSM(motor, logger)
 
 			// Set initial state if needed
 			if tt.initState == components.StateBurning {
@@ -51,7 +57,9 @@ func TestMotorFSM_StateTransitions(t *testing.T) {
 
 // TEST: GIVEN a new MotorFSM WHEN ConcurrentUpdates is called THEN the state is valid
 func TestMotorFSM_ConcurrentUpdates(t *testing.T) {
-	fsm := components.NewMotorFSM()
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	motor := &components.Motor{}
+	fsm := components.NewMotorFSM(motor, logger)
 
 	// Run multiple updates concurrently
 	for i := 0; i < 10; i++ {
@@ -83,7 +91,9 @@ func TestMotorFSM_NegativeValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fsm := components.NewMotorFSM()
+			logger := logf.New(logf.Opts{Writer: io.Discard})
+			motor := &components.Motor{}
+			fsm := components.NewMotorFSM(motor, logger)
 			err := fsm.UpdateState(tt.mass, tt.elapsedTime, tt.burnTime)
 			assert.NoError(t, err) // Should handle negative values gracefully
 		})
@@ -92,7 +102,9 @@ func TestMotorFSM_NegativeValues(t *testing.T) {
 
 // TEST: GIVEN a new MotorFSM WHEN InvalidState is called THEN the state is valid
 func TestMotorFSM_StateString(t *testing.T) {
-	fsm := components.NewMotorFSM()
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	motor := &components.Motor{}
+	fsm := components.NewMotorFSM(motor, logger)
 	assert.Equal(t, "idle", fsm.GetState())
 
 	_ = fsm.UpdateState(10.0, 1.0, 5.0)
@@ -101,7 +113,9 @@ func TestMotorFSM_StateString(t *testing.T) {
 
 // TEST: GIVEN a new MotorFSM WHEN RapidStateChanges is called THEN the state is valid
 func TestMotorFSM_RapidStateChanges(t *testing.T) {
-	fsm := components.NewMotorFSM()
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	motor := &components.Motor{}
+	fsm := components.NewMotorFSM(motor, logger)
 
 	// Rapidly toggle between states
 	for i := 0; i < 100; i++ {

@@ -1,0 +1,14 @@
+package pages
+
+import (
+	"github.com/bxrne/launchrail/templates/components"
+	"github.com/bxrne/launchrail/templates/layouts"
+)
+
+templ ErrorPage(errorMessage string) {
+	@layouts.Base(layouts.BaseProps{
+		Title: "Error",
+	}) {
+		@components.Error(errorMessage)
+	}
+}

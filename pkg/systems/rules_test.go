@@ -1,177 +1,166 @@
 package systems_test
 
 import (
-	"os"
 	"testing"
+
+	"io"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/pkg/components"
+	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
+	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/zerodha/logf"
 )
 
-// TEST: GIVEN a new RulesSystem WHEN NewRulesSystem is called THEN a new RulesSystem is returned
+func TestProcessRules_NilEntity(t *testing.T) {
+	world := &ecs.World{}
+	cfg := &config.Engine{}
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	rs := systems.NewRulesSystem(world, cfg, logger)
+	result := rs.ProcessRules(nil)
+	if result != types.None {
+		t.Errorf("Expected None for nil entity, got %v", result)
+	}
+}
+
+func TestDetectApogee_HighVelocity(t *testing.T) {
+	lg := logger.GetLogger("debug")
+	world := &ecs.World{}
+	cfg := &config.Engine{Simulation: config.Simulation{GroundTolerance: 0.1}}
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	rs := systems.NewRulesSystem(world, cfg, logger)
+	motor := &components.Motor{}
+	motor.FSM = components.NewMotorFSM(motor, *lg)
+	entity := &states.PhysicsState{
+		Velocity: &types.Velocity{Vec: types.Vector3{Y: 10}},
+		Motor:    motor,
+		Position: &types.Position{Vec: types.Vector3{Y: 100}},
+	}
+	result := rs.DetectApogee(entity)
+	if result {
+		t.Errorf("Expected false for high velocity, got %v", result)
+	}
+}
+
 func TestNewRulesSystem(t *testing.T) {
 	world := &ecs.World{}
-	err := os.Setenv("CONFIG_PATH", "/Users/adambyrne/code/launchrail/config.yaml")
-	require.NoError(t, err)
-	cfg := &config.Config{}
-	system := systems.NewRulesSystem(world, cfg)
-	require.NotNil(t, system)
+	cfg := &config.Engine{}
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	rs := systems.NewRulesSystem(world, cfg, logger)
+	assert.NotNil(t, rs)
 }
 
-// TEST: GIVEN a RulesSystem WHEN Add is called THEN the entity is added to the system
-func TestRulesSystem_Add(t *testing.T) {
+func TestAdd(t *testing.T) {
 	world := &ecs.World{}
-	cfg := &config.Config{}
-	system := systems.NewRulesSystem(world, cfg)
-	e := ecs.NewBasic()
+	cfg := &config.Engine{}
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	rs := systems.NewRulesSystem(world, cfg, logger)
+	en := &states.PhysicsState{}
 
-	entity := systems.PhysicsEntity{
-		Entity:       &e,
-		Position:     &types.Position{},
-		Velocity:     &types.Velocity{},
-		Acceleration: &types.Acceleration{},
-		Mass:         &types.Mass{},
-		Motor:        &components.Motor{},
-	}
-
-	system.Add(&entity)
+	rs.Add(en)
 }
 
-// TEST: GIVEN a RulesSystem WHEN Priority is called THEN the correct priority is returned
-func TestRulesSystem_Priority(t *testing.T) {
+func TestApogeeDetection(t *testing.T) {
+	cfg := &config.Engine{
+		Simulation: config.Simulation{
+			GroundTolerance: 0.1,
+		},
+	}
 	world := &ecs.World{}
-	cfg := &config.Config{}
-	system := systems.NewRulesSystem(world, cfg)
-	assert.Equal(t, 100, system.Priority())
-}
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	rs := systems.NewRulesSystem(world, cfg, logger)
 
-// TEST: GIVEN a RulesSystem WHEN Update is called with various flight conditions THEN appropriate events are detected
-func TestRulesSystem_Update(t *testing.T) {
-	tests := []struct {
-		name          string
-		position      types.Position
-		velocity      types.Velocity
-		motorState    string
-		expectedEvent systems.Event
-		description   string
-	}{
-		{
-			name:          "Pre-apogee ascending",
-			position:      types.Position{Vec: types.Vector3{Y: 100}},
-			velocity:      types.Velocity{Vec: types.Vector3{Y: 10}},
-			motorState:    "BURNOUT",
-			expectedEvent: systems.None,
-			description:   "Should not detect apogee while ascending",
-		},
-		{
-			name:          "Apogee detection",
-			position:      types.Position{Vec: types.Vector3{Y: 100}},
-			velocity:      types.Velocity{Vec: types.Vector3{Y: -0.1}},
-			motorState:    "BURNOUT",
-			expectedEvent: systems.Apogee,
-			description:   "Should detect apogee when velocity turns negative",
-		},
-		{
-			name:          "Post-apogee descending",
-			position:      types.Position{Vec: types.Vector3{Y: 50}},
-			velocity:      types.Velocity{Vec: types.Vector3{Y: -10}},
-			motorState:    "BURNOUT",
-			expectedEvent: systems.None,
-			description:   "Should not detect any event during descent",
-		},
-		{
-			name:          "Landing detection",
-			position:      types.Position{Vec: types.Vector3{Y: 0}},
-			velocity:      types.Velocity{Vec: types.Vector3{Y: -5}},
-			motorState:    "BURNOUT",
-			expectedEvent: systems.Land,
-			description:   "Should detect landing when reaching ground with negative velocity",
-		},
+	motorProps := &thrustcurves.MotorData{}
+	motor := &components.Motor{
+		Props: motorProps,
+	}
+	motor.FSM = components.NewMotorFSM(motor, logger)
+	motor.FSM.SetState(components.StateIdle)
+
+	entity := &states.PhysicsState{
+		Position:  &types.Position{Vec: types.Vector3{Y: 100}},
+		Velocity:  &types.Velocity{Vec: types.Vector3{Y: -0.01}},
+		Motor:     motor,
+		Parachute: &components.Parachute{Trigger: "apogee", Deployed: false},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			world := &ecs.World{}
-			cfg := &config.Config{}
-			system := systems.NewRulesSystem(world, cfg)
-			e := ecs.NewBasic()
+	rs.Add(entity)
 
-			// Create position, velocity and motor with initial states
-			pos := tt.position
-			vel := tt.velocity
-			motor := &components.Motor{}
-			motor.SetState(tt.motorState)
+	// 1. Simulate Liftoff
+	entity.Position.Vec.Y = 1.0                        // Ensure above ground
+	entity.Motor.FSM.SetState(components.StateBurning) // Use SetState to force motor state
+	_ = rs.Update(0)
+	assert.Equal(t, types.Liftoff, rs.GetLastEvent(), "Event should be Liftoff after first update")
 
-			// Create physics entity with test conditions
-			entity := systems.PhysicsEntity{
-				Entity:       &e,
-				Position:     &pos,
-				Velocity:     &vel,
-				Acceleration: &types.Acceleration{},
-				Mass:         &types.Mass{},
-				Motor:        motor,
-			}
+	// 2. Simulate Apogee condition (motor idle, negative velocity)
+	entity.Position.Vec.Y = 100.0                   // Set altitude high for apogee
+	entity.Velocity.Vec.Y = -0.01                   // Negative velocity indicating descent
+	entity.Motor.FSM.SetState(components.StateIdle) // Use SetState to force motor state
+	_ = rs.Update(0)
 
-			// Add entity to system
-			system.Add(&entity)
-
-			// If testing landing conditions, need to simulate apogee first
-			if tt.expectedEvent == systems.Land {
-				// First simulate apogee
-				entity.Position.Vec.Y = 100
-				entity.Velocity.Vec.Y = -0.1
-				entity.Motor.SetState("BURNOUT")
-				err := system.Update(0.016)
-				assert.NoError(t, err)
-
-				// Then simulate landing conditions
-				entity.Position.Vec.Y = 0
-				entity.Velocity.Vec.Y = -5
-			}
-
-			// Run the update
-			err := system.Update(0.016)
-			assert.NoError(t, err)
-
-			// Verify state based on expected event
-			switch tt.expectedEvent {
-			case systems.Apogee:
-				assert.True(t, entity.Velocity.Vec.Y < 0, "Velocity should be negative at apogee")
-				assert.Equal(t, "BURNOUT", entity.Motor.GetState(), "Motor should be burned out at apogee")
-			case systems.Land:
-				assert.Equal(t, float64(0), entity.Position.Vec.Y, "Position should be 0 at landing")
-				assert.Equal(t, float64(0), entity.Velocity.Vec.Y, "Velocity should be 0 at landing")
-				assert.Equal(t, float64(0), entity.Acceleration.Vec.Y, "Acceleration should be 0 at landing")
-			case systems.None:
-				if tt.name == "Pre-apogee ascending" {
-					assert.True(t, entity.Velocity.Vec.Y > 0, "Velocity should be positive while ascending")
-				}
-			}
-		})
-	}
+	// 3. Assert Apogee detection and parachute deployment
+	assert.Equal(t, types.Apogee, rs.GetLastEvent(), "Event should be Apogee after second update")
+	assert.True(t, entity.Parachute.Deployed, "Parachute should be deployed at apogee")
 }
 
-// TEST: GIVEN a RulesSystem WHEN Remove is called THEN the entity is removed from the system
-func TestRulesSystem_Remove(t *testing.T) {
+func TestLandingDetection(t *testing.T) {
+	cfg := &config.Engine{
+		Simulation: config.Simulation{
+			GroundTolerance: 0.1,
+		},
+	}
 	world := &ecs.World{}
-	cfg := &config.Config{}
-	system := systems.NewRulesSystem(world, cfg)
-	e := ecs.NewBasic()
-
-	entity := systems.PhysicsEntity{
-		Entity:       &e,
-		Position:     &types.Position{},
-		Velocity:     &types.Velocity{},
-		Acceleration: &types.Acceleration{},
-		Mass:         &types.Mass{},
-		Motor:        &components.Motor{},
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	rs := systems.NewRulesSystem(world, cfg, logger)
+	motorProps := &thrustcurves.MotorData{}
+	motor := &components.Motor{
+		Props: motorProps,
+	}
+	motor.FSM = components.NewMotorFSM(motor, logger)
+	entity := &states.PhysicsState{
+		Position:     &types.Position{Vec: types.Vector3{Y: 0.0}}, // Start at ground level
+		Velocity:     &types.Velocity{Vec: types.Vector3{Y: 0.0}},
+		Acceleration: &types.Acceleration{Vec: types.Vector3{}},
+		Motor:        motor,
+		Parachute:    &components.Parachute{Trigger: "apogee", Deployed: false},
 	}
 
-	system.Add(&entity)
-	system.Remove(e)
+	rs.Add(entity)
+
+	// 1. Simulate Liftoff
+	entity.Position.Vec.Y = 1.0                        // Ensure above ground
+	entity.Motor.FSM.SetState(components.StateBurning) // Force motor to burning state
+	_ = rs.Update(0)
+	assert.Equal(t, types.Liftoff, rs.GetLastEvent(), "Event should be Liftoff")
+
+	// 2. Simulate Apogee
+	entity.Position.Vec.Y = 100.0                   // Set altitude high for apogee
+	entity.Velocity.Vec.Y = -0.01                   // Negative velocity indicating descent
+	entity.Motor.FSM.SetState(components.StateIdle) // Motor should be idle/coasting at apogee
+	_ = rs.Update(0)
+	assert.Equal(t, types.Apogee, rs.GetLastEvent(), "Event should be Apogee")
+	assert.True(t, entity.Parachute.Deployed, "Parachute should be deployed at apogee")
+
+	// 3. Simulate Landing
+	entity.Position.Vec.Y = 0.05 // Below ground tolerance
+	entity.Velocity.Vec.Y = -0.1 // Moving down
+	_ = rs.Update(0)
+	assert.Equal(t, types.Land, rs.GetLastEvent(), "Event should be Land")
+}
+
+func TestInvalidEntityHandling(t *testing.T) {
+	world := &ecs.World{}
+	cfg := &config.Engine{}
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	rs := systems.NewRulesSystem(world, cfg, logger)
+	entity := &states.PhysicsState{}
+
+	rs.Add(entity)
+	_ = rs.Update(0)
+	assert.Equal(t, types.None, rs.GetLastEvent())
 }

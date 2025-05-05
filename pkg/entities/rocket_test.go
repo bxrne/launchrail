@@ -5,8 +5,10 @@ import (
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/pkg/components"
+	"github.com/bxrne/launchrail/pkg/designation"
 	"github.com/bxrne/launchrail/pkg/entities"
-	"github.com/bxrne/launchrail/pkg/openrocket"
+	openrocket "github.com/bxrne/launchrail/pkg/openrocket"
+	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -65,7 +67,11 @@ func createMockOpenRocketData() *openrocket.RocketDocument {
 
 func createMockMotor() *components.Motor {
 	return &components.Motor{
-		ID: ecs.NewBasic(),
+		ID:   ecs.NewBasic(),
+		Mass: 1.0, // Set a valid initial mass
+		Props: &thrustcurves.MotorData{
+			Designation: designation.Designation("MockMotor-A1-P"),
+		},
 	}
 }
 

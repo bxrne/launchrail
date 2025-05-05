@@ -1,0 +1,36 @@
+package layouts
+
+import "github.com/bxrne/launchrail/templates/components"
+
+type BaseProps struct {
+	Title       string
+	Description string
+	Scripts     []string
+	Version     string // Add version field
+}
+
+templ Base(props BaseProps) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Launchrail - { props.Title }</title>
+			<link href="https://unpkg.com/@primer/css@^20.2.4/dist/primer.css" rel="stylesheet"/>
+			<script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+			if props.Scripts != nil {
+				for _, script := range props.Scripts {
+					<script src={ script }></script>
+				}
+			}
+			<link rel="stylesheet" href="/static/css/main.css"/>
+		</head>
+		<body>
+			@components.Navbar()
+			<div class="container-xl p-4">
+				{ children... }
+			</div>
+			@components.Footer(props.Version)
+		</body>
+	</html>
+}

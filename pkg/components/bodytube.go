@@ -52,22 +52,23 @@ func NewBodytubeFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument) 
 	// Parse radius which may be in "auto X.XX" format
 	radiusStr := orkBodytube.Radius
 	var radius float64
+	radiusStr = strings.TrimSpace(radiusStr)
 	if strings.HasPrefix(radiusStr, "auto") {
-		parts := strings.Split(radiusStr, " ")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid radius format: %s", radiusStr)
-		}
-		var err error
-		radius, err = strconv.ParseFloat(parts[1], 64)
+		// Remove 'auto' and any whitespace
+		trimmed := strings.TrimSpace(strings.TrimPrefix(radiusStr, "auto"))
+		// Trim surrounding quotes if present
+		trimmed = strings.Trim(trimmed, "\"")
+		parsed, err := strconv.ParseFloat(trimmed, 64)
 		if err != nil {
-			return nil, fmt.Errorf("invalid radius value: %v", err)
+			return nil, fmt.Errorf("invalid BodyTube radius '%s': %v", radiusStr, err)
 		}
+		radius = parsed
 	} else {
-		var err error
-		radius, err = strconv.ParseFloat(radiusStr, 64)
+		parsed, err := strconv.ParseFloat(radiusStr, 64)
 		if err != nil {
-			return nil, fmt.Errorf("invalid radius value: %v", err)
+			return nil, fmt.Errorf("invalid BodyTube radius '%s': %v", radiusStr, err)
 		}
+		radius = parsed
 	}
 
 	// Calculate areas and volume

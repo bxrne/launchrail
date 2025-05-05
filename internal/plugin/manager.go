@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"plugin"
 
+	"github.com/bxrne/launchrail/internal/config"
 	pluginapi "github.com/bxrne/launchrail/pkg/plugin"
 	"github.com/zerodha/logf"
 )
@@ -11,12 +12,14 @@ import (
 type Manager struct {
 	plugins []pluginapi.SimulationPlugin
 	log     logf.Logger
+	cfg     *config.Config
 }
 
-func NewManager(log logf.Logger) *Manager {
+func NewManager(log logf.Logger, cfg *config.Config) *Manager {
 	return &Manager{
 		plugins: make([]pluginapi.SimulationPlugin, 0),
 		log:     log,
+		cfg:     cfg,
 	}
 }
 
@@ -45,7 +48,7 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 	}
 
 	// Initialize the plugin
-	if err := simulationPlugin.Initialize(m.log); err != nil {
+	if err := simulationPlugin.Initialize(m.log, m.cfg); err != nil {
 		return fmt.Errorf("failed to initialize plugin %s: %w", pluginPath, err)
 	}
 

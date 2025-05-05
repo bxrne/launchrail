@@ -2,40 +2,51 @@ package logger
 
 import (
 	"sync"
-	"time"
 
-	"github.com/bxrne/launchrail/internal/config"
 	"github.com/zerodha/logf"
 )
 
 var (
-	once   sync.Once
 	logger logf.Logger
-	opts   logf.Opts = logf.Opts{
+	once   sync.Once
+	opts   = logf.Opts{
+		EnableCaller:    true,
+		TimestampFormat: "15:04:05",
 		EnableColor:     true,
-		EnableCaller:    false,
-		TimestampFormat: time.RFC3339Nano,
-		Level:           logf.DebugLevel,
+		Level:           logf.InfoLevel,
 	}
 )
 
 // GetLogger returns the singleton instance of the logger.
-func GetLogger(cfg *config.Config) *logf.Logger {
-	switch cfg.Logging.Level {
+func GetLogger(level string) *logf.Logger {
+
+	var logLevel logf.Level
+	switch level {
 	case "debug":
-		opts.Level = logf.DebugLevel
+		logLevel = logf.DebugLevel
 	case "info":
-		opts.Level = logf.InfoLevel
+		logLevel = logf.InfoLevel
 	case "warn":
-		opts.Level = logf.WarnLevel
+		logLevel = logf.WarnLevel
 	case "error":
-		opts.Level = logf.ErrorLevel
+		logLevel = logf.ErrorLevel
 	case "fatal":
-		opts.Level = logf.FatalLevel
+		logLevel = logf.FatalLevel
+	default:
+		logLevel = logf.DebugLevel
 	}
+
+	opts.Level = logLevel
+
 	once.Do(func() {
 		logger = logf.New(opts)
 	})
 
 	return &logger
+}
+
+// Reset is for testing so that we can reset the logger singleton
+func Reset() {
+	once = sync.Once{}
+	logger = logf.Logger{}
 }

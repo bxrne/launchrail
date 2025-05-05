@@ -1,40 +1,54 @@
-app:
-  name: "launchrail-dev"
-  version: "0.0.1"
-  base_dir: ".launchrail"
+setup:
+  app:
+    name: "launchrail-dev"
+    version: "0.0.1"
 
-logging:
-  level: "debug"
+  logging:
+    level: "info"
+  plugins:
+    paths:
+      - "./plugins/windeffect.so"
+      - "./plugins/blackscholes.so"
 
-simulation:
-  step: 0.001
-  max_time: 300.0
-  ground_tolerance: 0.03 # Add ground tolerance
+server:
+  port: 8080
 
-plugins:
-  paths:
-    - "./plugins/windeffect.so"
+engine:
+  simulation:
+    step: 0.001
+    max_time: 300.0
+    ground_tolerance: 0.01
+  external:
+    openrocket_version: "23.09"
+  options:
+    motor_designation: "269H110-14A"
+    openrocket_file: "./testdata/openrocket/l1.ork"
+    launchrail:
+      length: 4
+      angle: 5.0
+      orientation: 0.01
+    launchsite:
+      latitude: 37.7749
+      longitude: -122.4194
+      altitude: 1.0
+      atmosphere:
+        isa_configuration: 
+          specific_gas_constant: 287.05
+          gravitational_accel: 9.81
+          sea_level_density: 1.225
+          sea_level_temperature: 288.15
+          sea_level_pressure: 101325.0
+          ratio_specific_heats: 1.4
+          temperature_lapse_rate: 0.0065
 
-external:
-  openrocket_version: "23.09"
-
-options:
-  motor_designation: "269H110-14A"
-  openrocket_file: "./testdata/openrocket/l1.ork"
-  launchrail:
-    length: 2.0
-    angle: 5.0
-    orientation: 0.01
-  launchsite:
-    latitude: 37.7749
-    longitude: -122.4194
-    altitude: 1.0
-    atmosphere:
-      isa_configuration: 
-        specific_gas_constant: 287.05
-        gravitational_accel: 9.81
-        sea_level_density: 1.225
-        sea_level_temperature: 288.15
-        sea_level_pressure: 101325.0
-        ratio_specific_heats: 1.4
-        temperature_lapse_rate: 0.0065
+#-------------------------------------------------------------------------------
+# Benchmarks Configuration
+#-------------------------------------------------------------------------------
+benchmarks:
+  hipr-euroc24:
+    name: "HIPR EuroC 2024 Flight Comparison"
+    description: "Compares simulation results against ground truth data for the HIPR EuroC 2024 flight."
+    design_file: "./benchdata/hipr-euroc24/design.ork"
+    data_dir: "./benchdata/hipr-euroc24" 
+    motor_designation: "269H110-14A"
+    enabled: true

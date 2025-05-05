@@ -1,6 +1,8 @@
 package simulation_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/bxrne/launchrail/internal/config"
@@ -9,82 +11,132 @@ import (
 	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/simulation"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
+	"github.com/stretchr/testify/require"
 	"github.com/zerodha/logf"
 )
 
+func setupTestStorage(t *testing.T) (*storage.Stores, func()) {
+	testDir := t.TempDir()
+	recordDir := filepath.Join(testDir, "launchrail-test")
+
+	motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
+	require.NoError(t, err)
+
+	eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
+	require.NoError(t, err)
+
+	dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
+	require.NoError(t, err)
+
+	stores := &storage.Stores{
+		Motion:   motionStore,
+		Events:   eventsStore,
+		Dynamics: dynamicsStore,
+	}
+
+	cleanup := func() {
+		motionStore.Close()
+		eventsStore.Close()
+		dynamicsStore.Close()
+		os.RemoveAll(testDir)
+	}
+
+	return stores, cleanup
+}
+
 // TEST: GIVEN nothing WHEN NewSimulation is called THEN a new Simulation is returned
 func TestNewSimulation(t *testing.T) {
-	cfg := &config.Config{}
-	log := &logf.Logger{}
-	motionStore := &storage.Storage{}
-	sim, err := simulation.NewSimulation(cfg, log, motionStore)
-	if err != nil {
-		t.Errorf("Error creating new simulation: %v", err)
+	cfg := &config.Config{
+		Engine: config.Engine{
+			Simulation: config.Simulation{
+				Step:    0.001,
+				MaxTime: 300.0,
+			},
+		},
 	}
-	if sim == nil {
-		t.Errorf("New simulation is nil")
-	}
+	log := logf.New(logf.Opts{})
+
+	stores, cleanup := setupTestStorage(t)
+	defer cleanup()
+
+	sim, err := simulation.NewSimulation(cfg, log, stores)
+	require.NoError(t, err)
+	require.NotNil(t, sim)
 }
 
 // TEST: GIVEN a Simulation when LoadRocket is called THEN a new Rocket is returned
 func TestLoadRocket(t *testing.T) {
-	cfg := &config.Config{}
-	log := &logf.Logger{}
-	motionStore := &storage.Storage{}
-	sim, _ := simulation.NewSimulation(cfg, log, motionStore)
+	cfg := &config.Config{
+		Engine: config.Engine{
+			Simulation: config.Simulation{
+				Step:    0.001,
+				MaxTime: 300.0,
+			},
+		},
+	}
+	log := logf.New(logf.Opts{})
+
+	stores, cleanup := setupTestStorage(t)
+	defer cleanup()
+
+	sim, err := simulation.NewSimulation(cfg, log, stores)
+	require.NoError(t, err)
 
 	orkData, err := openrocket.Load("../../testdata/openrocket/l1.ork", "23.09")
-	if err != nil {
-		t.Errorf("Error loading OpenRocket file: %v", err)
-	}
+	require.NoError(t, err)
 
 	motorData := &thrustcurves.MotorData{
 		Designation:  designation.Designation("269H110-14A"),
 		ID:           "1",
 		Thrust:       [][]float64{{0, 0}, {1, 1}},
-		TotalImpulse: 0,
-		BurnTime:     0,
-		AvgThrust:    0,
-		TotalMass:    0,
-		WetMass:      0,
-		MaxThrust:    0,
+		TotalImpulse: 100.0,
+		BurnTime:     1.0,
+		AvgThrust:    100.0,
+		TotalMass:    0.1,
+		WetMass:      0.2,
+		MaxThrust:    200.0,
 	}
 
 	err = sim.LoadRocket(&orkData.Rocket, motorData)
-	if err != nil {
-		t.Errorf("Error loading rocket: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 // TEST: GIVEN a Simulation WHEN Run is called THEN the simulation runs
 func TestRun(t *testing.T) {
-	cfg := &config.Config{}
-	log := &logf.Logger{}
-	motionStore := &storage.Storage{}
-	sim, _ := simulation.NewSimulation(cfg, log, motionStore)
+	cfg := &config.Config{
+		Engine: config.Engine{
+			Simulation: config.Simulation{
+				Step:    0.001,
+				MaxTime: 1.0, // Short duration for test
+			},
+		},
+	}
+	log := logf.New(logf.Opts{})
+
+	stores, cleanup := setupTestStorage(t)
+	defer cleanup()
+
+	sim, err := simulation.NewSimulation(cfg, log, stores)
+	require.NoError(t, err)
 
 	orkData, err := openrocket.Load("../../testdata/openrocket/l1.ork", "23.09")
-	if err != nil {
-		t.Errorf("Error loading OpenRocket file: %v", err)
-	}
+	require.NoError(t, err)
 
 	motorData := &thrustcurves.MotorData{
 		Designation:  designation.Designation("269H110-14A"),
 		ID:           "1",
 		Thrust:       [][]float64{{0, 0}, {1, 1}},
-		TotalImpulse: 0,
-		BurnTime:     0,
-		AvgThrust:    0,
-		TotalMass:    0,
-		WetMass:      0,
-		MaxThrust:    0,
+		TotalImpulse: 100.0,
+		BurnTime:     1.0,
+		AvgThrust:    100.0,
+		TotalMass:    0.1,
+		WetMass:      0.2,
+		MaxThrust:    200.0,
 	}
 
 	err = sim.LoadRocket(&orkData.Rocket, motorData)
-	if err != nil {
-		t.Errorf("Error loading rocket: %v", err)
-	}
+	require.NoError(t, err)
 
-	// nolint: errcheck
-	go sim.Run()
+	err = sim.Run()
+	require.NoError(t, err)
 }

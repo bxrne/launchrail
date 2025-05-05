@@ -2,91 +2,103 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/bxrne/launchrail/internal/config"
-	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/pkg/diff"
-	"github.com/bxrne/launchrail/pkg/openrocket"
-	"github.com/bxrne/launchrail/pkg/simulation"
-	"github.com/bxrne/launchrail/pkg/thrustcurves"
 )
 
 func main() {
-	// Load config
+	// Load config (which now handles flags and resolves output dir)
 	cfg, err := config.GetConfig()
 	if err != nil {
-		fmt.Printf("Failed to load config: %v\n", err)
-		return
+		// Use a basic logger or fmt.Println if logger init depends on config
+		fmt.Printf("Critical error: Failed to load configuration: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Initialize logger
-	log := logger.GetLogger(cfg)
-	log.Info("Config loaded", "Name", cfg.App.Name, "Version", cfg.App.Version)
+	log := logger.GetLogger(cfg.Setup.Logging.Level)
+	log.Info("Logger initialized", "level", cfg.Setup.Logging.Level)
 
-	// Load motor data
-	motorData, err := thrustcurves.Load(cfg.Options.MotorDesignation, http_client.NewHTTPClient())
-	if err != nil {
-		log.Fatal("Failed to load motor data", "Error", err)
-	}
-	log.Debug("Motor data loaded", "Designation", motorData.Designation, "TotalMass", motorData.TotalMass)
-
-	// Load OpenRocket data
-	orkData, err := openrocket.Load(cfg.Options.OpenRocketFile, cfg.External.OpenRocketVersion)
-	if err != nil {
-		log.Fatal("Failed to load OpenRocket data", "Error", err)
-	}
-	log.Debug("OpenRocket data loaded", "Version", orkData.Version, "Creator", orkData.Creator)
-
-	simulationHash := diff.CombinedHash(orkData.Bytes(), cfg.Bytes())
-	log.Debug("Simulation hash", "Hash", simulationHash)
-
-	// Initialize storage with headers
-	storage, err := storage.NewStorage(cfg.App.BaseDir, simulationHash, storage.MOTION)
-	if err != nil {
-		log.Fatal("Failed to create storage", "error", err)
-	}
-	defer storage.Close()
-
-	// Set headers for storage of motion data
-	err = storage.Init([]string{
-		"time",
-		"altitude",     // Changed from position_y for clarity
-		"velocity",     // Changed from velocity_y for clarity
-		"acceleration", // Changed from acceleration_y for clarity
-		"thrust",
-	})
-	if err != nil {
-		log.Fatal("Failed to init storage", "error", err)
+	// Determine simulation base output directory from config (with env vars)
+	homedir := os.Getenv("HOME")
+	outputBase := filepath.Join(homedir, ".launchrail")
+	log.Info("Using simulation base output directory", "path", outputBase)
+	// Ensure base output directory exists
+	if err := os.MkdirAll(outputBase, 0o755); err != nil {
+		log.Fatal("Failed to create simulation base output directory", "path", outputBase, "error", err)
 	}
 
-	// Configure logger with additional debug level
-	log.Debug("Storage initialized",
-		"path", storage.GetFilePath(),
-		"headers", fmt.Sprintf("%v", []string{"time", "altitude", "velocity", "acceleration", "thrust"}),
-	)
-
-	// Create simulation
-	sim, err := simulation.NewSimulation(cfg, log, storage)
+	// Generate unique run ID based on timestamp
+	ork_file_bytes, err := os.ReadFile(cfg.Engine.Options.OpenRocketFile)
 	if err != nil {
-		log.Fatal("Failed to create simulation", "Error", err)
+		log.Fatal("Failed to read openrocket file", "path", cfg.Engine.Options.OpenRocketFile, "error", err)
 	}
-	log.Debug("Simulation created")
+	hash := diff.CombinedHash(cfg.Bytes(), ork_file_bytes)
+	runDir := filepath.Join(outputBase, hash)
+	log.Info("Creating simulation run directory", "runID", hash, "path", runDir)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		log.Fatal("Failed to create simulation run directory", "path", runDir, "error", err)
+	}
 
-	// Load rocket data
-	err = sim.LoadRocket(&orkData.Rocket, motorData)
+	// Create and initialize simulation manager
+	simManager := simulation.NewManager(cfg, *log) // Dereference pointer to pass interface value
+
+	// Create storage for the run using the run-specific directory
+	motionStore, err := storage.NewStorage(runDir, storage.MOTION)
 	if err != nil {
-		log.Fatal("Failed to load rocket data", "Error", err)
+		log.Fatal("Failed to create motion storage", "error", err)
 	}
-	log.Debug("Rocket data loaded")
+	if err := motionStore.Init(); err != nil {
+		motionStore.Close()
+		log.Fatal("Failed to initialize motion storage headers", "error", err)
+	}
+	eventsStore, err := storage.NewStorage(runDir, storage.EVENTS)
+	if err != nil {
+		motionStore.Close() // Clean up previously opened store
+		log.Fatal("Failed to create events storage", "error", err)
+	}
+	if err := eventsStore.Init(); err != nil {
+		motionStore.Close()
+		eventsStore.Close()
+		log.Fatal("Failed to initialize events storage headers", "error", err)
+	}
+	dynamicsStore, err := storage.NewStorage(runDir, storage.DYNAMICS)
+	if err != nil {
+		motionStore.Close()
+		eventsStore.Close()
+		log.Fatal("Failed to create dynamics storage", "error", err)
+	}
+	if err := dynamicsStore.Init(); err != nil {
+		motionStore.Close()
+		eventsStore.Close()
+		dynamicsStore.Close()
+		log.Fatal("Failed to initialize dynamics storage headers", "error", err)
+	}
+	stores := &storage.Stores{
+		Motion:   motionStore,
+		Events:   eventsStore,
+		Dynamics: dynamicsStore,
+	}
+
+	if err := simManager.Initialize(stores); err != nil {
+		log.Fatal("Failed to initialize simulation manager", "error", err)
+	}
 
 	// Run simulation
-	err = sim.Run()
-	if err != nil {
+	if err := simManager.Run(); err != nil {
 		log.Fatal("Simulation failed", "Error", err)
 	}
 
-	log.Info("Simulation completed successfully")
-	log.Debug("Simulation data saved", "Path", storage.GetFilePath())
+	// Close the manager (which now closes the stores)
+	if err := simManager.Close(); err != nil {
+		log.Error("Failed to close simulation manager", "Error", err)
+	}
+
+	log.Info("Simulation completed successfully.", "output_dir", runDir)
 }

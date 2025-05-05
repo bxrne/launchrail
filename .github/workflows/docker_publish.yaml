@@ -1,0 +1,50 @@
+name: Docker Publish
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write 
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Trigger on version tags like v1.2.3
+
+jobs:
+  docker-build-push:
+    name: "Build and Push Docker image"
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ghcr.io
+      # Use github.repository which automatically gives owner/repo format
+      REPOSITORY: ${{ github.repository }}
+      IMAGE_TAG: ${{ github.ref_name }} # Use the tag that triggered the workflow
+
+    steps:
+      - name: Checkout code at new tag
+        uses: actions/checkout@v4 # Checkout action usually handles checking out the specific tag automatically
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.23 # Ensure this matches your project's Go version
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:latest
+
+      - name: Print image url
+        run: echo "Image pushed to ${{ steps.build-and-push.outputs.imageid }}"

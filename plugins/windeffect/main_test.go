@@ -4,7 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/bxrne/launchrail/pkg/systems"
+	"github.com/bxrne/launchrail/pkg/states"
+	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/zerodha/logf"
 )
 
@@ -34,9 +35,9 @@ func TestWindEffectPlugin_Version(t *testing.T) {
 
 func TestWindEffectPlugin_BeforeSimStep(t *testing.T) {
 	p := &WindEffectPlugin{}
-	state := &systems.RocketState{
+	state := &states.PhysicsState{
 		Time:     0, // This will make sin(time) = 1
-		Velocity: 10.0,
+		Velocity: &types.Velocity{Vec: types.Vector3{X: 10.0}},
 	}
 
 	err := p.BeforeSimStep(state)
@@ -45,14 +46,14 @@ func TestWindEffectPlugin_BeforeSimStep(t *testing.T) {
 	}
 
 	expectedVelocity := 10.0 // Original velocity + (windSpeed * sin(time) * 0.1)
-	if math.Abs(state.Velocity-expectedVelocity) > 0.0001 {
-		t.Errorf("Expected velocity to be %f, got %f", expectedVelocity, state.Velocity)
+	if math.Abs(state.Velocity.Vec.X-expectedVelocity) > 0.0001 {
+		t.Errorf("Expected velocity to be %f, got %f", expectedVelocity, state.Velocity.Vec.X)
 	}
 }
 
 func TestWindEffectPlugin_AfterSimStep(t *testing.T) {
 	p := &WindEffectPlugin{}
-	state := &systems.RocketState{}
+	state := &states.PhysicsState{}
 
 	err := p.AfterSimStep(state)
 	if err != nil {

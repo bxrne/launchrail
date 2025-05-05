@@ -1,0 +1,307 @@
+openapi: 3.1.0
+info:
+  title: Launchrail API
+  description: |
+    API for rocket flight simulation and analysis platform.
+    Provides endpoints for running simulations and accessing simulation data.
+  version: ${VERSION}  # This will be replaced during build
+  contact:
+    name: Adam Byrne
+    url: https://github.com/bxrne/launchrail
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Simulation
+    description: Simulation control endpoints
+  - name: Data
+    description: Data access and management endpoints
+
+paths:
+  /api/v1/run:
+    post:
+      summary: Run a new simulation
+      description: Start a new rocket simulation with the provided configuration
+      operationId: runSimulation
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - plugin-paths
+                - simulation-step
+                - max-time
+                - ground-tolerance
+                - openrocket-version
+                - motor-designation
+                - openrocket-file
+                - launchrail-length
+                - launchrail-angle
+                - launchrail-orientation
+                - latitude
+                - longitude
+                - altitude
+                - specific-gas-constant
+                - gravitational-accel
+                - sea-level-density
+                - sea-level-temperature
+                - sea-level-pressure
+                - ratio-specific-heats
+                - temperature-lapse-rate
+              properties:
+                plugin-paths:
+                  type: string
+                  description: Path to plugin files
+                  example: "./plugins/windeffect.so"
+                simulation-step:
+                  type: number
+                  format: float
+                  description: Time step for simulation calculations
+                  example: 0.001
+                max-time:
+                  type: number
+                  format: float
+                  description: Maximum simulation time in seconds
+                  example: 300.0
+                ground-tolerance:
+                  type: number
+                  format: float
+                  description: Ground impact detection tolerance
+                  example: 0.06
+                openrocket-version:
+                  type: string
+                  description: OpenRocket version
+                  example: "23.09"
+                motor-designation:
+                  type: string
+                  description: Motor designation code
+                  example: "269H110-14A"
+                openrocket-file:
+                  type: string
+                  description: Path to OpenRocket file
+                  example: "./testdata/openrocket/l1.ork"
+                launchrail-length:
+                  type: number
+                  format: float
+                  description: Length of launch rail in meters
+                  example: 2.21
+                launchrail-angle:
+                  type: number
+                  format: float
+                  description: Launch rail angle in degrees
+                  example: 5.0
+                launchrail-orientation:
+                  type: number
+                  format: float
+                  description: Launch rail orientation in degrees
+                  example: 0.01
+                latitude:
+                  type: number
+                  format: float
+                  description: Launch site latitude
+                  example: 37.7749
+                longitude:
+                  type: number
+                  format: float
+                  description: Launch site longitude
+                  example: -122.4194
+                altitude:
+                  type: number
+                  format: float
+                  description: Launch site altitude in meters
+                  example: 1.0
+                specific-gas-constant:
+                  type: number
+                  format: float
+                  description: Specific gas constant for atmosphere model
+                  example: 287.05
+                gravitational-accel:
+                  type: number
+                  format: float
+                  description: Gravitational acceleration in m/s²
+                  example: 9.81
+                sea-level-density:
+                  type: number
+                  format: float
+                  description: Air density at sea level in kg/m³
+                  example: 1.225
+                sea-level-temperature:
+                  type: number
+                  format: float
+                  description: Temperature at sea level in Kelvin
+                  example: 288.15
+                sea-level-pressure:
+                  type: number
+                  format: float
+                  description: Atmospheric pressure at sea level in Pa
+                  example: 101325.0
+                ratio-specific-heats:
+                  type: number
+                  format: float
+                  description: Ratio of specific heats for atmosphere
+                  example: 1.4
+                temperature-lapse-rate:
+                  type: number
+                  format: float
+                  description: Temperature lapse rate in K/m
+                  example: 0.0065
+      responses:
+        202:
+          description: Simulation started successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Simulation started"
+        400:
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid simulation parameters"
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Internal server error"
+
+  /api/v1/data:
+    get:
+      summary: List simulation records
+      description: Returns a paginated list of all simulation records
+      tags: [Data]
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: filter
+          in: query
+          description: Filter records by hash
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort order for records
+          schema:
+            type: string
+            enum: [time_asc, time_desc]
+            default: time_desc
+      responses:
+        200:
+          description: List of simulation records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  records:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Record'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        500:
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    SimulationConfig:
+      type: object
+      required:
+        - plugin-paths
+        - simulation-step
+        - max-time
+        - ground-tolerance
+        - motor-designation
+        - openrocket-file
+      properties:
+        plugin-paths:
+          type: string
+          example: "./plugins/windeffect.so"
+        simulation-step:
+          type: number
+          format: float
+          example: 0.001
+        max-time:
+          type: number
+          format: float
+          example: 300.0
+        ground-tolerance:
+          type: number
+          format: float
+          example: 0.06
+        motor-designation:
+          type: string
+          example: "269H110-14A"
+        openrocket-file:
+          type: string
+          example: "./testdata/openrocket/l1.ork"
+
+    Record:
+      type: object
+      properties:
+        hash:
+          type: string
+          description: Unique identifier for the simulation record
+        lastModified:
+          type: string
+          format: date-time
+          description: Last modification timestamp
+
+    Pagination:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+          minimum: 1
+        totalPages:
+          type: integer
+          minimum: 1
+
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Simulation started"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

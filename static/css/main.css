@@ -1,0 +1,420 @@
+/* main.css - Common styles for the Launchrail application */
+
+/* Custom container padding for mobile */
+@media (max-width: 1024px) {
+  .container-lg {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+}
+
+/* Tab styling */
+.tab {
+  position: relative;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+  border: none;
+  background-color: transparent;
+}
+
+.tab.active {
+  border-bottom-color: #0366d6;
+  font-weight: 600;
+}
+
+.tab:hover:not(.active) {
+  border-bottom-color: #959da5;
+  background-color: #f6f8fa;
+}
+
+/* Tab content container fixes */
+.tab-content {
+  display: none;
+  min-height: 400px;
+  overflow: visible;
+}
+
+.tab-content.active {
+  display: block;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Form styling */
+.form-group label {
+  font-weight: 500;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: #0366d6;
+  box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.3);
+}
+
+/* Plot container */
+#plot-container {
+  position: relative;
+  background-color: #2a2a2a !important;
+  width: 100%;
+  max-width: 100%;
+  height: 800px !important;
+  min-height: 800px !important;
+  overflow: visible;
+  padding: 2rem;
+}
+
+/* Plot specific */
+.js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.plotly {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Add fade-in animation for tab content */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Table improvements */
+.table {
+  font-size: 0.9rem;
+  margin-bottom: 0;
+  width: 100%;
+}
+
+.table th {
+  background-color: #333333 !important;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Improved nested boxes */
+details .Box {
+  border-left: 3px solid #0366d6;
+}
+
+/* Footer styling */
+.footer {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+  border-top: 1px solid #e1e4e8;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background-color: #111111;
+  color: #ffffff;
+}
+
+/* Toast improvements */
+.Toast {
+  margin-bottom: 0;
+}
+
+/* Custom scrollbar for tables */
+.overflow-auto::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.overflow-auto::-webkit-scrollbar-track {
+  background: #f6f8fa;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb {
+  background-color: #d1d5da;
+  border-radius: 4px;
+}
+
+/* General app improvements */
+.color-fg-accent {
+  color: #ff8c00 !important;
+}
+
+h1.color-fg-accent, h2.color-fg-accent {
+  font-weight: 600;
+}
+
+/* Make form sections more distinct */
+details {
+  background-color: #f6f8fa;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+details summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Improved button hover states */
+.btn-primary:hover {
+  background-color: #005cc5;
+}
+
+.btn-danger:hover {
+  background-color: #cb2431;
+}
+
+html, body {
+  background-color: #1a1a1a;
+  color: #ffffff;
+  font-family: "Fira Code", monospace;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-brand {
+  font-size: 1.25rem;
+}
+
+/* Dark theme overrides */
+.Box {
+  background-color: #2a2a2a !important;
+  border-color: #404040 !important;
+}
+
+.Box-header {
+  background-color: #2a2a2a !important;
+  border-color: #404040 !important;
+}
+
+.color-bg-subtle {
+  background-color: #2a2a2a !important;
+}
+
+/* Form controls dark theme */
+.form-select, .form-control {
+  background-color: #2a2a2a !important;
+  border-color: #404040 !important;
+  color: #ffffff !important;
+}
+
+.form-select option {
+  background-color: #2a2a2a;
+  color: #ffffff;
+}
+
+/* Navbar and links */
+.H1 {
+  color: #ff8c00 !important;
+  font-size: 1.5rem;
+}
+
+.Link--primary {
+  color: #ffffff !important;
+}
+
+/* Details/summary dark theme */
+details {
+  background-color: #2a2a2a !important;
+}
+
+details summary {
+  color: #ffffff;
+}
+
+/* Tab hover fix */
+.tab:hover:not(.active) {
+  background-color: #333333 !important;
+  border-bottom-color: #404040;
+}
+
+/* Footer text */
+.color-fg-muted {
+  color: #ffffff !important;
+}
+
+/* Tab styling overrides */
+.tab {
+  border: none !important;
+  background: none !important;
+}
+
+.tab:hover, .tab.active {
+  background: none !important;
+  border: none !important;
+  border-bottom: 2px solid #ff8c00 !important;
+}
+
+/* Table improvements */
+.table-container {
+  overflow-x: auto;
+  width: 100%;
+  padding: 1rem;
+  margin: 0 auto;
+  min-height: 400px;
+  background: #2a2a2a;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.table {
+  min-width: 100%;
+  white-space: nowrap;
+  margin: 0 auto;
+  max-width: 900px;
+  width: 100%;
+}
+
+/* Tooltip styling */
+.hash-tooltip {
+  cursor: help;
+  color: #ff8c00;
+  margin-left: 0.5rem;
+}
+
+.hash-tooltip:hover::after {
+  content: attr(data-hash);
+  position: absolute;
+  background: #2a2a2a;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #404040;
+  font-size: 0.8rem;
+  max-width: 300px;
+  word-wrap: break-word;
+  white-space: normal;
+  z-index: 1000;
+}
+
+/* Link styling */
+.Link {
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.Link:hover {
+  text-decoration: underline;
+}
+
+.color-fg-danger {
+  color: #cb2431 !important;
+}
+
+.color-fg-danger:hover {
+  color: #a0191f !important;
+}
+
+/* Remove border radius from tab buttons */
+.tab, .tab:hover, .tab.active {
+  border-radius: 0 !important;
+}
+
+/* Style pagination links */
+.Link--secondary {
+  color: #6a737d;
+  text-decoration: none;
+}
+
+.Link--secondary:hover {
+  color: #ff8c00;
+  text-decoration: none;
+}
+
+/* Link styling improvements */
+.Link--primary, 
+.Link--secondary,
+.btn-link,
+.Link {
+  color: #ff8c00 !important;
+  transition: opacity 0.2s ease;
+}
+
+.Link--primary:hover, 
+.Link--secondary:hover,
+.btn-link:hover,
+.Link:hover {
+  opacity: 0.8;
+  color: #ff8c00 !important;
+  text-decoration: none;
+}
+
+/* Preserve pagination outside scroll area */
+.pagination {
+  position: sticky;
+  bottom: 0;
+  background: #2a2a2a;
+  padding: 1rem 0;
+  margin: 0;
+  border-top: 1px solid #404040;
+}
+
+/* Pagination improvements */
+.pagination .Link--secondary {
+    min-width: 32px;
+    text-align: center;
+    border-radius: 4px;
+}
+
+.pagination .Link--secondary:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.pagination .color-fg-accent {
+    background-color: rgba(255, 140, 0, 0.2);
+}
+
+/* Navigation and footer specific links */
+.Box-header .Link--primary,
+.footer .Link--primary {
+  color: rgba(255, 255, 255, 0.8) !important;
+  transition: color 0.2s ease;
+}
+
+.Box-header .Link--primary:hover,
+.footer .Link--primary:hover {
+  color: #ff8c00 !important;
+  text-decoration: none;
+}
+
+/* Inactive state for tabs and pagination */
+.tab:not(.active) {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.Link--secondary:not(.color-fg-accent) {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Delete link styling */
+.Link.color-fg-danger {
+  color: #ff4d4d !important;
+  transition: color 0.2s ease;
+}
+
+.Link.color-fg-danger:hover {
+  color: #ff6666 !important;
+  opacity: 1;
+}
+
+/* Navigation styling */
+.Box-header .Link--primary,
+.footer .Link--primary,
+.navbar .Link--primary {
+  color: rgba(255, 255, 255, 0.9) !important;
+  transition: color 0.2s ease;
+}
+
+.Box-header .Link--primary:hover,
+.footer .Link--primary:hover,
+.navbar .Link--primary:hover {
+  color: #ff8c00 !important;
+  text-decoration: none;
+}
+
+/* Empty plot state */
+.blankslate {
+  text-align: center;
+  padding: 2rem;
+}
+
+.blankslate-heading {
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: normal;
+}
