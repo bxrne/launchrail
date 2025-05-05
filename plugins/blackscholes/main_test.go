@@ -128,12 +128,11 @@ func TestAfterSimStep_IntensityScaling(t *testing.T) {
 	deltaLowZ := math.Abs(stateLow.Velocity.Vec.Z - initialVelocityLow.Z)
 	magnitudeDeltaLow := math.Sqrt(deltaLowX*deltaLowX + deltaLowY*deltaLowY + deltaLowZ*deltaLowZ)
 
-
 	// High intensity run
 	// Re-initialize plugin to reset RNG sequence for a *comparable* (though not identical) draw
 	pluginHigh := &BlackScholesPlugin{}
-	_ = pluginHigh.Initialize(logger) // Needs a different seed ideally, but re-init is baseline
-	pluginHigh.turbulenceIntensity = 0.5 // Much higher intensity
+	_ = pluginHigh.Initialize(logger)                 // Needs a different seed ideally, but re-init is baseline
+	pluginHigh.turbulenceIntensity = 0.5              // Much higher intensity
 	stateHigh := newTestPhysicsState(100.0, 0.0, 0.0) // Same initial state
 	initialVelocityHigh := stateHigh.Velocity.Vec
 	_ = pluginHigh.AfterSimStep(stateHigh)

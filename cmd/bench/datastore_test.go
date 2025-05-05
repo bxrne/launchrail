@@ -53,23 +53,23 @@ func TestLoadFlightInfo_ErrorHandling(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name:       "Missing Column",
-			csvContent: "ts,height,velocity\n1.0,10.0,5.0",
+			name:        "Missing Column",
+			csvContent:  "ts,height,velocity\n1.0,10.0,5.0",
 			expectedErr: "unexpected number of columns",
 		},
 		{
-			name:       "Invalid Float",
-			csvContent: "ts,height,velocity,acceleration,motor_designation\n1.0,ten,5.0,1.0,A8-3",
+			name:        "Invalid Float",
+			csvContent:  "ts,height,velocity,acceleration,motor_designation\n1.0,ten,5.0,1.0,A8-3",
 			expectedErr: "invalid float value 'ten'",
 		},
 		{
-			name:       "Empty File",
-			csvContent: "",
+			name:        "Empty File",
+			csvContent:  "",
 			expectedErr: "failed to read header", // EOF error on header read
 		},
 		{
-			name:       "Header Only",
-			csvContent: "ts,height,velocity,acceleration,motor_designation\n",
+			name:        "Header Only",
+			csvContent:  "ts,height,velocity,acceleration,motor_designation\n",
 			expectedErr: "no data rows found",
 		},
 	}
@@ -96,10 +96,10 @@ func TestLoadFlightInfo_ErrorHandling(t *testing.T) {
 
 func TestLoadEventInfo(t *testing.T) {
 	tests := []struct {
-		name        string
-		csvContent  string
+		name         string
+		csvContent   string
 		expectedData []EventInfo
-		expectedErr string
+		expectedErr  string
 	}{
 		{
 			name: "Success",
@@ -115,15 +115,15 @@ func TestLoadEventInfo(t *testing.T) {
 			expectedErr: "",
 		},
 		{
-			name:       "Wrong Column Count",
+			name: "Wrong Column Count",
 			csvContent: `timestamp,event
 1.5,LAUNCH`, // Missing outidx
 			expectedErr: "unexpected number of columns",
 		},
 		{
-			name:       "Invalid Timestamp Float",
+			name: "Invalid Timestamp Float",
 			csvContent: `timestamp,event,outidx
-1.5x,LAUNCH,0`, 
+1.5x,LAUNCH,0`,
 			expectedErr: "invalid float value '1.5x'",
 		},
 		// Removed Invalid_OutIdx_Int test case as the column is now ignored
@@ -134,12 +134,12 @@ func TestLoadEventInfo(t *testing.T) {
 		// 	expectedErr: "invalid integer value 'zero'",
 		// },
 		{
-			name:       "Empty File",
-			csvContent: "",
+			name:        "Empty File",
+			csvContent:  "",
 			expectedErr: "failed to read header",
 		},
 		{
-			name:       "Header Only",
+			name: "Header Only",
 			csvContent: `timestamp,event,outidx
 `,
 			expectedErr: "no data rows found",
@@ -165,17 +165,17 @@ func TestLoadEventInfo(t *testing.T) {
 
 func TestLoadFlightStates(t *testing.T) {
 	tests := []struct {
-		name        string
-		csvContent  string
+		name         string
+		csvContent   string
 		expectedData []FlightState
-		expectedErr string
+		expectedErr  string
 	}{
 		{
 			name: "Success",
 			csvContent: `ts,state
 0.1,PRELAUNCH
 10.5,POWERED_ASCENT
-25.2,COAST`, 
+25.2,COAST`,
 			expectedData: []FlightState{
 				{Timestamp: 0.1, State: "PRELAUNCH"},
 				{Timestamp: 10.5, State: "POWERED_ASCENT"},
@@ -184,24 +184,24 @@ func TestLoadFlightStates(t *testing.T) {
 			expectedErr: "",
 		},
 		{
-			name:       "Wrong Column Count",
+			name: "Wrong Column Count",
 			csvContent: `ts,state,extra
-0.1,PRELAUNCH,oops`, 
+0.1,PRELAUNCH,oops`,
 			expectedErr: "unexpected number of columns",
 		},
 		{
-			name:       "Invalid Timestamp Float",
+			name: "Invalid Timestamp Float",
 			csvContent: `ts,state
-0.x,PRELAUNCH`, 
+0.x,PRELAUNCH`,
 			expectedErr: "invalid float value '0.x'",
 		},
 		{
-			name:       "Empty File",
-			csvContent: "",
+			name:        "Empty File",
+			csvContent:  "",
 			expectedErr: "failed to read header",
 		},
 		{
-			name:       "Header Only",
+			name: "Header Only",
 			csvContent: `ts,state
 `,
 			expectedErr: "no data rows found",

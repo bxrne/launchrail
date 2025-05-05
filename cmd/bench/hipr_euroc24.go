@@ -78,7 +78,7 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 	}
 	simManager := simulation.NewManager(cfg, *logger) // Dereference logger
 
-	// --- Initialize Simulation Manager with Storage --- 
+	// --- Initialize Simulation Manager with Storage ---
 	logger.Debug("Initializing simulation manager storage", "run_dir", runDir)
 	motionStore, err := storage.NewStorage(runDir, storage.MOTION)
 	if err != nil {
@@ -104,7 +104,7 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 	defer motionStore.Close()
 	defer eventsStore.Close()
 	defer dynamicsStore.Close()
-	// --- End Initialize --- 
+	// --- End Initialize ---
 
 	err = simManager.Run()
 	if err != nil {

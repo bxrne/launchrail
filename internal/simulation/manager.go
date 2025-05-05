@@ -18,7 +18,7 @@ import (
 type ManagerStatus string
 
 const (
-	StatusIdle       ManagerStatus = "idle"
+	StatusIdle         ManagerStatus = "idle"
 	StatusInitializing ManagerStatus = "initializing"
 	StatusRunning      ManagerStatus = "running"
 	StatusCompleted    ManagerStatus = "completed"

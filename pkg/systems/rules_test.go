@@ -92,15 +92,15 @@ func TestApogeeDetection(t *testing.T) {
 	rs.Add(entity)
 
 	// 1. Simulate Liftoff
-	entity.Position.Vec.Y = 1.0 // Ensure above ground
+	entity.Position.Vec.Y = 1.0                        // Ensure above ground
 	entity.Motor.FSM.SetState(components.StateBurning) // Use SetState to force motor state
 	_ = rs.Update(0)
 	assert.Equal(t, types.Liftoff, rs.GetLastEvent(), "Event should be Liftoff after first update")
 
 	// 2. Simulate Apogee condition (motor idle, negative velocity)
-	entity.Position.Vec.Y = 100.0 // Set altitude high for apogee
-	entity.Velocity.Vec.Y = -0.01 // Negative velocity indicating descent
-	entity.Motor.FSM.SetState(components.StateIdle)   // Use SetState to force motor state
+	entity.Position.Vec.Y = 100.0                   // Set altitude high for apogee
+	entity.Velocity.Vec.Y = -0.01                   // Negative velocity indicating descent
+	entity.Motor.FSM.SetState(components.StateIdle) // Use SetState to force motor state
 	_ = rs.Update(0)
 
 	// 3. Assert Apogee detection and parachute deployment
@@ -133,15 +133,15 @@ func TestLandingDetection(t *testing.T) {
 	rs.Add(entity)
 
 	// 1. Simulate Liftoff
-	entity.Position.Vec.Y = 1.0 // Ensure above ground
+	entity.Position.Vec.Y = 1.0                        // Ensure above ground
 	entity.Motor.FSM.SetState(components.StateBurning) // Force motor to burning state
 	_ = rs.Update(0)
 	assert.Equal(t, types.Liftoff, rs.GetLastEvent(), "Event should be Liftoff")
 
 	// 2. Simulate Apogee
-	entity.Position.Vec.Y = 100.0 // Set altitude high for apogee
-	entity.Velocity.Vec.Y = -0.01 // Negative velocity indicating descent
-	entity.Motor.FSM.SetState(components.StateIdle)   // Motor should be idle/coasting at apogee
+	entity.Position.Vec.Y = 100.0                   // Set altitude high for apogee
+	entity.Velocity.Vec.Y = -0.01                   // Negative velocity indicating descent
+	entity.Motor.FSM.SetState(components.StateIdle) // Motor should be idle/coasting at apogee
 	_ = rs.Update(0)
 	assert.Equal(t, types.Apogee, rs.GetLastEvent(), "Event should be Apogee")
 	assert.True(t, entity.Parachute.Deployed, "Parachute should be deployed at apogee")

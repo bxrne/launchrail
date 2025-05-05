@@ -31,12 +31,12 @@ func TestDragCoefficient(t *testing.T) {
 
 func TestCalculateDragForce(t *testing.T) {
 	tests := []struct {
-		name          string
-		velocity      float64
-		density       float64
-		referenceArea float64
+		name            string
+		velocity        float64
+		density         float64
+		referenceArea   float64
 		dragCoefficient float64
-		expected      float64
+		expected        float64
 	}{
 		{"Low Speed", 10.0, 1.225, 0.1, 0.5, 3.0625},
 		{"High Speed", 300.0, 1.225, 0.1, 0.5, 2756.25},

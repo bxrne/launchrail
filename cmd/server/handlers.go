@@ -19,8 +19,6 @@ import (
 	"github.com/zerodha/logf"
 )
 
-
-
 type DataHandler struct {
 	records *storage.RecordManager
 	Cfg     *config.Config
@@ -656,7 +654,7 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 		startIndex = totalRecords
 		endIndex = totalRecords
 	} else if startIndex < 0 { // Should not happen with default 0, but good practice
-	    startIndex = 0
+		startIndex = 0
 	}
 
 	// Return paginated records with total count

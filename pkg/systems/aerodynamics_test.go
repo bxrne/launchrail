@@ -59,9 +59,9 @@ func TestAerodynamicSystem_GetAirDensity_SeaLevel(t *testing.T) {
 			Launchsite: config.Launchsite{
 				Atmosphere: config.Atmosphere{
 					ISAConfiguration: config.ISAConfiguration{
-						SeaLevelDensity:     1.225,
-						SeaLevelPressure:    101325,
-						SeaLevelTemperature: 288.15,
+						SeaLevelDensity:      1.225,
+						SeaLevelPressure:     101325,
+						SeaLevelTemperature:  288.15,
 						SpecificGasConstant:  287.058,
 						GravitationalAccel:   9.80665,
 						RatioSpecificHeats:   1.4,
@@ -169,10 +169,10 @@ func TestAerodynamicSystem_Update(t *testing.T) {
 		Nosecone:            &components.Nosecone{Radius: 0.1},
 		Bodytube:            &components.Bodytube{Radius: 0.1, Length: 1.0},
 		Orientation:         &types.Orientation{}, // Initialize Orientation
-		AngularVelocity:     &types.Vector3{}, // Initialize AngularVelocity
-		AngularAcceleration: &types.Vector3{}, // Initialize AngularAcceleration
-		AccumulatedForce:    types.Vector3{}, // Initialize AccumulatedForce
-		AccumulatedMoment:   types.Vector3{}, // Initialize AccumulatedMoment
+		AngularVelocity:     &types.Vector3{},     // Initialize AngularVelocity
+		AngularAcceleration: &types.Vector3{},     // Initialize AngularAcceleration
+		AccumulatedForce:    types.Vector3{},      // Initialize AccumulatedForce
+		AccumulatedMoment:   types.Vector3{},      // Initialize AccumulatedMoment
 	}
 
 	system.Add(entity1) // Add the PhysicsState wrapper to the system's list

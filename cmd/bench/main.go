@@ -81,12 +81,12 @@ func writeMarkdownReport(runDir, tag string, results []BenchmarkResult) error {
 }
 
 func main() {
-	// --- Setup Logger --- 
+	// --- Setup Logger ---
 	// Initialize logger early for setup messages
 	// Use GetLogger with a default level initially
 	benchLogger = logger.GetLogger("debug") // Use debug for benchmark setup
 
-	// --- Load Configuration --- 
+	// --- Load Configuration ---
 	cfg, err := config.GetConfig()
 	if err != nil {
 		benchLogger.Fatal("Failed to load configuration", "error", err)
@@ -96,7 +96,7 @@ func main() {
 
 	benchLogger.Info("--- Starting Benchmark Run --- ")
 
-	// --- Create Base Output Directory --- 
+	// --- Create Base Output Directory ---
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		benchLogger.Fatal("Failed to get user home directory", "error", err)
@@ -108,7 +108,7 @@ func main() {
 	}
 	benchLogger.Info("Benchmark results will be stored in", "directory", baseOutputDir)
 
-	// --- Run Benchmarks from Config --- 
+	// --- Run Benchmarks from Config ---
 	overallResults := make(map[string][]BenchmarkResult)
 	overallPassedCount := 0
 	overallFailedCount := 0
@@ -133,7 +133,7 @@ func main() {
 			continue
 		}
 
-		// --- Instantiate the correct benchmark based on tag --- 
+		// --- Instantiate the correct benchmark based on tag ---
 		var benchmark Benchmark // Use the interface type
 		switch tag {
 		case "hipr-euroc24":
@@ -150,7 +150,7 @@ func main() {
 			continue
 		}
 
-		// --- Execute the Benchmark --- 
+		// --- Execute the Benchmark ---
 		// NOTE: The Run signature needs to be updated in benchmark.go and hipr_euroc24.go
 		// Expected new signature: Run(cfg config.BenchmarkEntry, logger *logf.Logger, runDir string) ([]BenchmarkResult, error)
 		currentResults, err := benchmark.Run(benchmarkEntry, benchLogger, runDir) // Pass config and runDir. Lint error 4463794b-e453-41f8-91f5-eb464281b522 is expected here and will be fixed by updating the interface.
@@ -170,7 +170,7 @@ func main() {
 		}
 		overallResults[tag] = currentResults
 
-		// --- Write Markdown Report --- 
+		// --- Write Markdown Report ---
 		if err := writeMarkdownReport(runDir, tag, currentResults); err != nil {
 			benchLogger.Error("Failed to write markdown report", "tag", tag, "runDir", runDir, "error", err)
 			// Optionally treat report writing failure as a benchmark failure
@@ -197,7 +197,7 @@ func main() {
 		benchLogger.Warn("No enabled benchmarks found in configuration.")
 	}
 
-	// --- Final Summary --- 
+	// --- Final Summary ---
 	fmt.Println("\n--- Overall Benchmark Summary ---") // Print header to stdout
 	// Sort keys for consistent output order
 	benchmarkNames := make([]string, 0, len(overallResults))
@@ -228,7 +228,7 @@ func main() {
 	fmt.Printf("Total Passed: %d, Total Failed: %d\n", overallPassedCount, overallFailedCount)
 	fmt.Println("--------------------------------") // Footer separator
 
-	// --- Exit Status --- 
+	// --- Exit Status ---
 	if overallFailedCount > 0 {
 		benchLogger.Error("Exiting with failure status due to benchmark errors.")
 		os.Exit(1) // Exit with error code if any benchmarks failed

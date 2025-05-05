@@ -38,11 +38,11 @@ var StorageHeaders = map[SimStorageType][]string{
 // Storage is a service that writes csv's to disk
 type Storage struct {
 	recordDir string
-	store    SimStorageType
-	mu       sync.RWMutex
-	filePath string
-	writer   *csv.Writer
-	file     *os.File
+	store     SimStorageType
+	mu        sync.RWMutex
+	filePath  string
+	writer    *csv.Writer
+	file      *os.File
 }
 
 // Stores is a collection of storage services
@@ -77,10 +77,10 @@ func NewStorage(recordDir string, store SimStorageType) (*Storage, error) {
 
 	return &Storage{
 		recordDir: absRecordDir,
-		store:    store,
-		filePath: filePath,
-		file:     file,
-		writer:   csv.NewWriter(file),
+		store:     store,
+		filePath:  filePath,
+		file:      file,
+		writer:    csv.NewWriter(file),
 	}, nil
 }
 

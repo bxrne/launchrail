@@ -68,11 +68,11 @@ func TestSchemaNoseconeString(t *testing.T) {
 		Subcomponents: openrocket.NoseSubcomponents{
 			XMLName: xml.Name{Local: "subcomponents"},
 			MassComponent: openrocket.MassComponent{
-				XMLName:     xml.Name{Local: "masscomponent"},
-				Name:        "Payload",
-				ID:          "masscomp-1",
-				Mass:        0.1,
-				Type:        "part",
+				XMLName: xml.Name{Local: "masscomponent"},
+				Name:    "Payload",
+				ID:      "masscomp-1",
+				Mass:    0.1,
+				Type:    "part",
 			},
 		},
 	}

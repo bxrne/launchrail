@@ -105,8 +105,8 @@ func (c *CenteringRing) GetMass() float64 {
 	totalMass := massPerRing * float64(c.InstanceCount)
 
 	if math.IsNaN(totalMass) || totalMass < 0 {
-		 fmt.Printf("Warning: Invalid mass (%.4f) calculated for CenteringRing '%s', returning 0.\n", totalMass, c.Name)
-		 return 0.0
+		fmt.Printf("Warning: Invalid mass (%.4f) calculated for CenteringRing '%s', returning 0.\n", totalMass, c.Name)
+		return 0.0
 	}
 
 	return totalMass

@@ -21,7 +21,6 @@ func TransformRowsToFloat64(rows [][]string) [][]float64 {
 	return floatData
 }
 
-
 // axisIndices finds the indices of the requested axes in headers.
 func axisIndices(headers []string, xAxis, yAxis, zAxis string) (int, int, int) {
 	xIndex, yIndex, zIndex := -1, -1, -1
@@ -109,4 +108,3 @@ func TransformForPlot(headers []string, rows [][]string, source, xAxis, yAxis, z
 
 	return plotData, plotLayout, nil
 }
-

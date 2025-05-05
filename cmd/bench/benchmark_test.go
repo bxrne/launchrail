@@ -12,14 +12,14 @@ import (
 
 // MockBenchmark is a mock implementation of the Benchmark interface for testing.
 type MockBenchmark struct {
-	MockName      string
-	MockSetupErr  error
-	MockRunErr    error
-	MockResults   []BenchmarkResult
+	MockName        string
+	MockSetupErr    error
+	MockRunErr      error
+	MockResults     []BenchmarkResult
 	MockLoadDataErr error
-	LoadDataCalled bool
-	SetupCalled   bool
-	RunCalled     bool
+	LoadDataCalled  bool
+	SetupCalled     bool
+	RunCalled       bool
 }
 
 func (m *MockBenchmark) Name() string {

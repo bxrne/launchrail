@@ -12,10 +12,10 @@ import (
 
 // FlightInfo holds data from flight_info_processed.csv
 type FlightInfo struct {
-	Timestamp    float64
-	Height       float64
-	Velocity     float64
-	Acceleration float64
+	Timestamp        float64
+	Height           float64
+	Velocity         float64
+	Acceleration     float64
 	MotorDesignation string
 }
 
@@ -129,20 +129,28 @@ func LoadFlightInfo(filePath string) ([]FlightInfo, error) {
 		}
 
 		ts, err := parseFloat(record[0], i, "Timestamp", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		height, err := parseFloat(record[1], i, "Height", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		velocity, err := parseFloat(record[2], i, "Velocity", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		acceleration, err := parseFloat(record[3], i, "Acceleration", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		motorDesignation := record[4] // Read the motor designation string
 
 		flightInfos = append(flightInfos, FlightInfo{
-			Timestamp:    ts,
-			Height:       height,
-			Velocity:     velocity,
-			Acceleration: acceleration,
+			Timestamp:        ts,
+			Height:           height,
+			Velocity:         velocity,
+			Acceleration:     acceleration,
 			MotorDesignation: motorDesignation, // Assign the new field
 		})
 	}
@@ -337,40 +345,68 @@ func LoadSimDynamicsData(filePath string) ([]SimDynamicsData, error) {
 		}
 
 		ts, err := parseFloat(record[0], i, "time", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		posX, err := parseFloat(record[1], i, "position_x", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		posY, err := parseFloat(record[2], i, "position_y", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		posZ, err := parseFloat(record[3], i, "position_z", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		velX, err := parseFloat(record[4], i, "velocity_x", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		velY, err := parseFloat(record[5], i, "velocity_y", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		velZ, err := parseFloat(record[6], i, "velocity_z", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		accX, err := parseFloat(record[7], i, "acceleration_x", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		accY, err := parseFloat(record[8], i, "acceleration_y", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		accZ, err := parseFloat(record[9], i, "acceleration_z", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		oriX, err := parseFloat(record[10], i, "orientation_x", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		oriY, err := parseFloat(record[11], i, "orientation_y", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		oriZ, err := parseFloat(record[12], i, "orientation_z", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		oriW, err := parseFloat(record[13], i, "orientation_w", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 
 		data = append(data, SimDynamicsData{
-			Timestamp:     ts,
-			PositionX:     posX, PositionY:     posY, PositionZ:     posZ,
-			VelocityX:     velX, VelocityY:     velY, VelocityZ:     velZ,
+			Timestamp: ts,
+			PositionX: posX, PositionY: posY, PositionZ: posZ,
+			VelocityX: velX, VelocityY: velY, VelocityZ: velZ,
 			AccelerationX: accX, AccelerationY: accY, AccelerationZ: accZ,
-			OrientationX:  oriX, OrientationY:  oriY, OrientationZ:  oriZ, OrientationW: oriW,
+			OrientationX: oriX, OrientationY: oriY, OrientationZ: oriZ, OrientationW: oriW,
 		})
 	}
 	return data, nil
