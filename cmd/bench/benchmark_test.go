@@ -4,6 +4,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/bxrne/launchrail/internal/config"
+	logf "github.com/zerodha/logf"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,7 +39,7 @@ func (m *MockBenchmark) Setup() error {
 	return m.MockSetupErr
 }
 
-func (m *MockBenchmark) Run() ([]BenchmarkResult, error) {
+func (m *MockBenchmark) Run(entry config.BenchmarkEntry, logger *logf.Logger, runDir string) ([]BenchmarkResult, error) {
 	m.RunCalled = true
 	return m.MockResults, m.MockRunErr
 }

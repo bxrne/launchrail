@@ -16,6 +16,7 @@ type FlightInfo struct {
 	Height       float64
 	Velocity     float64
 	Acceleration float64
+	MotorDesignation string
 }
 
 // EventInfo holds data from event_info_processed.csv
@@ -114,32 +115,33 @@ func LoadFlightInfo(filePath string) ([]FlightInfo, error) {
 		return nil, err
 	}
 
-	data := make([]FlightInfo, 0, len(records))
+	var flightInfos []FlightInfo
+	const expectedCols = 5 // Updated: Timestamp, Height, Velocity, Acceleration, MotorDesignation
+
 	for i, record := range records {
-		if len(record) < 4 {
-			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want >= 4", filepath.Base(filePath), i+2, len(record))
+		if len(record) != expectedCols {
+			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want %d", filepath.Base(filePath), i+2, len(record), expectedCols)
 		}
 
-		ts, err := parseFloat(record[0], i, "ts", filePath)
-		if err != nil {
-			return nil, err
-		}
-		h, err := parseFloat(record[1], i, "height", filePath)
-		if err != nil {
-			return nil, err
-		}
-		v, err := parseFloat(record[2], i, "velocity", filePath)
-		if err != nil {
-			return nil, err
-		}
-		a, err := parseFloat(record[3], i, "acceleration", filePath)
-		if err != nil {
-			return nil, err
-		}
+		ts, err := parseFloat(record[0], i, "Timestamp", filePath)
+		if err != nil { return nil, err }
+		height, err := parseFloat(record[1], i, "Height", filePath)
+		if err != nil { return nil, err }
+		velocity, err := parseFloat(record[2], i, "Velocity", filePath)
+		if err != nil { return nil, err }
+		acceleration, err := parseFloat(record[3], i, "Acceleration", filePath)
+		if err != nil { return nil, err }
+		motorDesignation := record[4] // Read the motor designation string
 
-		data = append(data, FlightInfo{Timestamp: ts, Height: h, Velocity: v, Acceleration: a})
+		flightInfos = append(flightInfos, FlightInfo{
+			Timestamp:    ts,
+			Height:       height,
+			Velocity:     velocity,
+			Acceleration: acceleration,
+			MotorDesignation: motorDesignation, // Assign the new field
+		})
 	}
-	return data, nil
+	return flightInfos, nil
 }
 
 // LoadEventInfo loads event data from a CSV file.
