@@ -333,6 +333,7 @@ func main() {
 		api.GET("/spec", func(c *gin.Context) {
 			c.Redirect(http.StatusMovedPermanently, "/swagger/spec")
 		})
+		api.GET("/explore/:hash/report", dataHandler.DownloadReport)
 	}
 
 	// Web routes

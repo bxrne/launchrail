@@ -10,7 +10,9 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/plot_transformer"
+	"github.com/bxrne/launchrail/internal/reporting"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
@@ -578,4 +580,78 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// DownloadReport downloads a report for a specific record.
+func (h *DataHandler) DownloadReport(c *gin.Context) {
+	log := logger.GetLogger(h.Cfg.Setup.Logging.Level)
+	recordID := c.Param("hash") // Use "hash" as per the route definition
+	if recordID == "" {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Record hash/ID is required"})
+		return
+	}
+
+	log.Info("Generating report", "recordID", recordID)
+
+	// Assuming templates are relative to the executable or configured path
+	// TODO: Make template path configurable or determine relative path reliably
+	templateDir := "internal/reporting/templates" 
+	reportGen, err := reporting.NewGenerator(templateDir)
+	if err != nil {
+		log.Error("Failed to create report generator", "error", err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize report generator"})
+		return
+	}
+
+	// --- Placeholder Data Loading & Plot Generation ---
+	// In a real implementation, load data from storage based on recordID
+	// and generate actual plots/maps.
+	reportData, err := reporting.LoadSimulationData(recordID) // Placeholder load
+	if err != nil {
+		log.Warn("Using placeholder report data due to load error", "recordID", recordID, "loadError", err) 
+		// Proceed with basic data if loading fails for now
+		reportData = reporting.ReportData{
+			RecordID: recordID,
+			Version: h.Cfg.Setup.App.Version, // Get version from config
+			// Add placeholder paths or indicate missing data
+			GPSMapImagePath: "(Map generation not implemented)", 
+		}
+	} else {
+		// Ensure version is set even if loading succeeds partially
+		reportData.Version = h.Cfg.Setup.App.Version 
+		// TODO: Add actual map generation logic here
+		reportData.GPSMapImagePath = "(Map generation not implemented)" // Placeholder path
+	}
+
+	// --- Generate PDF ---
+	pdfBytes, err := reportGen.GeneratePDF(reportData)
+	if err != nil {
+		// Log the detailed error
+		log.Error("Failed to generate PDF report", "recordID", recordID, "error", err)
+		
+		// Check if it's the placeholder error vs. a real generation error
+		if strings.Contains(err.Error(), "not yet implemented") || strings.Contains(err.Error(), "Placeholder") {
+			// If it's just a placeholder issue, maybe return the markdown or a simpler error?
+			// For now, return the placeholder PDF content which includes the markdown.
+			log.Warn("PDF generation using placeholder", "recordID", recordID)
+		} else {
+			// If it's a different error, return a generic server error
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate report"})
+			return
+		}
+		// If we logged a warning but decided to proceed with placeholder PDF bytes, continue here.
+	}
+
+	if pdfBytes == nil {
+	    log.Error("Generated PDF bytes are nil", "recordID", recordID)
+	    c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate report content"})
+        return
+	}
+
+
+	// --- Send Response ---
+	fileName := fmt.Sprintf("launch_report_%s.pdf", recordID)
+	c.Header("Content-Disposition", "attachment; filename="+fileName)
+	c.Data(http.StatusOK, "application/pdf", pdfBytes)
+	log.Info("Report sent successfully", "recordID", recordID, "fileName", fileName, "sizeBytes", len(pdfBytes))
 }
