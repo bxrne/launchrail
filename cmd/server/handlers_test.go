@@ -597,7 +597,7 @@ func TestDeleteRecord(t *testing.T) {
 
 	// 4. Make DELETE request
 	req := httptest.NewRequest(http.MethodDelete, "/data/"+hashToDelete, nil)
-	req.Header.Set("Accept", "text/html") // Simulate HTMX request
+	req.Header.Set("Hx-Request", "true") // Simulate HTMX request
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
