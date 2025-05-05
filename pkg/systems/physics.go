@@ -209,7 +209,10 @@ func (s *PhysicsSystem) handleGroundCollision(entity *states.PhysicsState) bool 
 			*entity.AngularAcceleration = types.Vector3{}
 		}
 
-		// TODO: Trigger LANDING event if not already landed
+		// Set landing event if not already landed
+		if entity.CurrentEvent != types.Land {
+			entity.CurrentEvent = types.Land
+		}
 		s.logger.Debug("Ground collision detected", "entity_id", entity.Entity.ID())
 
 		return true // Collision handled

@@ -169,7 +169,6 @@ func (s *Shockcord) GetMass() float64 {
 		return 0.0
 	}
 
-	// TODO: Clarify if Material.Density is linear or volumetric for shock cords.
 	mass := s.CordLength * s.Material.Density
 
 	if math.IsNaN(mass) || mass < 0 {

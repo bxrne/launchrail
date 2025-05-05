@@ -36,7 +36,7 @@ func (p *Parachute) String() string {
 
 // GetMass calculates the mass of the parachute based on canopy and line materials/dimensions.
 // NOTE: This calculation assumes Parachute.Material.Density represents AREAL density (e.g., kg/m^2).
-// Line mass calculation is currently a placeholder and needs LineMaterial definition (density, thickness/linear density).
+// Line mass calculation uses LineMaterial density (assumed linear).
 func (p *Parachute) GetMass() float64 {
 	if p.Material.Density <= 0 || p.Diameter <= 0 {
 		return 0.0 // Cannot calculate without material density and diameter
@@ -47,10 +47,8 @@ func (p *Parachute) GetMass() float64 {
 	canopyArea := math.Pi * canopyRadius * canopyRadius
 	canopyMass := canopyArea * p.Material.Density // Density is assumed areal (mass/area)
 
-	// Line Mass Placeholder
-	// TODO: Implement line mass: Requires LineMaterial definition (Density, likely linear).
-	// Approx: lineMass = p.LineLength * p.LineCount * linearDensityOfLineMaterial
-	lineMass := 0.0 // Placeholder for now
+	// Line Mass
+	lineMass := p.LineLength * float64(p.LineCount) * p.LineMaterial.Density
 
 	totalMass := canopyMass + lineMass
 
