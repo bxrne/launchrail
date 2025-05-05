@@ -64,13 +64,50 @@ func (n *Nosecone) GetMass() float64 {
 		}
 		switch shape {
 		case "ogive":
-			// Tangent Ogive Volume: rho = (r^2 + l^2) / (2*r)
-			// V = pi * l * (rho^2 - l^2/3) - pi * (rho - r) * (rho^2 - l^2) // This formula seems complex/potentially wrong
-			// Let's use a simpler approximation or a known formula.
-			// Using formula from Apogee rocketry: V = pi*l/3 * (r^2 + r*rho + rho^2) ?? Needs verification.
-			// For simplicity, let's approximate with Conical for now, acknowledging inaccuracy.
-			// TODO: Implement accurate Ogive volume formula
-			return (1.0 / 3.0) * math.Pi * radius * radius * length
+			// Tangent Ogive Volume Calculation (derived from integral)
+			if radius <= 0 {
+				return 0 // Avoid division by zero and invalid geometry
+			}
+			r_sq := radius * radius
+			l_sq := length * length
+			// Avoid division by zero if radius is extremely small, though caught above.
+			// Check for length being zero as well.
+			if length == 0 {
+			    return 0
+			}
+
+			R := (r_sq + l_sq) / (2.0 * radius) // Ogive radius (rho)
+			h := (r_sq - l_sq) / (2.0 * radius) // x-offset of circle center
+			R_sq := R * R
+
+			// arcsin argument must be between -1 and 1.
+			// Check for R being zero or very small, although unlikely with l > 0.
+			if R == 0 {
+			    return 0
+			}
+			asinArg := length / R
+			if asinArg > 1.0 {
+				// Handle potential floating point inaccuracies or invalid geometry (l > R)
+				asinArg = 1.0
+			} else if asinArg < -1.0 {
+				// Should not happen with l>0, R>0
+				asinArg = -1.0
+			}
+
+			// Ensure asinArg is valid before calling arcsin
+			if math.IsNaN(asinArg) {
+				fmt.Printf("Warning: Invalid asin argument (NaN) for ogive volume calculation (radius=%.4f, length=%.4f). Returning 0.\n", radius, length)
+				return 0.0
+			}
+
+			volume := math.Pi * (R_sq*length - l_sq*length/3.0 + h*R_sq*math.Asin(asinArg))
+
+			// Final safety check for calculated volume
+			if math.IsNaN(volume) || volume < 0 {
+				fmt.Printf("Warning: Invalid volume (%.4f) calculated for ogive (radius=%.4f, length=%.4f). Returning 0.\n", volume, radius, length)
+				return 0.0
+			}
+			return volume
 		case "conical":
 			return (1.0 / 3.0) * math.Pi * radius * radius * length
 		case "elliptical": // Half-ellipsoid
@@ -107,7 +144,6 @@ func (n *Nosecone) GetMass() float64 {
 	totalMass := materialMass + additionalMass
 
 	// NOTE: Shoulder mass is not included here.
-	// NOTE: Ogive volume calculation needs refinement.
 
 	return totalMass // REMOVED the / 10 division
 }

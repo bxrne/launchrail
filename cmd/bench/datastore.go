@@ -115,6 +115,11 @@ func LoadFlightInfo(filePath string) ([]FlightInfo, error) {
 		return nil, err
 	}
 
+	// Check if there are any data rows after the header
+	if len(records) == 0 {
+		return nil, fmt.Errorf("no data rows found in %s", filepath.Base(filePath))
+	}
+
 	var flightInfos []FlightInfo
 	const expectedCols = 5 // Updated: Timestamp, Height, Velocity, Acceleration, MotorDesignation
 
