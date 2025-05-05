@@ -19,11 +19,11 @@ type StorageParasiteSystem struct {
 }
 
 // NewStorageParasiteSystem creates a new StorageParasiteSystem
-func NewStorageParasiteSystem(world *ecs.World, store storage.StorageInterface, storeType storage.SimStorageType) *StorageParasiteSystem {
+func NewStorageParasiteSystem(world *ecs.World, storage storage.StorageInterface, storeType storage.SimStorageType) *StorageParasiteSystem {
 	return &StorageParasiteSystem{
 		world:     world,
-		storage:   store,
-		entities:  make([]*states.PhysicsState, 0),
+		storage:   storage,
+		entities:  make([]*states.PhysicsState, 0), // Initialize as empty slice
 		done:      make(chan struct{}),
 		storeType: storeType,
 	}
@@ -95,8 +95,12 @@ func (s *StorageParasiteSystem) handleEvents(state *states.PhysicsState) {
 		parachuteStatus = "DEPLOYED"
 	}
 
+	// Get the string representation of the current event
+	eventName := state.CurrentEvent.String()
+
 	record := []string{
 		fmt.Sprintf("%.6f", state.Time),
+		eventName, // Add event name to record
 		state.Motor.GetState(),
 		parachuteStatus,
 	}

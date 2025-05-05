@@ -19,6 +19,13 @@ type PhysicsState struct {
 	Mass                *types.Mass
 	Time                float64
 
+	// Accumulators for forces and moments within a timestep
+	AccumulatedForce  types.Vector3
+	AccumulatedMoment types.Vector3
+
+	// Current event detected this timestep
+	CurrentEvent types.Event
+
 	// components
 	Motor     *components.Motor
 	Bodytube  *components.Bodytube

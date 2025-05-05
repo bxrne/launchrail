@@ -6,8 +6,8 @@ import (
 
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/stretchr/testify/assert"
-	"io"
 	"github.com/zerodha/logf"
+	"io"
 )
 
 // TEST: GIVEN a new MotorFSM WHEN InitialState is called THEN the state is "idle"

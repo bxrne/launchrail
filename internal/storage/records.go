@@ -173,20 +173,37 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 
 // DeleteRecord deletes a record by Hash
 func (rm *RecordManager) DeleteRecord(hash string) error {
+	// Validate the hash to prevent directory traversal
+	if strings.Contains(hash, "/") || strings.Contains(hash, "\\") || strings.Contains(hash, "..") {
+		return fmt.Errorf("invalid hash: contains forbidden characters")
+	}
+
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get user home directory: %w", err)
 	}
 	launchrailDir := filepath.Join(homeDir, ".launchrail")
 	recordPath := filepath.Join(launchrailDir, hash)
-	if err := os.RemoveAll(recordPath); err != nil {
-		return fmt.Errorf("failed to delete record: %v", err)
+
+	// Check if the record directory exists first
+	if _, err := os.Stat(recordPath); os.IsNotExist(err) {
+		// Directory does not exist, return specific error
+		return ErrRecordNotFound // Use the defined sentinel error
+	} else if err != nil {
+		// Some other error occurred during stat (e.g., permissions)
+		return fmt.Errorf("failed to check record existence: %w", err)
 	}
 
-	return nil
+	// Directory exists, proceed with deletion
+	if err := os.RemoveAll(recordPath); err != nil {
+		// Error during deletion
+		return fmt.Errorf("failed to delete record directory: %w", err)
+	}
+
+	return nil // Deletion successful
 }
 
 // ListRecords lists all existing valid records in the base directory.

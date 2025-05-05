@@ -12,8 +12,8 @@ import (
 
 // Package-level logger for openrocket parsing/calculation issues
 var pkgLogger = logf.New(logf.Opts{
-	Level:      logf.WarnLevel,
-	Writer:     os.Stderr,
+	Level:  logf.WarnLevel,
+	Writer: os.Stderr,
 })
 
 // SustainerSubcomponents represents the sustainer subcomponents element of the XML document
@@ -114,21 +114,21 @@ func (b *BodyTubeSubcomponents) String() string {
 
 // InnerTube represents the inner tube element of the XML document
 type InnerTube struct {
-	XMLName              xml.Name             `xml:"innertube"`
-	Name                 string               `xml:"name"`
-	ID                   string               `xml:"id"`
-	AxialOffset          AxialOffset          `xml:"axialoffset"`
-	Position             Position             `xml:"position"`
-	Material             Material             `xml:"material"`
-	Length               float64              `xml:"length"`
-	RadialPosition       float64              `xml:"radialposition"`
-	RadialDirection      float64              `xml:"radialdirection"`
-	OuterRadius          float64              `xml:"outerradius"`
-	Thickness            float64              `xml:"thickness"`
-	ClusterConfiguration string               `xml:"clusterconfiguration"`
-	ClusterScale         float64              `xml:"clusterscale"`
-	ClusterRotation      float64              `xml:"clusterrotation"`
-	MotorMount           MotorMount           `xml:"motormount"` // Direct motor mount info
+	XMLName              xml.Name               `xml:"innertube"`
+	Name                 string                 `xml:"name"`
+	ID                   string                 `xml:"id"`
+	AxialOffset          AxialOffset            `xml:"axialoffset"`
+	Position             Position               `xml:"position"`
+	Material             Material               `xml:"material"`
+	Length               float64                `xml:"length"`
+	RadialPosition       float64                `xml:"radialposition"`
+	RadialDirection      float64                `xml:"radialdirection"`
+	OuterRadius          float64                `xml:"outerradius"`
+	Thickness            float64                `xml:"thickness"`
+	ClusterConfiguration string                 `xml:"clusterconfiguration"`
+	ClusterScale         float64                `xml:"clusterscale"`
+	ClusterRotation      float64                `xml:"clusterrotation"`
+	MotorMount           MotorMount             `xml:"motormount"`    // Direct motor mount info
 	Subcomponents        InnerTubeSubcomponents `xml:"subcomponents"` // Contains nested components like another motor mount? (Schema unclear)
 }
 

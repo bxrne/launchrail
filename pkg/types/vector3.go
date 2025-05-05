@@ -56,13 +56,13 @@ func (v Vector3) MultiplyScalar(scalar float64) Vector3 {
 // INFO: Ensure the scalar is not zero to avoid division by zero.
 func (v Vector3) DivideScalar(scalar float64) Vector3 {
 	if scalar == 0 {
-		return v.DivideScalar(math.SmallestNonzeroFloat64)
+		return Vector3{} // Or handle as an error, depending on desired behavior
 	}
-
+	invScalar := 1.0 / scalar
 	return Vector3{
-		X: v.X / scalar,
-		Y: v.Y / scalar,
-		Z: v.Z / scalar,
+		X: v.X * invScalar,
+		Y: v.Y * invScalar,
+		Z: v.Z * invScalar,
 	}
 }
 

@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -373,4 +376,315 @@ func TestListRecordsHTML(t *testing.T) {
 		assert.Contains(t, body, fmt.Sprintf("test-hash-%d", i),
 			"HTML should include record hash identifiers")
 	}
+	// Check for version string
+	assert.Contains(t, body, "test", "HTML should contain app version")
+
+}
+
+// setupTestTemplate creates the dummy template file needed by the reporting generator.
+func setupTestTemplate(t *testing.T) string {
+	templateDir := filepath.Join("internal", "reporting", "templates")
+	templatePath := filepath.Join(templateDir, "report.md.tmpl")
+
+	// Ensure parent directory exists
+	err := os.MkdirAll(templateDir, 0755)
+	require.NoError(t, err)
+
+	// Create dummy template content
+	templateContent := "Report for {{.RecordID}} Version {{.Version}}"
+	err = os.WriteFile(templatePath, []byte(templateContent), 0644)
+	require.NoError(t, err)
+
+	// Cleanup function to remove the created structure
+	t.Cleanup(func() {
+		os.RemoveAll(filepath.Join("internal")) // Remove the top-level dir created
+	})
+
+	return templateDir // Although not used by handler directly, good practice
+}
+
+func TestDownloadReport(t *testing.T) {
+	// Arrange
+	_ = setupTestTemplate(t) // Create the dummy template file
+
+	// Use the real RecordManager in a temp directory
+	tempStorageDir := t.TempDir()
+	realManager, err := storage.NewRecordManager(tempStorageDir)
+	require.NoError(t, err, "Failed to create real RecordManager for test")
+
+	// Create a dummy record using the real manager
+	dummyRecord, err := realManager.CreateRecord()
+	require.NoError(t, err, "Failed to create dummy record")
+	require.NotNil(t, dummyRecord)
+	recordHash := dummyRecord.Hash
+	defer dummyRecord.Close() // Close the record created by the real manager
+
+	cfg := &config.Config{ // Minimal config needed
+		Setup: config.Setup{
+			App:     config.App{Version: "test-report-v1"},
+			Logging: config.Logging{Level: "error"},
+		},
+	}
+
+	// Initialize DataHandler with a logger
+	log := logger.GetLogger("debug")
+	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(gin.Recovery()) // Add recovery middleware
+	router.GET("/explore/:hash/report", dataHandler.DownloadReport)
+
+	// Act
+	req := httptest.NewRequest(http.MethodGet, "/explore/"+recordHash+"/report", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Assert
+	require.Equal(t, http.StatusOK, w.Code, "Expected OK status for report download")
+
+	assert.Equal(t, "application/pdf", w.Header().Get("Content-Type"))
+
+	expectedFilename := fmt.Sprintf("launch_report_%s.pdf", recordHash)
+	contentDisposition := w.Header().Get("Content-Disposition")
+	assert.Contains(t, contentDisposition, "attachment; filename=")
+	assert.Contains(t, contentDisposition, expectedFilename)
+
+	// Check body contains placeholder content (since PDF conversion is placeholder)
+	body := w.Body.String()
+	assert.NotEmpty(t, body)
+	assert.Contains(t, body, "--- PDF Conversion Placeholder ---") // From reporting.convertMarkdownToPDF placeholder
+	assert.Contains(t, body, recordHash)                           // Check if hash from template is included
+}
+
+func TestDownloadReport_NotFound(t *testing.T) {
+	// Arrange
+	// _ = setupTestTemplate(t) // No longer needed as we abort before report generation
+
+	// Use the real RecordManager in a temp directory
+	tempStorageDir := t.TempDir()
+	realManager, err := storage.NewRecordManager(tempStorageDir)
+	require.NoError(t, err, "Failed to create real RecordManager for test")
+
+	nonExistentHash := "record-does-not-exist"
+
+	cfg := &config.Config{ // Minimal config
+		Setup: config.Setup{
+			App:     config.App{Version: "test-report-v1"},
+			Logging: config.Logging{Level: "error"},
+		},
+	}
+
+	// Initialize DataHandler with a logger
+	log := logger.GetLogger("debug")
+	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(gin.Recovery()) // Add recovery middleware
+	router.GET("/explore/:hash/report", dataHandler.DownloadReport)
+
+	// Act
+	req := httptest.NewRequest(http.MethodGet, "/explore/"+nonExistentHash+"/report", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Assert
+	// Expecting NotFound status because LoadSimulationData fails
+	require.Equal(t, http.StatusNotFound, w.Code)
+
+	// Check error message in JSON response
+	var jsonResponse map[string]string
+	err = json.Unmarshal(w.Body.Bytes(), &jsonResponse)
+	require.NoError(t, err, "Response body should be valid JSON")
+	assert.Equal(t, "Failed to load data for report", jsonResponse["error"])
+}
+
+// --- New Test for HTML ListRecords with Real Manager ---
+
+func TestListRecords_RealManager(t *testing.T) {
+	// Arrange
+	// 1. Setup real RecordManager
+	tempStorageDir := t.TempDir()
+	realManager, err := storage.NewRecordManager(tempStorageDir)
+	require.NoError(t, err, "Failed to create real RecordManager for test")
+
+	// 2. Create dummy records
+	var expectedHashes []string
+	for i := 0; i < 3; i++ {
+		record, err := realManager.CreateRecord()
+		require.NoError(t, err)
+		require.NotNil(t, record)
+		expectedHashes = append(expectedHashes, record.Hash)
+		// Close record resources, important for file handles
+		defer record.Close()
+	}
+
+	cfg := &config.Config{ // Minimal config
+		Setup: config.Setup{
+			App:     config.App{Version: "test-list-v1"},
+			Logging: config.Logging{Level: "error"},
+		},
+	}
+
+	// 3. Setup real DataHandler and Router
+	// Initialize DataHandler with a logger
+	log := logger.GetLogger("debug")
+	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/data", dataHandler.ListRecords) // Use the HTML handler
+
+	// 4. Make GET request
+	req := httptest.NewRequest(http.MethodGet, "/data", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// 5. Assert StatusOK
+	require.Equal(t, http.StatusOK, w.Code)
+
+	// 6. Assert HTML content
+	body := w.Body.String()
+	assert.Contains(t, body, "<html", "Response should be HTML")
+	assert.Contains(t, body, "<table", "HTML should contain a table for records")
+	// Check if the hashes of created records are present
+	for _, hash := range expectedHashes {
+		assert.Contains(t, body, hash, "HTML should contain record hash: %s", hash)
+	}
+	// Check for version string
+	assert.Contains(t, body, "test-list-v1", "HTML should contain app version")
+
+}
+
+// --- New Test for DeleteRecord ---
+
+func TestDeleteRecord(t *testing.T) {
+	// Arrange
+	// 1. Setup real RecordManager
+	tempStorageDir := t.TempDir()
+	realManager, err := storage.NewRecordManager(tempStorageDir)
+	require.NoError(t, err, "Failed to create real RecordManager for test")
+
+	// 2. Create dummy records
+	recordToDelete, err := realManager.CreateRecord()
+	require.NoError(t, err)
+	defer recordToDelete.Close()
+	hashToDelete := recordToDelete.Hash
+
+	recordToKeep, err := realManager.CreateRecord()
+	require.NoError(t, err)
+	defer recordToKeep.Close()
+	hashToKeep := recordToKeep.Hash
+
+	cfg := &config.Config{ // Minimal config
+		Setup: config.Setup{
+			App:     config.App{Version: "test-delete-v1"},
+			Logging: config.Logging{Level: "error"},
+		},
+	}
+
+	// 3. Setup real DataHandler and Router
+	// Initialize DataHandler with a logger
+	log := logger.GetLogger("debug")
+	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(gin.Recovery()) // Add recovery middleware
+	// Note the route path from main.go
+	router.DELETE("/data/:hash", dataHandler.DeleteRecord)
+
+	// 4. Make DELETE request
+	req := httptest.NewRequest(http.MethodDelete, "/data/"+hashToDelete, nil)
+	req.Header.Set("Hx-Request", "true") // Simulate HTMX request
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// 5. Assert StatusOK
+	require.Equal(t, http.StatusOK, w.Code, "Expected OK status for HTMX delete response")
+
+	// 6. Assert HTML response content (updated list)
+	body := w.Body.String()
+	// Check for the presence of the ID attribute, less sensitive to class changes
+	if !assert.Contains(t, body, "id=\"records-list\"", "Response should contain the records-list ID") {
+		t.Logf("Actual response body:\n%s", body) // Print body on failure
+	}
+	assert.NotContains(t, body, hashToDelete, "HTML response should NOT contain the deleted hash")
+	assert.Contains(t, body, hashToKeep, "HTML response SHOULD contain the remaining hash")
+
+	// 7. Assert record is actually deleted from storage
+	_, err = realManager.GetRecord(hashToDelete)
+	require.Error(t, err, "GetRecord should return an error for the deleted hash")
+	assert.ErrorContains(t, err, "not found", "Error message should indicate record not found")
+
+	// Double-check the kept record still exists
+	_, err = realManager.GetRecord(hashToKeep)
+	require.NoError(t, err, "GetRecord should succeed for the kept hash")
+}
+
+// --- New Test for DeleteRecordAPI ---
+
+func TestDeleteRecordAPI(t *testing.T) {
+	// Arrange
+	// 1. Setup real RecordManager
+	tempStorageDir := t.TempDir()
+	realManager, err := storage.NewRecordManager(tempStorageDir)
+	require.NoError(t, err, "Failed to create real RecordManager for test")
+
+	// 2. Create a dummy record
+	recordToDelete, err := realManager.CreateRecord()
+	require.NoError(t, err)
+	defer recordToDelete.Close()
+	hashToDelete := recordToDelete.Hash
+
+	cfg := &config.Config{ // Minimal config
+		Setup: config.Setup{
+			Logging: config.Logging{Level: "error"},
+		},
+	}
+
+	// 3. Setup real DataHandler and Router
+	// Initialize DataHandler with a logger
+	log := logger.GetLogger("debug")
+	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(gin.Recovery()) // Add recovery middleware
+	// Note the route path from main.go - the handler is DeleteRecord
+	router.DELETE("/api/data/:hash", dataHandler.DeleteRecord)
+
+	// --- Test Case 1: Delete Existing Record ---
+	// 4. Make DELETE request
+	req1 := httptest.NewRequest(http.MethodDelete, "/api/data/"+hashToDelete, nil)
+	req1.Header.Set("Accept", "application/json") // Set Accept header
+	w1 := httptest.NewRecorder()
+	router.ServeHTTP(w1, req1)
+
+	// 5. Assert StatusNoContent (204)
+	require.Equal(t, http.StatusNoContent, w1.Code, "Expected NoContent status for successful API delete")
+
+	// 6. Assert record is actually deleted from storage
+	_, err = realManager.GetRecord(hashToDelete)
+	require.Error(t, err, "GetRecord should return an error for the deleted hash")
+	assert.ErrorContains(t, err, "not found", "Error message should indicate record not found")
+
+	// --- Test Case 2: Delete Non-Existent Record ---
+	// 7. Make DELETE request for non-existent hash
+	nonExistentHash := "this-hash-does-not-exist"
+	req2 := httptest.NewRequest(http.MethodDelete, "/api/data/"+nonExistentHash, nil)
+	req2.Header.Set("Accept", "application/json") // Set Accept header
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, req2)
+
+	// 8. Assert StatusNotFound (404)
+	require.Equal(t, http.StatusNotFound, w2.Code, "Expected NotFound status for deleting non-existent hash")
+
+	// Check error message in JSON response
+	var jsonResponse map[string]string
+	err = json.Unmarshal(w2.Body.Bytes(), &jsonResponse)
+	require.NoError(t, err, "Response body should be valid JSON for 404 error")
+	assert.Equal(t, "Record not found", jsonResponse["error"], "Expected 'Record not found' error message")
+
 }

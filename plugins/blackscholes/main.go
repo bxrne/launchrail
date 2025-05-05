@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/zerodha/logf"
 )
@@ -21,7 +22,8 @@ type BlackScholesPlugin struct {
 var Plugin BlackScholesPlugin
 
 // Initialize is called when the plugin is loaded
-func (p *BlackScholesPlugin) Initialize(log logf.Logger) error {
+func (p *BlackScholesPlugin) Initialize(log logf.Logger, cfg *config.Config) error {
+	// TODO: Use cfg if needed to load parameters like turbulenceIntensity
 	p.log = log
 	p.log.Info("Initializing Black-Scholes turbulence plugin")
 

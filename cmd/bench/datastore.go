@@ -12,10 +12,11 @@ import (
 
 // FlightInfo holds data from flight_info_processed.csv
 type FlightInfo struct {
-	Timestamp    float64
-	Height       float64
-	Velocity     float64
-	Acceleration float64
+	Timestamp        float64
+	Height           float64
+	Velocity         float64
+	Acceleration     float64
+	MotorDesignation string
 }
 
 // EventInfo holds data from event_info_processed.csv
@@ -23,6 +24,14 @@ type EventInfo struct {
 	Timestamp float64
 	Event     string
 	OutIdx    int // Assuming this is an integer index
+}
+
+// SimEventInfo holds data parsed from the simulation's EVENTS.csv output.
+type SimEventInfo struct {
+	Time            float64
+	EventName       string
+	MotorStatus     string
+	ParachuteStatus string
 }
 
 // FlightState holds data from flight_states_processed.csv
@@ -106,32 +115,46 @@ func LoadFlightInfo(filePath string) ([]FlightInfo, error) {
 		return nil, err
 	}
 
-	data := make([]FlightInfo, 0, len(records))
-	for i, record := range records {
-		if len(record) < 4 {
-			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want >= 4", filepath.Base(filePath), i+2, len(record))
-		}
-
-		ts, err := parseFloat(record[0], i, "ts", filePath)
-		if err != nil {
-			return nil, err
-		}
-		h, err := parseFloat(record[1], i, "height", filePath)
-		if err != nil {
-			return nil, err
-		}
-		v, err := parseFloat(record[2], i, "velocity", filePath)
-		if err != nil {
-			return nil, err
-		}
-		a, err := parseFloat(record[3], i, "acceleration", filePath)
-		if err != nil {
-			return nil, err
-		}
-
-		data = append(data, FlightInfo{Timestamp: ts, Height: h, Velocity: v, Acceleration: a})
+	// Check if there are any data rows after the header
+	if len(records) == 0 {
+		return nil, fmt.Errorf("no data rows found in %s", filepath.Base(filePath))
 	}
-	return data, nil
+
+	var flightInfos []FlightInfo
+	const expectedCols = 5 // Updated: Timestamp, Height, Velocity, Acceleration, MotorDesignation
+
+	for i, record := range records {
+		if len(record) != expectedCols {
+			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want %d", filepath.Base(filePath), i+2, len(record), expectedCols)
+		}
+
+		ts, err := parseFloat(record[0], i, "Timestamp", filePath)
+		if err != nil {
+			return nil, err
+		}
+		height, err := parseFloat(record[1], i, "Height", filePath)
+		if err != nil {
+			return nil, err
+		}
+		velocity, err := parseFloat(record[2], i, "Velocity", filePath)
+		if err != nil {
+			return nil, err
+		}
+		acceleration, err := parseFloat(record[3], i, "Acceleration", filePath)
+		if err != nil {
+			return nil, err
+		}
+		motorDesignation := record[4] // Read the motor designation string
+
+		flightInfos = append(flightInfos, FlightInfo{
+			Timestamp:        ts,
+			Height:           height,
+			Velocity:         velocity,
+			Acceleration:     acceleration,
+			MotorDesignation: motorDesignation, // Assign the new field
+		})
+	}
+	return flightInfos, nil
 }
 
 // LoadEventInfo loads event data from a CSV file.
@@ -153,23 +176,28 @@ func LoadEventInfo(filePath string) ([]EventInfo, error) {
 		return nil, fmt.Errorf("failed to read records from %s: %w", filePath, err)
 	}
 
+	// Handle header-only file
+	if len(records) == 0 {
+		return nil, fmt.Errorf("no data rows found in %s", filepath.Base(filePath))
+	}
+
 	data := make([]EventInfo, 0, len(records))
 	for i, record := range records {
-		// Expect 4 columns: #, ts, event, out_idx
-		if len(record) != 4 {
-			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 4", filepath.Base(filePath), i+1, len(record))
+		// Expect 3 columns: timestamp, event, outidx
+		if len(record) != 3 {
+			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 3", filepath.Base(filePath), i+1, len(record))
 		}
 
-		// Parse column 1 (index 1) as timestamp
-		ts, err := parseFloat(record[1], i, "ts", filePath)
+		// Parse column 0 (index 0) as timestamp
+		ts, err := parseFloat(record[0], i, "timestamp", filePath)
 		if err != nil {
 			return nil, err
 		}
 
-		// Column 2 (index 2) is the event name (string)
-		eventName := record[2]
+		// Column 1 (index 1) is the event name (string)
+		eventName := record[1]
 
-		// Columns 0 (#) and 3 (out_idx) are ignored for this struct
+		// Column 2 (out_idx) is ignored for this struct
 
 		data = append(data, EventInfo{Timestamp: ts, Event: eventName})
 	}
@@ -183,20 +211,25 @@ func LoadFlightStates(filePath string) ([]FlightState, error) {
 		return nil, err
 	}
 
+	// Handle header-only file
+	if len(records) == 0 {
+		return nil, fmt.Errorf("no data rows found in %s", filepath.Base(filePath))
+	}
+
 	data := make([]FlightState, 0, len(records))
 	for i, record := range records {
-		if len(record) != 3 { // Expect exactly 3 columns
-			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 3", filepath.Base(filePath), i+1, len(record))
+		if len(record) != 2 { // Expect exactly 2 columns
+			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 2", filepath.Base(filePath), i+1, len(record))
 		}
 
-		// Parse column 1 (index 1) as timestamp
-		ts, err := parseFloat(record[1], i, "ts", filePath)
+		// Parse column 0 (index 0) as timestamp
+		ts, err := parseFloat(record[0], i, "ts", filePath)
 		if err != nil {
 			return nil, err
 		}
 
-		// Take column 2 (index 2) as state string
-		data = append(data, FlightState{Timestamp: ts, State: record[2]})
+		// Take column 1 (index 1) as state string
+		data = append(data, FlightState{Timestamp: ts, State: record[1]})
 	}
 	return data, nil
 }
@@ -246,28 +279,51 @@ func LoadSimMotionData(filePath string) ([]SimMotionData, error) {
 	return data, nil
 }
 
-// LoadSimEventData loads data from the simulation's EVENTS.csv
-func LoadSimEventData(filePath string) ([]SimEventData, error) {
-	records, err := loadCSV(filePath)
+// LoadSimEventData loads event data from the simulation's output EVENTS.csv file.
+func LoadSimEventData(filePath string) ([]SimEventInfo, error) {
+	file, err := os.Open(filePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open sim event data %s: %w", filePath, err)
 	}
-	const expectedCols = 3 // time, motor_status, parachute_status
-	data := make([]SimEventData, 0, len(records))
+	defer file.Close()
+
+	r := csv.NewReader(file)
+	// Skip header row
+	if _, err := r.Read(); err != nil {
+		return nil, fmt.Errorf("failed to read header from sim event data %s: %w", filePath, err)
+	}
+
+	records, err := r.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read records from sim event data %s: %w", filePath, err)
+	}
+
+	data := make([]SimEventInfo, 0, len(records))
 	for i, record := range records {
-		if len(record) != expectedCols {
-			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want %d", filepath.Base(filePath), i+2, len(record), expectedCols)
+		// Expect 4 columns: time, event_name, motor_status, parachute_status
+		if len(record) != 4 {
+			// Return specific error if column count is wrong
+			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 4", filepath.Base(filePath), i+2, len(record)) // i+2 for user-friendly row number (1-based + header)
 		}
 
-		ts, err := parseFloat(record[0], i, "time", filePath)
+		// Parse column 0 as timestamp
+		t, err := parseFloat(record[0], i+2, "time", filePath) // i+2 for user-friendly row number
 		if err != nil {
 			return nil, err
 		}
-		motorStatus := record[1]
-		parachuteStatus := record[2]
 
-		data = append(data, SimEventData{
-			Timestamp:       ts,
+		// Column 1 is event name (string)
+		eventName := record[1]
+
+		// Column 2 is motor status (string)
+		motorStatus := record[2]
+
+		// Column 3 is parachute status (string)
+		parachuteStatus := record[3]
+
+		data = append(data, SimEventInfo{
+			Time:            t,
+			EventName:       eventName,
 			MotorStatus:     motorStatus,
 			ParachuteStatus: parachuteStatus,
 		})
@@ -289,40 +345,68 @@ func LoadSimDynamicsData(filePath string) ([]SimDynamicsData, error) {
 		}
 
 		ts, err := parseFloat(record[0], i, "time", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		posX, err := parseFloat(record[1], i, "position_x", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		posY, err := parseFloat(record[2], i, "position_y", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		posZ, err := parseFloat(record[3], i, "position_z", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		velX, err := parseFloat(record[4], i, "velocity_x", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		velY, err := parseFloat(record[5], i, "velocity_y", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		velZ, err := parseFloat(record[6], i, "velocity_z", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		accX, err := parseFloat(record[7], i, "acceleration_x", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		accY, err := parseFloat(record[8], i, "acceleration_y", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		accZ, err := parseFloat(record[9], i, "acceleration_z", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		oriX, err := parseFloat(record[10], i, "orientation_x", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		oriY, err := parseFloat(record[11], i, "orientation_y", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		oriZ, err := parseFloat(record[12], i, "orientation_z", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		oriW, err := parseFloat(record[13], i, "orientation_w", filePath)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 
 		data = append(data, SimDynamicsData{
-			Timestamp:     ts,
-			PositionX:     posX, PositionY:     posY, PositionZ:     posZ,
-			VelocityX:     velX, VelocityY:     velY, VelocityZ:     velZ,
+			Timestamp: ts,
+			PositionX: posX, PositionY: posY, PositionZ: posZ,
+			VelocityX: velX, VelocityY: velY, VelocityZ: velZ,
 			AccelerationX: accX, AccelerationY: accY, AccelerationZ: accZ,
-			OrientationX:  oriX, OrientationY:  oriY, OrientationZ:  oriZ, OrientationW: oriW,
+			OrientationX: oriX, OrientationY: oriY, OrientationZ: oriZ, OrientationW: oriW,
 		})
 	}
 	return data, nil

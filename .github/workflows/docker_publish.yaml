@@ -1,4 +1,4 @@
-name: Docker Build & Publish
+name: Docker Publish
 
 permissions:
   contents: write
@@ -7,62 +7,22 @@ permissions:
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*.*.*' # Trigger on version tags like v1.2.3
 
 jobs:
-  bump-version:
-    name: "Bump version and create tag"
-    runs-on: ubuntu-latest
-    outputs:
-      new_tag: ${{ steps.cz.outputs.tag }}
-      bumped: ${{ steps.cz.outputs.bumped }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Fetch all history for version bump analysis
-          token: ${{ secrets.GITHUB_TOKEN }} # Token needed to push changes
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install commitizen
-        run: pip install commitizen
-
-      - name: Create Bump and Changelog
-        id: cz
-        uses: commitizen-tools/commitizen-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Print Version Details # Optional debugging
-        if: steps.cz.outputs.bumped == 'true'
-        run: |
-          echo "Version bumped: ${{ steps.cz.outputs.bumped }}"
-          echo "New tag: ${{ steps.cz.outputs.tag }}"
-          echo "Previous version: ${{ steps.cz.outputs.version }}"
-
   docker-build-push:
     name: "Build and Push Docker image"
-    needs: bump-version # Depends on the bump job
-    if: needs.bump-version.outputs.bumped == 'true' # Only run if a version bump happened
     runs-on: ubuntu-latest
     env:
       REGISTRY: ghcr.io
       # Use github.repository which automatically gives owner/repo format
       REPOSITORY: ${{ github.repository }}
-      IMAGE_TAG: ${{ needs.bump-version.outputs.new_tag }}
+      IMAGE_TAG: ${{ github.ref_name }} # Use the tag that triggered the workflow
 
     steps:
       - name: Checkout code at new tag
-        uses: actions/checkout@v4
-        with:
-          # Checkout the specific tag created by the bump-version job
-          ref: ${{ needs.bump-version.outputs.new_tag }}
+        uses: actions/checkout@v4 # Checkout action usually handles checking out the specific tag automatically
 
       - name: Set up Go
         uses: actions/setup-go@v4

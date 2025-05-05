@@ -43,6 +43,7 @@ templ RecordList(props DataProps) {
                                 </td>
                                 <td>
                                     <a href={ templ.URL("/explore/" + record.Hash) } class="Link mr-3 color-fg-accent">View</a>
+                                    <a href={ templ.URL("/explore/" + record.Hash + "/report") } class="Link mr-3 color-fg-inherit">See Report</a>
                                     <a href="#" class="Link color-fg-danger"
                                         hx-delete={ "/data/" + record.Hash }
                                         hx-include="[name='filter'], [name='sort'], [name='page']"
@@ -78,6 +79,7 @@ templ RecordList(props DataProps) {
 templ Data(props DataProps, version string) {
     @layouts.Base(layouts.BaseProps{
         Title: "Simulation Records",
+        Version: version,
     }) {
         <div class="container-xl">
             <h1 class="h3 text-center p-4">Simulation Records</h1>

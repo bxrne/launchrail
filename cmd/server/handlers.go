@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -11,23 +12,41 @@ import (
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/plot_transformer"
+	"github.com/bxrne/launchrail/internal/reporting"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
+	"github.com/zerodha/logf"
 )
 
 type DataHandler struct {
 	records *storage.RecordManager
 	Cfg     *config.Config
+	log     *logf.Logger
 }
 
-// Helper function to render templ components
-func renderTempl(c *gin.Context, component templ.Component) {
+// Helper method to render templ components
+// Accepts optional status codes. If provided and >= 400, sets the response status.
+// Defaults to 200 OK otherwise.
+func (h *DataHandler) renderTempl(c *gin.Context, component templ.Component, statusCodes ...int) {
+	// Determine the status code to set
+	statusCode := http.StatusOK // Default to 200 OK
+	setStatus := false
+	if len(statusCodes) > 0 && statusCodes[0] >= 400 {
+		statusCode = statusCodes[0]
+		setStatus = true // Mark that we intended to set a specific status
+	}
+	c.Status(statusCode) // Set the status code
+
 	err := component.Render(c.Request.Context(), c.Writer)
 	if err != nil {
-		err_err := c.AbortWithError(http.StatusInternalServerError, err)
-		if err_err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to render template"})
+		h.log.Error("Failed to render template", "intended_status", statusCode, "error", err)
+		// If we specifically set an error status code beforehand,
+		// don't overwrite it with a 500 just because rendering failed.
+		// Log the render error, but let the original status stand.
+		if !setStatus && !c.Writer.Written() {
+			// Only abort with 500 if we hadn't already set a specific error status
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to render template"})
 		}
 	}
 }
@@ -51,7 +70,8 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 
 	records, err := h.records.ListRecords()
 	if err != nil {
-		renderTempl(c, pages.ErrorPage(err.Error()))
+		c.Status(http.StatusInternalServerError)
+		h.renderTempl(c, pages.ErrorPage("Failed to list records"), http.StatusInternalServerError) // Pass status
 		return
 	}
 
@@ -66,7 +86,6 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 	totalPages := int(math.Ceil(float64(totalRecords) / float64(params.ItemsPerPage)))
 	startIndex := (params.Page - 1) * params.ItemsPerPage
 	endIndex := min(startIndex+params.ItemsPerPage, totalRecords)
-
 	if startIndex >= totalRecords {
 		startIndex = 0
 		endIndex = min(params.ItemsPerPage, totalRecords)
@@ -84,25 +103,117 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 		}
 	}
 
-	renderTempl(c, pages.Data(pages.DataProps{
+	h.renderTempl(c, pages.Data(pages.DataProps{
 		Records: simRecords,
 		Pagination: pages.Pagination{
 			CurrentPage: params.Page,
 			TotalPages:  totalPages,
 		},
-	}, h.Cfg.Setup.App.Version))
+	}, h.Cfg.Setup.App.Version)) // No status needed for success
+}
+
+// DeleteRecord handles the deletion of a specific simulation record.
+func (h *DataHandler) DeleteRecord(c *gin.Context) {
+	hash := c.Param("hash")
+	if hash == "" {
+		h.log.Warn("DeleteRecord request missing hash")
+		// Assume API request for this path
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Record hash is required"})
+		return
+	}
+	h.log.Debug("Received API request to delete record", "hash", hash)
+
+	// Delete the record
+	err := h.records.DeleteRecord(hash)
+
+	// Handle response based on error and request type
+	if err != nil {
+		h.log.Error("Failed to delete record", "hash", hash, "error", err)
+		if errors.Is(err, storage.ErrRecordNotFound) { // Check for specific error
+			h.log.Warn("Attempted to delete non-existent record", "hash", hash)
+			// Assume API for this path
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		} else {
+			// Generic internal server error for other deletion failures
+			// Assume API for this path
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete record"})
+		}
+		return // Abort further processing
+	}
+
+	// Success
+	h.log.Info("Successfully deleted record via API", "hash", hash)
+
+	hxHeader := c.Request.Header.Get("Hx-Request")
+
+	if hxHeader != "" {
+		// HTMX request: Fetch updated records and render the list component
+		updatedRecords, err := h.records.ListRecords()
+		if err != nil {
+			h.log.Error("Failed to list records after deletion for HTMX response", "error", err)
+			// Send a generic error back to HTMX, or maybe an empty list with an error message?
+			// For now, send 500
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		// Map storage.Record to pages.SimulationRecord
+		pageRecords := make([]pages.SimulationRecord, 0, len(updatedRecords))
+		for _, rec := range updatedRecords {
+			pageRecords = append(pageRecords, pages.SimulationRecord{
+				Hash:         rec.Hash,
+				LastModified: rec.LastModified,
+			})
+		}
+
+		// Prepare props for the RecordList component (no pagination for this simple swap)
+		props := pages.DataProps{
+			Records: pageRecords,
+			// Pagination: pages.Pagination{}, // Omit pagination for now
+		}
+
+		// Set content type and render the component
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		err = pages.RecordList(props).Render(c.Request.Context(), c.Writer)
+		if err != nil {
+			h.log.Error("Failed to render RecordList component for HTMX response", "error", err)
+			// Abort if rendering fails, status code is already set potentially by Render
+			return
+		}
+		// Status OK is implicit on successful render without Abort
+
+	} else {
+		// API request: Respond with No Content
+		c.AbortWithStatus(http.StatusNoContent)
+	}
 }
 
 // DeleteRecord handles the request to delete a specific record
-func (h *DataHandler) DeleteRecord(c *gin.Context) {
+func (h *DataHandler) DeleteRecordOld(c *gin.Context) {
 	hash := c.Param("hash")
 
 	// Delete the record
 	err := h.records.DeleteRecord(hash)
 	if err != nil {
-		renderTempl(c, pages.ErrorPage("Failed to delete record"))
+		// Handle errors first, regardless of request type
+		if strings.Contains(err.Error(), "not found") {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "record not found"})
+		} else {
+			// Log the unexpected error
+			h.log.Error("Failed to delete record", "error", err, "recordID", hash)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "failed to delete record"})
+		}
 		return
 	}
+
+	// Deletion successful, now determine response type
+	if !strings.Contains(c.GetHeader("Accept"), "text/html") {
+		// API request: Return No Content and stop processing
+		c.AbortWithStatus(http.StatusNoContent)
+		return
+	}
+
+	// --- HTMX Request: Proceed to render the updated list ---
 
 	// Prepare pagination parameters
 	params := ListParams{
@@ -119,7 +230,8 @@ func (h *DataHandler) DeleteRecord(c *gin.Context) {
 	// Retrieve and (re)sort records
 	records, err := h.records.ListRecords()
 	if err != nil {
-		renderTempl(c, pages.ErrorPage(err.Error()))
+		c.Status(http.StatusInternalServerError)
+		h.renderTempl(c, pages.ErrorPage("Failed to list records"), http.StatusInternalServerError) // Pass status
 		return
 	}
 
@@ -153,7 +265,7 @@ func (h *DataHandler) DeleteRecord(c *gin.Context) {
 	}
 
 	// Render only the updated record list (partial HTML) so htmx can swap it in-place
-	renderTempl(c, pages.RecordList(pages.DataProps{
+	h.renderTempl(c, pages.RecordList(pages.DataProps{
 		Records: simRecords,
 		Pagination: pages.Pagination{
 			CurrentPage: params.Page,
@@ -169,39 +281,33 @@ func (h *DataHandler) GetRecordData(c *gin.Context) {
 
 	// Validate the hash to ensure it is a single-component identifier
 	if strings.Contains(hash, "/") || strings.Contains(hash, "\\") || strings.Contains(hash, "..") {
-		renderTempl(c, pages.ErrorPage("Invalid record identifier"))
+		h.renderTempl(c, pages.ErrorPage("Invalid record identifier"), http.StatusBadRequest) // Pass status
 		return
 	}
 
 	record, err := h.records.GetRecord(hash)
 	if err != nil {
-		renderTempl(c, pages.ErrorPage("Record not found"))
+		h.renderTempl(c, pages.ErrorPage("Record not found"), http.StatusNotFound) // Pass status
 		return
 	}
 	defer record.Close()
 
 	var store *storage.Storage
-	var title string
 	switch dataType {
 	case "motion":
 		store = record.Motion
-		title = "Motion Data"
 	case "events":
 		store = record.Events
-		title = "Events Data"
 	case "dynamics":
 		store = record.Dynamics
-		title = "Dynamics Data"
 	default:
-		renderTempl(c, pages.ErrorPage("Invalid data type"))
+		h.renderTempl(c, pages.ErrorPage("Invalid data type"), http.StatusBadRequest) // Pass status
 		return
 	}
 
-	headers, data, err := store.ReadHeadersAndData()
-	fmt.Println(headers, data, title)
+	_, _, err = store.ReadHeadersAndData() // Use '=' as err is already declared
 	if err != nil {
-		renderTempl(c, pages.ErrorPage("Failed to read data"))
-
+		h.renderTempl(c, pages.ErrorPage("Failed to read data"), http.StatusInternalServerError) // Pass status
 		return
 	}
 
@@ -282,7 +388,7 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 		return
 	}
 
-	headers, data, err := storage.ReadHeadersAndData()
+	_, data, err := storage.ReadHeadersAndData() // Use blank identifier for headers as it's not directly used here
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read data"})
 		return
@@ -291,7 +397,24 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 	// Sort the data
 	// Find column index
 	colIndex := -1
-	for i, h := range headers {
+	var sortHeaders []string
+	if len(data) > 0 {
+		// Assuming the first row of data contains headers if headers aren't fetched separately
+		// This needs verification based on how storage.ReadHeadersAndData works.
+		// Let's assume for now we need to fetch headers properly if they aren't in data[0]
+		headers, _, err := storage.ReadHeadersAndData() // Fetch headers specifically for sorting
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read headers for sorting"})
+			return
+		}
+		sortHeaders = headers
+	} else {
+		// Handle case with no data? Or assume headers can still be fetched?
+		// For now, use an empty slice if no data.
+		sortHeaders = []string{}
+	}
+
+	for i, h := range sortHeaders { // Correct: Iterate over actual headers fetched for sorting
 		if h == column {
 			colIndex = i
 			break
@@ -355,19 +478,20 @@ func (h *DataHandler) GetTableRows(c *gin.Context) {
 	}
 
 	// Get data and paginate
-	_, data, err := store.ReadHeadersAndData()
+	headers, data, err := store.ReadHeadersAndData()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read data"})
 		return
 	}
 
-	itemsPerPage := 15 // Changed from 10 to 15
+	itemsPerPage := 15
 	startIndex := (page - 1) * itemsPerPage
 	endIndex := min(startIndex+itemsPerPage, len(data))
 
 	// Return only the table rows HTML
 	c.HTML(http.StatusOK, "table_rows.html", gin.H{
-		"rows": data[startIndex:endIndex],
+		"headers": headers,
+		"rows":    data[startIndex:endIndex],
 	})
 }
 
@@ -541,7 +665,7 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 		startIndex = totalRecords
 		endIndex = totalRecords
 	} else if startIndex < 0 { // Should not happen with default 0, but good practice
-	    startIndex = 0
+		startIndex = 0
 	}
 
 	// Return paginated records with total count
@@ -578,4 +702,62 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// DownloadReport handles downloading the simulation report for a specific hash.
+func (h *DataHandler) DownloadReport(c *gin.Context) {
+	hash := c.Param("hash")
+	if hash == "" {
+		h.log.Warn("DownloadReport request missing hash")
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Record hash is required"})
+		return
+	}
+	h.log.Debug("Received request to download report", "hash", hash)
+
+	// Load simulation data
+	reportData, err := reporting.LoadSimulationData(h.records, hash)
+	if err != nil {
+		h.log.Error("Failed to load simulation data for report", "hash", hash, "error", err)
+		if errors.Is(err, storage.ErrRecordNotFound) || strings.Contains(strings.ToLower(err.Error()), "not found") {
+			h.log.Warn("Report requested for non-existent record", "hash", hash)
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Failed to load data for report"})
+		} else {
+			h.renderTempl(c, pages.ErrorPage("Internal Server Error"), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Create the report
+	templateDir := "internal/reporting/templates"
+	reportGen, err := reporting.NewGenerator(templateDir)
+	if err != nil {
+		h.log.Error("Failed to create report generator", "error", err)
+		h.renderTempl(c, pages.ErrorPage("Report Generation Failed"), http.StatusInternalServerError) // Pass status
+		return
+	}
+
+	pdfBytes, err := reportGen.GeneratePDF(reportData) // Use GeneratePDF, pass by value
+	if err != nil {
+		h.log.Error("Failed to create PDF report", "hash", hash, "error", err)
+		h.renderTempl(c, pages.ErrorPage("Report Generation Failed"), http.StatusInternalServerError) // Pass status
+		return
+	}
+
+	// Set headers for file download
+	fileName := fmt.Sprintf("launch_report_%s.pdf", hash)
+	c.Header("Content-Disposition", "attachment; filename="+fileName)
+	c.Header("Content-Type", "application/pdf")
+	c.Header("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
+
+	// Write the PDF content to the response
+	if _, err := c.Writer.Write(pdfBytes); err != nil {
+		h.log.Error("Failed to write PDF report to response", "hash", hash, "fileName", fileName, "error", err)
+		// Attempt to render an error page if possible, though headers might already be sent
+		if !c.Writer.Written() {
+			h.renderTempl(c, pages.ErrorPage("Download Failed"), http.StatusInternalServerError) // Pass status
+		}
+		return
+	}
+
+	h.log.Info("Report sent successfully", "hash", hash, "fileName", fileName, "sizeBytes", len(pdfBytes))
 }

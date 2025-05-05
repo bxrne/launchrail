@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -20,10 +22,10 @@ func createTempCSV(t *testing.T, content string) string {
 }
 
 func TestLoadFlightInfo(t *testing.T) {
-	csvContent := `ts,height,velocity,acceleration
--0.75,0.45,0.14,-0.02
--0.74,0.45,0.14,-0.02
-21.22,7444.18,-10.90,-9.8
+	csvContent := `ts,height,velocity,acceleration,motor_designation
+-0.75,0.45,0.14,-0.02,TEST
+-0.74,0.45,0.14,-0.02,TEST
+21.22,7444.18,-10.90,-9.8,TEST
 ` // Added apogee data point
 	filePath := createTempCSV(t, csvContent)
 
@@ -35,11 +37,13 @@ func TestLoadFlightInfo(t *testing.T) {
 	assert.Equal(t, 0.45, data[0].Height)
 	assert.Equal(t, 0.14, data[0].Velocity)
 	assert.Equal(t, -0.02, data[0].Acceleration)
+	assert.Equal(t, "TEST", data[0].MotorDesignation)
 
 	assert.Equal(t, 21.22, data[2].Timestamp)
 	assert.Equal(t, 7444.18, data[2].Height)
 	assert.Equal(t, -10.90, data[2].Velocity)
 	assert.Equal(t, -9.8, data[2].Acceleration)
+	assert.Equal(t, "TEST", data[2].MotorDesignation)
 }
 
 func TestLoadFlightInfo_ErrorHandling(t *testing.T) {
@@ -49,24 +53,24 @@ func TestLoadFlightInfo_ErrorHandling(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name:       "Missing Column",
-			csvContent: "ts,height,velocity\n1.0,10.0,5.0",
+			name:        "Missing Column",
+			csvContent:  "ts,height,velocity\n1.0,10.0,5.0",
 			expectedErr: "unexpected number of columns",
 		},
 		{
-			name:       "Invalid Float",
-			csvContent: "ts,height,velocity,acceleration\n1.0,ten,5.0,1.0",
+			name:        "Invalid Float",
+			csvContent:  "ts,height,velocity,acceleration,motor_designation\n1.0,ten,5.0,1.0,A8-3",
 			expectedErr: "invalid float value 'ten'",
 		},
 		{
-			name:       "Empty File",
-			csvContent: "",
+			name:        "Empty File",
+			csvContent:  "",
 			expectedErr: "failed to read header", // EOF error on header read
 		},
 		{
-			name:       "Header Only",
-			csvContent: "ts,height,velocity,acceleration\n",
-			expectedErr: "", // Should load zero records without error
+			name:        "Header Only",
+			csvContent:  "ts,height,velocity,acceleration,motor_designation\n",
+			expectedErr: "no data rows found",
 		},
 	}
 
@@ -91,84 +95,175 @@ func TestLoadFlightInfo_ErrorHandling(t *testing.T) {
 }
 
 func TestLoadEventInfo(t *testing.T) {
-	// Arrange: Use comma delimiter, matching default CSV reader
-	// LoadEventInfo reads ts from index 1 and event from index 2.
-	csvContent := `#,ts,event,out_idx
-1,0.1,LAUNCH,1
-2,5.2,BURNOUT,2
-3,21.2,APOGEE,3
-4,30.5,DROGUE_DEPLOY,4
-5,45.1,MAIN_DEPLOY,5
-6,60.0,LANDED,6
-`
-	filePath := createTempCSV(t, csvContent)
+	tests := []struct {
+		name         string
+		csvContent   string
+		expectedData []EventInfo
+		expectedErr  string
+	}{
+		{
+			name: "Success",
+			csvContent: `timestamp,event,outidx
+1.5,LAUNCH,0
+10.2,APOGEE,1
+20.8,LANDING,2`, // Note: outidx is parsed as int
+			expectedData: []EventInfo{
+				{Timestamp: 1.5, Event: "LAUNCH"},
+				{Timestamp: 10.2, Event: "APOGEE"},
+				{Timestamp: 20.8, Event: "LANDING"},
+			},
+			expectedErr: "",
+		},
+		{
+			name: "Wrong Column Count",
+			csvContent: `timestamp,event
+1.5,LAUNCH`, // Missing outidx
+			expectedErr: "unexpected number of columns",
+		},
+		{
+			name: "Invalid Timestamp Float",
+			csvContent: `timestamp,event,outidx
+1.5x,LAUNCH,0`,
+			expectedErr: "invalid float value '1.5x'",
+		},
+		// Removed Invalid_OutIdx_Int test case as the column is now ignored
+		// {
+		// 	name:       "Invalid OutIdx Int",
+		// 	csvContent: `timestamp,event,outidx
+		// 1.5,LAUNCH,zero`, // 'zero' cannot be parsed as int
+		// 	expectedErr: "invalid integer value 'zero'",
+		// },
+		{
+			name:        "Empty File",
+			csvContent:  "",
+			expectedErr: "failed to read header",
+		},
+		{
+			name: "Header Only",
+			csvContent: `timestamp,event,outidx
+`,
+			expectedErr: "no data rows found",
+		},
+	}
 
-	data, err := LoadEventInfo(filePath)
-	require.NoError(t, err, "LoadEventInfo failed")
-	require.Len(t, data, 6, "Incorrect number of events loaded")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filePath := createTempCSV(t, tt.csvContent)
+			data, err := LoadEventInfo(filePath)
 
-	assert.Equal(t, 0.1, data[0].Timestamp)
-	assert.Equal(t, "LAUNCH", data[0].Event)
-	assert.Equal(t, 60.0, data[5].Timestamp)
-	assert.Equal(t, "LANDED", data[5].Event)
-
-	// Test error case (invalid float)
-	invalidCsv := `#,ts,event,out_idx
-1,not_a_float,FAIL,1
-`
-	invalidFilePath := createTempCSV(t, invalidCsv)
-	_, err = LoadEventInfo(invalidFilePath)
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "invalid float value 'not_a_float'")
-
-	// Test error case (missing column)
-	missingColCsv := `#	ts
-1	1.0
-` // Keep tabs here to test the column count error correctly
-	missingColFilePath := createTempCSV(t, missingColCsv)
-	_, err = LoadEventInfo(missingColFilePath)
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "unexpected number of columns")
+			if tt.expectedErr != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.expectedErr)
+				assert.Nil(t, data)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedData, data)
+			}
+		})
+	}
 }
 
 func TestLoadFlightStates(t *testing.T) {
-	// Arrange: Use comma delimiter, matching default CSV reader
-	// LoadFlightStates reads ts from index 1 and state from index 2.
-	csvContent := `#,ts,state
-1,0.0,PRELAUNCH
-2,0.1,POWERED_ASCENT
-3,5.2,COAST
-4,21.2,APOGEE_STATE
-5,21.3,DROGUE_DESCENT
-6,45.1,MAIN_DESCENT
-7,60.0,LANDED_STATE
-` // Using distinct state names
-	filePath := createTempCSV(t, csvContent)
+	tests := []struct {
+		name         string
+		csvContent   string
+		expectedData []FlightState
+		expectedErr  string
+	}{
+		{
+			name: "Success",
+			csvContent: `ts,state
+0.1,PRELAUNCH
+10.5,POWERED_ASCENT
+25.2,COAST`,
+			expectedData: []FlightState{
+				{Timestamp: 0.1, State: "PRELAUNCH"},
+				{Timestamp: 10.5, State: "POWERED_ASCENT"},
+				{Timestamp: 25.2, State: "COAST"},
+			},
+			expectedErr: "",
+		},
+		{
+			name: "Wrong Column Count",
+			csvContent: `ts,state,extra
+0.1,PRELAUNCH,oops`,
+			expectedErr: "unexpected number of columns",
+		},
+		{
+			name: "Invalid Timestamp Float",
+			csvContent: `ts,state
+0.x,PRELAUNCH`,
+			expectedErr: "invalid float value '0.x'",
+		},
+		{
+			name:        "Empty File",
+			csvContent:  "",
+			expectedErr: "failed to read header",
+		},
+		{
+			name: "Header Only",
+			csvContent: `ts,state
+`,
+			expectedErr: "no data rows found",
+		},
+	}
 
-	data, err := LoadFlightStates(filePath)
-	require.NoError(t, err, "LoadFlightStates failed")
-	require.Len(t, data, 7, "Incorrect number of states loaded")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filePath := createTempCSV(t, tt.csvContent)
+			data, err := LoadFlightStates(filePath)
 
-	assert.Equal(t, 0.0, data[0].Timestamp)
-	assert.Equal(t, "PRELAUNCH", data[0].State)
-	assert.Equal(t, 60.0, data[6].Timestamp)
-	assert.Equal(t, "LANDED_STATE", data[6].State)
+			if tt.expectedErr != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.expectedErr)
+				assert.Nil(t, data)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedData, data)
+			}
+		})
+	}
+}
 
-	// Test error case (invalid float)
-	invalidCsv := `#,ts,state
-1,bad_ts,FAIL_STATE
-`
-	invalidFilePath := createTempCSV(t, invalidCsv)
-	_, err = LoadFlightStates(invalidFilePath)
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "invalid float value 'bad_ts'")
+func TestParseFloat(t *testing.T) {
+	tests := []struct {
+		name        string
+		inputStr    string
+		rowIdx      int
+		colName     string
+		fileName    string
+		expectedVal float64
+		expectedErr string // Substring of the expected error
+	}{
+		{"Valid Float", "123.45", 5, "TestCol", "test.csv", 123.45, ""},
+		{"Valid Negative Float", "-0.99", 1, "NegVal", "neg.csv", -0.99, ""},
+		{"Invalid Float String", "abc", 10, "Alpha", "alpha.csv", 0, "invalid float value 'abc'"},
+		{"Empty String", "", 2, "Empty", "empty.csv", 0, "invalid float value ''"},
+		{"Float with Extra Chars", "1.2x", 8, "Extra", "extra.csv", 0, "invalid float value '1.2x'"},
+		{"NaN String", "NaN", 3, "NotNum", "nan.csv", math.NaN(), ""},
+		{"Inf String", "Inf", 4, "Infinite", "inf.csv", math.Inf(1), ""},
+	}
 
-	// Test error case (missing column)
-	missingColCsv := `#	ts
-1	1.0
-` // Keep tabs here to test the column count error correctly
-	missingColFilePath := createTempCSV(t, missingColCsv)
-	_, err = LoadFlightStates(missingColFilePath)
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "unexpected number of columns")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			val, err := parseFloat(tt.inputStr, tt.rowIdx, tt.colName, tt.fileName)
+
+			if tt.expectedErr != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.expectedErr)
+				// Check that row, col, filename are in error message
+				assert.ErrorContains(t, err, fmt.Sprintf("row %d", tt.rowIdx+2)) // +2 for 1-based and header
+				assert.ErrorContains(t, err, fmt.Sprintf("column %s", tt.colName))
+				assert.ErrorContains(t, err, filepath.Base(tt.fileName))
+			} else {
+				require.NoError(t, err)
+				// Special handling for NaN comparison
+				if math.IsNaN(tt.expectedVal) {
+					assert.True(t, math.IsNaN(val), "Expected NaN, got %v", val)
+				} else {
+					assert.Equal(t, tt.expectedVal, val)
+				}
+			}
+		})
+	}
 }

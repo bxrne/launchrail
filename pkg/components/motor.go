@@ -55,9 +55,9 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 		Mass:        md.TotalMass,
 		Props:       md,
 		// Initialize thrust to first data point
-		thrust:      md.Thrust[0][1],
-		burnTime:    burnTime,
-		logger:      logger,
+		thrust:   md.Thrust[0][1],
+		burnTime: burnTime,
+		logger:   logger,
 		// FSM is initialized below after m is fully defined
 	}
 	m.FSM = NewMotorFSM(m, logger) // Initialize FSM here, passing the motor instance

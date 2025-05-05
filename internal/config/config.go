@@ -126,11 +126,12 @@ type Server struct {
 
 // BenchmarkEntry defines the configuration for a single benchmark.
 type BenchmarkEntry struct {
-	Name        string `mapstructure:"name" validate:"required"`
-	Description string `mapstructure:"description"` // Added missing field
-	DesignFile  string `mapstructure:"design_file" validate:"required,file"`
-	DataDir     string `mapstructure:"data_dir" validate:"required,dir"`
-	Enabled     bool   `mapstructure:"enabled" validate:"boolean"`
+	Name             string `mapstructure:"name" validate:"required"`
+	Description      string `mapstructure:"description"` // Added missing field
+	DesignFile       string `mapstructure:"design_file" validate:"required,file"`
+	DataDir          string `mapstructure:"data_dir" validate:"required,dir"`
+	MotorDesignation string `mapstructure:"motor_designation"` // Added motor designation
+	Enabled          bool   `mapstructure:"enabled" validate:"boolean"`
 }
 
 // Config represents the overall application configuration.
@@ -197,6 +198,7 @@ func (c *Config) String() map[string]string {
 		marshalled["benchmarks."+tag+".description"] = benchmark.Description
 		marshalled["benchmarks."+tag+".design_file"] = benchmark.DesignFile
 		marshalled["benchmarks."+tag+".data_dir"] = benchmark.DataDir
+		marshalled["benchmarks."+tag+".motor_designation"] = benchmark.MotorDesignation
 		marshalled["benchmarks."+tag+".enabled"] = fmt.Sprintf("%v", benchmark.Enabled)
 	}
 
@@ -317,6 +319,9 @@ func (cfg *Config) Validate() error {
 		// Removed os.Stat check that incorrectly used BaseDir here
 		if benchmark.DataDir == "" {
 			return fmt.Errorf("benchmark '%s': benchmark.data_dir is required", tag)
+		}
+		if benchmark.MotorDesignation == "" { // Added validation
+			return fmt.Errorf("benchmark '%s': benchmark.motor_designation is required", tag)
 		}
 
 		// Check if DesignFile exists (relative to project root or absolute)
