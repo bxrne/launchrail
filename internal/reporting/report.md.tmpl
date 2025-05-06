@@ -58,6 +58,11 @@ Version: {{.Version}}
 
 ## Plots & Data
 
+### Detailed Telemetry Plots (SVG)
+{{range $filename, $filepath := .Assets}}
+![{{ $filename }}]({{ $filepath }})
+{{end}}
+
 ## Atmospheric Conditions
 
 | Parameter            | Value |
@@ -88,10 +93,26 @@ Version: {{.Version}}
 
 ## Additional Analysis
 
-*Placeholder for:
-- Pressure vs. Altitude
-- Thrust-to-Weight Ratio
-- G-Force Profile
+{{if .PressureAltitudePlotPath}}
+### Pressure vs. Altitude
+![Pressure vs. Altitude Plot]({{.PressureAltitudePlotPath}})
+{{else}}
+*Pressure vs. Altitude plot not available.*
+{{end}}
+
+{{if .TWRPlotPath}}
+### Thrust-to-Weight Ratio
+![Thrust-to-Weight Ratio Plot]({{.TWRPlotPath}})
+{{else}}
+*Thrust-to-Weight Ratio plot not available.*
+{{end}}
+
+{{if .GForcePlotPath}}
+### G-Force Profile
+![G-Force Profile Plot]({{.GForcePlotPath}})
+{{else}}
+*G-Force Profile plot not available.*
+{{end}}
 
 ## GPS Landing Map
 

@@ -274,20 +274,35 @@ func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 	// Initialize storage services for the record
 	motionStore, err := NewStorage(recordPath, MOTION) // Use recordPath
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create motion storage for %s: %w", hash, err) // More context for error
+	}
+	if err := motionStore.Init(); err != nil {
+		motionStore.Close()
+		return nil, fmt.Errorf("failed to initialize motion storage for %s: %w", hash, err)
 	}
 
 	eventsStore, err := NewStorage(recordPath, EVENTS) // Use recordPath
 	if err != nil {
+		motionStore.Close() // Clean up previously successful store
+		return nil, fmt.Errorf("failed to create events storage for %s: %w", hash, err)
+	}
+	if err := eventsStore.Init(); err != nil {
 		motionStore.Close()
-		return nil, err
+		eventsStore.Close()
+		return nil, fmt.Errorf("failed to initialize events storage for %s: %w", hash, err)
 	}
 
 	dynamicsStore, err := NewStorage(recordPath, DYNAMICS) // Use recordPath
 	if err != nil {
 		motionStore.Close()
+		eventsStore.Close() // Clean up previously successful stores
+		return nil, fmt.Errorf("failed to create dynamics storage for %s: %w", hash, err)
+	}
+	if err := dynamicsStore.Init(); err != nil {
+		motionStore.Close()
 		eventsStore.Close()
-		return nil, err
+		dynamicsStore.Close()
+		return nil, fmt.Errorf("failed to initialize dynamics storage for %s: %w", hash, err)
 	}
 
 	// Get last modified time

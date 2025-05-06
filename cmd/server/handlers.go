@@ -1,13 +1,10 @@
 package main
 
 import (
-	"archive/zip"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -18,6 +15,7 @@ import (
 	"github.com/bxrne/launchrail/internal/plot_transformer"
 	"github.com/bxrne/launchrail/internal/reporting"
 	"github.com/bxrne/launchrail/internal/storage"
+
 	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
 	"github.com/zerodha/logf"
@@ -725,84 +723,50 @@ func min(a, b int) int {
 	return b
 }
 
-// DownloadReport handles downloading the simulation report for a specific hash.
-func (h *DataHandler) DownloadReport(c *gin.Context) {
+// ReportAPIV2 serves a specific report, potentially as a downloadable package or rendered view.
+// TODO: This currently returns JSON data. Needs to be adapted for actual report serving (HTML/Zip).
+func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 	hash := c.Param("hash")
-	h.log.Info("Report download requested", "hash", hash)
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		h.log.Error("Failed to get user home directory", "error", err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user home directory"})
+	if hash == "" {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Missing report hash"})
 		return
 	}
-	reportsDir := filepath.Join(homeDir, ".launchrail", "reports")
-	outPath, err := reporting.GenerateReportPackage(hash, h.records.(*storage.RecordManager), reportsDir)
+	h.log.Info("Report data requested", "hash", hash)
+
+	// Use the RecordManager's configured storage directory
+	baseRecordsDir := h.records.GetStorageDir()
+	if baseRecordsDir == "" {
+		h.log.Error("Base records directory is not configured or accessible in RecordManager")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Internal server error: Records directory configuration error"})
+		return
+	}
+	reportSpecificDir := filepath.Join(baseRecordsDir, hash)
+
+	// Ensure h.records is not nil and is of type *storage.RecordManager
+	rm, ok := h.records.(*storage.RecordManager)
+	if !ok || rm == nil {
+		h.log.Error("RecordManager is not initialized or of incorrect type in handler")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Internal server error: Record manager not available"})
+		return
+	}
+
+	reportData, err := reporting.LoadSimulationData(hash, rm, reportSpecificDir, h.Cfg)
 	if err != nil {
-		h.log.Error("Failed to generate report package", "hash", hash, "error", err)
-		if errors.Is(err, storage.ErrRecordNotFound) || strings.Contains(strings.ToLower(err.Error()), "record not found") || strings.Contains(err.Error(), "no such file or directory") {
+		h.log.Error("Failed to load simulation data for report", "hash", hash, "error", err)
+		if errors.Is(err, storage.ErrRecordNotFound) ||
+			strings.Contains(strings.ToLower(err.Error()), "record not found") ||
+			strings.Contains(err.Error(), "no such file or directory") || // Check for file system errors too
+			strings.Contains(err.Error(), "failed to get record") { // Check for our specific GetRecord error
 			h.log.Warn("Report requested for non-existent record or data loading failed", "hash", hash)
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Data for report not found"})
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Data for report not found or incomplete"})
 		} else {
-			h.renderTempl(c, pages.ErrorPage("Report Generation Failed"), http.StatusInternalServerError)
+			// For other errors, return a generic server error or a more specific one if appropriate
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate report data"})
 		}
 		return
 	}
 
-	// Instead of serving the markdown file directly, zip the whole report directory.
-	zipFileName := fmt.Sprintf("report_%s.zip", hash)
-	c.Header("Content-Disposition", "attachment; filename="+zipFileName)
-	c.Header("Content-Type", "application/zip")
-
-	zipWriter := zip.NewWriter(c.Writer)
-	defer zipWriter.Close()
-
-	err = filepath.Walk(outPath, func(path string, info os.FileInfo, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-
-		// Skip directories, we only want to add files.
-		if info.IsDir() {
-			return nil
-		}
-
-		// We only want to add regular files
-		if !info.Mode().IsRegular() {
-			return nil
-		}
-
-		relPath, err := filepath.Rel(outPath, path)
-		if err != nil {
-			return fmt.Errorf("failed to get relative path for %s: %w", path, err)
-		}
-
-		zipFile, err := zipWriter.Create(relPath)
-		if err != nil {
-			return fmt.Errorf("failed to create entry in zip for %s (relPath %s): %w", path, relPath, err)
-		}
-
-		fsFile, err := os.Open(path)
-		if err != nil {
-			return fmt.Errorf("failed to open file %s for zipping: %w", path, err)
-		}
-		defer fsFile.Close()
-
-		_, err = io.Copy(zipFile, fsFile)
-		if err != nil {
-			return fmt.Errorf("failed to copy file %s to zip: %w", path, err)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		h.log.Error("Failed during zip creation or streaming", "hash", hash, "error", err)
-		// Headers are likely already sent, so we can't easily send a JSON error.
-		// The client might receive a partial or corrupted zip file.
-		// The deferred zipWriter.Close() will attempt to finalize the zip.
-		return
-	}
-
-	h.log.Info("Successfully prepared report zip archive for streaming", "hash", hash, "filename", zipFileName)
+	c.JSON(http.StatusOK, reportData)
 }
+
+// CreateRecordAPI handles the creation of a new simulation record.

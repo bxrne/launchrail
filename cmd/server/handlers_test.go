@@ -1,11 +1,8 @@
 package main
 
 import (
-	"archive/zip"
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,11 +13,14 @@ import (
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/internal/reporting"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var testLog = logger.GetLogger("debug") // Define testLog
 
 // Response structure for API tests
 type ListRecordsAPIResponse struct {
@@ -68,9 +68,6 @@ func newTestRecordManager(n int) RecordManagerInterface {
 
 	return &TestRecordManager{mock: mock}
 }
-
-// We don't need the AsRecordManager method anymore since we're directly using TestRecordManager
-// in our tests instead of trying to convert it to a storage.RecordManager
 
 // ListRecords implements storage.RecordManager interface
 func (t *TestRecordManager) ListRecords() ([]*storage.Record, error) {
@@ -389,7 +386,7 @@ func setupTestTemplate(t *testing.T) string {
 
 func TestDownloadReport(t *testing.T) {
 	// Arrange
-	_ = setupTestTemplate(t) // Create the dummy template file
+	_ = setupTestTemplate(t) // Create the dummy template file. Kept for now, though report.md isn't directly served.
 
 	// Use the real RecordManager in a temp directory
 	tempStorageDir := t.TempDir()
@@ -399,123 +396,128 @@ func TestDownloadReport(t *testing.T) {
 	// Create a dummy record using the real manager
 	dummyRecord, err := realManager.CreateRecord() // CreateRecord takes no arguments
 	require.NoError(t, err, "Failed to create dummy record")
-	require.NotNil(t, dummyRecord, "Dummy record should not be nil")
 
-	recordHash := dummyRecord.Hash // Use the Hash field from the Record struct
-
-	// Write sample MOTION.csv data
-	require.NotNil(t, dummyRecord.Motion, "Motion storage should not be nil")
-	err = dummyRecord.Motion.Init() // Write headers
-	require.NoError(t, err, "Failed to init motion storage")
+	// Populate dummy record with some data
 	motionData := [][]string{
-		{"0.0", "10.0", "0.0", "9.8", "0.0"}, // time, altitude, velocity, acceleration, thrust
+		{"0.0", "10.0", "0.0", "9.8", "0.0"},
 		{"1.0", "15.0", "5.0", "15.0", "0.0"},
-		{"2.0", "30.0", "10.0", "10.0", "0.0"}, // Apogee for this simple data
+		{"2.0", "30.0", "10.0", "10.0", "0.0"}, // Apogee at t=2.0s, altitude=30.0
 		{"3.0", "25.0", "-5.0", "-9.8", "0.0"},
-		{"4.0", "10.5", "-10.0", "-9.8", "0.0"}, // Landing
+		{"4.0", "10.5", "-10.0", "-9.8", "0.0"}, // Landing near t=4.0s
 	}
-	for _, row := range motionData {
-		err = dummyRecord.Motion.Write(row)
-		require.NoError(t, err, "Failed to write motion data row")
-	}
-	err = dummyRecord.Motion.Close() // Close after writing
-	require.NoError(t, err, "Failed to close motion storage")
-
-	// Write sample EVENTS.csv data
-	require.NotNil(t, dummyRecord.Events, "Events storage should not be nil")
-	err = dummyRecord.Events.Init()
-	require.NoError(t, err, "Failed to init events storage")
 	eventsData := [][]string{
-		{"0.0", "Liftoff", "", ""}, // time, event_name, motor_status, parachute_status
+		{"0.0", "Liftoff", "", ""},
 		{"2.0", "Apogee", "", ""},
 		{"4.0", "Landing", "", ""},
 	}
+
+	err = dummyRecord.Motion.Init() // Call Init to write headers
+	require.NoError(t, err, "Failed to init motion data for dummy record")
+	for _, row := range motionData {
+		err = dummyRecord.Motion.Write(row)
+		require.NoError(t, err, "Failed to write motion data row to dummy record")
+	}
+
+	err = dummyRecord.Events.Init() // Call Init to write headers
+	require.NoError(t, err, "Failed to init events data for dummy record")
 	for _, row := range eventsData {
 		err = dummyRecord.Events.Write(row)
-		require.NoError(t, err, "Failed to write event data row")
+		require.NoError(t, err, "Failed to write events data row to dummy record")
 	}
-	err = dummyRecord.Events.Close() // Close after writing
-	require.NoError(t, err, "Failed to close events storage")
 
-	// The main record.Close() is deferred, which is fine as it will clean up the directory.
-	// Individual stores are closed above to ensure data is flushed before reading.
-	defer dummyRecord.Close() // Close the record created by the real manager
+	// The record hash is generated internally, so we need to get it from the record
+	actualHash := dummyRecord.Hash // Corrected from GetHash()
 
-	cfg := &config.Config{ // Minimal config needed
+	// Create a dummy engine_config.json in the record's directory for LoadSimulationData
+	recordDir := filepath.Join(tempStorageDir, actualHash)
+	err = os.MkdirAll(recordDir, 0755) // Ensure the specific record directory exists
+	require.NoError(t, err, "Failed to create record directory for engine_config.json")
+	dummyEngineConfig := config.Engine{
+		Options: config.Options{
+			OpenRocketFile:   "./testdata/l1.ork",
+			MotorDesignation: "TestMotor-ABC",
+		},
+	}
+	dummyEngineConfigBytes, err := json.Marshal(dummyEngineConfig)
+	require.NoError(t, err, "Failed to marshal dummy engine config")
+	err = os.WriteFile(filepath.Join(recordDir, "engine_config.json"), dummyEngineConfigBytes, 0644)
+	require.NoError(t, err, "Failed to write dummy engine_config.json")
+
+	// Close the record to flush data and release file handles before the handler tries to read them
+	err = dummyRecord.Close()
+	require.NoError(t, err, "Failed to close dummy record")
+
+	cfg := &config.Config{ // Minimal config needed by LoadSimulationData
 		Setup: config.Setup{
-			App: config.App{Version: "test-report-v1"},
+			App: config.App{Version: "test-v0.1.0"},
 		},
 	}
 
-	// Initialize DataHandler with a logger
-	log := logger.GetLogger("debug")
-	dataHandler := NewDataHandler(realManager, cfg, log)
-
-	gin.SetMode(gin.TestMode)
+	dataHandler := NewDataHandler(realManager, cfg, testLog)
 	router := gin.New()
-	router.Use(gin.Recovery()) // Add recovery middleware
-	router.GET("/api/v0/explore/:hash/report", dataHandler.DownloadReport)
+	// The test was previously trying to hit /reports/{hash}/download, but ReportAPIV2 is mounted differently
+	// The actual route in main.go is /explore/:hash/report.
+	// For consistency with how TestDownloadReport_NotFound sets up the router, we'll use the versioned path.
+	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
+
+	w := httptest.NewRecorder()
+	reqURL := fmt.Sprintf("/api/v0/explore/%s/report", actualHash)
+	req, _ := http.NewRequest("GET", reqURL, nil)
 
 	// Act
-	req := httptest.NewRequest(http.MethodGet, "/api/v0/explore/"+recordHash+"/report", nil)
-	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	// Assert
-	require.Equal(t, http.StatusOK, w.Code, "Expected OK status for report download")
+	require.Equal(t, http.StatusOK, w.Code, "Expected OK status for report data")
+	assert.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"), "Expected Content-Type to be application/json")
 
-	// Check for Zip content type and disposition
-	contentType := w.Header().Get("Content-Type")
-	assert.Equal(t, "application/zip", contentType, "Expected Content-Type to be application/zip")
+	var reportDataResponse reporting.ReportData
+	err = json.Unmarshal(w.Body.Bytes(), &reportDataResponse)
+	require.NoError(t, err, "Failed to unmarshal JSON response from ReportAPIV2")
 
-	expectedFilename := fmt.Sprintf("report_%s.zip", recordHash)
-	contentDisposition := w.Header().Get("Content-Disposition")
-	assert.Equal(t, "attachment; filename="+expectedFilename, contentDisposition, "Content-Disposition not set correctly for zip download")
+	// Verify some key fields in the ReportData
+	assert.Equal(t, actualHash, reportDataResponse.RecordID, "RecordID in response mismatch")
+	assert.Equal(t, "test-v0.1.0", reportDataResponse.Version, "Version in response mismatch")
+	assert.Equal(t, "l1.ork", reportDataResponse.RocketName, "RocketName in response mismatch")      // Based on dummyEngineConfig
+	assert.Equal(t, "TestMotor-ABC", reportDataResponse.MotorName, "MotorName in response mismatch") // Based on dummyEngineConfig
 
-	bodyBytes := w.Body.Bytes()
-	zipReader, err := zip.NewReader(bytes.NewReader(bodyBytes), int64(len(bodyBytes)))
-	require.NoError(t, err, "Failed to read zip archive from response body")
+	// Check MotionMetrics (Apogee, MaxVelocity etc.) - These are calculated by processReportData
+	// which is called within LoadSimulationData. We need to ensure processReportData is robust.
+	// For now, let's assume LoadSimulationData populates these correctly based on the dummy data.
+	// Apogee was 30.0 at t=2.0. Max velocity was 10.0 at t=2.0.
+	// The current `LoadSimulationData` calls `processReportData` which should populate these.
 
-	foundReportMd := false
-	foundAtmospherePlot := false
-
-	for _, zf := range zipReader.File {
-		switch zf.Name {
-		case "report.md":
-			foundReportMd = true
-			rc, err := zf.Open()
-			require.NoError(t, err, "Failed to open report.md from zip")
-			defer rc.Close()
-
-			mdContentBytes, err := io.ReadAll(rc)
-			require.NoError(t, err, "Failed to read report.md content from zip")
-			mdContentString := string(mdContentBytes)
-
-			assert.Contains(t, mdContentString, fmt.Sprintf("# Simulation Report: %s", recordHash), "Zipped report.md does not contain correct title")
-			assert.Contains(t, mdContentString, "## Plots & Data", "Zipped report.md does not contain Plots & Data section")
-			assert.Contains(t, mdContentString, "![](assets/atmosphere_plot.png)", "Zipped report.md does not contain atmosphere plot asset link")
-			// Check for new content based on parsed data
-			assert.Contains(t, mdContentString, "Apogee: 30.0 meters", "Report missing correct apogee")
-			assert.Contains(t, mdContentString, "Max Velocity: 10.0 m/s", "Report missing correct max velocity")
-			assert.Contains(t, mdContentString, "Total Flight Time: 4.0 seconds", "Report missing correct total flight time")
-			// assert.Contains(t, mdContentString, "| Liftoff | 0.0 | 10.0 |", "Report missing Liftoff event") // This will fail until events parsing/headers are aligned
-
-		case "assets/atmosphere_plot.png":
-			foundAtmospherePlot = true
-			// Optionally, check file size or content if needed, but presence is often enough for dummy assets
-			assert.Greater(t, zf.UncompressedSize64, uint64(0), "atmosphere_plot.png in zip should not be empty")
-		}
+	// For dummy data: Apogee should be 30.0, MaxVelocity 10.0
+	// Need to ensure processReportData is called and populates these fields in ReportData.
+	// Directly asserting after LoadSimulationData would require processReportData to be called by it.
+	// Let's verify if MotionMetrics is not nil first.
+	assert.NotNil(t, reportDataResponse.MotionMetrics, "MotionMetrics should be populated")
+	if reportDataResponse.MotionMetrics != nil {
+		assert.InDelta(t, 30.0, reportDataResponse.MotionMetrics.MaxAltitude, 0.001, "Apogee mismatch")
+		assert.InDelta(t, 10.0, reportDataResponse.MotionMetrics.MaxVelocity, 0.001, "MaxVelocity mismatch")
 	}
 
-	assert.True(t, foundReportMd, "report.md not found in the downloaded zip archive")
-	assert.True(t, foundAtmospherePlot, "assets/atmosphere_plot.png not found in the downloaded zip archive")
+	// Check if EventsData is populated
+	assert.NotEmpty(t, reportDataResponse.EventsData, "EventsData should not be empty")
+	if len(reportDataResponse.EventsData) > 1 { // header + data rows
+		// Example: check the first data event (Liftoff)
+		// Assuming EventsData includes headers. If not, adjust index.
+		assert.Contains(t, reportDataResponse.EventsData[1], "Liftoff", "First event should be Liftoff")
+	}
 
-	// Clean up: remove the created reports directory to avoid clutter
-	homeDir, _ := os.UserHomeDir()
-	reportSpecificDir := filepath.Join(homeDir, ".launchrail", "reports", recordHash)
-	_ = os.RemoveAll(reportSpecificDir) // Clean up the specific report directory
+	// Check if plot data (placeholders for now, as it's SVG strings) exists
+	// The ReportAPIV2 and LoadSimulationData pipeline should generate plot data and include it.
+	// The `GeneratePlots` function inside `LoadSimulationData` should populate `rData.Plots`.
+	assert.NotEmpty(t, reportDataResponse.Plots, "Plots map should not be empty")
+	assert.Contains(t, reportDataResponse.Plots, "altitude_vs_time", "Altitude plot should exist")
+	assert.Contains(t, reportDataResponse.Plots, "velocity_vs_time", "Velocity plot should exist")
+	assert.Contains(t, reportDataResponse.Plots, "acceleration_vs_time", "Acceleration plot should exist")
+
+	// The old test checked for zip file contents. Now we check the JSON fields directly.
+	// Assertions about specific markdown content or SVG links are no longer applicable here.
 }
 
+// TestDownloadReport_NotFound tests the scenario where a report is requested for a non-existent hash.
 func TestDownloadReport_NotFound(t *testing.T) {
 	// Arrange
 	// _ = setupTestTemplate(t) // No longer needed as we abort before report generation
@@ -541,7 +543,7 @@ func TestDownloadReport_NotFound(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(gin.Recovery()) // Add recovery middleware
-	router.GET("/api/v0/explore/:hash/report", dataHandler.DownloadReport)
+	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
 
 	// Act
 	req := httptest.NewRequest(http.MethodGet, "/api/v0/explore/"+nonExistentHash+"/report", nil)
@@ -557,7 +559,7 @@ func TestDownloadReport_NotFound(t *testing.T) {
 	err = json.Unmarshal(w.Body.Bytes(), &jsonResponse)
 	require.NoError(t, err, "Response body should be valid JSON")
 	// Updated expected error message
-	assert.Equal(t, "Data for report not found", jsonResponse["error"], "Error message for non-existent report mismatch")
+	assert.Equal(t, "Data for report not found or incomplete", jsonResponse["error"], "Error message for non-existent report mismatch")
 }
 
 // --- New Test for HTML ListRecords with Real Manager ---

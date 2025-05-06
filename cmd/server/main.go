@@ -237,14 +237,6 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config, log *logf.Logger) 
 	// }
 	log.Debug("Manager initialized successfully within configFromCtx")
 
-	// Validate the configuration
-	log.Debug("Attempting to validate simConfig")
-	if err := simConfig.Validate(); err != nil {
-		log.Warn("simConfig.Validate() failed", "error", err)
-		return nil, fmt.Errorf("failed to validate config: %w", err)
-	}
-	log.Debug("simConfig.Validate() succeeded")
-
 	return &simConfig, nil
 }
 
@@ -266,10 +258,6 @@ func main() {
 		return
 	}
 	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
-
-	// Bind the port flag to the server.port configuration key
-	// flag.IntVar(&cfg.Server.Port, "port", cfg.Server.Port, "Server port")
-	// flag.Parse()
 
 	r := gin.Default()
 	err = r.SetTrustedProxies(nil)
@@ -336,7 +324,7 @@ func main() {
 		api.GET("/spec", func(c *gin.Context) {
 			c.Redirect(http.StatusMovedPermanently, "/swagger/spec")
 		})
-		api.GET("/explore/:hash/report", dataHandler.DownloadReport)
+		api.GET("/explore/:hash/report", dataHandler.ReportAPIV2) // New endpoint for structured report data
 	}
 
 	// Web routes
@@ -410,7 +398,7 @@ func main() {
 		render(c, pages.Explorer(explorerData, cfg.Setup.App.Version))
 	})
 	r.GET("/explore/:hash/json", dataHandler.GetExplorerData)
-	r.GET("/explore/:hash/report", dataHandler.DownloadReport)
+	r.GET("/explore/:hash/report", dataHandler.ReportAPIV2)
 
 	r.POST("/plot", func(c *gin.Context) {
 		hash := c.PostForm("hash")
