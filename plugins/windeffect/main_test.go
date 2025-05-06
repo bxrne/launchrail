@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/zerodha/logf"
@@ -12,8 +13,8 @@ import (
 func TestWindEffectPlugin_Initialize(t *testing.T) {
 	p := &WindEffectPlugin{}
 	logger := logf.New(logf.Opts{})
-
-	err := p.Initialize(logger)
+	cfg := &config.Config{}
+	err := p.Initialize(logger, cfg)
 	if err != nil {
 		t.Errorf("Initialize failed: %v", err)
 	}
