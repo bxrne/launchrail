@@ -731,6 +731,12 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Missing report hash"})
 		return
 	}
+	// Validate that the hash is a safe single path component
+	if strings.Contains(hash, "/") || strings.Contains(hash, "\\") || strings.Contains(hash, "..") {
+		h.log.Warn("Invalid report hash provided", "hash", hash)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid report hash"})
+		return
+	}
 	h.log.Info("Report data requested", "hash", hash)
 
 	// Use the RecordManager's configured storage directory
@@ -741,6 +747,13 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 		return
 	}
 	reportSpecificDir := filepath.Join(baseRecordsDir, hash)
+	// Ensure the resolved path is within the base directory
+	absReportDir, err := filepath.Abs(reportSpecificDir)
+	if err != nil || !strings.HasPrefix(absReportDir, filepath.Clean(baseRecordsDir)+string(os.PathSeparator)) {
+		h.log.Warn("Resolved report directory is outside the base directory", "resolvedDir", absReportDir, "baseDir", baseRecordsDir)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid report hash"})
+		return
+	}
 
 	// Ensure h.records is not nil and is of type *storage.RecordManager
 	rm, ok := h.records.(*storage.RecordManager)
