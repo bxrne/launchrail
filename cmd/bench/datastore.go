@@ -82,19 +82,19 @@ type SimDynamicsData struct {
 func loadCSV(filePath string) ([][]string, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to open %s: %w", filepath.Base(filePath), err)
 	}
 	defer f.Close()
 
 	r := csv.NewReader(f)
 	// Skip header row
 	if _, err := r.Read(); err != nil {
-		return nil, fmt.Errorf("failed to read header from %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to read header from %s: %w", filepath.Base(filePath), err)
 	}
 
 	records, err := r.ReadAll()
 	if err != nil {
-		return nil, fmt.Errorf("failed to read records from %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to read records from %s: %w", filepath.Base(filePath), err)
 	}
 	return records, nil
 }
@@ -159,51 +159,36 @@ func LoadFlightInfo(filePath string) ([]FlightInfo, error) {
 
 // LoadEventInfo loads event data from a CSV file.
 func LoadEventInfo(filePath string) ([]EventInfo, error) {
-	file, err := os.Open(filePath)
+	records, err := loadCSV(filePath) // Skips header
 	if err != nil {
-		return nil, fmt.Errorf("failed to open %s: %w", filePath, err)
-	}
-	defer file.Close()
-
-	r := csv.NewReader(file)
-	// Skip header row
-	if _, err := r.Read(); err != nil {
-		// Handle EOF specifically for empty or header-only files
-		if err.Error() == "EOF" { // csv.ErrBareQuote or other errors might also mean empty/bad header
-			return nil, fmt.Errorf("failed to read header from %s (file might be empty or header-only): %w", filepath.Base(filePath), err)
-		}
-		return nil, fmt.Errorf("failed to read header from %s: %w", filepath.Base(filePath), err)
+		return nil, err
 	}
 
-	records, err := r.ReadAll()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read records from %s: %w", filepath.Base(filePath), err)
-	}
-
-	// Handle header-only file (no data records after header)
+	// Check if there are any data rows after the header
 	if len(records) == 0 {
 		return nil, fmt.Errorf("no data rows found in %s", filepath.Base(filePath))
 	}
 
-	data := make([]EventInfo, 0, len(records))
+	var eventInfos []EventInfo
+	const expectedCols = 2 // Timestamp, Event
+
 	for i, record := range records {
-		// Expect 2 columns: timestamp, event
-		if len(record) != 2 {
-			return nil, fmt.Errorf("unexpected number of columns in %s, row %d (1-based data): got %d, want 2. Record: %v", filepath.Base(filePath), i+1, len(record), record)
+		if len(record) != expectedCols {
+			return nil, fmt.Errorf("unexpected number of columns in %s, row %d (1-based data): got %d, want %d. Record: [%s]", filepath.Base(filePath), i+1, len(record), expectedCols, strings.Join(record, " "))
 		}
 
-		// Parse column 0 (index 0) as timestamp
-		ts, err := parseFloat(record[0], i, "timestamp", filePath) // parseFloat is defined elsewhere in this file
+		ts, err := parseFloat(record[0], i, "timestamp", filePath)
 		if err != nil {
 			return nil, err
 		}
+		event := record[1]
 
-		// Column 1 (index 1) is the event name (string)
-		eventName := strings.TrimSpace(record[1])
-
-		data = append(data, EventInfo{Timestamp: ts, Event: eventName})
+		eventInfos = append(eventInfos, EventInfo{
+			Timestamp: ts,
+			Event:     event,
+		})
 	}
-	return data, nil
+	return eventInfos, nil
 }
 
 // LoadFlightStates loads data from flight_states_processed.csv

@@ -44,4 +44,4 @@ jobs:
       
       - name: Run benchmarks
         run: |
-          go run ./cmd/bench/
+          go run ./cmd/bench/...
