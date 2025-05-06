@@ -7,6 +7,13 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 )
 
+// Model defines the interface for atmospheric models that can provide atmospheric data and speed of sound
+// Implementers include ISAModel and plugin-wrapped models.
+type Model interface {
+	GetAtmosphere(altitude float64) AtmosphereData
+	GetSpeedOfSound(altitude float64) float64
+}
+
 // ISAModel implements the International Standard Atmosphere
 type ISAModel struct {
 	cache map[float64]AtmosphereData

@@ -13,9 +13,9 @@ import (
 // BlackScholesPlugin implements the atmospheric turbulence model
 type BlackScholesPlugin struct {
 	log                   logf.Logger
-	rng                   *rand.Rand // Random number generator
-	turbulenceIntensity   float64    // σ (sigma) - magnitude of random fluctuations
-	deterministicForcesMu float64    // μ (mu) - deterministic drift component
+	rng                   *rand.Rand     // Random number generator
+	turbulenceIntensity   float64        // σ (sigma) - magnitude of random fluctuations
+	deterministicForcesMu float64        // μ (mu) - deterministic drift component
 	cfg                   *config.Config // config for simulation parameters
 }
 
@@ -28,10 +28,14 @@ func (p *BlackScholesPlugin) Initialize(log logf.Logger, cfg *config.Config) err
 	p.cfg = cfg
 	p.log.Info("Initializing Black-Scholes turbulence plugin")
 
-	// Seed the random number generator
-	seed := time.Now().UnixNano()
-	p.rng = rand.New(rand.NewSource(seed))
-	p.log.Debug("Random number generator seeded", "seed", seed)
+	// Seed RNG: deterministic for tests (nil cfg), otherwise time-based
+	if cfg == nil {
+		p.rng = rand.New(rand.NewSource(1))
+	} else {
+		seed := time.Now().UnixNano()
+		p.rng = rand.New(rand.NewSource(seed))
+	}
+	p.log.Debug("Random number generator seeded", "seed", /* omitted */)
 
 	// TODO: Initialize parameters (e.g., load from config file)
 	p.turbulenceIntensity = 0.05   // Example initial value for turbulence intensity (adjust based on desired effect)
@@ -58,27 +62,24 @@ func (p *BlackScholesPlugin) BeforeSimStep(state *states.PhysicsState) error {
 
 // AfterSimStep applies stochastic turbulence effects based on Black-Scholes model
 func (p *BlackScholesPlugin) AfterSimStep(state *states.PhysicsState) error {
-	// Retrieve simulation timestep
-	dt := p.cfg.Engine.Simulation.Step
-
-	// Current velocity components
-	vx := state.Velocity.Vec.X
-	vy := state.Velocity.Vec.Y
-	vz := state.Velocity.Vec.Z
-
-	// Parameters
-	sigma := p.turbulenceIntensity
-	mu := p.deterministicForcesMu
-
-	// Compute increments via Geometric Brownian Motion
-	inc := func(v float64) float64 {
-		return (mu-0.5*sigma*sigma)*dt + sigma*math.Sqrt(dt)*p.rng.NormFloat64()
+	// No change if zero intensity
+	if p.turbulenceIntensity == 0 {
+		return nil
 	}
-
-	// Update velocities (override additive noise)
-	state.Velocity.Vec.X = vx * math.Exp(inc(vx))
-	state.Velocity.Vec.Y = vy * math.Exp(inc(vy))
-	state.Velocity.Vec.Z = vz * math.Exp(inc(vz))
+	// Determine timestep
+	dt := 1.0
+	if p.cfg != nil {
+		dt = p.cfg.Engine.Simulation.Step
+	}
+	// Compute current speed magnitude
+	vx, vy, vz := state.Velocity.Vec.X, state.Velocity.Vec.Y, state.Velocity.Vec.Z
+	speed := math.Sqrt(vx*vx + vy*vy + vz*vz)
+	// Standard deviation for noise
+	stdDev := p.turbulenceIntensity * speed * math.Sqrt(dt)
+	// Generate noise and apply
+	state.Velocity.Vec.X += p.rng.NormFloat64() * stdDev
+	state.Velocity.Vec.Y += p.rng.NormFloat64() * stdDev
+	state.Velocity.Vec.Z += p.rng.NormFloat64() * stdDev
 
 	return nil
 }

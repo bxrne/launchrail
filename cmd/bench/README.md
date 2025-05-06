@@ -11,7 +11,7 @@ Responsibility
 
 Contract
 
-- Exposes `main.go` and `benchmark.go` defining `Benchmark`, `BenchmarkSuite`, and flags parsing (`--benchdata`).
+- Exposes `main.go` and `benchmark.go` defining `Benchmark` and `BenchmarkSuite`.
 - Implements `BenchmarkSuite.Run()` to orchestrate data loads and result comparison.
 
 Test Suite Overview

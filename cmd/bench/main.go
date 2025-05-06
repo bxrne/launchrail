@@ -114,7 +114,7 @@ func main() {
 	overallFailedCount := 0
 
 	benchmarkFound := false
-	for tag, benchmarkEntry := range cfg.Benchmarks {
+	for tag, benchmarkEntry := range cfg.Benchmarks { // removed flag-based benchdata, using config
 		if !benchmarkEntry.Enabled {
 			benchLogger.Info("Skipping disabled benchmark", "tag", tag)
 			continue
