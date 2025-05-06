@@ -29,15 +29,15 @@ type ReportData struct {
 	GPSMapImagePath    string
 
 	// Environmental Conditions
-	LaunchSiteName    string
-	LaunchLatitude    float64
-	LaunchLongitude   float64
-	LaunchElevation   float64 // meters AMSL
-	WindSpeed         float64 // m/s at a reference altitude (e.g., 10m)
-	WindDirection     float64 // degrees from North
-	Temperature       float64 // Celsius at launch site
-	Pressure          float64 // Pascals at launch site
-	Humidity          float64 // Percentage
+	LaunchSiteName  string
+	LaunchLatitude  float64
+	LaunchLongitude float64
+	LaunchElevation float64 // meters AMSL
+	WindSpeed       float64 // m/s at a reference altitude (e.g., 10m)
+	WindDirection   float64 // degrees from North
+	Temperature     float64 // Celsius at launch site
+	Pressure        float64 // Pascals at launch site
+	Humidity        float64 // Percentage
 
 	// Flight Summary
 	ApogeeMeters        float64
@@ -48,9 +48,9 @@ type ReportData struct {
 	KeyFlightEvents     []FlightEvent
 
 	// Landing Information
-	LandingLatitude        float64
-	LandingLongitude       float64
-	LandingDistanceMeters  float64 // Distance from launch site
+	LandingLatitude          float64
+	LandingLongitude         float64
+	LandingDistanceMeters    float64 // Distance from launch site
 	LandingRadius95PctMeters float64 // Placeholder for 95th percentile landing radius
 }
 
@@ -153,20 +153,20 @@ func LoadSimulationData(rm *storage.RecordManager, recordID string, reportSpecif
 	log.Info("Loaded record for report", "recordID", recordID, "creationTime", record.CreationTime)
 
 	data := ReportData{
-		RecordID: record.Hash,
-		Version:  "v0.0.0-dev",
-		LaunchSiteName:    "Default Launch Site",
-		LaunchLatitude:    37.7749,
-		LaunchLongitude:   -122.4194,
-		LaunchElevation:   10.0,
-		WindSpeed:         5.0,
-		WindDirection:     270.0,
-		Temperature:       20.0,
-		Pressure:          101325.0,
-		Humidity:          60.0,
-		LandingLatitude:        37.7750,
-		LandingLongitude:       -122.4200,
-		LandingDistanceMeters:  100.0,
+		RecordID:                 record.Hash,
+		Version:                  "v0.0.0-dev",
+		LaunchSiteName:           "Default Launch Site",
+		LaunchLatitude:           37.7749,
+		LaunchLongitude:          -122.4194,
+		LaunchElevation:          10.0,
+		WindSpeed:                5.0,
+		WindDirection:            270.0,
+		Temperature:              20.0,
+		Pressure:                 101325.0,
+		Humidity:                 60.0,
+		LandingLatitude:          37.7750,
+		LandingLongitude:         -122.4200,
+		LandingDistanceMeters:    100.0,
 		LandingRadius95PctMeters: 50.0,
 	}
 
@@ -175,28 +175,28 @@ func LoadSimulationData(rm *storage.RecordManager, recordID string, reportSpecif
 		allMotionData, err := record.Motion.ReadAll()
 		if err != nil {
 			log.Error("Failed to read all data from MOTION.csv", "recordID", recordID, "error", err)
-            return ReportData{}, fmt.Errorf("failed to read motion data for %s: %w", recordID, err)
-		} 
+			return ReportData{}, fmt.Errorf("failed to read motion data for %s: %w", recordID, err)
+		}
 		log.Debug("Raw motion data for record %s (first 5 rows)", "recordID", recordID, "data", allMotionData[:min(5, len(allMotionData))])
 		if len(allMotionData) < 2 { // Need at least headers and one data row
 			log.Error("MOTION.csv is empty or contains only headers", "recordID", recordID)
-            return ReportData{}, fmt.Errorf("motion data is insufficient for record %s (rows: %d)", recordID, len(allMotionData))
-		} 
+			return ReportData{}, fmt.Errorf("motion data is insufficient for record %s (rows: %d)", recordID, len(allMotionData))
+		}
 		motionMetrics, err := parseMotionData(allMotionData, data.LaunchElevation, log)
 		if err != nil {
 			log.Error("Failed to parse MOTION.csv data", "recordID", recordID, "error", err)
-            return ReportData{}, fmt.Errorf("failed to parse motion data for %s: %w", recordID, err)
-		} 
+			return ReportData{}, fmt.Errorf("failed to parse motion data for %s: %w", recordID, err)
+		}
 		data.ApogeeMeters = motionMetrics.ApogeeMeters
 		data.MaxVelocityMPS = motionMetrics.MaxVelocityMPS
 		data.MaxAccelerationMPS2 = motionMetrics.MaxAccelerationMPS2
 		data.TotalFlightTimeSec = motionMetrics.TotalFlightTimeSec
 		data.LandingVelocityMPS = motionMetrics.LandingVelocityMPS
 		log.Debug("Parsed motion data for record %s", "recordID", recordID, "apogeeM", data.ApogeeMeters, "maxVeloMPS", data.MaxVelocityMPS, "flightTimeS", data.TotalFlightTimeSec)
-		
+
 	} else {
 		log.Error("MOTION.csv storage not available for record", "recordID", recordID)
-        return ReportData{}, fmt.Errorf("motion storage not available for record %s", recordID)
+		return ReportData{}, fmt.Errorf("motion storage not available for record %s", recordID)
 	}
 
 	// --- Process EVENTS.csv ---
@@ -204,27 +204,27 @@ func LoadSimulationData(rm *storage.RecordManager, recordID string, reportSpecif
 		allEventsData, err := record.Events.ReadAll()
 		if err != nil {
 			log.Error("Failed to read all data from EVENTS.csv", "recordID", recordID, "error", err)
-            return ReportData{}, fmt.Errorf("failed to read events data for %s: %w", recordID, err)
-		} 
+			return ReportData{}, fmt.Errorf("failed to read events data for %s: %w", recordID, err)
+		}
 		log.Debug("Raw events data for record %s (first 5 rows)", "recordID", recordID, "data", allEventsData[:min(5, len(allEventsData))])
 		if len(allEventsData) == 0 { // Completely empty file
-            log.Warn("EVENTS.csv is empty", "recordID", recordID) // Allow empty events, use placeholders later
-        } else if len(allEventsData) == 1 { // Only headers
-            log.Warn("EVENTS.csv contains only headers", "recordID", recordID) // Allow empty events, use placeholders later
-        } else { // Has headers and data
+			log.Warn("EVENTS.csv is empty", "recordID", recordID) // Allow empty events, use placeholders later
+		} else if len(allEventsData) == 1 { // Only headers
+			log.Warn("EVENTS.csv contains only headers", "recordID", recordID) // Allow empty events, use placeholders later
+		} else { // Has headers and data
 			keyEvents, err := parseEventsData(allEventsData)
 			if err != nil {
 				log.Error("Failed to parse EVENTS.csv data", "recordID", recordID, "error", err)
-                return ReportData{}, fmt.Errorf("failed to parse events data for %s: %w", recordID, err)
-			} 
+				return ReportData{}, fmt.Errorf("failed to parse events data for %s: %w", recordID, err)
+			}
 			data.KeyFlightEvents = keyEvents
 			log.Debug("Parsed events data for record %s (event count %d)", "recordID", recordID, "eventCount", len(data.KeyFlightEvents))
-			
+
 		}
-		
+
 	} else {
 		log.Error("EVENTS.csv storage not available for record", "recordID", recordID)
-        return ReportData{}, fmt.Errorf("events storage not available for record %s", recordID)
+		return ReportData{}, fmt.Errorf("events storage not available for record %s", recordID)
 	}
 
 	// If KeyFlightEvents is still empty after trying to parse (or if file was empty/headers only), add placeholders
@@ -357,7 +357,7 @@ func parseMotionData(allRows [][]string, launchElevation float64, log *logf.Logg
 		if velocity > metrics.MaxVelocityMPS {
 			metrics.MaxVelocityMPS = velocity
 		}
-		if math.Abs(acceleration) > metrics.MaxAccelerationMPS2 { 
+		if math.Abs(acceleration) > metrics.MaxAccelerationMPS2 {
 			metrics.MaxAccelerationMPS2 = math.Abs(acceleration)
 		}
 
@@ -365,22 +365,26 @@ func parseMotionData(allRows [][]string, launchElevation float64, log *logf.Logg
 		lastAltitude = altitude
 		lastVelocity = velocity
 
-		if apogeeReached && math.Abs(altitude-launchElevation) < 1.0 { 
+		if apogeeReached && math.Abs(altitude-launchElevation) < 1.0 {
 			metrics.LandingVelocityMPS = velocity
 		}
 	}
 
 	metrics.TotalFlightTimeSec = lastTime
 	if metrics.LandingVelocityMPS == 0 && lastTime > 0 {
-        if math.Abs(lastAltitude - launchElevation) < 5.0 { 
-            metrics.LandingVelocityMPS = lastVelocity
-        } else {
-             metrics.LandingVelocityMPS = 0 
-        }
+		if math.Abs(lastAltitude-launchElevation) < 5.0 {
+			metrics.LandingVelocityMPS = lastVelocity
+		} else {
+			metrics.LandingVelocityMPS = 0
+		}
 	}
-    // Ensure MaxVelocity and MaxAcceleration are not the initial small numbers if no data processed meaningfully
-    if metrics.MaxVelocityMPS == -1e9 { metrics.MaxVelocityMPS = 0}
-    if metrics.MaxAccelerationMPS2 == -1e9 { metrics.MaxAccelerationMPS2 = 0}
+	// Ensure MaxVelocity and MaxAcceleration are not the initial small numbers if no data processed meaningfully
+	if metrics.MaxVelocityMPS == -1e9 {
+		metrics.MaxVelocityMPS = 0
+	}
+	if metrics.MaxAccelerationMPS2 == -1e9 {
+		metrics.MaxAccelerationMPS2 = 0
+	}
 
 	return metrics, nil
 }
@@ -390,13 +394,13 @@ func parseEventsData(allRows [][]string) ([]FlightEvent, error) {
 	if len(allRows) == 0 { // No data at all
 		return events, nil
 	}
-    if len(allRows) == 1 { // Only headers, no data rows
-        // logger.GetLogger("").Info("EVENTS.csv contains only headers, no data rows to parse for events.")
-        return events, nil
-    }
+	if len(allRows) == 1 { // Only headers, no data rows
+		// logger.GetLogger("").Info("EVENTS.csv contains only headers, no data rows to parse for events.")
+		return events, nil
+	}
 
 	headers := allRows[0]
-    dataRows := allRows[1:]
+	dataRows := allRows[1:]
 
 	colIndices := make(map[string]int)
 	for i, header := range headers {
@@ -409,7 +413,7 @@ func parseEventsData(allRows [][]string) ([]FlightEvent, error) {
 			return nil, fmt.Errorf("EVENTS.csv missing required column: %s. Available: %v", colName, headers)
 		}
 	}
-	
+
 	timeIdx := colIndices["time"]
 	eventNameIdx := colIndices["event_name"]
 	altIdx, altColExists := colIndices["altitude"]
@@ -423,8 +427,8 @@ func parseEventsData(allRows [][]string) ([]FlightEvent, error) {
 			// logger.GetLogger("").Warn("Failed to parse time in EVENTS.csv row, skipping event", "value", timeStr, "error", err); continue
 			return nil, fmt.Errorf("failed to parse time '%s' in EVENTS.csv: %w", timeStr, err)
 		}
-		
-		altitude := 0.0 
+
+		altitude := 0.0
 		if altColExists {
 			altStr := row[altIdx]
 			altVal, parseErr := strconv.ParseFloat(altStr, 64)

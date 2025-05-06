@@ -419,7 +419,7 @@ func TestDownloadReport(t *testing.T) {
 	dummyRecord, err := realManager.CreateRecord() // CreateRecord takes no arguments
 	require.NoError(t, err, "Failed to create dummy record")
 	require.NotNil(t, dummyRecord, "Dummy record should not be nil")
-	
+
 	recordHash := dummyRecord.Hash // Use the Hash field from the Record struct
 
 	// Write sample MOTION.csv data
@@ -427,7 +427,7 @@ func TestDownloadReport(t *testing.T) {
 	err = dummyRecord.Motion.Init() // Write headers
 	require.NoError(t, err, "Failed to init motion storage")
 	motionData := [][]string{
-		{"0.0", "10.0", "0.0", "9.8", "0.0"},    // time, altitude, velocity, acceleration, thrust
+		{"0.0", "10.0", "0.0", "9.8", "0.0"}, // time, altitude, velocity, acceleration, thrust
 		{"1.0", "15.0", "5.0", "15.0", "0.0"},
 		{"2.0", "30.0", "10.0", "10.0", "0.0"}, // Apogee for this simple data
 		{"3.0", "25.0", "-5.0", "-9.8", "0.0"},
@@ -445,7 +445,7 @@ func TestDownloadReport(t *testing.T) {
 	err = dummyRecord.Events.Init()
 	require.NoError(t, err, "Failed to init events storage")
 	eventsData := [][]string{
-		{"0.0", "Liftoff", "", ""},       // time, event_name, motor_status, parachute_status
+		{"0.0", "Liftoff", "", ""}, // time, event_name, motor_status, parachute_status
 		{"2.0", "Apogee", "", ""},
 		{"4.0", "Landing", "", ""},
 	}
@@ -458,7 +458,7 @@ func TestDownloadReport(t *testing.T) {
 
 	// The main record.Close() is deferred, which is fine as it will clean up the directory.
 	// Individual stores are closed above to ensure data is flushed before reading.
-	defer dummyRecord.Close()      // Close the record created by the real manager
+	defer dummyRecord.Close() // Close the record created by the real manager
 
 	cfg := &config.Config{ // Minimal config needed
 		Setup: config.Setup{
@@ -472,7 +472,7 @@ func TestDownloadReport(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Use(gin.Recovery())                                         // Add recovery middleware
+	router.Use(gin.Recovery()) // Add recovery middleware
 	router.GET("/api/v0/explore/:hash/report", dataHandler.DownloadReport)
 
 	// Act

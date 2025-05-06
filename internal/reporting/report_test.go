@@ -32,7 +32,7 @@ func TestLoadSimulationData(t *testing.T) {
 
 	// Add dummy motion data (1 data row, headers are written by Storage.Init)
 	motionHeader := []string{"time", "altitude", "velocity", "acceleration", "thrust"} // Define for context if needed elsewhere or for data row structure clarity
-	_ = motionHeader // Acknowledge variable, headers handled by Init
+	_ = motionHeader                                                                   // Acknowledge variable, headers handled by Init
 	motionDataRow1 := []string{"0.0", "10.0", "0.0", "9.8", "1000.0"}
 	err = record.Motion.Write(motionDataRow1)
 	require.NoError(t, err)
@@ -114,7 +114,7 @@ func TestGenerateReportPackage(t *testing.T) {
 
 	// Add dummy motion data (1 data row, headers are written by Storage.Init)
 	motionHeader := []string{"time", "altitude", "velocity", "acceleration", "thrust"} // Define for context if needed elsewhere or for data row structure clarity
-	_ = motionHeader // Acknowledge variable, headers handled by Init
+	_ = motionHeader                                                                   // Acknowledge variable, headers handled by Init
 	motionDataRow1 := []string{"0.0", "10.0", "0.0", "9.8", "1000.0"}
 	err = record.Motion.Write(motionDataRow1)
 	require.NoError(t, err)

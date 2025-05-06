@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/bxrne/launchrail/internal/logger" // Import for GetLogger
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCompareFloat(t *testing.T) {

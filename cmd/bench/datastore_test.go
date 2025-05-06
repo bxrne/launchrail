@@ -164,7 +164,7 @@ invalid,LAUNCH_ATTEMPT
 			// it won't use `headerMap` from `loadCSVWithHeader` if that's not called.
 			// The version of LoadEventInfo from Step 82 doesn't use loadCSVWithHeader.
 			expectedData: []EventInfo{{Timestamp: 1.0, Event: "EVENT"}},
-			expectedErr: "", // This should pass with the current LoadEventInfo from Step 82
+			expectedErr:  "", // This should pass with the current LoadEventInfo from Step 82
 		},
 	}
 
