@@ -3,11 +3,13 @@ package storage
 import (
 	"encoding/csv"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/zerodha/logf"
 )
 
 // SimStorageType is the type of storage service (MOTION, EVENTS, etc.)
@@ -43,6 +45,7 @@ type Storage struct {
 	filePath  string
 	writer    *csv.Writer
 	file      *os.File
+	log       *logf.Logger
 }
 
 // Stores is a collection of storage services
@@ -89,6 +92,8 @@ func (s *Storage) Init() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.log = logger.GetLogger("debug")
+
 	// Truncate file before writing headers
 	if err := s.file.Truncate(0); err != nil {
 		return fmt.Errorf("failed to truncate file: %v", err)
@@ -101,13 +106,13 @@ func (s *Storage) Init() error {
 
 	// Write headers
 	headers := StorageHeaders[s.store]
-	log.Printf("[DEBUG] Initializing storage headers for %s: headers=%v", s.filePath, headers)
+	s.log.Debug(fmt.Sprintf("Initializing storage headers for %s: headers=%v", s.filePath, headers))
 	if err := s.writer.Write(headers); err != nil {
-		return fmt.Errorf("failed to write headers: %v", err)
+		s.log.Error(fmt.Sprintf("failed to write headers: %v", err))
 	}
 	s.writer.Flush()
 	if err := s.writer.Error(); err != nil {
-		return fmt.Errorf("failed to flush headers: %v", err)
+		s.log.Error(fmt.Sprintf("failed to flush headers: %v", err))
 	}
 
 	return nil
@@ -119,17 +124,19 @@ func (s *Storage) Write(data []string) error {
 	defer s.mu.Unlock()
 
 	headers := StorageHeaders[s.store]
-	log.Printf("[DEBUG] Writing to %s: headers=%v, data=%v", s.filePath, headers, data)
+	s.log.Debug(fmt.Sprintf("Writing to %s: headers=%v, data=%v", s.filePath, headers, data))
 	if len(data) != len(headers) {
+		s.log.Error(fmt.Sprintf("data length (%d) does not match headers length (%d)", len(data), len(headers)))
+		// It's important to return an error here if this condition is problematic
 		return fmt.Errorf("data length (%d) does not match headers length (%d)", len(data), len(headers))
 	}
 
 	if err := s.writer.Write(data); err != nil {
-		return fmt.Errorf("failed to write data: %v", err)
+		s.log.Error(fmt.Sprintf("failed to write data: %v", err))
 	}
 
 	if err := s.writer.Error(); err != nil {
-		return fmt.Errorf("failed to flush data: %v", err)
+		s.log.Error(fmt.Sprintf("failed to flush data: %v", err))
 	}
 	s.writer.Flush()
 
@@ -144,13 +151,13 @@ func (s *Storage) Close() error {
 	if s.writer != nil {
 		s.writer.Flush()
 		if err := s.writer.Error(); err != nil {
-			return fmt.Errorf("failed to flush on close: %v", err)
+			s.log.Error(fmt.Sprintf("failed to flush on close: %v", err))
 		}
 	}
 
 	if s.file != nil {
 		if err := s.file.Sync(); err != nil {
-			return fmt.Errorf("failed to sync file: %v", err)
+			s.log.Error(fmt.Sprintf("failed to sync file: %v", err))
 		}
 		return s.file.Close()
 	}
@@ -169,18 +176,18 @@ func (s *Storage) ReadAll() ([][]string, error) {
 
 	// Seek to the beginning of the file
 	if _, err := s.file.Seek(0, 0); err != nil {
-		return nil, fmt.Errorf("failed to seek to beginning: %v", err)
+		s.log.Error(fmt.Sprintf("failed to seek to beginning: %v", err))
 	}
 
 	reader := csv.NewReader(s.file)
 	allData, err := reader.ReadAll()
 	if err != nil {
-		return nil, fmt.Errorf("failed to read CSV data: %v", err)
+		s.log.Error(fmt.Sprintf("failed to read CSV data: %v", err))
 	}
 
 	// Ensure there is at least one row (headers)
 	if len(allData) == 0 {
-		return nil, fmt.Errorf("no data found in storage")
+		s.log.Error("no data found in storage")
 	}
 
 	return allData, nil
@@ -190,7 +197,7 @@ func (s *Storage) ReadAll() ([][]string, error) {
 func (s *Storage) ReadHeadersAndData() ([]string, [][]string, error) {
 	allData, err := s.ReadAll()
 	if err != nil {
-		return nil, nil, err
+		s.log.Error(fmt.Sprintf("failed to read all data: %v", err))
 	}
 
 	// Separate headers and data
