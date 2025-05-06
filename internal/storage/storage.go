@@ -148,20 +148,31 @@ func (s *Storage) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.writer != nil {
-		s.writer.Flush()
-		if err := s.writer.Error(); err != nil {
-			s.log.Error(fmt.Sprintf("failed to flush on close: %v", err))
+	var firstErr error
+
+	// Helper to capture and log the first error encountered
+	// It ensures that subsequent operations are still attempted.
+	setErr := func(err error, context string) {
+		if err != nil {
+			if s.log != nil { // s.log might be nil if Init() was never called or failed
+				s.log.Error(fmt.Sprintf("error during %s: %v", context, err))
+			}
+			if firstErr == nil {
+				firstErr = fmt.Errorf("%s: %w", context, err)
+			}
 		}
 	}
 
-	if s.file != nil {
-		if err := s.file.Sync(); err != nil {
-			s.log.Error(fmt.Sprintf("failed to sync file: %v", err))
-		}
-		return s.file.Close()
+	if s.writer != nil {
+		s.writer.Flush() // Attempt to flush any buffered data
+		setErr(s.writer.Error(), "csv writer flush/error")
 	}
-	return nil
+
+	if s.file != nil {
+		setErr(s.file.Sync(), "file sync")
+		setErr(s.file.Close(), "file close")
+	}
+	return firstErr
 }
 
 // GetFilePath returns the file path of the storage service.

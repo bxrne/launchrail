@@ -33,12 +33,11 @@ type ListRecordsAPIResponse struct {
 type RecordManagerInterface interface {
 	ListRecords() ([]*storage.Record, error)
 	GetRecord(hash string) (*storage.Record, error)
-	CreateRecord() (*storage.Record, error)
 	DeleteRecord(hash string) error
 	GetStorageDir() string
 }
 
-// TestRecordManager is a test implementation of RecordManagerInterface
+// TestRecordManager is a test implementation of RecordManagerInterface for testing.
 type TestRecordManager struct {
 	mock *MockRecordManager
 }
@@ -86,18 +85,6 @@ func (t *TestRecordManager) GetRecord(hash string) (*storage.Record, error) {
 		}
 	}
 	return nil, fmt.Errorf("record not found with hash: %s", hash)
-}
-
-// CreateRecord implements storage.RecordManager interface
-func (t *TestRecordManager) CreateRecord() (*storage.Record, error) {
-	hash := fmt.Sprintf("test-hash-%d", len(t.mock.records)+1)
-	record := &storage.Record{
-		Hash:         hash,
-		CreationTime: time.Now(),
-		LastModified: time.Now(),
-	}
-	t.mock.records = append(t.mock.records, record)
-	return record, nil
 }
 
 // DeleteRecord implements storage.RecordManager interface
@@ -204,10 +191,8 @@ func TestEmptyRecordsAPI(t *testing.T) {
 	}
 
 	// Create handler
-	handler := &TestDataHandler{
-		records: mockRecords,
-		Cfg:     cfg,
-	}
+	log := logger.GetLogger("debug")
+	handler := NewDataHandler(mockRecords, cfg, log)
 
 	// Register API route
 	apiPath := "/api/v0"
@@ -249,10 +234,8 @@ func TestPaginationAPI(t *testing.T) {
 	}
 
 	// Create handler
-	handler := &TestDataHandler{
-		records: mockRecords,
-		Cfg:     cfg,
-	}
+	log := logger.GetLogger("debug")
+	handler := NewDataHandler(mockRecords, cfg, log)
 
 	// Register API route
 	apiPath := "/api/v0"
@@ -352,10 +335,8 @@ func TestListRecordsHTML(t *testing.T) {
 	}
 
 	// Create handler
-	handler := &TestDataHandler{
-		records: mockRecords,
-		Cfg:     cfg,
-	}
+	log := logger.GetLogger("debug")
+	handler := NewDataHandler(mockRecords, cfg, log)
 
 	// Register route for HTML handler
 	router.GET("/data", handler.ListRecords)
@@ -468,7 +449,7 @@ func TestDownloadReport(t *testing.T) {
 
 	// Initialize DataHandler with a logger
 	log := logger.GetLogger("debug")
-	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+	dataHandler := NewDataHandler(realManager, cfg, log)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -555,7 +536,7 @@ func TestDownloadReport_NotFound(t *testing.T) {
 
 	// Initialize DataHandler with a logger
 	log := logger.GetLogger("debug")
-	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+	dataHandler := NewDataHandler(realManager, cfg, log)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -609,7 +590,7 @@ func TestListRecords_RealManager(t *testing.T) {
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
 	log := logger.GetLogger("debug")
-	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+	dataHandler := NewDataHandler(realManager, cfg, log)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -666,7 +647,7 @@ func TestDeleteRecord(t *testing.T) {
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
 	log := logger.GetLogger("debug")
-	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+	dataHandler := NewDataHandler(realManager, cfg, log)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -726,7 +707,7 @@ func TestDeleteRecordAPI(t *testing.T) {
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
 	log := logger.GetLogger("debug")
-	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+	dataHandler := NewDataHandler(realManager, cfg, log)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

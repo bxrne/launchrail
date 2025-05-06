@@ -23,10 +23,27 @@ import (
 	"github.com/zerodha/logf"
 )
 
+// HandlerRecordManager defines the subset of storage.RecordManager methods used by DataHandler.
+type HandlerRecordManager interface {
+	ListRecords() ([]*storage.Record, error)
+	GetRecord(hash string) (*storage.Record, error)
+	DeleteRecord(hash string) error
+	GetStorageDir() string // Used by reporting.GenerateReportPackage
+}
+
 type DataHandler struct {
-	records *storage.RecordManager
+	records HandlerRecordManager
 	Cfg     *config.Config
 	log     *logf.Logger
+}
+
+// NewDataHandler creates a new instance of DataHandler.
+func NewDataHandler(records HandlerRecordManager, cfg *config.Config, log *logf.Logger) *DataHandler {
+	return &DataHandler{
+		records: records,
+		Cfg:     cfg,
+		log:     log,
+	}
 }
 
 // Helper method to render templ components
@@ -716,16 +733,14 @@ func (h *DataHandler) DownloadReport(c *gin.Context) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		h.log.Error("Failed to get user home directory", "error", err)
-		h.renderTempl(c, pages.ErrorPage("Internal Server Error"), http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user home directory"})
 		return
 	}
-	baseReportsDir := filepath.Join(homeDir, ".launchrail", "reports")
-
-	// Generate the report package. This creates the directory and files if they don't exist.
-	reportSpecificDir, err := reporting.GenerateReportPackage(h.records, hash, baseReportsDir)
+	reportsDir := filepath.Join(homeDir, ".launchrail", "reports")
+	outPath, err := reporting.GenerateReportPackage(hash, h.records.(*storage.RecordManager), reportsDir)
 	if err != nil {
 		h.log.Error("Failed to generate report package", "hash", hash, "error", err)
-		if errors.Is(err, storage.ErrRecordNotFound) || strings.Contains(strings.ToLower(err.Error()), "not found") {
+		if errors.Is(err, storage.ErrRecordNotFound) || strings.Contains(strings.ToLower(err.Error()), "record not found") || strings.Contains(err.Error(), "no such file or directory") {
 			h.log.Warn("Report requested for non-existent record or data loading failed", "hash", hash)
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Data for report not found"})
 		} else {
@@ -742,7 +757,7 @@ func (h *DataHandler) DownloadReport(c *gin.Context) {
 	zipWriter := zip.NewWriter(c.Writer)
 	defer zipWriter.Close()
 
-	err = filepath.Walk(reportSpecificDir, func(path string, info os.FileInfo, walkErr error) error {
+	err = filepath.Walk(outPath, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -757,7 +772,7 @@ func (h *DataHandler) DownloadReport(c *gin.Context) {
 			return nil
 		}
 
-		relPath, err := filepath.Rel(reportSpecificDir, path)
+		relPath, err := filepath.Rel(outPath, path)
 		if err != nil {
 			return fmt.Errorf("failed to get relative path for %s: %w", path, err)
 		}

@@ -2,6 +2,7 @@ package reporting
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"image"
 	"image/color"
@@ -14,21 +15,32 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/bxrne/launchrail/internal/logger"
+	logger "github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/storage"
-	logf "github.com/zerodha/logf"
+	"github.com/zerodha/logf"
+
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/plotutil"
+	"gonum.org/v1/plot/vg"
 )
 
+//go:embed report.md.tmpl
+var reportTemplateBytes []byte
+
 // ReportData holds all the necessary information for generating a report.
-// TODO: Consolidate redundant fields (e.g., LandingVelocity vs motionMetrics.LandingVelocityMPS)
 type ReportData struct {
-	Version            string // Application version
-	RecordID           string
-	AtmospherePlotPath string
-	ThrustPlotPath     string
-	TrajectoryPlotPath string
-	DynamicsPlotPath   string
-	GPSMapImagePath    string
+	Version              string // Application version
+	RecordID             string
+	AtmospherePlotPath   string
+	ThrustPlotPath       string
+	TrajectoryPlotPath   string
+	DynamicsPlotPath     string
+	GPSMapImagePath      string
+	VelocityPlotPath     string
+	AccelerationPlotPath string
+
+	SimulationName string // Added to hold simulation name
 
 	// Environmental Conditions
 	LaunchSiteName  string
@@ -41,12 +53,15 @@ type ReportData struct {
 	Pressure        float64 // Pascals at launch site
 	Humidity        float64 // Percentage
 
+	MotionMetrics MotionMetrics // Consolidated motion metrics
+
 	// Flight Summary
 	ApogeeMeters        float64
 	MaxVelocityMPS      float64
 	MaxAccelerationMPS2 float64
 	TotalFlightTimeSec  float64
 	LandingVelocityMPS  float64
+	LandingAltitude     float64
 	AllEvents           []FlightEvent
 
 	// Event Summaries / Highlights
@@ -59,78 +74,93 @@ type ReportData struct {
 	LandingLongitude         float64
 	LandingDistanceMeters    float64 // Distance from launch site
 	LandingRadius95PctMeters float64 // Placeholder for 95th percentile landing radius
+	LandingTime              float64 // Time of landing event in seconds
+
+	Assets map[string]string
+}
+
+// MotionMetrics holds calculated summary values from motion data.
+type MotionMetrics struct {
+	ApogeeMeters        float64
+	MaxVelocityMPS      float64
+	MaxAccelerationMPS2 float64
+	TotalFlightTimeSec  float64
+	LandingVelocityMPS  float64
 }
 
 // MotorHighlights summarizes key motor-related events.
 type MotorHighlights struct {
-	IgnitionTimeSec   float64
-	BurnoutTimeSec    float64
-	BurnDurationSec   float64
-	HasMotorEvents    bool // True if any motor-specific events were identified
+	IgnitionTimeSec  float64
+	BurnoutTimeSec   float64
+	BurnDurationSec  float64
+	HasMotorEvents   bool    // True if any motor-specific events were identified
+	IgnitionAltitude float64 // Altitude at ignition
+	BurnoutAltitude  float64 // Altitude at burnout
 }
 
-// ParachuteEventDetail provides specifics for a single parachute event.
+// ParachuteEventDetail captures information about a single parachute deployment event.
 type ParachuteEventDetail struct {
-	Name                     string  // e.g., "Drogue Deployed", "Main Deployed"
-	DeploymentTimeSec        float64
-	DeploymentAltitudeMeters float64
-	TimeToDeploySec          float64 // Relative to liftoff
+	Type           string  // e.g., "Drogue", "Main"
+	TimeSec        float64 // Time of deployment
+	AltitudeMeters float64 // Altitude at deployment
 }
 
-// ParachuteHighlights summarizes parachute deployment events.
+// ParachuteHighlights summarizes key parachute-related events.
 type ParachuteHighlights struct {
 	Events               []ParachuteEventDetail
-	HasParachuteEvents   bool // True if any parachute events were identified
+	HasParachuteEvents   bool    // True if any parachute events were identified
+	DrogueDeployTimeSec  float64 // Convenience field for template
+	DrogueDeployAltitude float64 // Convenience field for template
+	MainDeployTimeSec    float64 // Convenience field for template
+	MainDeployAltitude   float64 // Convenience field for template
 }
 
-// RocketPhaseHighlights summarizes major flight phases and events.
+// RocketPhaseHighlights summarizes key phases of the rocket's flight.
 type RocketPhaseHighlights struct {
-	LiftoffTimeSec      float64 // From motion data or "Liftoff" event
-	ApogeeTimeSec       float64 // From motion data or "Apogee" event
-	LandingTimeSec      float64 // From "Landing" event
-	CoastStartTimeSec   float64 // Typically after motor burnout
-	CoastEndTimeSec     float64 // Typically at apogee or first parachute deployment
-	CoastDurationSec    float64
-	HasLiftoffEvent     bool
-	HasApogeeEvent      bool
-	HasLandingEvent     bool
+	LiftoffTimeSec              float64 // From motion data or "Liftoff" event
+	ApogeeTimeSec               float64 // From motion data or "Apogee" event
+	LandingTimeSec              float64 // From "Landing" event
+	CoastStartTimeSec           float64 // Typically after motor burnout
+	CoastEndTimeSec             float64 // Typically at apogee or first parachute deployment
+	CoastDurationSec            float64
+	HasLiftoffEvent             bool
+	HasApogeeEvent              bool
+	HasLandingEvent             bool
+	PoweredAscentDurationSec    float64
+	ApogeeAltitude              float64
+	CoastToApogeeDurationSec    float64
+	MainChuteDescentDurationSec float64
+	DrogueDescentDurationSec    float64
+	FreeFallDurationSec         float64
 }
 
-// FlightEvent represents a significant event during the simulation.
-// It can be used to populate tables in the report.
+// FlightEvent represents a discrete event during the simulation.
 type FlightEvent struct {
 	Name           string
 	TimeSec        float64
 	AltitudeMeters float64
-	// Add other relevant data like velocity, status, etc.
 }
 
 // Generator handles report generation using text/template.
 type Generator struct {
 	template *template.Template
+	log      *logf.Logger
 }
 
-// NewGenerator creates a new report generator by reading and parsing the template file.
+// NewGenerator creates a new report generator by parsing the embedded template.
 func NewGenerator() (*Generator, error) {
-	// Assuming report.md.tmpl is now in the same directory (internal/reporting)
-	templatePath := "internal/reporting/report.md.tmpl"
-	tmplBytes, err := os.ReadFile(templatePath)
+	log := logger.GetLogger("reporting")
+
+	// Parse the embedded template
+	tmpl, err := template.New("report.md.tmpl").Parse(string(reportTemplateBytes))
 	if err != nil {
-		// Attempt to read from relative path if absolute fails (e.g., during tests)
-		wd, _ := os.Getwd()
-		altPath := filepath.Join(wd, templatePath)
-		tmplBytes, err = os.ReadFile(altPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read markdown template file from %s or %s: %w", templatePath, altPath, err)
-		}
+		log.Error("Failed to parse embedded markdown template", "error", err)
+		return nil, fmt.Errorf("failed to parse embedded markdown template: %w", err)
 	}
 
-	tmpl, err := template.New("report").Parse(string(tmplBytes))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse markdown template file %s: %w", templatePath, err)
-	}
 	return &Generator{
 		template: tmpl,
+		log:      log,
 	}, nil
 }
 
@@ -149,7 +179,6 @@ func (g *Generator) GenerateMarkdownFile(data ReportData, outputDir string) erro
 }
 
 // createDummyAsset creates a minimal 1x1 transparent PNG at the given path.
-// In a real scenario, this would generate actual plot images.
 func createDummyAsset(assetPath string) error {
 	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
 	img.Set(0, 0, color.Transparent)
@@ -166,202 +195,166 @@ func createDummyAsset(assetPath string) error {
 	return nil
 }
 
-// LoadSimulationData loads the necessary data for a report from storage and creates dummy assets.
-func LoadSimulationData(rm *storage.RecordManager, recordID string, reportSpecificDir string, log *logf.Logger) (ReportData, error) {
-	log.Debug("Attempting to load simulation data for record", "recordID", recordID)
+// LoadSimulationData loads the necessary data for a report from storage.
+func LoadSimulationData(recordID string, rm *storage.RecordManager, reportSpecificDir string) (ReportData, error) {
+	log := logger.GetLogger("reporting")
+	log.Debug("Loading simulation data", "record_id", recordID, "output_dir", reportSpecificDir)
 
-	record, err := rm.GetRecord(recordID)
+	var err error
+	var record *storage.Record
+	record, err = rm.GetRecord(recordID)
 	if err != nil {
 		log.Error("Failed to get record for report data", "recordID", recordID, "error", err)
 		return ReportData{}, fmt.Errorf("failed to load record %s: %w", recordID, err)
 	}
-	defer record.Close() // Ensure record files are closed
+	defer record.Close()
 
-	log.Info("Loaded record for report", "recordID", recordID, "creationTime", record.CreationTime)
+	var timeData, altitudeData, velocityData, accelerationData []float64
+	// var motionMetrics MotionMetrics // No longer needed here, part of ReportData
 
 	data := ReportData{
-		RecordID:                 record.Hash,
-		Version:                  "v0.0.0-dev",
-		LaunchSiteName:           "Default Launch Site",
-		LaunchLatitude:           37.7749,
-		LaunchLongitude:          -122.4194,
-		LaunchElevation:          10.0,
-		WindSpeed:                5.0,
-		WindDirection:            270.0,
-		Temperature:              20.0,
-		Pressure:                 101325.0,
-		Humidity:                 60.0,
-		LandingLatitude:          37.7750,
-		LandingLongitude:         -122.4200,
-		LandingDistanceMeters:    100.0,
-		LandingRadius95PctMeters: 50.0,
+		RecordID: record.Hash, Version: "v0.0.0-dev", LaunchSiteName: "Default Launch Site",
+		LaunchLatitude: 37.7749, LaunchLongitude: -122.4194, LaunchElevation: 10.0,
+		WindSpeed: 5.0, WindDirection: 270.0, Temperature: 20.0, Pressure: 101325.0, Humidity: 60.0,
+		LandingLatitude: 37.7750, LandingLongitude: -122.4200, LandingDistanceMeters: 100.0,
+		LandingRadius95PctMeters: 50.0, Assets: map[string]string{},
+		SimulationName: record.Name, // Populate SimulationName from record.Name
 	}
 
-	// --- Process MOTION.csv ---
 	if record.Motion != nil {
-		allMotionData, err := record.Motion.ReadAll()
-		if err != nil {
-			log.Error("Failed to read all data from MOTION.csv", "recordID", recordID, "error", err)
-			return ReportData{}, fmt.Errorf("failed to read motion data for %s: %w", recordID, err)
+		allMotionData, readErr := record.Motion.ReadAll()
+		if readErr != nil {
+			return ReportData{}, fmt.Errorf("failed to read motion data: %w", readErr)
 		}
-		log.Debug("Raw motion data for record %s (first 5 rows)", "recordID", recordID, "data", allMotionData[:min(5, len(allMotionData))])
-		if len(allMotionData) < 2 { // Need at least headers and one data row
-			log.Error("MOTION.csv is empty or contains only headers", "recordID", recordID)
-			return ReportData{}, fmt.Errorf("motion data is insufficient for record %s (rows: %d)", recordID, len(allMotionData))
+		if len(allMotionData) < 2 {
+			return ReportData{}, fmt.Errorf("motion data insufficient, rows: %d", len(allMotionData))
 		}
-		motionMetrics, err := parseMotionData(allMotionData, data.LaunchElevation, log)
-		if err != nil {
-			log.Error("Failed to parse MOTION.csv data", "recordID", recordID, "error", err)
-			return ReportData{}, fmt.Errorf("failed to parse motion data for %s: %w", recordID, err)
-		}
-		data.ApogeeMeters = motionMetrics.ApogeeMeters
-		data.MaxVelocityMPS = motionMetrics.MaxVelocityMPS
-		data.MaxAccelerationMPS2 = motionMetrics.MaxAccelerationMPS2
-		data.TotalFlightTimeSec = motionMetrics.TotalFlightTimeSec
-		data.LandingVelocityMPS = motionMetrics.LandingVelocityMPS
-		log.Debug("Parsed motion data for record %s", "recordID", recordID, "apogeeM", data.ApogeeMeters, "maxVeloMPS", data.MaxVelocityMPS, "flightTimeS", data.TotalFlightTimeSec)
 
+		var parseErr error
+		// motionMetrics, parseErr = parseMotionData(allMotionData, data.LaunchElevation)
+		data.MotionMetrics, parseErr = parseMotionData(allMotionData, data.LaunchElevation) // Populate data.MotionMetrics
+		if parseErr != nil {
+			return ReportData{}, fmt.Errorf("failed to parse motion data: %w", parseErr)
+		}
+		data.ApogeeMeters, data.MaxVelocityMPS, data.MaxAccelerationMPS2, data.TotalFlightTimeSec, data.LandingVelocityMPS =
+			data.MotionMetrics.ApogeeMeters, data.MotionMetrics.MaxVelocityMPS, data.MotionMetrics.MaxAccelerationMPS2, data.MotionMetrics.TotalFlightTimeSec, data.MotionMetrics.LandingVelocityMPS
+
+		if len(allMotionData) > 1 {
+			headers, dataRows := allMotionData[0], allMotionData[1:]
+			timeIdx, altIdx, velIdx, accIdx := -1, -1, -1, -1
+			for i, h := range headers {
+				switch strings.ToLower(strings.TrimSpace(h)) {
+				case "time", "time (s)":
+					timeIdx = i
+				case "altitude", "altitude (m)":
+					altIdx = i
+				case "velocity", "velocity (m/s)":
+					velIdx = i
+				case "acceleration", "acceleration (m/s^2)":
+					accIdx = i
+				}
+			}
+			if timeIdx != -1 && altIdx != -1 && velIdx != -1 && accIdx != -1 {
+				for _, row := range dataRows {
+					t, tErr := parseFloatFromRow(row, timeIdx)
+					a, aErr := parseFloatFromRow(row, altIdx)
+					v, vErr := parseFloatFromRow(row, velIdx)
+					ac, acErr := parseFloatFromRow(row, accIdx)
+					if tErr == nil && aErr == nil && vErr == nil && acErr == nil {
+						timeData = append(timeData, t)
+						altitudeData = append(altitudeData, a)
+						velocityData = append(velocityData, v)
+						accelerationData = append(accelerationData, ac)
+					}
+				}
+			}
+		}
+		// Plot generation
+		if len(timeData) > 1 { // Need at least two points to plot a line
+			altitudePlotData := newXYs(timeData, altitudeData)
+			if altSVG, err := generatePlotSVG("Altitude vs. Time", "Time (s)", "Altitude (m)", altitudePlotData, reportSpecificDir, "altitude_vs_time.svg"); err == nil {
+				data.Assets["altitude_vs_time.svg"] = altSVG
+			} else {
+				log.Error("Failed to generate altitude plot", "error", err)
+			}
+
+			velocityPlotData := newXYs(timeData, velocityData)
+			if velSVG, err := generatePlotSVG("Velocity vs. Time", "Time (s)", "Velocity (m/s)", velocityPlotData, reportSpecificDir, "velocity_vs_time.svg"); err == nil {
+				data.Assets["velocity_vs_time.svg"] = velSVG
+			} else {
+				log.Error("Failed to generate velocity plot", "error", err)
+			}
+
+			accelerationPlotData := newXYs(timeData, accelerationData)
+			if accSVG, err := generatePlotSVG("Acceleration vs. Time", "Time (s)", "Acceleration (m/s^2)", accelerationPlotData, reportSpecificDir, "acceleration_vs_time.svg"); err == nil {
+				data.Assets["acceleration_vs_time.svg"] = accSVG
+			} else {
+				log.Error("Failed to generate acceleration plot", "error", err)
+			}
+		}
 	} else {
-		log.Error("MOTION.csv storage not available for record", "recordID", recordID)
 		return ReportData{}, fmt.Errorf("motion storage not available for record %s", recordID)
 	}
 
-	// --- Process EVENTS.csv ---
+	data.AllEvents = []FlightEvent{}
+	var landingTime float64 = -1
 	if record.Events != nil {
-		allEventsData, err := record.Events.ReadAll()
-		if err != nil {
-			log.Error("Failed to read all data from EVENTS.csv", "recordID", recordID, "error", err)
-			// Decide whether to return error or continue without events
-			// Continuing for now, highlights will be empty/defaulted
-		} else {
-			log.Debug("Raw events data for record %s (first 5 rows)", "recordID", recordID, "data", allEventsData[:min(5, len(allEventsData))])
-			if len(allEventsData) == 0 { // Completely empty file
-				log.Warn("EVENTS.csv is empty", "recordID", recordID)
-			} else if len(allEventsData) == 1 { // Only headers, no data rows
-				log.Warn("EVENTS.csv contains only headers", "recordID", recordID)
-			} else { // Has headers and data
-				headers := allEventsData[0]
-				dataRows := allEventsData[1:]
-
-				colIndices := make(map[string]int)
-				for i, header := range headers {
-					colIndices[strings.ToLower(strings.TrimSpace(header))] = i
+		allEventsData, readErr := record.Events.ReadAll()
+		if readErr == nil && len(allEventsData) >= 2 {
+			headers, dataRows := allEventsData[0], allEventsData[1:]
+			timeIdx, eventIdx := -1, -1
+			for i, h := range headers {
+				switch strings.ToLower(strings.TrimSpace(h)) {
+				case "time (s)", "time":
+					timeIdx = i
+				case "event name", "event_name":
+					eventIdx = i
 				}
-
-				requiredCols := []string{"time", "event_name"}
-				var missingCols []string
-				for _, colName := range requiredCols {
-					if _, ok := colIndices[colName]; !ok {
-						missingCols = append(missingCols, colName)
+			}
+			if timeIdx != -1 && eventIdx != -1 {
+				for _, row := range dataRows {
+					if len(row) <= max(timeIdx, eventIdx) {
+						continue
 					}
-				}
-				if len(missingCols) > 0 {
-					log.Error("EVENTS.csv missing required columns", "recordID", recordID, "missing", missingCols, "available", headers)
-					// Decide whether to return error or continue without events
-					// Continuing for now, highlights will be empty/defaulted
-				} else {
-					timeIdx := colIndices["time"]
-					eventNameIdx := colIndices["event_name"]
-					altIdx, altColExists := colIndices["altitude"]
-
-					for i, row := range dataRows {
-						if len(row) <= timeIdx || len(row) <= eventNameIdx || (altColExists && len(row) <= altIdx) {
-							log.Warn("Skipping malformed row in EVENTS.csv", "recordID", recordID, "rowIndex", i+1, "rowLength", len(row), "requiredIndices", []int{timeIdx, eventNameIdx, altIdx})
-							continue
-						}
-						timeStr := row[timeIdx]
-						eventName := row[eventNameIdx]
-
-						time, err := strconv.ParseFloat(timeStr, 64)
-						if err != nil {
-							log.Warn("Failed to parse time in EVENTS.csv row, skipping event", "recordID", recordID, "rowIndex", i+1, "value", timeStr, "error", err)
-							continue // Skip this event
-						}
-
-						altitude := 0.0
-						if altColExists {
-							altStr := row[altIdx]
-							altVal, parseErr := strconv.ParseFloat(altStr, 64)
-							if parseErr == nil {
-								altitude = altVal
-							} else {
-								// Log quietly if altitude parsing fails, use 0.0
-								log.Debug("Failed to parse altitude for event, using 0.0", "recordID", recordID, "rowIndex", i+1, "event", eventName, "value", altStr, "error", parseErr)
-							}
-						}
-
-						data.AllEvents = append(data.AllEvents, FlightEvent{Name: eventName, TimeSec: time, AltitudeMeters: altitude})
+					timeStr, eventName := row[timeIdx], strings.TrimSpace(row[eventIdx])
+					t, tErr := strconv.ParseFloat(timeStr, 64)
+					if tErr != nil {
+						continue
+					}
+					altAtEvent := findAltitudeAtTime(timeData, altitudeData, t)
+					data.AllEvents = append(data.AllEvents, FlightEvent{Name: eventName, TimeSec: t, AltitudeMeters: altAtEvent})
+					if strings.EqualFold(eventName, "Landing") {
+						landingTime, data.LandingAltitude, data.LandingTime = t, altAtEvent, t
 					}
 				}
 			}
 		}
-	} else {
-		log.Error("EVENTS.csv storage not available for record", "recordID", recordID)
-		// Continue without events, highlights will be empty/defaulted
 	}
 
-	// --- Process Highlights & Placeholders ---
-	data.MotorSummary, data.ParachuteSummary, data.PhaseSummary = processEventHighlights(data.AllEvents, parsedMotionMetrics{ApogeeMeters: data.ApogeeMeters, MaxVelocityMPS: data.MaxVelocityMPS, MaxAccelerationMPS2: data.MaxAccelerationMPS2, TotalFlightTimeSec: data.TotalFlightTimeSec, LandingVelocityMPS: data.LandingVelocityMPS}, data.LaunchElevation)
-
-	// If AllEvents is still empty after trying to parse (or if file was empty/headers only), add placeholders
-	if len(data.AllEvents) == 0 {
-		log.Info("No key flight events parsed or available, using placeholders", "recordID", recordID)
-		// Ensure ApogeeMeters and TotalFlightTimeSec are not zero to avoid division by zero or nonsensical time
-		apogeeTimeEstimate := 0.0
-		if data.ApogeeMeters > 0 && data.MaxVelocityMPS > 0 { // Basic sanity check for apogee time estimation
-			apogeeTimeEstimate = data.ApogeeMeters / (data.MaxVelocityMPS / 2) // Very rough estimate
-			if apogeeTimeEstimate > data.TotalFlightTimeSec && data.TotalFlightTimeSec > 0 {
-				apogeeTimeEstimate = data.TotalFlightTimeSec / 2
-			}
-		}
-		data.AllEvents = []FlightEvent{
-			{"Liftoff (placeholder)", 0.0, data.LaunchElevation},
-			{"Apogee (placeholder)", math.Max(0, apogeeTimeEstimate), data.ApogeeMeters},
-			{"Landing (placeholder)", math.Max(0, data.TotalFlightTimeSec), data.LaunchElevation},
-		}
+	if landingTime == -1 && len(altitudeData) > 0 && data.TotalFlightTimeSec > 0 {
+		data.LandingAltitude, data.LandingTime = altitudeData[len(altitudeData)-1], data.TotalFlightTimeSec
+		log.Warn("Landing event not found, using fallback from MOTION.csv", "alt", data.LandingAltitude, "time", data.LandingTime)
 	}
 
-	// --- Create dummy plot assets ---
-	assetSubDir := "assets"
-	plotPaths := map[string]*string{
-		"atmosphere_plot.svg":     &data.AtmospherePlotPath,
-		"thrust_plot.svg":         &data.ThrustPlotPath,
-		"trajectory_plot.svg":     &data.TrajectoryPlotPath,
-		"dynamics_plot.svg":       &data.DynamicsPlotPath,
-		"gps_map.svg":             &data.GPSMapImagePath,
-	}
+	processEventHighlights(data.AllEvents, &data) // Pass pointer to data, it will be modified in place
+	// data.MotorSummary, data.ParachuteSummary, data.PhaseSummary are now populated by processEventHighlights
 
-	for name, pathVar := range plotPaths {
-		relPath := filepath.Join(assetSubDir, name)
-		*pathVar = relPath
-		if err := createDummyAsset(filepath.Join(reportSpecificDir, relPath)); err != nil {
-			// Log error but continue, report might be partially useful
-			log.Error("Failed to create dummy asset for report", "assetName", name, "recordID", recordID, "error", err)
-		}
-	}
-
+	log.Info("Finished loading data for report", "recordID", recordID)
 	return data, nil
 }
 
-// Helper struct for parsed motion data
-type parsedMotionMetrics struct {
-	ApogeeMeters        float64
-	MaxVelocityMPS      float64
-	MaxAccelerationMPS2 float64
-	TotalFlightTimeSec  float64
-	LandingVelocityMPS  float64
-}
+// parseMotionData processes raw string data from MOTION.csv to calculate MotionMetrics.
+func parseMotionData(allRows [][]string, launchElevation float64) (MotionMetrics, error) {
+	log := logger.GetLogger("reporting.parseMotionData")
 
-func parseMotionData(allRows [][]string, launchElevation float64, log *logf.Logger) (parsedMotionMetrics, error) {
-	metrics := parsedMotionMetrics{
-		ApogeeMeters:        launchElevation,
-		MaxVelocityMPS:      -1e9,
-		MaxAccelerationMPS2: -1e9,
+	metrics := MotionMetrics{
+		ApogeeMeters:        launchElevation, // Initialize apogee with launch elevation
+		MaxVelocityMPS:      -1e9,            // Initialize with a very small number
+		MaxAccelerationMPS2: -1e9,            // Initialize with a very small number
 	}
 
 	if len(allRows) < 2 { // Headers + at least one data row
-		// Log this error using the passed-in logger if it's critical enough
-		// log.Error("MOTION.csv data error", "message", "Requires at least a header and one data row", "rows_received", len(allRows))
+		log.Error("MOTION.csv data error: Requires at least a header and one data row", "rows_received", len(allRows))
 		return metrics, fmt.Errorf("MOTION.csv data requires at least a header and one data row, got %d total rows", len(allRows))
 	}
 
@@ -373,64 +366,111 @@ func parseMotionData(allRows [][]string, launchElevation float64, log *logf.Logg
 		colIndices[strings.ToLower(strings.TrimSpace(header))] = i
 	}
 
-	requiredCols := []string{"time", "altitude", "velocity", "acceleration"}
-	for _, colName := range requiredCols {
-		if _, ok := colIndices[colName]; !ok {
-			// log.Error("MOTION.csv missing column", "column", colName, "available_headers", headers)
-			return metrics, fmt.Errorf("MOTION.csv missing required column: %s. Available: %v", colName, headers)
+	// Define expected column names (case-insensitive)
+	// Allowing for variations like "Time" or "Time (s)"
+	getTimeIdx := func() int {
+		if idx, ok := colIndices["time"]; ok {
+			return idx
 		}
+		if idx, ok := colIndices["time (s)"]; ok {
+			return idx
+		}
+		return -1
+	}
+	getAltIdx := func() int {
+		if idx, ok := colIndices["altitude"]; ok {
+			return idx
+		}
+		if idx, ok := colIndices["altitude (m)"]; ok {
+			return idx
+		}
+		return -1
+	}
+	getVelIdx := func() int {
+		if idx, ok := colIndices["velocity"]; ok {
+			return idx
+		}
+		if idx, ok := colIndices["velocity (m/s)"]; ok {
+			return idx
+		}
+		return -1
+	}
+	getAccelIdx := func() int {
+		if idx, ok := colIndices["acceleration"]; ok {
+			return idx
+		}
+		if idx, ok := colIndices["acceleration (m/s^2)"]; ok {
+			return idx
+		}
+		return -1
 	}
 
-	timeIdx := colIndices["time"]
-	altIdx := colIndices["altitude"]
-	velIdx := colIndices["velocity"]
-	accelIdx := colIndices["acceleration"]
+	timeIdx := getTimeIdx()
+	altIdx := getAltIdx()
+	velIdx := getVelIdx()
+	accelIdx := getAccelIdx()
+
+	if timeIdx == -1 || altIdx == -1 || velIdx == -1 || accelIdx == -1 {
+		missingCols := []string{}
+		if timeIdx == -1 {
+			missingCols = append(missingCols, "Time")
+		}
+		if altIdx == -1 {
+			missingCols = append(missingCols, "Altitude")
+		}
+		if velIdx == -1 {
+			missingCols = append(missingCols, "Velocity")
+		}
+		if accelIdx == -1 {
+			missingCols = append(missingCols, "Acceleration")
+		}
+		log.Error("MOTION.csv missing required columns", "missing_columns", strings.Join(missingCols, ", "), "available_headers", headers)
+		return metrics, fmt.Errorf("MOTION.csv missing required columns: %s. Available headers: %v", strings.Join(missingCols, ", "), headers)
+	}
 
 	var lastTime, lastAltitude, lastVelocity float64
-	apogeeReached := false
+	// apogeeReached := false // This variable was used in a more complex landing velocity detection; simplified for now
 
-	log.Debug("Processing MOTION.csv data rows")
-	for _, row := range dataRows {
-		timeStr := strings.TrimSpace(row[timeIdx])
-		altStr := strings.TrimSpace(row[altIdx])
-		velStr := strings.TrimSpace(row[velIdx])
-		accelStr := strings.TrimSpace(row[accelIdx])
-
-		log.Debug("Parsing motion data row", "timeStr", timeStr, "altStr", altStr, "velStr", velStr, "accelStr", accelStr)
-
-		time, err := strconv.ParseFloat(timeStr, 64)
-		if err != nil {
-			log.Error("Failed to parse time in MOTION.csv row", "value", timeStr, "error", err)
-			return metrics, fmt.Errorf("failed to parse time '%s' in MOTION.csv: %w", timeStr, err)
+	log.Debug("Processing MOTION.csv data rows", "count", len(dataRows))
+	for i, row := range dataRows {
+		// Find the maximum index required from the row to ensure it's not out of bounds
+		maxRequiredIndex := max(max(timeIdx, altIdx), max(velIdx, accelIdx))
+		if len(row) <= maxRequiredIndex { // Ensure row has enough columns
+			log.Warn("Skipping malformed row in MOTION.csv", "row_index", i+1, "row_length", len(row), "expected_max_idx", maxRequiredIndex)
+			continue
 		}
-		log.Debug("Parsed time", "value", time)
 
-		altitude, err := strconv.ParseFloat(altStr, 64)
+		time, err := parseFloatFromRow(row, timeIdx)
 		if err != nil {
-			log.Error("Failed to parse altitude in MOTION.csv row", "value", altStr, "error", err)
-			return metrics, fmt.Errorf("failed to parse altitude '%s' in MOTION.csv: %w", altStr, err)
+			log.Warn("Failed to parse time in MOTION.csv row", "row_index", i+1, "value", row[timeIdx], "error", err)
+			continue // Skip row if time is unparseable
 		}
-		log.Debug("Parsed altitude", "value", altitude)
 
-		velocity, err := strconv.ParseFloat(velStr, 64)
+		altitude, err := parseFloatFromRow(row, altIdx)
 		if err != nil {
-			log.Error("Failed to parse velocity in MOTION.csv row", "value", velStr, "error", err)
-			return metrics, fmt.Errorf("failed to parse velocity '%s' in MOTION.csv: %w", velStr, err)
+			log.Warn("Failed to parse altitude in MOTION.csv row", "row_index", i+1, "value", row[altIdx], "error", err)
+			// Potentially continue or use a default/previous value
+			altitude = lastAltitude // For simplicity, use last known if current is bad
 		}
-		log.Debug("Parsed velocity", "value", velocity)
 
-		acceleration, err := strconv.ParseFloat(accelStr, 64)
+		velocity, err := parseFloatFromRow(row, velIdx)
 		if err != nil {
-			log.Error("Failed to parse acceleration in MOTION.csv row", "value", accelStr, "error", err)
-			return metrics, fmt.Errorf("failed to parse acceleration '%s' in MOTION.csv: %w", accelStr, err)
+			log.Warn("Failed to parse velocity in MOTION.csv row", "row_index", i+1, "value", row[velIdx], "error", err)
+			velocity = lastVelocity
 		}
-		log.Debug("Parsed acceleration", "value", acceleration)
+
+		acceleration, err := parseFloatFromRow(row, accelIdx)
+		if err != nil {
+			log.Warn("Failed to parse acceleration in MOTION.csv row", "row_index", i+1, "value", row[accelIdx], "error", err)
+			// For acceleration, a default of 0 might be safer if unparseable
+			acceleration = 0
+		}
 
 		if altitude > metrics.ApogeeMeters {
 			metrics.ApogeeMeters = altitude
-			apogeeReached = true
+			// apogeeReached = true
 		}
-		if velocity > metrics.MaxVelocityMPS {
+		if velocity > metrics.MaxVelocityMPS { // For max speed, consider magnitude if bi-directional expected
 			metrics.MaxVelocityMPS = velocity
 		}
 		if math.Abs(acceleration) > metrics.MaxAccelerationMPS2 {
@@ -440,20 +480,21 @@ func parseMotionData(allRows [][]string, launchElevation float64, log *logf.Logg
 		lastTime = time
 		lastAltitude = altitude
 		lastVelocity = velocity
-
-		if apogeeReached && math.Abs(altitude-launchElevation) < 1.0 {
-			metrics.LandingVelocityMPS = velocity
-		}
 	}
 
 	metrics.TotalFlightTimeSec = lastTime
-	if metrics.LandingVelocityMPS == 0 && lastTime > 0 {
-		if math.Abs(lastAltitude-launchElevation) < 5.0 {
-			metrics.LandingVelocityMPS = lastVelocity
-		} else {
-			metrics.LandingVelocityMPS = 0
-		}
+
+	// Simplified landing velocity: use the last recorded velocity if altitude is close to launch elevation.
+	// More robust logic might involve checking for negative velocity after apogee.
+	if math.Abs(lastAltitude-launchElevation) < 5.0 { // Within 5m of launch elevation
+		metrics.LandingVelocityMPS = lastVelocity
+	} else {
+		// If not near launch elevation at end, landing velocity might be zero or needs other estimation
+		// For now, if it's high, it implies it didn't 'land' in the data timeframe relative to launch elevation
+		metrics.LandingVelocityMPS = lastVelocity // Or set to 0 if lastAltitude is still high
+		log.Debug("Final altitude far from launch elevation", "last_alt", lastAltitude, "launch_elev", launchElevation, "assigned_landing_velo", metrics.LandingVelocityMPS)
 	}
+
 	// Ensure MaxVelocity and MaxAcceleration are not the initial small numbers if no data processed meaningfully
 	if metrics.MaxVelocityMPS == -1e9 {
 		metrics.MaxVelocityMPS = 0
@@ -462,246 +503,277 @@ func parseMotionData(allRows [][]string, launchElevation float64, log *logf.Logg
 		metrics.MaxAccelerationMPS2 = 0
 	}
 
+	log.Debug("Finished parsing MOTION.csv", "apogee", metrics.ApogeeMeters, "max_velo", metrics.MaxVelocityMPS, "flight_time", metrics.TotalFlightTimeSec, "landing_velo", metrics.LandingVelocityMPS)
 	return metrics, nil
 }
 
-// parseEventsDataFromCSV processes raw string data from EVENTS.csv into a slice of FlightEvent.
-// This function now primarily focuses on parsing the CSV content.
-func parseEventsDataFromCSV(allRows [][]string) ([]FlightEvent, error) {
-	var events []FlightEvent
-	if len(allRows) == 0 { // No data at all
-		return events, nil
+// Helper function to parse a float from a specific column in a CSV row
+func parseFloatFromRow(row []string, index int) (float64, error) {
+	if index < 0 || index >= len(row) {
+		return 0, fmt.Errorf("index %d out of bounds for row length %d", index, len(row))
 	}
-	if len(allRows) == 1 { // Only headers, no data rows
-		return events, nil
+	val, err := strconv.ParseFloat(strings.TrimSpace(row[index]), 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse float '%s': %w", row[index], err)
 	}
-
-	headers := allRows[0]
-	dataRows := allRows[1:]
-
-	colIndices := make(map[string]int)
-	for i, header := range headers {
-		colIndices[strings.ToLower(strings.TrimSpace(header))] = i
-	}
-
-	requiredCols := []string{"time", "event_name"}
-	for _, colName := range requiredCols {
-		if _, ok := colIndices[colName]; !ok {
-			return nil, fmt.Errorf("EVENTS.csv missing required column: %s. Available: %v", colName, headers)
-		}
-	}
-
-	timeIdx := colIndices["time"]
-	eventNameIdx := colIndices["event_name"]
-	altIdx, altColExists := colIndices["altitude"]
-
-	for _, row := range dataRows {
-		timeStr := row[timeIdx]
-		eventName := row[eventNameIdx]
-
-		time, err := strconv.ParseFloat(timeStr, 64)
-		if err != nil {
-			// logger.GetLogger("").Warn("Failed to parse time in EVENTS.csv row, skipping event", "value", timeStr, "error", err); continue
-			return nil, fmt.Errorf("failed to parse time '%s' in EVENTS.csv: %w", timeStr, err)
-		}
-
-		altitude := 0.0
-		if altColExists {
-			altStr := row[altIdx]
-			altVal, parseErr := strconv.ParseFloat(altStr, 64)
-			if parseErr == nil {
-				altitude = altVal
-			}
-		}
-
-		events = append(events, FlightEvent{Name: eventName, TimeSec: time, AltitudeMeters: altitude})
-	}
-	return events, nil
+	return val, nil
 }
 
-// processEventHighlights analyzes parsed events and motion metrics to populate summary structures.
-func processEventHighlights(allEvents []FlightEvent, motionMetrics parsedMotionMetrics, launchElevation float64) (MotorHighlights, ParachuteHighlights, RocketPhaseHighlights) {
-	motorSummary := MotorHighlights{HasMotorEvents: false, IgnitionTimeSec: -1, BurnoutTimeSec: -1}
-	parachuteSummary := ParachuteHighlights{HasParachuteEvents: false}
-	phaseSummary := RocketPhaseHighlights{
-		LiftoffTimeSec:    0, // Usually time 0
-		ApogeeTimeSec:     motionMetrics.ApogeeMeters, // From motion data
-		LandingTimeSec:    motionMetrics.TotalFlightTimeSec,  // From motion data (overall flight time)
-		HasLiftoffEvent:   true, // Assume liftoff at t=0 if no specific event
-		HasApogeeEvent:    motionMetrics.ApogeeMeters > 0,
-		HasLandingEvent:   motionMetrics.TotalFlightTimeSec > 0 && motionMetrics.LandingVelocityMPS != 0, // Crude check
-		CoastStartTimeSec: -1,
-		CoastEndTimeSec:   -1,
-	}
-
-	var liftoffTime float64 = 0 // Default to 0, can be updated by Liftoff event
-
-	for _, event := range allEvents {
-		nameLower := strings.ToLower(event.Name)
-
-		// Motor Events
-		if strings.Contains(nameLower, "motor ignition") || strings.Contains(nameLower, "ignition") && !strings.Contains(nameLower, "parachute") {
-			if motorSummary.IgnitionTimeSec < 0 || event.TimeSec < motorSummary.IgnitionTimeSec {
-				motorSummary.IgnitionTimeSec = event.TimeSec
-				motorSummary.HasMotorEvents = true
-			}
-		}
-		if strings.Contains(nameLower, "motor burnout") || strings.Contains(nameLower, "burnout") && !strings.Contains(nameLower, "parachute") {
-			if motorSummary.BurnoutTimeSec < 0 || event.TimeSec > motorSummary.BurnoutTimeSec { // Take the latest burnout if multiple
-				motorSummary.BurnoutTimeSec = event.TimeSec
-				motorSummary.HasMotorEvents = true
-			}
-		}
-
-		// Parachute Events
-		if strings.Contains(nameLower, "parachute deployed") || strings.Contains(nameLower, "deploy") && strings.Contains(nameLower, "parachute") {
-			parachuteDetail := ParachuteEventDetail{
-				Name:                     event.Name,
-				DeploymentTimeSec:        event.TimeSec,
-				DeploymentAltitudeMeters: event.AltitudeMeters,
-				TimeToDeploySec:          event.TimeSec - liftoffTime, // Calculated relative to liftoff
-			}
-			parachuteSummary.Events = append(parachuteSummary.Events, parachuteDetail)
-			parachuteSummary.HasParachuteEvents = true
-		}
-
-		// Phase Events
-		if strings.Contains(nameLower, "liftoff") {
-			phaseSummary.LiftoffTimeSec = event.TimeSec
-			liftoffTime = event.TimeSec // Update liftoff time for parachute calculations
-			phaseSummary.HasLiftoffEvent = true
-		}
-		if strings.Contains(nameLower, "apogee") {
-			// Prefer motion data if available and event confirms, otherwise use event
-			if !(motionMetrics.ApogeeMeters > 0) || (motionMetrics.ApogeeMeters > 0 && math.Abs(motionMetrics.ApogeeMeters-event.TimeSec) < 5.0) { // 5s tolerance
-				phaseSummary.ApogeeTimeSec = event.TimeSec
-			}
-			phaseSummary.HasApogeeEvent = true
-		}
-		if strings.Contains(nameLower, "landing") {
-			phaseSummary.LandingTimeSec = event.TimeSec
-			phaseSummary.HasLandingEvent = true
+// newXYs converts two slices of float64 (x and y values) into a plotter.XYs structure.
+func newXYs(xData []float64, yData []float64) plotter.XYs {
+	pts := make(plotter.XYs, len(xData))
+	for i := range xData {
+		if i < len(yData) { // Ensure we don't go out of bounds for yData if lengths differ
+			pts[i].X = xData[i]
+			pts[i].Y = yData[i]
+		} else {
+			// Handle mismatch if necessary, e.g., by logging or truncating
+			// For now, assume xData is the primary length controller
+			pts = pts[:i] // Truncate if yData is shorter
+			break
 		}
 	}
-
-	// Calculate motor burn duration
-	if motorSummary.IgnitionTimeSec >= 0 && motorSummary.BurnoutTimeSec > motorSummary.IgnitionTimeSec {
-		motorSummary.BurnDurationSec = motorSummary.BurnoutTimeSec - motorSummary.IgnitionTimeSec
-	}
-
-	// Calculate coast phase (very basic)
-	if motorSummary.HasMotorEvents && motorSummary.BurnoutTimeSec >= 0 {
-		phaseSummary.CoastStartTimeSec = motorSummary.BurnoutTimeSec
-	} else if phaseSummary.HasLiftoffEvent { // If no motor burnout, assume coast starts after liftoff (e.g. glider)
-		phaseSummary.CoastStartTimeSec = phaseSummary.LiftoffTimeSec
-	}
-
-	if phaseSummary.HasApogeeEvent && phaseSummary.ApogeeTimeSec > 0 {
-		phaseSummary.CoastEndTimeSec = phaseSummary.ApogeeTimeSec
-		// If parachute deploys before apogee, coast might end sooner
-		if parachuteSummary.HasParachuteEvents && len(parachuteSummary.Events) > 0 {
-			firstParachuteDeployTime := -1.0
-			for _, pEvent := range parachuteSummary.Events {
-				if firstParachuteDeployTime < 0 || pEvent.DeploymentTimeSec < firstParachuteDeployTime {
-					firstParachuteDeployTime = pEvent.DeploymentTimeSec
-				}
-			}
-			if firstParachuteDeployTime >= 0 && firstParachuteDeployTime < phaseSummary.ApogeeTimeSec {
-				phaseSummary.CoastEndTimeSec = firstParachuteDeployTime
-			}
-		}
-	}
-
-	if phaseSummary.CoastStartTimeSec >= 0 && phaseSummary.CoastEndTimeSec > phaseSummary.CoastStartTimeSec {
-		phaseSummary.CoastDurationSec = phaseSummary.CoastEndTimeSec - phaseSummary.CoastStartTimeSec
-	}
-
-	// Sort parachute events by time for consistent reporting
-	sort.Slice(parachuteSummary.Events, func(i, j int) bool {
-		return parachuteSummary.Events[i].DeploymentTimeSec < parachuteSummary.Events[j].DeploymentTimeSec
-	})
-
-	return motorSummary, parachuteSummary, phaseSummary
+	return pts
 }
 
-// GenerateReportPackage orchestrates the generation of a self-contained report package.
-func GenerateReportPackage(rm *storage.RecordManager, recordID string, baseReportsDir string) (string, error) {
-	log := logger.GetLogger("info")
-	reportSpecificDir := filepath.Join(baseReportsDir, recordID)
+// generatePlotSVG creates a plot with the given data and saves it as an SVG file.
+// It returns the path to the saved SVG file or an error.
+func generatePlotSVG(title, xLabel, yLabel string, data plotter.XYs, reportSpecificDir, filename string) (string, error) {
+	log := logger.GetLogger("reporting.generatePlotSVG")
 
+	p := plot.New()
+
+	p.Title.Text = title
+	p.X.Label.Text = xLabel
+	p.Y.Label.Text = yLabel
+
+	// Add a line plotter for the data
+	l, err := plotter.NewLine(data)
+	if err != nil {
+		log.Error("Failed to create new line plotter", "title", title, "error", err)
+		return "", fmt.Errorf("failed to create line plotter for %s: %w", title, err)
+	}
+	l.LineStyle.Width = vg.Points(1)
+	l.LineStyle.Color = plotutil.Color(0) // Use the first color in the default palette
+
+	p.Add(l)
+
+	// Add a grid
+	p.Add(plotter.NewGrid())
+
+	// Ensure the reportSpecificDir exists
 	if err := os.MkdirAll(reportSpecificDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create report directory %s: %w", reportSpecificDir, err)
+		log.Error("Failed to create directory for plot SVG", "directory", reportSpecificDir, "error", err)
+		return "", fmt.Errorf("failed to create directory %s: %w", reportSpecificDir, err)
 	}
 
-	// TODO: Get actual config and app version if needed by GenerateReportData
-	// For now, passing nil config and placeholder version
-	// We might need to restructure to pass Config down or load it here.
-	data, err := LoadSimulationData(rm, recordID, reportSpecificDir, log)
-	if err != nil {
-		// LoadSimulationData now returns the data even on some errors, handle specific cases?
-		log.Error("Error generating report data, attempting to create report with partial data", "recordID", recordID, "error", err)
-		// Optionally return error here if data generation failure is critical
-		// return "", fmt.Errorf("failed to generate report data for %s: %w", recordID, err)
+	filePath := filepath.Join(reportSpecificDir, filename)
+
+	// Save the plot to an SVG file.
+	// Dimensions are in vg.Inch units.
+	if err := p.Save(8*vg.Inch, 4*vg.Inch, filePath); err != nil {
+		log.Error("Failed to save plot SVG", "file_path", filePath, "error", err)
+		return "", fmt.Errorf("failed to save plot %s: %w", filePath, err)
 	}
 
-	// --- Generate Markdown using text/template Generator --- 
-	gen, err := NewGenerator() // Use the reinstated generator
-	if err != nil {
-		return "", fmt.Errorf("failed to create report generator: %w", err)
-	}
-	if err := gen.GenerateMarkdownFile(data, reportSpecificDir); err != nil { // Call the generator method
-		return "", fmt.Errorf("failed to generate markdown report file: %w", err)
-	}
-
-	// --- Copy Assets --- 
-	// (Keep existing asset copying logic if any, or add it here)
-	assetSourceDir := "internal/reporting/assets" // Relative path from project root
-	assetDestDir := filepath.Join(reportSpecificDir, "assets")
-	if err := copyAssets(assetSourceDir, assetDestDir); err != nil {
-		log.Warn("Failed to copy assets for report, plots might be missing", "recordID", recordID, "source", assetSourceDir, "dest", assetDestDir, "error", err)
-		// Decide if this is a fatal error. Continuing for now.
-	}
-
-	log.Info("Successfully generated report package", "recordID", recordID, "outputDir", reportSpecificDir)
-	return reportSpecificDir, nil
+	log.Info("Successfully generated plot SVG", "file_path", filePath)
+	return filePath, nil
 }
 
-// min is a helper function to prevent out-of-bounds access when logging slices.
-func min(a, b int) int {
-	if a < b {
+// Helper function to find altitude at a specific time from MOTION.csv data
+// This assumes allRows includes headers and is sorted by time.
+func findAltitudeAtTime(timeData, altitudeData []float64, targetTime float64) float64 {
+	if len(timeData) == 0 || len(timeData) != len(altitudeData) {
+		return 0
+	}
+	closestIdx, minDiff := 0, math.Abs(timeData[0]-targetTime)
+	for i := 1; i < len(timeData); i++ {
+		diff := math.Abs(timeData[i] - targetTime)
+		if diff < minDiff {
+			minDiff, closestIdx = diff, i
+		}
+	}
+	return altitudeData[closestIdx]
+}
+
+func max(a, b int) int {
+	if a > b {
 		return a
 	}
 	return b
 }
 
-// copyAssets copies files from sourceDir to destDir.
-func copyAssets(sourceDir, destDir string) error {
-	entries, err := os.ReadDir(sourceDir)
+// processEventHighlights processes a list of flight events to populate summary structures.
+// It modifies the data struct directly.
+func processEventHighlights(allEvents []FlightEvent, data *ReportData) {
+	log := logger.GetLogger("reporting.processEventHighlights")
+
+	// Sort events by time to make phase processing easier
+	sort.SliceStable(allEvents, func(i, j int) bool {
+		return allEvents[i].TimeSec < allEvents[j].TimeSec
+	})
+	data.AllEvents = allEvents // Store sorted events
+
+	// Initialize summaries (some convenience fields in ParachuteHighlights will be set later)
+	data.MotorSummary = MotorHighlights{BurnoutTimeSec: -1, IgnitionTimeSec: -1}
+	// data.ParachuteSummary will be built by appending events
+	data.ParachuteSummary.Events = []ParachuteEventDetail{}
+	data.PhaseSummary = RocketPhaseHighlights{}
+
+	var apogeeEventTime float64 = -1
+
+	for _, event := range allEvents {
+		log.Debug("Processing event", "name", event.Name, "time", event.TimeSec, "alt", event.AltitudeMeters)
+		switch strings.ToLower(event.Name) {
+		// Motor Events
+		case "motor_ignition":
+			data.MotorSummary.IgnitionTimeSec = event.TimeSec
+			data.MotorSummary.IgnitionAltitude = event.AltitudeMeters
+			data.MotorSummary.HasMotorEvents = true
+		case "motor_burnout", "burnout":
+			data.MotorSummary.BurnoutTimeSec = event.TimeSec
+			data.MotorSummary.BurnoutAltitude = event.AltitudeMeters
+			data.MotorSummary.HasMotorEvents = true
+			if data.MotorSummary.IgnitionTimeSec > 0 {
+				data.MotorSummary.BurnDurationSec = event.TimeSec - data.MotorSummary.IgnitionTimeSec
+				data.PhaseSummary.PoweredAscentDurationSec = data.MotorSummary.BurnDurationSec
+			}
+
+		// Parachute Events
+		case "drogue_parachute_deploy", "drogue_deploy":
+			data.ParachuteSummary.Events = append(data.ParachuteSummary.Events, ParachuteEventDetail{
+				Type: "Drogue", TimeSec: event.TimeSec, AltitudeMeters: event.AltitudeMeters,
+			})
+			data.ParachuteSummary.HasParachuteEvents = true
+			// Set convenience fields
+			data.ParachuteSummary.DrogueDeployTimeSec = event.TimeSec
+			data.ParachuteSummary.DrogueDeployAltitude = event.AltitudeMeters
+		case "main_parachute_deploy", "main_deploy":
+			data.ParachuteSummary.Events = append(data.ParachuteSummary.Events, ParachuteEventDetail{
+				Type: "Main", TimeSec: event.TimeSec, AltitudeMeters: event.AltitudeMeters,
+			})
+			data.ParachuteSummary.HasParachuteEvents = true
+			// Set convenience fields
+			data.ParachuteSummary.MainDeployTimeSec = event.TimeSec
+			data.ParachuteSummary.MainDeployAltitude = event.AltitudeMeters
+
+		// Phase Events (Apogee is critical for phase calculations)
+		case "apogee":
+			data.PhaseSummary.ApogeeTimeSec = event.TimeSec
+			data.PhaseSummary.ApogeeAltitude = event.AltitudeMeters // This should match data.ApogeeMeters from motion data
+			data.PhaseSummary.HasApogeeEvent = true
+			apogeeEventTime = event.TimeSec
+			if data.MotorSummary.BurnoutTimeSec > 0 { // Ensure burnout happened
+				data.PhaseSummary.CoastToApogeeDurationSec = event.TimeSec - data.MotorSummary.BurnoutTimeSec
+				data.PhaseSummary.CoastStartTimeSec = data.MotorSummary.BurnoutTimeSec
+				data.PhaseSummary.CoastEndTimeSec = event.TimeSec
+			}
+
+		// Landing Event (can be used to determine descent duration)
+		case "landing", "landed", "ground_hit":
+			data.PhaseSummary.HasLandingEvent = true
+			data.PhaseSummary.LandingTimeSec = event.TimeSec // Prefer event time for landing
+			// LandingTime in ReportData is also set from this event in LoadSimulationData, which is good for consistency.
+			// Descent durations are calculated later, using the most accurate landing time.
+
+		case "liftoff":
+			data.PhaseSummary.LiftoffTimeSec = event.TimeSec
+			data.PhaseSummary.HasLiftoffEvent = true
+		}
+	}
+
+	// Determine landing time to use for duration calculations.
+	// Prefer specific landing event time, then motion data landing time, then total flight time.
+	finalLandingTime := data.TotalFlightTimeSec // Fallback to total flight time from motion
+	if data.PhaseSummary.HasLandingEvent && data.PhaseSummary.LandingTimeSec > 0 {
+		finalLandingTime = data.PhaseSummary.LandingTimeSec
+	} else if data.LandingTime > 0 { // data.LandingTime is from EVENTS.csv (or motion fallback) in LoadSimulationData
+		finalLandingTime = data.LandingTime
+	}
+
+	// Refine descent durations based on the determined finalLandingTime
+	if finalLandingTime > 0 {
+		mainDeployed := false
+		var mainDeployTime float64
+		drogueDeployed := false
+		var drogueDeployTime float64
+
+		for _, pEvent := range data.ParachuteSummary.Events {
+			if strings.ToLower(pEvent.Type) == "main" && pEvent.TimeSec < finalLandingTime {
+				mainDeployed = true
+				mainDeployTime = pEvent.TimeSec
+				// Use the latest main deployment if multiple (though unlikely)
+			} else if strings.ToLower(pEvent.Type) == "drogue" && pEvent.TimeSec < finalLandingTime {
+				drogueDeployed = true
+				drogueDeployTime = pEvent.TimeSec
+			}
+		}
+
+		if mainDeployed {
+			data.PhaseSummary.MainChuteDescentDurationSec = finalLandingTime - mainDeployTime
+		} else if drogueDeployed {
+			data.PhaseSummary.DrogueDescentDurationSec = finalLandingTime - drogueDeployTime
+		} else if apogeeEventTime > 0 && finalLandingTime > apogeeEventTime {
+			data.PhaseSummary.FreeFallDurationSec = finalLandingTime - apogeeEventTime
+		}
+	}
+
+	log.Debug("Finished processing event highlights", "motor_summary", data.MotorSummary, "parachute_summary", data.ParachuteSummary, "phase_summary", data.PhaseSummary)
+}
+
+// GenerateReportPackage creates a report package directory containing the report and its assets.
+// It returns the path to the report directory or an error.
+func GenerateReportPackage(recordHash string, rm *storage.RecordManager, reportsBaseDir string) (string, error) {
+	reportDir := filepath.Join(reportsBaseDir, recordHash)
+	if err := os.MkdirAll(reportDir, 0o755); err != nil {
+		return "", err
+	}
+
+	// Load simulation data
+	data, err := LoadSimulationData(recordHash, rm, reportDir)
 	if err != nil {
-		return fmt.Errorf("failed to read source asset directory %s: %w", sourceDir, err)
+		return "", err
 	}
 
-	if err := os.MkdirAll(destDir, 0755); err != nil {
-		return fmt.Errorf("failed to create destination asset directory %s: %w", destDir, err)
+	// Set asset paths in ReportData and create dummy assets for all expected plots
+	assetsDir := filepath.Join(reportDir, "assets")
+	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
+		return "", err
+	}
+	data.GPSMapImagePath = "assets/gps_map.png"
+	data.AtmospherePlotPath = "assets/atmosphere_plot.png"
+	data.ThrustPlotPath = "assets/thrust_plot.png"
+	data.TrajectoryPlotPath = "assets/trajectory_plot.png"
+	data.DynamicsPlotPath = "assets/dynamics_plot.png"
+
+	for _, asset := range []string{
+		"gps_map.png",
+		"atmosphere_plot.png",
+		"thrust_plot.png",
+		"trajectory_plot.png",
+		"dynamics_plot.png",
+	} {
+		if err := createDummyAsset(filepath.Join(assetsDir, asset)); err != nil {
+			return "", err
+		}
 	}
 
-	for _, entry := range entries {
-		sourcePath := filepath.Join(sourceDir, entry.Name())
-		destPath := filepath.Join(destDir, entry.Name())
-
-		if entry.IsDir() {
-			// Skip directories for now, or implement recursive copy if needed
-			continue
-		}
-
-		input, err := os.ReadFile(sourcePath)
-		if err != nil {
-			return fmt.Errorf("failed to read source asset file %s: %w", sourcePath, err)
-		}
-
-		if err := os.WriteFile(destPath, input, 0644); err != nil {
-			return fmt.Errorf("failed to write destination asset file %s: %w", destPath, err)
-		}
+	// Generate the markdown report
+	gen, err := NewGenerator()
+	if err != nil {
+		return "", err
 	}
-	return nil
+	if err := gen.GenerateMarkdownFile(data, reportDir); err != nil {
+		return "", err
+	}
+
+	// Ensure assets directory and gps_map.png exist for report references
+	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
+		return "", err
+	}
+
+	// TODO: Copy other assets, plots, etc. if needed for full packaging
+	// TODO: Optionally zip the directory if required by API contract
+
+	return reportDir, nil
 }

@@ -478,7 +478,7 @@ func (h *DataHandler) handleSimRun(c *gin.Context) {
 	}
 
 	// Use the existing record manager from the DataHandler instance (h.records)
-	if err := runSim(simConfig, h.records, h.log); err != nil {
+	if err := runSim(simConfig, h.records.(*storage.RecordManager), h.log); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
