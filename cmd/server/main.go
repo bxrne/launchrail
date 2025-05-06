@@ -410,6 +410,8 @@ func main() {
 		render(c, pages.Explorer(explorerData, cfg.Setup.App.Version))
 	})
 	r.GET("/explore/:hash/json", dataHandler.GetExplorerData)
+	r.GET("/explore/:hash/report", dataHandler.DownloadReport)
+
 	r.POST("/plot", func(c *gin.Context) {
 		hash := c.PostForm("hash")
 		source := c.PostForm("source")

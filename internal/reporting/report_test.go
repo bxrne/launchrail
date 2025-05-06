@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,14 @@ func TestLoadSimulationData(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, record)
 	recordHash := record.Hash
+
+	// Add dummy motion data (1 data row, headers are written by Storage.Init)
+	motionHeader := []string{"time", "altitude", "velocity", "acceleration", "thrust"} // Define for context if needed elsewhere or for data row structure clarity
+	_ = motionHeader // Acknowledge variable, headers handled by Init
+	motionDataRow1 := []string{"0.0", "10.0", "0.0", "9.8", "1000.0"}
+	err = record.Motion.Write(motionDataRow1)
+	require.NoError(t, err)
+
 	// It's good practice to close the record resources, even in tests
 	defer record.Close()
 
@@ -36,8 +45,11 @@ func TestLoadSimulationData(t *testing.T) {
 	err = os.MkdirAll(reportSpecificDir, 0755)
 	require.NoError(t, err)
 
+	// Instantiate logger for the test
+	testLog := logger.GetLogger("debug")
+
 	// 4. Call LoadSimulationData
-	loadedData, err := LoadSimulationData(rm, recordHash, reportSpecificDir)
+	loadedData, err := LoadSimulationData(rm, recordHash, reportSpecificDir, testLog)
 	require.NoError(t, err)
 
 	// 5. Assertions on ReportData
@@ -76,8 +88,11 @@ func TestLoadSimulationData_NotFound(t *testing.T) {
 	reportSpecificDir := filepath.Join(tempDir, "test_report_pkg_notfound", nonExistentHash)
 	// No need to create this dir as LoadSimulationData should fail before asset creation
 
+	// Instantiate logger for the test
+	testLog := logger.GetLogger("debug")
+
 	// 3. Attempt to load non-existent record
-	_, err = LoadSimulationData(rm, nonExistentHash, reportSpecificDir)
+	_, err = LoadSimulationData(rm, nonExistentHash, reportSpecificDir, testLog)
 
 	// 4. Assertions
 	require.Error(t, err) // Expect an error
@@ -96,6 +111,14 @@ func TestGenerateReportPackage(t *testing.T) {
 	record, err := rm.CreateRecord()
 	require.NoError(t, err)
 	recordHash := record.Hash
+
+	// Add dummy motion data (1 data row, headers are written by Storage.Init)
+	motionHeader := []string{"time", "altitude", "velocity", "acceleration", "thrust"} // Define for context if needed elsewhere or for data row structure clarity
+	_ = motionHeader // Acknowledge variable, headers handled by Init
+	motionDataRow1 := []string{"0.0", "10.0", "0.0", "9.8", "1000.0"}
+	err = record.Motion.Write(motionDataRow1)
+	require.NoError(t, err)
+
 	defer record.Close()
 
 	// 3. Call GenerateReportPackage

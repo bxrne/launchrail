@@ -1,8 +1,10 @@
 package main
 
 import (
+	"archive/zip"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"os"
@@ -732,12 +734,60 @@ func (h *DataHandler) DownloadReport(c *gin.Context) {
 		return
 	}
 
-	// Construct the path to the markdown file
-	mdFilePath := filepath.Join(reportSpecificDir, "report.md")
+	// Instead of serving the markdown file directly, zip the whole report directory.
+	zipFileName := fmt.Sprintf("report_%s.zip", hash)
+	c.Header("Content-Disposition", "attachment; filename="+zipFileName)
+	c.Header("Content-Type", "application/zip")
 
-	// Serve the markdown file.
-	// c.File() handles setting Content-Type based on file extension and streams the file.
-	// It will also return a 404 if the file doesn't exist, though GenerateReportPackage should ensure it does.
-	h.log.Info("Serving markdown report file", "hash", hash, "path", mdFilePath)
-	c.File(mdFilePath)
+	zipWriter := zip.NewWriter(c.Writer)
+	defer zipWriter.Close()
+
+	err = filepath.Walk(reportSpecificDir, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		// Skip directories, we only want to add files.
+		if info.IsDir() {
+			return nil
+		}
+
+		// We only want to add regular files
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(reportSpecificDir, path)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path for %s: %w", path, err)
+		}
+
+		zipFile, err := zipWriter.Create(relPath)
+		if err != nil {
+			return fmt.Errorf("failed to create entry in zip for %s (relPath %s): %w", path, relPath, err)
+		}
+
+		fsFile, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("failed to open file %s for zipping: %w", path, err)
+		}
+		defer fsFile.Close()
+
+		_, err = io.Copy(zipFile, fsFile)
+		if err != nil {
+			return fmt.Errorf("failed to copy file %s to zip: %w", path, err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		h.log.Error("Failed during zip creation or streaming", "hash", hash, "error", err)
+		// Headers are likely already sent, so we can't easily send a JSON error.
+		// The client might receive a partial or corrupted zip file.
+		// The deferred zipWriter.Close() will attempt to finalize the zip.
+		return
+	}
+
+	h.log.Info("Successfully prepared report zip archive for streaming", "hash", hash, "filename", zipFileName)
 }

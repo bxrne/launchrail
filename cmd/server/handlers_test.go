@@ -1,9 +1,11 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"io" // Added import
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -419,12 +421,48 @@ func TestDownloadReport(t *testing.T) {
 	require.NotNil(t, dummyRecord, "Dummy record should not be nil")
 	
 	recordHash := dummyRecord.Hash // Use the Hash field from the Record struct
+
+	// Write sample MOTION.csv data
+	require.NotNil(t, dummyRecord.Motion, "Motion storage should not be nil")
+	err = dummyRecord.Motion.Init() // Write headers
+	require.NoError(t, err, "Failed to init motion storage")
+	motionData := [][]string{
+		{"0.0", "10.0", "0.0", "9.8", "0.0"},    // time, altitude, velocity, acceleration, thrust
+		{"1.0", "15.0", "5.0", "15.0", "0.0"},
+		{"2.0", "30.0", "10.0", "10.0", "0.0"}, // Apogee for this simple data
+		{"3.0", "25.0", "-5.0", "-9.8", "0.0"},
+		{"4.0", "10.5", "-10.0", "-9.8", "0.0"}, // Landing
+	}
+	for _, row := range motionData {
+		err = dummyRecord.Motion.Write(row)
+		require.NoError(t, err, "Failed to write motion data row")
+	}
+	err = dummyRecord.Motion.Close() // Close after writing
+	require.NoError(t, err, "Failed to close motion storage")
+
+	// Write sample EVENTS.csv data
+	require.NotNil(t, dummyRecord.Events, "Events storage should not be nil")
+	err = dummyRecord.Events.Init()
+	require.NoError(t, err, "Failed to init events storage")
+	eventsData := [][]string{
+		{"0.0", "Liftoff", "", ""},       // time, event_name, motor_status, parachute_status
+		{"2.0", "Apogee", "", ""},
+		{"4.0", "Landing", "", ""},
+	}
+	for _, row := range eventsData {
+		err = dummyRecord.Events.Write(row)
+		require.NoError(t, err, "Failed to write event data row")
+	}
+	err = dummyRecord.Events.Close() // Close after writing
+	require.NoError(t, err, "Failed to close events storage")
+
+	// The main record.Close() is deferred, which is fine as it will clean up the directory.
+	// Individual stores are closed above to ensure data is flushed before reading.
 	defer dummyRecord.Close()      // Close the record created by the real manager
 
 	cfg := &config.Config{ // Minimal config needed
 		Setup: config.Setup{
-			App:     config.App{Version: "test-report-v1"},
-			Logging: config.Logging{Level: "error"},
+			App: config.App{Version: "test-report-v1"},
 		},
 	}
 
@@ -445,23 +483,51 @@ func TestDownloadReport(t *testing.T) {
 	// Assert
 	require.Equal(t, http.StatusOK, w.Code, "Expected OK status for report download")
 
-	// Check for Markdown content type
+	// Check for Zip content type and disposition
 	contentType := w.Header().Get("Content-Type")
-	assert.Contains(t, contentType, "text/markdown", "Expected Content-Type to be text/markdown")
+	assert.Equal(t, "application/zip", contentType, "Expected Content-Type to be application/zip")
 
-	// Content-Disposition might not be set for inline display, or might be different.
-	// If reports are meant to be downloaded, this might need to be `attachment; filename=report.md`
-	// For now, we'll assume it's served for direct viewing, so Content-Disposition might be absent or different.
-	// assert.Contains(t, w.Header().Get("Content-Disposition"), "attachment; filename=", "Content-Disposition for attachment not set correctly")
-	// assert.Contains(t, w.Header().Get("Content-Disposition"), "report.md", "Filename in Content-Disposition not set correctly")
+	expectedFilename := fmt.Sprintf("report_%s.zip", recordHash)
+	contentDisposition := w.Header().Get("Content-Disposition")
+	assert.Equal(t, "attachment; filename="+expectedFilename, contentDisposition, "Content-Disposition not set correctly for zip download")
 
-	bodyBytes, _ := io.ReadAll(w.Body)
-	bodyString := string(bodyBytes)
+	bodyBytes := w.Body.Bytes()
+	zipReader, err := zip.NewReader(bytes.NewReader(bodyBytes), int64(len(bodyBytes)))
+	require.NoError(t, err, "Failed to read zip archive from response body")
 
-	// Check for Markdown specific content
-	assert.Contains(t, bodyString, fmt.Sprintf("# Simulation Report: %s", recordHash), "Report body does not contain correct Markdown title")
-	assert.Contains(t, bodyString, "## Plots & Data", "Report body does not contain Plots & Data section")
-	assert.Contains(t, bodyString, "![](assets/atmosphere_plot.png)", "Report body does not contain atmosphere plot asset link")
+	foundReportMd := false
+	foundAtmospherePlot := false
+
+	for _, zf := range zipReader.File {
+		switch zf.Name {
+		case "report.md":
+			foundReportMd = true
+			rc, err := zf.Open()
+			require.NoError(t, err, "Failed to open report.md from zip")
+			defer rc.Close()
+
+			mdContentBytes, err := io.ReadAll(rc)
+			require.NoError(t, err, "Failed to read report.md content from zip")
+			mdContentString := string(mdContentBytes)
+
+			assert.Contains(t, mdContentString, fmt.Sprintf("# Simulation Report: %s", recordHash), "Zipped report.md does not contain correct title")
+			assert.Contains(t, mdContentString, "## Plots & Data", "Zipped report.md does not contain Plots & Data section")
+			assert.Contains(t, mdContentString, "![](assets/atmosphere_plot.png)", "Zipped report.md does not contain atmosphere plot asset link")
+			// Check for new content based on parsed data
+			assert.Contains(t, mdContentString, "Apogee: 30.0 meters", "Report missing correct apogee")
+			assert.Contains(t, mdContentString, "Max Velocity: 10.0 m/s", "Report missing correct max velocity")
+			assert.Contains(t, mdContentString, "Total Flight Time: 4.0 seconds", "Report missing correct total flight time")
+			// assert.Contains(t, mdContentString, "| Liftoff | 0.0 | 10.0 |", "Report missing Liftoff event") // This will fail until events parsing/headers are aligned
+
+		case "assets/atmosphere_plot.png":
+			foundAtmospherePlot = true
+			// Optionally, check file size or content if needed, but presence is often enough for dummy assets
+			assert.Greater(t, zf.UncompressedSize64, uint64(0), "atmosphere_plot.png in zip should not be empty")
+		}
+	}
+
+	assert.True(t, foundReportMd, "report.md not found in the downloaded zip archive")
+	assert.True(t, foundAtmospherePlot, "assets/atmosphere_plot.png not found in the downloaded zip archive")
 
 	// Clean up: remove the created reports directory to avoid clutter
 	homeDir, _ := os.UserHomeDir()

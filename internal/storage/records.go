@@ -337,16 +337,31 @@ func (rm *RecordManager) loadRecord(hash string) (*Record, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to init motion storage for %s: %w", hash, err)
 	}
+	if err := motionStore.Init(); err != nil {
+		motionStore.Close()
+		return nil, fmt.Errorf("failed to initialize motionStore for %s: %w", hash, err)
+	}
 	eventsStore, err := NewStorage(recordPath, EVENTS)
 	if err != nil {
 		motionStore.Close()
 		return nil, fmt.Errorf("failed to init events storage for %s: %w", hash, err)
+	}
+	if err := eventsStore.Init(); err != nil {
+		motionStore.Close()
+		eventsStore.Close()
+		return nil, fmt.Errorf("failed to initialize eventsStore for %s: %w", hash, err)
 	}
 	dynamicsStore, err := NewStorage(recordPath, DYNAMICS)
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close()
 		return nil, fmt.Errorf("failed to init dynamics storage for %s: %w", hash, err)
+	}
+	if err := dynamicsStore.Init(); err != nil {
+		motionStore.Close()
+		eventsStore.Close()
+		dynamicsStore.Close()
+		return nil, fmt.Errorf("failed to initialize dynamicsStore for %s: %w", hash, err)
 	}
 	return &Record{
 		Hash:         hash,
