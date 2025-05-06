@@ -150,10 +150,11 @@ func createValidConfig() config.Config {
 		Benchmarks: map[string]config.BenchmarkEntry{
 			"test-bench": {
 				Name:             "Test Benchmark",
+				Description:      "Detailed description of Test Benchmark",
 				DesignFile:       designFilePath,
 				DataDir:          dataDirPath,
 				Enabled:          true,
-				MotorDesignation: "A8-3", // Added missing field
+				MotorDesignation: "M1297", // Corrected field
 			},
 		},
 	}
@@ -748,4 +749,135 @@ benchmarks:
 			}
 		})
 	}
+}
+
+// TEST: GIVEN a valid config WHEN ToMap is called THEN returns a map with correct stringified values
+func TestConfig_ToMap(t *testing.T) {
+	tc := createValidConfig() // Use the existing helper to get a valid config
+
+	// Create dummy files/dirs needed by the valid config for path resolution if ToMap relies on it
+	// (Although ToMap primarily just stringifies existing fields, good practice if validation is implicitly part of it)
+	tempDir := t.TempDir()
+	dummyOrkFile, err := os.Create(filepath.Join(tempDir, "test.ork"))
+	require.NoError(t, err)
+	dummyOrkFile.Close()
+	tc.Engine.Options.OpenRocketFile = dummyOrkFile.Name()
+
+	dummyPluginDir := filepath.Join(tempDir, "plugins")
+	err = os.Mkdir(dummyPluginDir, 0755)
+	require.NoError(t, err)
+	tc.Setup.Plugins.Paths = []string{dummyPluginDir}
+
+	// Create dummy benchmark files/dirs
+	dummyBenchDesignFile, err := os.Create(filepath.Join(tempDir, "bench_design.ork"))
+	require.NoError(t, err)
+	dummyBenchDesignFile.Close()
+	dummyBenchDataDir := filepath.Join(tempDir, "bench_data_dir")
+	err = os.Mkdir(dummyBenchDataDir, 0755)
+	require.NoError(t, err)
+
+	for k, bench := range tc.Benchmarks {
+		bench.DesignFile = dummyBenchDesignFile.Name()
+		bench.DataDir = dummyBenchDataDir
+		tc.Benchmarks[k] = bench
+	}
+
+	configMap := tc.ToMap()
+
+	assert.NotEmpty(t, configMap, "Map should not be empty")
+
+	// Check a few key values
+	assert.Equal(t, "TestApp", configMap["app.name"])
+	assert.Equal(t, "1.0.0", configMap["app.version"])
+	assert.Equal(t, "debug", configMap["logging.level"])
+	assert.Equal(t, "8080", configMap["server.port"])
+	assert.Equal(t, "23.0", configMap["external.openrocket_version"])
+	assert.Equal(t, "A8-3", configMap["options.motor_designation"])
+	assert.Equal(t, dummyOrkFile.Name(), configMap["options.openrocket_file"])
+
+	// Launchrail
+	assert.Equal(t, "1.20", configMap["options.launchrail.length"])
+	assert.Equal(t, "5.00", configMap["options.launchrail.angle"])
+	assert.Equal(t, "90.00", configMap["options.launchrail.orientation"])
+
+	// Launchsite
+	assert.Equal(t, "34.0522", configMap["options.launchsite.latitude"])
+	assert.Equal(t, "-118.2437", configMap["options.launchsite.longitude"])
+	assert.Equal(t, "100.00", configMap["options.launchsite.altitude"])
+
+	// Atmosphere
+	assert.Equal(t, "287.058", configMap["options.launchsite.atmosphere.isa_configuration.specific_gas_constant"])
+	assert.Equal(t, "9.807", configMap["options.launchsite.atmosphere.isa_configuration.gravitational_accel"])
+	assert.Equal(t, "1.225", configMap["options.launchsite.atmosphere.isa_configuration.sea_level_density"])
+	assert.Equal(t, "15.00", configMap["options.launchsite.atmosphere.isa_configuration.sea_level_temperature"])
+	assert.Equal(t, "101325.00", configMap["options.launchsite.atmosphere.isa_configuration.sea_level_pressure"])
+	assert.Equal(t, "1.40", configMap["options.launchsite.atmosphere.isa_configuration.ratio_specific_heats"])
+	assert.Equal(t, "0.01", configMap["options.launchsite.atmosphere.isa_configuration.temperature_lapse_rate"])
+
+	// Simulation
+	assert.Equal(t, "0.0100", configMap["simulation.step"])
+	assert.Equal(t, "10.00", configMap["simulation.max_time"])
+	assert.Equal(t, "0.10", configMap["simulation.ground_tolerance"])
+
+	// Plugins
+	// ToMap stores plugins.paths as a Go-syntax string representation of a slice, e.g., "[/path/to/plugin1 /path/to/plugin2]"
+	expectedPluginPathString := fmt.Sprintf("[%s]", dummyPluginDir) // For a single path
+	assert.Equal(t, expectedPluginPathString, configMap["plugins.paths"])
+
+	// Benchmarks - check one entry
+	assert.Equal(t, "Test Benchmark", configMap["benchmarks.test-bench.name"])
+	assert.Equal(t, "Detailed description of Test Benchmark", configMap["benchmarks.test-bench.description"])
+	assert.Equal(t, dummyBenchDesignFile.Name(), configMap["benchmarks.test-bench.design_file"])
+	assert.Equal(t, dummyBenchDataDir, configMap["benchmarks.test-bench.data_dir"])
+	assert.Equal(t, "M1297", configMap["benchmarks.test-bench.motor_designation"])
+	assert.Equal(t, "true", configMap["benchmarks.test-bench.enabled"])
+
+	// Test ToMap with empty plugin paths
+	tcNoPlugins := createValidConfig()
+	tcNoPlugins.Setup.Plugins.Paths = []string{}
+	configMapNoPlugins := tcNoPlugins.ToMap()
+	assert.Equal(t, "", configMapNoPlugins["plugins.paths"], "plugins.paths should be empty string if no paths")
+}
+
+// TEST: GIVEN a valid config WHEN Bytes is called THEN returns a non-empty byte slice
+func TestConfig_Bytes(t *testing.T) {
+	tc := createValidConfig() // Use the existing helper
+
+	// Create dummy files/dirs needed by the valid config
+	tempDir := t.TempDir()
+	dummyOrkFile, err := os.Create(filepath.Join(tempDir, "test.ork"))
+	require.NoError(t, err)
+	dummyOrkFile.Close()
+	tc.Engine.Options.OpenRocketFile = dummyOrkFile.Name()
+
+	dummyPluginDir := filepath.Join(tempDir, "plugins")
+	err = os.Mkdir(dummyPluginDir, 0755)
+	require.NoError(t, err)
+	tc.Setup.Plugins.Paths = []string{dummyPluginDir}
+
+	// Create dummy benchmark files/dirs
+	dummyBenchDesignFile, err := os.Create(filepath.Join(tempDir, "bench_design.ork"))
+	require.NoError(t, err)
+	dummyBenchDesignFile.Close()
+	dummyBenchDataDir := filepath.Join(tempDir, "bench_data_dir")
+	err = os.Mkdir(dummyBenchDataDir, 0755)
+	require.NoError(t, err)
+
+	for k, bench := range tc.Benchmarks {
+		bench.DesignFile = dummyBenchDesignFile.Name()
+		bench.DataDir = dummyBenchDataDir
+		tc.Benchmarks[k] = bench
+	}
+
+	configBytes := tc.Bytes()
+
+	assert.NotEmpty(t, configBytes, "Byte slice should not be empty")
+
+	// Optionally, check if some key substrings are present
+	// This can be brittle if the %+v format changes, but can catch major issues.
+	configString := string(configBytes)
+	assert.Contains(t, configString, "TestApp", "Byte slice string should contain app name")
+	assert.Contains(t, configString, "8080", "Byte slice string should contain server port")
+	assert.Contains(t, configString, "A8-3", "Byte slice string should contain motor designation")
+
 }

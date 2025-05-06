@@ -158,8 +158,8 @@ type Config struct {
 	Benchmarks map[string]BenchmarkEntry `mapstructure:"benchmarks"`
 }
 
-// String returns the configuration as a map of strings, useful for testing.
-func (c *Config) String() map[string]string {
+// ToMap converts the configuration to a map of strings.
+func (c *Config) ToMap() map[string]string {
 	marshalled := make(map[string]string)
 
 	// Setup Config
