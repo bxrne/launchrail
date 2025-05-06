@@ -12,7 +12,7 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
-	loggerpkg "github.com/bxrne/launchrail/internal/logger"
+	logger "github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/plot_transformer"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
@@ -259,7 +259,7 @@ func render(c *gin.Context, component templ.Component) {
 }
 
 func main() {
-	log := loggerpkg.GetLogger("debug")
+	log := logger.GetLogger("debug")
 	cfg, err := config.GetConfig()
 	if err != nil {
 		log.Warn("Failed to load config", "error", err)
