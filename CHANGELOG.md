@@ -1,3 +1,10 @@
+## v0.6.1 (2025-05-06)
+
+### Fix
+
+- **storage**: Fix log formatting and add error return in Write method
+- **storage**: Replace log package with logf logger and update error handling
+
 ## v0.6.0 (2025-05-06)
 
 ### Feat
