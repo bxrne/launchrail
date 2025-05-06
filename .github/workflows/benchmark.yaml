@@ -1,0 +1,47 @@
+name: Benchmarks
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+jobs:
+  run_benchmarks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.23 # Using the same Go version as in build_test.yaml
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Build the application (optional, ensures code compiles)
+        run: go build ./cmd/... ./pkg/... ./internal/...
+
+      - name: Build individual plugins
+        run: |
+          for dir in ./plugins/*; do
+            if [ -d "$dir" ]; then
+              plugin_name=$(basename "$dir")
+              # Compile to ./plugins/<plugin_name>.so
+              go build -buildmode=plugin -o "./plugins/${plugin_name}.so" "$dir"
+            fi
+          done
+      
+      - name: Run benchmarks
+        run: |
+          go run ./cmd/bench/
