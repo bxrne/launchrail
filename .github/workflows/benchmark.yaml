@@ -36,9 +36,9 @@ jobs:
         run: |
           for dir in ./plugins/*; do
             if [ -d "$dir" ]; then
-              # This builds plugins into their respective directories as plugin.so
-              # Ensure your benchmark configuration can find these if they are needed.
-              go build -buildmode=plugin -o "./$dir/plugin.so" "./$dir"
+              plugin_name=$(basename "$dir")
+              # Compile to ./plugins/<plugin_name>.so
+              go build -buildmode=plugin -o "./plugins/${plugin_name}.so" "$dir"
             fi
           done
       
