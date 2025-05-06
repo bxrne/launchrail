@@ -54,6 +54,18 @@
 
 ## Atmospheric Conditions
 
+| Parameter            | Value |
+| -------------------- | ----- |
+| Launch Site          | {{.LaunchSiteName}} |
+| Latitude             | {{printf "%.4f" .LaunchLatitude}}° |
+| Longitude            | {{printf "%.4f" .LaunchLongitude}}° |
+| Elevation (AMSL)     | {{printf "%.1f" .LaunchElevation}} m |
+| Temperature          | {{printf "%.1f" .Temperature}} °C |
+| Pressure             | {{printf "%.1f" .Pressure}} Pa |
+| Humidity             | {{printf "%.1f" .Humidity}} % |
+| Wind Speed           | {{printf "%.1f" .WindSpeed}} m/s |
+| Wind Direction (from)| {{printf "%.1f" .WindDirection}}° |
+
 *Placeholder for atmospheric model plots (wind speed/direction, turbulence vs. altitude).*
 
 ## Motor Performance

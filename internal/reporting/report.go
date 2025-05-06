@@ -3,7 +3,6 @@ package reporting
 import (
 	"bytes"
 	"fmt"
-	"html/template"
 	"image"
 	"image/color"
 	"image/png"
@@ -13,13 +12,15 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/storage"
-	"github.com/zerodha/logf"
+	logf "github.com/zerodha/logf"
 )
 
 // ReportData holds all the necessary information for generating a report.
+// TODO: Consolidate redundant fields (e.g., LandingVelocity vs motionMetrics.LandingVelocityMPS)
 type ReportData struct {
 	Version            string // Application version
 	RecordID           string
@@ -104,99 +105,64 @@ type FlightEvent struct {
 	// Add other relevant data like velocity, status, etc.
 }
 
-const defaultReportTemplate = `
-# Simulation Report: {{.RecordID}}
+// Generator handles report generation using text/template.
+type Generator struct {
+	template *template.Template
+}
 
-Version: {{.Version}}
+// NewGenerator creates a new report generator by reading and parsing the template file.
+func NewGenerator() (*Generator, error) {
+	// Assuming report.md.tmpl is now in the same directory (internal/reporting)
+	templatePath := "internal/reporting/report.md.tmpl"
+	tmplBytes, err := os.ReadFile(templatePath)
+	if err != nil {
+		// Attempt to read from relative path if absolute fails (e.g., during tests)
+		wd, _ := os.Getwd()
+		altPath := filepath.Join(wd, templatePath)
+		tmplBytes, err = os.ReadFile(altPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read markdown template file from %s or %s: %w", templatePath, altPath, err)
+		}
+	}
 
-## Environmental Conditions
+	tmpl, err := template.New("report").Parse(string(tmplBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse markdown template file %s: %w", templatePath, err)
+	}
+	return &Generator{
+		template: tmpl,
+	}, nil
+}
 
-- Launch Site: {{.LaunchSiteName}}
-- Latitude: {{.LaunchLatitude}}
-- Longitude: {{.LaunchLongitude}}
-- Elevation: {{.LaunchElevation}} meters AMSL
-- Wind Speed: {{.WindSpeed}} m/s
-- Wind Direction: {{.WindDirection}} degrees from North
-- Temperature: {{.Temperature}} Celsius
-- Pressure: {{.Pressure}} Pascals
-- Humidity: {{.Humidity}}%
+// GenerateMarkdownFile creates the markdown report content and saves it to a file.
+func (g *Generator) GenerateMarkdownFile(data ReportData, outputDir string) error {
+	var mdOutput bytes.Buffer
+	if err := g.template.Execute(&mdOutput, data); err != nil {
+		return fmt.Errorf("failed to execute markdown template: %w", err)
+	}
 
-## Plots & Data
-
-- Atmosphere: ![]({{.AtmospherePlotPath}})
-- Thrust Curve: ![]({{.ThrustPlotPath}})
-- Trajectory: ![]({{.TrajectoryPlotPath}})
-- Dynamics: ![]({{.DynamicsPlotPath}})
-- GPS Map: ![]({{.GPSMapImagePath}})
-
-## Flight Summary
-
-- Apogee: {{printf "%.1f" .ApogeeMeters}} meters
-- Max Velocity: {{printf "%.1f" .MaxVelocityMPS}} m/s
-- Max Acceleration: {{printf "%.1f" .MaxAccelerationMPS2}} m/s²
-- Total Flight Time: {{printf "%.1f" .TotalFlightTimeSec}} seconds
-- Landing Velocity: {{printf "%.1f" .LandingVelocityMPS}} m/s
-
-## Key Flight Events
-
-| Event Name | Time (s) | Altitude (m) |
-| --- | --- | --- |
-{{ range .AllEvents }}
-| {{ .Name }} | {{printf "%.1f" .TimeSec }} | {{printf "%.1f" .AltitudeMeters }} |
-{{ end }}
-
-## Event Summaries
-
-### Motor Summary
-- Ignition Time: {{printf "%.1f" .MotorSummary.IgnitionTimeSec}} seconds
-- Burnout Time: {{printf "%.1f" .MotorSummary.BurnoutTimeSec}} seconds
-- Burn Duration: {{printf "%.1f" .MotorSummary.BurnDurationSec}} seconds
-
-### Parachute Summary
-{{ range .ParachuteSummary.Events }}
-- {{ .Name }}: {{printf "%.1f" .DeploymentTimeSec}} seconds at {{printf "%.1f" .DeploymentAltitudeMeters}} meters
-{{ end }}
-
-### Phase Summary
-- Liftoff Time: {{printf "%.1f" .PhaseSummary.LiftoffTimeSec}} seconds
-- Apogee Time: {{printf "%.1f" .PhaseSummary.ApogeeTimeSec}} seconds
-- Landing Time: {{printf "%.1f" .PhaseSummary.LandingTimeSec}} seconds
-- Coast Start Time: {{printf "%.1f" .PhaseSummary.CoastStartTimeSec}} seconds
-- Coast End Time: {{printf "%.1f" .PhaseSummary.CoastEndTimeSec}} seconds
-- Coast Duration: {{printf "%.1f" .PhaseSummary.CoastDurationSec}} seconds
-
-## Landing Information
-
-- Latitude: {{.LandingLatitude}}
-- Longitude: {{.LandingLongitude}}
-- Distance from Launch Site: {{printf "%.1f" .LandingDistanceMeters}} meters
-- 95th Percentile Landing Radius: {{printf "%.1f" .LandingRadius95PctMeters}} meters
-
-<!-- Add more sections for tables, etc. -->
-`
+	mdFilePath := filepath.Join(outputDir, "report.md")
+	if err := os.WriteFile(mdFilePath, mdOutput.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write markdown report to %s: %w", mdFilePath, err)
+	}
+	return nil
+}
 
 // createDummyAsset creates a minimal 1x1 transparent PNG at the given path.
 // In a real scenario, this would generate actual plot images.
 func createDummyAsset(assetPath string) error {
-	assetDir := filepath.Dir(assetPath)
-	if err := os.MkdirAll(assetDir, 0755); err != nil {
-		return fmt.Errorf("failed to create asset directory %s: %w", assetDir, err)
-	}
-
-	// Create a minimal 1x1 transparent PNG
 	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
 	img.Set(0, 0, color.Transparent)
 
 	f, err := os.Create(assetPath)
 	if err != nil {
-		return fmt.Errorf("failed to create dummy asset %s: %w", assetPath, err)
+		return fmt.Errorf("failed to create dummy asset file %s: %w", assetPath, err)
 	}
 	defer f.Close()
 
 	if err := png.Encode(f, img); err != nil {
-		return fmt.Errorf("failed to encode dummy PNG asset %s: %w", assetPath, err)
+		return fmt.Errorf("failed to encode dummy PNG %s: %w", assetPath, err)
 	}
-
 	return nil
 }
 
@@ -265,28 +231,77 @@ func LoadSimulationData(rm *storage.RecordManager, recordID string, reportSpecif
 		allEventsData, err := record.Events.ReadAll()
 		if err != nil {
 			log.Error("Failed to read all data from EVENTS.csv", "recordID", recordID, "error", err)
-			return ReportData{}, fmt.Errorf("failed to read events data for %s: %w", recordID, err)
-		}
-		log.Debug("Raw events data for record %s (first 5 rows)", "recordID", recordID, "data", allEventsData[:min(5, len(allEventsData))])
-		if len(allEventsData) == 0 { // Completely empty file
-			log.Warn("EVENTS.csv is empty", "recordID", recordID) // Allow empty events, use placeholders later
-		} else if len(allEventsData) == 1 { // Only headers, no data rows
-			log.Warn("EVENTS.csv contains only headers", "recordID", recordID) // Allow empty events, use placeholders later
-		} else { // Has headers and data
-			parsedEvents, err := parseEventsDataFromCSV(allEventsData)
-			if err != nil {
-				log.Error("Failed to parse EVENTS.csv data", "recordID", recordID, "error", err)
-				return ReportData{}, fmt.Errorf("failed to parse events data for %s: %w", recordID, err)
+			// Decide whether to return error or continue without events
+			// Continuing for now, highlights will be empty/defaulted
+		} else {
+			log.Debug("Raw events data for record %s (first 5 rows)", "recordID", recordID, "data", allEventsData[:min(5, len(allEventsData))])
+			if len(allEventsData) == 0 { // Completely empty file
+				log.Warn("EVENTS.csv is empty", "recordID", recordID)
+			} else if len(allEventsData) == 1 { // Only headers, no data rows
+				log.Warn("EVENTS.csv contains only headers", "recordID", recordID)
+			} else { // Has headers and data
+				headers := allEventsData[0]
+				dataRows := allEventsData[1:]
+
+				colIndices := make(map[string]int)
+				for i, header := range headers {
+					colIndices[strings.ToLower(strings.TrimSpace(header))] = i
+				}
+
+				requiredCols := []string{"time", "event_name"}
+				var missingCols []string
+				for _, colName := range requiredCols {
+					if _, ok := colIndices[colName]; !ok {
+						missingCols = append(missingCols, colName)
+					}
+				}
+				if len(missingCols) > 0 {
+					log.Error("EVENTS.csv missing required columns", "recordID", recordID, "missing", missingCols, "available", headers)
+					// Decide whether to return error or continue without events
+					// Continuing for now, highlights will be empty/defaulted
+				} else {
+					timeIdx := colIndices["time"]
+					eventNameIdx := colIndices["event_name"]
+					altIdx, altColExists := colIndices["altitude"]
+
+					for i, row := range dataRows {
+						if len(row) <= timeIdx || len(row) <= eventNameIdx || (altColExists && len(row) <= altIdx) {
+							log.Warn("Skipping malformed row in EVENTS.csv", "recordID", recordID, "rowIndex", i+1, "rowLength", len(row), "requiredIndices", []int{timeIdx, eventNameIdx, altIdx})
+							continue
+						}
+						timeStr := row[timeIdx]
+						eventName := row[eventNameIdx]
+
+						time, err := strconv.ParseFloat(timeStr, 64)
+						if err != nil {
+							log.Warn("Failed to parse time in EVENTS.csv row, skipping event", "recordID", recordID, "rowIndex", i+1, "value", timeStr, "error", err)
+							continue // Skip this event
+						}
+
+						altitude := 0.0
+						if altColExists {
+							altStr := row[altIdx]
+							altVal, parseErr := strconv.ParseFloat(altStr, 64)
+							if parseErr == nil {
+								altitude = altVal
+							} else {
+								// Log quietly if altitude parsing fails, use 0.0
+								log.Debug("Failed to parse altitude for event, using 0.0", "recordID", recordID, "rowIndex", i+1, "event", eventName, "value", altStr, "error", parseErr)
+							}
+						}
+
+						data.AllEvents = append(data.AllEvents, FlightEvent{Name: eventName, TimeSec: time, AltitudeMeters: altitude})
+					}
+				}
 			}
-			data.AllEvents = parsedEvents
-			log.Debug("Parsed events data for record %s (event count %d)", "recordID", recordID, "eventCount", len(data.AllEvents))
-
 		}
-
 	} else {
 		log.Error("EVENTS.csv storage not available for record", "recordID", recordID)
-		return ReportData{}, fmt.Errorf("events storage not available for record %s", recordID)
+		// Continue without events, highlights will be empty/defaulted
 	}
+
+	// --- Process Highlights & Placeholders ---
+	data.MotorSummary, data.ParachuteSummary, data.PhaseSummary = processEventHighlights(data.AllEvents, parsedMotionMetrics{ApogeeMeters: data.ApogeeMeters, MaxVelocityMPS: data.MaxVelocityMPS, MaxAccelerationMPS2: data.MaxAccelerationMPS2, TotalFlightTimeSec: data.TotalFlightTimeSec, LandingVelocityMPS: data.LandingVelocityMPS}, data.LaunchElevation)
 
 	// If AllEvents is still empty after trying to parse (or if file was empty/headers only), add placeholders
 	if len(data.AllEvents) == 0 {
@@ -306,17 +321,14 @@ func LoadSimulationData(rm *storage.RecordManager, recordID string, reportSpecif
 		}
 	}
 
-	// Process event highlights from AllEvents and motionMetrics
-	data.MotorSummary, data.ParachuteSummary, data.PhaseSummary = processEventHighlights(data.AllEvents, parsedMotionMetrics{ApogeeMeters: data.ApogeeMeters, MaxVelocityMPS: data.MaxVelocityMPS, MaxAccelerationMPS2: data.MaxAccelerationMPS2, TotalFlightTimeSec: data.TotalFlightTimeSec, LandingVelocityMPS: data.LandingVelocityMPS}, data.LaunchElevation)
-
 	// --- Create dummy plot assets ---
 	assetSubDir := "assets"
 	plotPaths := map[string]*string{
-		"atmosphere_plot.png": &data.AtmospherePlotPath,
-		"thrust_plot.png":     &data.ThrustPlotPath,
-		"trajectory_plot.png": &data.TrajectoryPlotPath,
-		"dynamics_plot.png":   &data.DynamicsPlotPath,
-		"gps_map.png":         &data.GPSMapImagePath,
+		"atmosphere_plot.svg":     &data.AtmospherePlotPath,
+		"thrust_plot.svg":         &data.ThrustPlotPath,
+		"trajectory_plot.svg":     &data.TrajectoryPlotPath,
+		"dynamics_plot.svg":       &data.DynamicsPlotPath,
+		"gps_map.svg":             &data.GPSMapImagePath,
 	}
 
 	for name, pathVar := range plotPaths {
@@ -612,36 +624,6 @@ func processEventHighlights(allEvents []FlightEvent, motionMetrics parsedMotionM
 	return motorSummary, parachuteSummary, phaseSummary
 }
 
-// Generator handles report generation.
-type Generator struct {
-	template *template.Template
-}
-
-// NewGenerator creates a new report generator.
-func NewGenerator() (*Generator, error) {
-	tmpl, err := template.New("report").Parse(defaultReportTemplate)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse default markdown template: %w", err)
-	}
-	return &Generator{
-		template: tmpl,
-	}, nil
-}
-
-// GenerateMarkdownFile creates the markdown report content and saves it to a file.
-func (g *Generator) GenerateMarkdownFile(data ReportData, outputDir string) error {
-	var mdOutput bytes.Buffer
-	if err := g.template.Execute(&mdOutput, data); err != nil {
-		return fmt.Errorf("failed to execute markdown template: %w", err)
-	}
-
-	mdFilePath := filepath.Join(outputDir, "report.md")
-	if err := os.WriteFile(mdFilePath, mdOutput.Bytes(), 0644); err != nil {
-		return fmt.Errorf("failed to write markdown report to %s: %w", mdFilePath, err)
-	}
-	return nil
-}
-
 // GenerateReportPackage orchestrates the generation of a self-contained report package.
 func GenerateReportPackage(rm *storage.RecordManager, recordID string, baseReportsDir string) (string, error) {
 	log := logger.GetLogger("info")
@@ -651,18 +633,33 @@ func GenerateReportPackage(rm *storage.RecordManager, recordID string, baseRepor
 		return "", fmt.Errorf("failed to create report directory %s: %w", reportSpecificDir, err)
 	}
 
+	// TODO: Get actual config and app version if needed by GenerateReportData
+	// For now, passing nil config and placeholder version
+	// We might need to restructure to pass Config down or load it here.
 	data, err := LoadSimulationData(rm, recordID, reportSpecificDir, log)
 	if err != nil {
-		return "", fmt.Errorf("failed to load simulation data for report: %w", err)
+		// LoadSimulationData now returns the data even on some errors, handle specific cases?
+		log.Error("Error generating report data, attempting to create report with partial data", "recordID", recordID, "error", err)
+		// Optionally return error here if data generation failure is critical
+		// return "", fmt.Errorf("failed to generate report data for %s: %w", recordID, err)
 	}
 
-	gen, err := NewGenerator()
+	// --- Generate Markdown using text/template Generator --- 
+	gen, err := NewGenerator() // Use the reinstated generator
 	if err != nil {
 		return "", fmt.Errorf("failed to create report generator: %w", err)
 	}
-
-	if err := gen.GenerateMarkdownFile(data, reportSpecificDir); err != nil {
+	if err := gen.GenerateMarkdownFile(data, reportSpecificDir); err != nil { // Call the generator method
 		return "", fmt.Errorf("failed to generate markdown report file: %w", err)
+	}
+
+	// --- Copy Assets --- 
+	// (Keep existing asset copying logic if any, or add it here)
+	assetSourceDir := "internal/reporting/assets" // Relative path from project root
+	assetDestDir := filepath.Join(reportSpecificDir, "assets")
+	if err := copyAssets(assetSourceDir, assetDestDir); err != nil {
+		log.Warn("Failed to copy assets for report, plots might be missing", "recordID", recordID, "source", assetSourceDir, "dest", assetDestDir, "error", err)
+		// Decide if this is a fatal error. Continuing for now.
 	}
 
 	log.Info("Successfully generated report package", "recordID", recordID, "outputDir", reportSpecificDir)
@@ -675,4 +672,36 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// copyAssets copies files from sourceDir to destDir.
+func copyAssets(sourceDir, destDir string) error {
+	entries, err := os.ReadDir(sourceDir)
+	if err != nil {
+		return fmt.Errorf("failed to read source asset directory %s: %w", sourceDir, err)
+	}
+
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return fmt.Errorf("failed to create destination asset directory %s: %w", destDir, err)
+	}
+
+	for _, entry := range entries {
+		sourcePath := filepath.Join(sourceDir, entry.Name())
+		destPath := filepath.Join(destDir, entry.Name())
+
+		if entry.IsDir() {
+			// Skip directories for now, or implement recursive copy if needed
+			continue
+		}
+
+		input, err := os.ReadFile(sourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to read source asset file %s: %w", sourcePath, err)
+		}
+
+		if err := os.WriteFile(destPath, input, 0644); err != nil {
+			return fmt.Errorf("failed to write destination asset file %s: %w", destPath, err)
+		}
+	}
+	return nil
 }
