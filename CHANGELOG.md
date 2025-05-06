@@ -1,3 +1,9 @@
+## v0.7.1 (2025-05-06)
+
+### Fix
+
+- **bench**: simplify LoadEventInfo by reusing loadCSV helper and improving error messages
+
 ## v0.7.0 (2025-05-06)
 
 ### Feat
