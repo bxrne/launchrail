@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -707,57 +709,35 @@ func min(a, b int) int {
 // DownloadReport handles downloading the simulation report for a specific hash.
 func (h *DataHandler) DownloadReport(c *gin.Context) {
 	hash := c.Param("hash")
-	if hash == "" {
-		h.log.Warn("DownloadReport request missing hash")
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Record hash is required"})
+	h.log.Info("Report download requested", "hash", hash)
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		h.log.Error("Failed to get user home directory", "error", err)
+		h.renderTempl(c, pages.ErrorPage("Internal Server Error"), http.StatusInternalServerError)
 		return
 	}
-	h.log.Debug("Received request to download report", "hash", hash)
+	baseReportsDir := filepath.Join(homeDir, ".launchrail", "reports")
 
-	// Load simulation data
-	reportData, err := reporting.LoadSimulationData(h.records, hash)
+	// Generate the report package. This creates the directory and files if they don't exist.
+	reportSpecificDir, err := reporting.GenerateReportPackage(h.records, hash, baseReportsDir)
 	if err != nil {
-		h.log.Error("Failed to load simulation data for report", "hash", hash, "error", err)
+		h.log.Error("Failed to generate report package", "hash", hash, "error", err)
 		if errors.Is(err, storage.ErrRecordNotFound) || strings.Contains(strings.ToLower(err.Error()), "not found") {
-			h.log.Warn("Report requested for non-existent record", "hash", hash)
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Failed to load data for report"})
+			h.log.Warn("Report requested for non-existent record or data loading failed", "hash", hash)
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Data for report not found"})
 		} else {
-			h.renderTempl(c, pages.ErrorPage("Internal Server Error"), http.StatusInternalServerError)
+			h.renderTempl(c, pages.ErrorPage("Report Generation Failed"), http.StatusInternalServerError)
 		}
 		return
 	}
 
-	// Create the report
-	templateDir := "internal/reporting/templates"
-	reportGen, err := reporting.NewGenerator(templateDir)
-	if err != nil {
-		h.log.Error("Failed to create report generator", "error", err)
-		h.renderTempl(c, pages.ErrorPage("Report Generation Failed"), http.StatusInternalServerError) // Pass status
-		return
-	}
+	// Construct the path to the markdown file
+	mdFilePath := filepath.Join(reportSpecificDir, "report.md")
 
-	pdfBytes, err := reportGen.GeneratePDF(reportData) // Use GeneratePDF, pass by value
-	if err != nil {
-		h.log.Error("Failed to create PDF report", "hash", hash, "error", err)
-		h.renderTempl(c, pages.ErrorPage("Report Generation Failed"), http.StatusInternalServerError) // Pass status
-		return
-	}
-
-	// Set headers for file download
-	fileName := fmt.Sprintf("launch_report_%s.pdf", hash)
-	c.Header("Content-Disposition", "attachment; filename="+fileName)
-	c.Header("Content-Type", "application/pdf")
-	c.Header("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
-
-	// Write the PDF content to the response
-	if _, err := c.Writer.Write(pdfBytes); err != nil {
-		h.log.Error("Failed to write PDF report to response", "hash", hash, "fileName", fileName, "error", err)
-		// Attempt to render an error page if possible, though headers might already be sent
-		if !c.Writer.Written() {
-			h.renderTempl(c, pages.ErrorPage("Download Failed"), http.StatusInternalServerError) // Pass status
-		}
-		return
-	}
-
-	h.log.Info("Report sent successfully", "hash", hash, "fileName", fileName, "sizeBytes", len(pdfBytes))
+	// Serve the markdown file.
+	// c.File() handles setting Content-Type based on file extension and streams the file.
+	// It will also return a 404 if the file doesn't exist, though GenerateReportPackage should ensure it does.
+	h.log.Info("Serving markdown report file", "hash", hash, "path", mdFilePath)
+	c.File(mdFilePath)
 }

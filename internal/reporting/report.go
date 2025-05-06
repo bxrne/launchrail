@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"os"
 	"path/filepath"
 
 	"github.com/bxrne/launchrail/internal/logger"
@@ -12,20 +13,48 @@ import (
 
 // ReportData holds all the necessary data for generating the report.
 type ReportData struct {
-	// TODO: Define fields for simulation results, atmospheric data, motor data, etc.
-	Version  string // Application version
-	RecordID string
-	// ... add other fields like plot paths/data
-	AtmospherePlotPath string // Example placeholder
-	ThrustPlotPath     string // Example placeholder
-	TrajectoryPlotPath string // Example placeholder
-	DynamicsPlotPath   string // Example placeholder
-	GPSMapImagePath    string // Path to generated GPS map image
+	Version            string // Application version
+	RecordID           string
+	AtmospherePlotPath string
+	ThrustPlotPath     string
+	TrajectoryPlotPath string
+	DynamicsPlotPath   string
+	GPSMapImagePath    string
 }
 
-// LoadSimulationData loads the necessary data for a report from storage.
-func LoadSimulationData(rm *storage.RecordManager, recordID string) (ReportData, error) {
-	log := logger.GetLogger("") // Consider passing logger or config
+const defaultReportTemplate = `
+# Simulation Report: {{.RecordID}}
+
+Version: {{.Version}}
+
+## Plots & Data
+
+- Atmosphere: ![]({{.AtmospherePlotPath}})
+- Thrust Curve: ![]({{.ThrustPlotPath}})
+- Trajectory: ![]({{.TrajectoryPlotPath}})
+- Dynamics: ![]({{.DynamicsPlotPath}})
+- GPS Map: ![]({{.GPSMapImagePath}})
+
+<!-- Add more sections for tables, etc. -->
+`
+
+// createDummyAsset creates an empty file at the given path.
+// In a real scenario, this would generate actual plot images.
+func createDummyAsset(assetPath string) error {
+	assetDir := filepath.Dir(assetPath)
+	if err := os.MkdirAll(assetDir, 0755); err != nil {
+		return fmt.Errorf("failed to create asset directory %s: %w", assetDir, err)
+	}
+	f, err := os.Create(assetPath)
+	if err != nil {
+		return fmt.Errorf("failed to create dummy asset %s: %w", assetPath, err)
+	}
+	return f.Close()
+}
+
+// LoadSimulationData loads the necessary data for a report from storage and creates dummy assets.
+func LoadSimulationData(rm *storage.RecordManager, recordID string, reportSpecificDir string) (ReportData, error) {
+	log := logger.GetLogger("")
 
 	record, err := rm.GetRecord(recordID)
 	if err != nil {
@@ -33,22 +62,42 @@ func LoadSimulationData(rm *storage.RecordManager, recordID string) (ReportData,
 		return ReportData{}, fmt.Errorf("failed to load record %s: %w", recordID, err)
 	}
 
-	// TODO: Load actual data from record.Motion, record.Events, record.Dynamics
-	//       using record.Motion.ReadHeadersAndData(), etc.
-	// TODO: Generate plots/maps using the loaded data and store paths.
-
 	log.Info("Loaded record for report", "recordID", recordID, "creationTime", record.CreationTime)
 
-	// Populate ReportData with basic info and placeholders
+	// Define relative paths for assets
+	assetSubDir := "assets"
+	atmoPlotRelPath := filepath.Join(assetSubDir, "atmosphere_plot.png")
+	thrustPlotRelPath := filepath.Join(assetSubDir, "thrust_plot.png")
+	trajectoryPlotRelPath := filepath.Join(assetSubDir, "trajectory_plot.png")
+	dynamicsPlotRelPath := filepath.Join(assetSubDir, "dynamics_plot.png")
+	gpsMapRelPath := filepath.Join(assetSubDir, "gps_map.png")
+
+	// Create dummy assets in the report-specific directory
+	if err := createDummyAsset(filepath.Join(reportSpecificDir, atmoPlotRelPath)); err != nil {
+		return ReportData{}, err
+	}
+	if err := createDummyAsset(filepath.Join(reportSpecificDir, thrustPlotRelPath)); err != nil {
+		return ReportData{}, err
+	}
+	if err := createDummyAsset(filepath.Join(reportSpecificDir, trajectoryPlotRelPath)); err != nil {
+		return ReportData{}, err
+	}
+	if err := createDummyAsset(filepath.Join(reportSpecificDir, dynamicsPlotRelPath)); err != nil {
+		return ReportData{}, err
+	}
+	if err := createDummyAsset(filepath.Join(reportSpecificDir, gpsMapRelPath)); err != nil {
+		return ReportData{}, err
+	}
+
 	data := ReportData{
-		RecordID: record.Hash,
-		// Version: Needs config access or to be passed in.
-		// Plot Paths - Keep as placeholders for now:
-		AtmospherePlotPath: "(Plot not generated)",
-		ThrustPlotPath:     "(Plot not generated)",
-		TrajectoryPlotPath: "(Plot not generated)",
-		DynamicsPlotPath:   "(Plot not generated)",
-		GPSMapImagePath:    "(Map not generated)",
+		RecordID:           record.Hash,
+		// Version: Needs config or to be passed in. For now, hardcode or leave empty.
+		Version:            "v0.0.0-dev",
+		AtmospherePlotPath: atmoPlotRelPath,
+		ThrustPlotPath:     thrustPlotRelPath,
+		TrajectoryPlotPath: trajectoryPlotRelPath,
+		DynamicsPlotPath:   dynamicsPlotRelPath,
+		GPSMapImagePath:    gpsMapRelPath,
 	}
 
 	return data, nil
@@ -60,64 +109,53 @@ type Generator struct {
 }
 
 // NewGenerator creates a new report generator.
-func NewGenerator(templateDir string) (*Generator, error) {
-	tmplPath := filepath.Join(templateDir, "report.md.tmpl")
-	tmpl, err := template.ParseFiles(tmplPath)
+func NewGenerator() (*Generator, error) {
+	tmpl, err := template.New("report").Parse(defaultReportTemplate)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse report template '%s': %w", tmplPath, err)
+		return nil, fmt.Errorf("failed to parse default markdown template: %w", err)
 	}
-
 	return &Generator{
 		template: tmpl,
 	}, nil
 }
 
-// GenerateMarkdown creates the markdown report content for the given data.
-func (g *Generator) GenerateMarkdown(data ReportData) ([]byte, error) {
+// GenerateMarkdownFile creates the markdown report content and saves it to a file.
+func (g *Generator) GenerateMarkdownFile(data ReportData, outputDir string) error {
 	var mdOutput bytes.Buffer
 	if err := g.template.Execute(&mdOutput, data); err != nil {
-		return nil, fmt.Errorf("failed to execute markdown template: %w", err)
+		return fmt.Errorf("failed to execute markdown template: %w", err)
 	}
-	return mdOutput.Bytes(), nil
+
+	mdFilePath := filepath.Join(outputDir, "report.md")
+	if err := os.WriteFile(mdFilePath, mdOutput.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write markdown report to %s: %w", mdFilePath, err)
+	}
+	return nil
 }
 
-// GeneratePDF generates the final PDF report.
-func (g *Generator) GeneratePDF(data ReportData) ([]byte, error) {
-	// 2. Generate Plots (Needs implementation - create temporary image files)
-	// data.AtmospherePlotPath, err = generateAtmospherePlot(data) ...
-	// data.ThrustPlotPath, err = generateThrustPlot(data) ...
-	// ... etc for other plots
-	// Remember to clean up temporary plot files later.
+// GenerateReportPackage orchestrates the generation of a self-contained report package.
+func GenerateReportPackage(rm *storage.RecordManager, recordID string, baseReportsDir string) (string, error) {
+	log := logger.GetLogger("")
+	reportSpecificDir := filepath.Join(baseReportsDir, recordID)
 
-	// 3. Generate Markdown from template
-	mdBytes, err := g.GenerateMarkdown(data)
+	if err := os.MkdirAll(reportSpecificDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create report directory %s: %w", reportSpecificDir, err)
+	}
+
+	data, err := LoadSimulationData(rm, recordID, reportSpecificDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate markdown content: %w", err)
+		return "", fmt.Errorf("failed to load simulation data for report: %w", err)
 	}
 
-	// 4. Convert Markdown to PDF (Needs implementation)
-	pdfBytes, err := convertMarkdownToPDF(mdBytes)
+	gen, err := NewGenerator()
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert markdown to PDF: %w", err)
+		return "", fmt.Errorf("failed to create report generator: %w", err)
 	}
 
-	// TODO: Clean up temporary plot files if they were created.
+	if err := gen.GenerateMarkdownFile(data, reportSpecificDir); err != nil {
+		return "", fmt.Errorf("failed to generate markdown report file: %w", err)
+	}
 
-	return pdfBytes, nil
+	log.Info("Successfully generated report package", "recordID", recordID, "outputDir", reportSpecificDir)
+	return reportSpecificDir, nil
 }
-
-// convertMarkdownToPDF placeholder function
-func convertMarkdownToPDF(md []byte) ([]byte, error) {
-	// TODO: Implement actual Markdown to PDF conversion
-	// This might involve using a library like gofpdf + a markdown parser,
-	// or shelling out to pandoc or wkhtmltopdf.
-	// For now, just return the markdown wrapped in a placeholder message.
-	pdfContent := fmt.Sprintf("--- PDF Conversion Placeholder ---\n\n%s\n\n--- End Placeholder ---", string(md))
-	return []byte(pdfContent), nil
-	// return nil, fmt.Errorf("PDF conversion not yet implemented")
-}
-
-// TODO: Add placeholder functions for plot generation
-// func generateAtmospherePlot(data ReportData) (string, error) { ... return plotFilePath, nil }
-// func generateThrustPlot(data ReportData) (string, error) { ... return plotFilePath, nil }
-// ... etc ...

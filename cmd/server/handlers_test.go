@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io" // Added import
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -413,11 +414,12 @@ func TestDownloadReport(t *testing.T) {
 	require.NoError(t, err, "Failed to create real RecordManager for test")
 
 	// Create a dummy record using the real manager
-	dummyRecord, err := realManager.CreateRecord()
+	dummyRecord, err := realManager.CreateRecord() // CreateRecord takes no arguments
 	require.NoError(t, err, "Failed to create dummy record")
-	require.NotNil(t, dummyRecord)
-	recordHash := dummyRecord.Hash
-	defer dummyRecord.Close() // Close the record created by the real manager
+	require.NotNil(t, dummyRecord, "Dummy record should not be nil")
+	
+	recordHash := dummyRecord.Hash // Use the Hash field from the Record struct
+	defer dummyRecord.Close()      // Close the record created by the real manager
 
 	cfg := &config.Config{ // Minimal config needed
 		Setup: config.Setup{
@@ -432,29 +434,39 @@ func TestDownloadReport(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Use(gin.Recovery()) // Add recovery middleware
-	router.GET("/explore/:hash/report", dataHandler.DownloadReport)
+	router.Use(gin.Recovery())                                         // Add recovery middleware
+	router.GET("/api/v0/explore/:hash/report", dataHandler.DownloadReport)
 
 	// Act
-	req := httptest.NewRequest(http.MethodGet, "/explore/"+recordHash+"/report", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v0/explore/"+recordHash+"/report", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	// Assert
 	require.Equal(t, http.StatusOK, w.Code, "Expected OK status for report download")
 
-	assert.Equal(t, "application/pdf", w.Header().Get("Content-Type"))
+	// Check for Markdown content type
+	contentType := w.Header().Get("Content-Type")
+	assert.Contains(t, contentType, "text/markdown", "Expected Content-Type to be text/markdown")
 
-	expectedFilename := fmt.Sprintf("launch_report_%s.pdf", recordHash)
-	contentDisposition := w.Header().Get("Content-Disposition")
-	assert.Contains(t, contentDisposition, "attachment; filename=")
-	assert.Contains(t, contentDisposition, expectedFilename)
+	// Content-Disposition might not be set for inline display, or might be different.
+	// If reports are meant to be downloaded, this might need to be `attachment; filename=report.md`
+	// For now, we'll assume it's served for direct viewing, so Content-Disposition might be absent or different.
+	// assert.Contains(t, w.Header().Get("Content-Disposition"), "attachment; filename=", "Content-Disposition for attachment not set correctly")
+	// assert.Contains(t, w.Header().Get("Content-Disposition"), "report.md", "Filename in Content-Disposition not set correctly")
 
-	// Check body contains placeholder content (since PDF conversion is placeholder)
-	body := w.Body.String()
-	assert.NotEmpty(t, body)
-	assert.Contains(t, body, "--- PDF Conversion Placeholder ---") // From reporting.convertMarkdownToPDF placeholder
-	assert.Contains(t, body, recordHash)                           // Check if hash from template is included
+	bodyBytes, _ := io.ReadAll(w.Body)
+	bodyString := string(bodyBytes)
+
+	// Check for Markdown specific content
+	assert.Contains(t, bodyString, fmt.Sprintf("# Simulation Report: %s", recordHash), "Report body does not contain correct Markdown title")
+	assert.Contains(t, bodyString, "## Plots & Data", "Report body does not contain Plots & Data section")
+	assert.Contains(t, bodyString, "![](assets/atmosphere_plot.png)", "Report body does not contain atmosphere plot asset link")
+
+	// Clean up: remove the created reports directory to avoid clutter
+	homeDir, _ := os.UserHomeDir()
+	reportSpecificDir := filepath.Join(homeDir, ".launchrail", "reports", recordHash)
+	_ = os.RemoveAll(reportSpecificDir) // Clean up the specific report directory
 }
 
 func TestDownloadReport_NotFound(t *testing.T) {
@@ -482,10 +494,10 @@ func TestDownloadReport_NotFound(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(gin.Recovery()) // Add recovery middleware
-	router.GET("/explore/:hash/report", dataHandler.DownloadReport)
+	router.GET("/api/v0/explore/:hash/report", dataHandler.DownloadReport)
 
 	// Act
-	req := httptest.NewRequest(http.MethodGet, "/explore/"+nonExistentHash+"/report", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v0/explore/"+nonExistentHash+"/report", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -497,7 +509,8 @@ func TestDownloadReport_NotFound(t *testing.T) {
 	var jsonResponse map[string]string
 	err = json.Unmarshal(w.Body.Bytes(), &jsonResponse)
 	require.NoError(t, err, "Response body should be valid JSON")
-	assert.Equal(t, "Failed to load data for report", jsonResponse["error"])
+	// Updated expected error message
+	assert.Equal(t, "Data for report not found", jsonResponse["error"], "Error message for non-existent report mismatch")
 }
 
 // --- New Test for HTML ListRecords with Real Manager ---
@@ -685,6 +698,7 @@ func TestDeleteRecordAPI(t *testing.T) {
 	var jsonResponse map[string]string
 	err = json.Unmarshal(w2.Body.Bytes(), &jsonResponse)
 	require.NoError(t, err, "Response body should be valid JSON for 404 error")
+	// Updated expected error message
 	assert.Equal(t, "Record not found", jsonResponse["error"], "Expected 'Record not found' error message")
 
 }

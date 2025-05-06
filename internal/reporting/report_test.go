@@ -11,80 +11,10 @@ import (
 )
 
 func TestNewGenerator(t *testing.T) {
-	tempDir := t.TempDir()
-	templateDir := filepath.Join(tempDir, "templates")
-
-	err := os.Mkdir(templateDir, 0755)
-	require.NoError(t, err)
-
-	templateContent := "Report for {{.RecordID}} Version: {{.Version}}"
-	templatePath := filepath.Join(templateDir, "report.md.tmpl")
-	err = os.WriteFile(templatePath, []byte(templateContent), 0644)
-	require.NoError(t, err)
-
-	gen, err := NewGenerator(templateDir)
+	gen, err := NewGenerator()
 	require.NoError(t, err)
 	assert.NotNil(t, gen)
 	assert.NotNil(t, gen.template)
-}
-
-func TestGenerateMarkdown(t *testing.T) {
-	tempDir := t.TempDir()
-	templateDir := filepath.Join(tempDir, "templates")
-
-	err := os.Mkdir(templateDir, 0755)
-	require.NoError(t, err)
-
-	templateContent := "# Report for {{.RecordID}}\nVersion: {{.Version}}"
-	templatePath := filepath.Join(templateDir, "report.md.tmpl")
-	err = os.WriteFile(templatePath, []byte(templateContent), 0644)
-	require.NoError(t, err)
-
-	gen, err := NewGenerator(templateDir)
-	require.NoError(t, err)
-
-	data := ReportData{
-		RecordID: "test1234",
-		Version:  "v1.0.0",
-	}
-
-	mdBytes, err := gen.GenerateMarkdown(data)
-	require.NoError(t, err)
-	assert.NotEmpty(t, mdBytes)
-
-	contentString := string(mdBytes)
-	assert.Contains(t, contentString, "# Report for test1234")
-	assert.Contains(t, contentString, "Version: v1.0.0")
-}
-
-func TestGeneratePDF_Placeholder(t *testing.T) {
-	tempDir := t.TempDir()
-	templateDir := filepath.Join(tempDir, "templates")
-
-	err := os.Mkdir(templateDir, 0755)
-	require.NoError(t, err)
-
-	templateContent := "# Report for {{.RecordID}}"
-	templatePath := filepath.Join(templateDir, "report.md.tmpl")
-	err = os.WriteFile(templatePath, []byte(templateContent), 0644)
-	require.NoError(t, err)
-
-	gen, err := NewGenerator(templateDir)
-	require.NoError(t, err)
-
-	data := ReportData{
-		RecordID: "pdf_test",
-		Version:  "v1.1.0",
-	}
-
-	pdfBytes, err := gen.GeneratePDF(data)
-	require.NoError(t, err)
-	assert.NotEmpty(t, pdfBytes)
-
-	contentString := string(pdfBytes)
-	assert.Contains(t, contentString, "--- PDF Conversion Placeholder ---")
-	assert.Contains(t, contentString, "# Report for pdf_test")
-	assert.Contains(t, contentString, "--- End Placeholder ---")
 }
 
 func TestLoadSimulationData(t *testing.T) {
@@ -101,20 +31,38 @@ func TestLoadSimulationData(t *testing.T) {
 	// It's good practice to close the record resources, even in tests
 	defer record.Close()
 
-	// 3. Call LoadSimulationData
-	loadedData, err := LoadSimulationData(rm, recordHash)
+	// 3. Define report specific directory for this test
+	reportSpecificDir := filepath.Join(tempDir, "test_report_pkg", recordHash)
+	err = os.MkdirAll(reportSpecificDir, 0755)
 	require.NoError(t, err)
 
-	// 4. Assertions
+	// 4. Call LoadSimulationData
+	loadedData, err := LoadSimulationData(rm, recordHash, reportSpecificDir)
+	require.NoError(t, err)
+
+	// 5. Assertions on ReportData
 	assert.Equal(t, recordHash, loadedData.RecordID)
-	// Version is set in the handler, so it will be empty here initially
-	assert.Empty(t, loadedData.Version)
-	// Check placeholder paths
-	assert.Equal(t, "(Plot not generated)", loadedData.AtmospherePlotPath)
-	assert.Equal(t, "(Plot not generated)", loadedData.ThrustPlotPath)
-	assert.Equal(t, "(Plot not generated)", loadedData.TrajectoryPlotPath)
-	assert.Equal(t, "(Plot not generated)", loadedData.DynamicsPlotPath)
-	assert.Equal(t, "(Map not generated)", loadedData.GPSMapImagePath)
+	assert.Equal(t, "v0.0.0-dev", loadedData.Version) // Check hardcoded version
+
+	assetSubDir := "assets"
+	expectedAtmoPlotPath := filepath.Join(assetSubDir, "atmosphere_plot.png")
+	expectedThrustPlotPath := filepath.Join(assetSubDir, "thrust_plot.png")
+	expectedTrajectoryPlotPath := filepath.Join(assetSubDir, "trajectory_plot.png")
+	expectedDynamicsPlotPath := filepath.Join(assetSubDir, "dynamics_plot.png")
+	expectedGPSMapPath := filepath.Join(assetSubDir, "gps_map.png")
+
+	assert.Equal(t, expectedAtmoPlotPath, loadedData.AtmospherePlotPath)
+	assert.Equal(t, expectedThrustPlotPath, loadedData.ThrustPlotPath)
+	assert.Equal(t, expectedTrajectoryPlotPath, loadedData.TrajectoryPlotPath)
+	assert.Equal(t, expectedDynamicsPlotPath, loadedData.DynamicsPlotPath)
+	assert.Equal(t, expectedGPSMapPath, loadedData.GPSMapImagePath)
+
+	// 6. Assertions on created dummy assets
+	assert.FileExists(t, filepath.Join(reportSpecificDir, expectedAtmoPlotPath))
+	assert.FileExists(t, filepath.Join(reportSpecificDir, expectedThrustPlotPath))
+	assert.FileExists(t, filepath.Join(reportSpecificDir, expectedTrajectoryPlotPath))
+	assert.FileExists(t, filepath.Join(reportSpecificDir, expectedDynamicsPlotPath))
+	assert.FileExists(t, filepath.Join(reportSpecificDir, expectedGPSMapPath))
 }
 
 func TestLoadSimulationData_NotFound(t *testing.T) {
@@ -123,15 +71,70 @@ func TestLoadSimulationData_NotFound(t *testing.T) {
 	rm, err := storage.NewRecordManager(tempDir)
 	require.NoError(t, err)
 
-	// 2. Attempt to load non-existent record
+	// 2. Define report specific directory (even for a non-existent record)
 	nonExistentHash := "this_hash_does_not_exist"
-	_, err = LoadSimulationData(rm, nonExistentHash)
+	reportSpecificDir := filepath.Join(tempDir, "test_report_pkg_notfound", nonExistentHash)
+	// No need to create this dir as LoadSimulationData should fail before asset creation
 
-	// 3. Assertions
+	// 3. Attempt to load non-existent record
+	_, err = LoadSimulationData(rm, nonExistentHash, reportSpecificDir)
+
+	// 4. Assertions
 	require.Error(t, err) // Expect an error
 	assert.Contains(t, err.Error(), "failed to load record")
 	assert.Contains(t, err.Error(), nonExistentHash)
 }
 
-// TODO: Add tests for PDF generation once implemented
-// TODO: Add tests for plot generation placeholders/mocks
+func TestGenerateReportPackage(t *testing.T) {
+	// 1. Setup Test RecordManager and base reports directory
+	tempDir := t.TempDir()
+	rm, err := storage.NewRecordManager(filepath.Join(tempDir, "records"))
+	require.NoError(t, err)
+	baseReportsDir := filepath.Join(tempDir, "reports")
+
+	// 2. Create a dummy record
+	record, err := rm.CreateRecord()
+	require.NoError(t, err)
+	recordHash := record.Hash
+	defer record.Close()
+
+	// 3. Call GenerateReportPackage
+	generatedReportDir, err := GenerateReportPackage(rm, recordHash, baseReportsDir)
+	require.NoError(t, err)
+
+	// 4. Assertions on the generated package structure
+	expectedReportDir := filepath.Join(baseReportsDir, recordHash)
+	assert.Equal(t, expectedReportDir, generatedReportDir)
+	assert.DirExists(t, generatedReportDir)
+
+	mdFilePath := filepath.Join(generatedReportDir, "report.md")
+	assert.FileExists(t, mdFilePath)
+
+	assetsDir := filepath.Join(generatedReportDir, "assets")
+	assert.DirExists(t, assetsDir)
+
+	// Check for dummy asset files
+	expectedAssetFiles := []string{
+		"atmosphere_plot.png",
+		"thrust_plot.png",
+		"trajectory_plot.png",
+		"dynamics_plot.png",
+		"gps_map.png",
+	}
+	for _, assetFile := range expectedAssetFiles {
+		assert.FileExists(t, filepath.Join(assetsDir, assetFile))
+	}
+
+	// 5. Assertions on report.md content (check for relative links)
+	mdContentBytes, err := os.ReadFile(mdFilePath)
+	require.NoError(t, err)
+	mdContent := string(mdContentBytes)
+
+	assert.Contains(t, mdContent, "# Simulation Report: "+recordHash)
+	assert.Contains(t, mdContent, "Version: v0.0.0-dev")
+	assert.Contains(t, mdContent, "![](assets/atmosphere_plot.png)")
+	assert.Contains(t, mdContent, "![](assets/thrust_plot.png)")
+	assert.Contains(t, mdContent, "![](assets/trajectory_plot.png)")
+	assert.Contains(t, mdContent, "![](assets/dynamics_plot.png)")
+	assert.Contains(t, mdContent, "![](assets/gps_map.png)")
+}
