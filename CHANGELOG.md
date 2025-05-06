@@ -1,3 +1,27 @@
+## v0.6.0 (2025-05-06)
+
+### Feat
+
+- **weather**: Add config to plugin system and implement weather client for wind data
+- **reporting**: Add report generation and download functionality with PDF placeholder
+
+### Fix
+
+- **weather, plugin, blackscholes, simulation**: Update plugin initialization to pass config and add weather client tests
+- **weather, blackscholes**: Add weather client tests and update plugin initialization interface
+- **server**: Add HTMX response to delete handler with updated record list
+- **server**: Remove debug logs and fix HTMX header casing in delete record handler
+- **bench**: Update CSV parsing to handle NaN/Inf and adjust column indices for events/states
+- **bench, openrocket, systems**: Add motor designation field and improve test coverage for data loading and benchmarks
+- **bench**: Improve event time comparison handling and store benchmark results in user home dir
+
+### Refactor
+
+- **server, entities, openrocket**: Refactor mass calculation and add unit tests for component mass calculations
+- **server**: Add request header logging and initialize DataHandler with logger in tests
+- **server, reporting, storage, pages**: Add error handling and report generation for record deletion and downloads
+- **bench, config**: Refactor benchmark system with new Run interface and improved data handling
+
 ## v0.5.0 (2025-05-05)
 
 ### Feat
