@@ -1,18 +1,26 @@
 package pages
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/bxrne/launchrail/templates/layouts"
 )
 
-templ Index(version string) {
+templ Index(appVersion string) {
 	@layouts.Base(layouts.BaseProps{
 		Title:   "Home",
-		Version: version,
+		Version: appVersion,
 		Scripts: []string{"/static/scripts/simulation.js"},
 	}) {
 		<h1 class="h3 text-center p-4">New Simulation</h1>
 		
-		<form class="Box color-shadow-medium p-4" hx-post="/api/v0/run" hx-target="#response" hx-swap="innerHTML" hx-on="submit: event.preventDefault()">
+		<form class="Box color-shadow-medium p-4" hx-post={ fmt.Sprintf("/api/v%s/run", func() string {
+			if parts := strings.Split(appVersion, "."); len(parts) > 0 {
+				return parts[0]
+			}
+			return "0"
+		}()) } hx-target="#response" hx-swap="innerHTML" hx-on="submit: event.preventDefault()">
 			<div class="form-group">
 				<div class="flex-items-center mb-2">
 					<label for="plugin-paths" class="f4 color-fg-accent">Plugin Paths:</label>

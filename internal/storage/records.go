@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/zerodha/logf"
 )
 
 // No JSON metadata or data files are produced per record; only CSVs
@@ -96,6 +97,12 @@ func (r *Record) Close() error {
 type RecordManager struct {
 	baseDir string
 	mu      sync.RWMutex
+	log     *logf.Logger
+}
+
+// GetStorageDir returns the base directory for the record manager.
+func (rm *RecordManager) GetStorageDir() string {
+	return rm.baseDir
 }
 
 func NewRecordManager(baseDir string) (*RecordManager, error) {
@@ -111,8 +118,11 @@ func NewRecordManager(baseDir string) (*RecordManager, error) {
 		return nil, err
 	}
 
+	log := logger.GetLogger("info") // Or a more appropriate level
+
 	return &RecordManager{
 		baseDir: baseDir,
+		log:     log,
 	}, nil
 }
 
@@ -125,22 +135,19 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 	defer rm.mu.Unlock()
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(time.Now().String())))
 
-	// Ensure .launchrail directory exists
-	homeDir, err := os.UserHomeDir()
+	// Use rm.baseDir as the root for record directories.
+	// rm.baseDir should already be an absolute path, created by NewRecordManager.
+	// MkdirAll is still good practice in case baseDir was removed externally or for subdirs.
+	err := os.MkdirAll(rm.baseDir, 0755) // Ensure baseDir itself exists
 	if err != nil {
-		return nil, err
-	}
-	launchrailDir := filepath.Join(homeDir, ".launchrail")
-	err = os.MkdirAll(launchrailDir, 0755)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create .launchrail directory: %w", err)
+		return nil, fmt.Errorf("failed to ensure base directory exists %s: %w", rm.baseDir, err)
 	}
 
-	// Create hash-named directory inside .launchrail
-	hashDir := filepath.Join(launchrailDir, hash)
+	// Create hash-named directory inside rm.baseDir
+	hashDir := filepath.Join(rm.baseDir, hash)
 	err = os.MkdirAll(hashDir, 0755)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create hash directory: %w", err)
+		return nil, fmt.Errorf("failed to create hash directory %s: %w", hashDir, err)
 	}
 
 	record, err := NewRecord(hashDir, hash)
@@ -181,12 +188,8 @@ func (rm *RecordManager) DeleteRecord(hash string) error {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get user home directory: %w", err)
-	}
-	launchrailDir := filepath.Join(homeDir, ".launchrail")
-	recordPath := filepath.Join(launchrailDir, hash)
+	// Use rm.baseDir to construct the path to the record directory
+	recordPath := filepath.Join(rm.baseDir, hash)
 
 	// Check if the record directory exists first
 	if _, err := os.Stat(recordPath); os.IsNotExist(err) {
@@ -211,14 +214,10 @@ func (rm *RecordManager) ListRecords() ([]*Record, error) {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 
-	homeDir, err := os.UserHomeDir()
+	// Use rm.baseDir instead of hardcoding to ~/.launchrail
+	entries, err := os.ReadDir(rm.baseDir)
 	if err != nil {
-		return nil, err
-	}
-	launchrailDir := filepath.Join(homeDir, ".launchrail")
-	entries, err := os.ReadDir(launchrailDir)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read directory %s: %w", rm.baseDir, err)
 	}
 
 	var records []*Record
@@ -227,9 +226,11 @@ func (rm *RecordManager) ListRecords() ([]*Record, error) {
 			continue
 		}
 
-		recordPath := filepath.Join(launchrailDir, entry.Name())
+		// Construct recordPath relative to rm.baseDir
+		recordPath := filepath.Join(rm.baseDir, entry.Name())
 		info, err := os.Stat(recordPath)
 		if err != nil {
+			rm.log.Warn("Failed to stat record, skipping", "path", recordPath, "error", err)
 			continue // Skip invalid records
 		}
 
@@ -261,36 +262,47 @@ func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-	launchrailDir := filepath.Join(homeDir, ".launchrail")
-	recordPath := filepath.Join(launchrailDir, hash)
+	// Construct path using rm.baseDir
+	recordPath := filepath.Join(rm.baseDir, hash)
 	if _, err := os.Stat(recordPath); err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("record not found")
+			return nil, fmt.Errorf("record not found") // Consistent error message with loadRecord
 		}
-		return nil, fmt.Errorf("failed to stat record path: %w", err)
+		return nil, fmt.Errorf("failed to stat record path %s: %w", recordPath, err)
 	}
 
 	// Initialize storage services for the record
 	motionStore, err := NewStorage(recordPath, MOTION) // Use recordPath
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create motion storage for %s: %w", hash, err) // More context for error
+	}
+	if err := motionStore.Init(); err != nil {
+		motionStore.Close()
+		return nil, fmt.Errorf("failed to initialize motion storage for %s: %w", hash, err)
 	}
 
 	eventsStore, err := NewStorage(recordPath, EVENTS) // Use recordPath
 	if err != nil {
+		motionStore.Close() // Clean up previously successful store
+		return nil, fmt.Errorf("failed to create events storage for %s: %w", hash, err)
+	}
+	if err := eventsStore.Init(); err != nil {
 		motionStore.Close()
-		return nil, err
+		eventsStore.Close()
+		return nil, fmt.Errorf("failed to initialize events storage for %s: %w", hash, err)
 	}
 
 	dynamicsStore, err := NewStorage(recordPath, DYNAMICS) // Use recordPath
 	if err != nil {
 		motionStore.Close()
+		eventsStore.Close() // Clean up previously successful stores
+		return nil, fmt.Errorf("failed to create dynamics storage for %s: %w", hash, err)
+	}
+	if err := dynamicsStore.Init(); err != nil {
+		motionStore.Close()
 		eventsStore.Close()
-		return nil, err
+		dynamicsStore.Close()
+		return nil, fmt.Errorf("failed to initialize dynamics storage for %s: %w", hash, err)
 	}
 
 	// Get last modified time
@@ -317,15 +329,12 @@ func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 
 // loadRecord loads a record by hash and initializes its CSV stores.
 func (rm *RecordManager) loadRecord(hash string) (*Record, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-	recordPath := filepath.Join(homeDir, ".launchrail", hash)
+	// Construct path using rm.baseDir
+	recordPath := filepath.Join(rm.baseDir, hash)
 	info, err := os.Stat(recordPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("record %s not found", hash)
+			return nil, fmt.Errorf("record %s not found at %s", hash, recordPath)
 		}
 		return nil, fmt.Errorf("failed to stat record directory %s: %w", recordPath, err)
 	}
@@ -337,16 +346,31 @@ func (rm *RecordManager) loadRecord(hash string) (*Record, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to init motion storage for %s: %w", hash, err)
 	}
+	if err := motionStore.Init(); err != nil {
+		motionStore.Close()
+		return nil, fmt.Errorf("failed to initialize motionStore for %s: %w", hash, err)
+	}
 	eventsStore, err := NewStorage(recordPath, EVENTS)
 	if err != nil {
 		motionStore.Close()
 		return nil, fmt.Errorf("failed to init events storage for %s: %w", hash, err)
+	}
+	if err := eventsStore.Init(); err != nil {
+		motionStore.Close()
+		eventsStore.Close()
+		return nil, fmt.Errorf("failed to initialize eventsStore for %s: %w", hash, err)
 	}
 	dynamicsStore, err := NewStorage(recordPath, DYNAMICS)
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close()
 		return nil, fmt.Errorf("failed to init dynamics storage for %s: %w", hash, err)
+	}
+	if err := dynamicsStore.Init(); err != nil {
+		motionStore.Close()
+		eventsStore.Close()
+		dynamicsStore.Close()
+		return nil, fmt.Errorf("failed to initialize dynamicsStore for %s: %w", hash, err)
 	}
 	return &Record{
 		Hash:         hash,

@@ -3,39 +3,55 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/viper"
 )
 
 var (
-	cfg *Config // Singleton instance of Config
+	v *viper.Viper // Package-level viper instance, used by Validate via ConfigFileUsed()
 )
 
-// GetConfig reads configuration, validates it, resolves paths, and returns the singleton instance.
+// GetConfig reads configuration, validates it, resolves paths, and returns a new instance.
 func GetConfig() (*Config, error) {
-	v := viper.New()
+	v = viper.New() // Initialize package-level viper instance for this call's context
 
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
-	v.AddConfigPath(".") // Look for config in the current directory
+	v.AddConfigPath(".")     // Look for config in the current directory
+	v.AddConfigPath("..")    // Look for config in the parent directory
+	v.AddConfigPath("../..") // Look for config in the grandparent directory
 
 	// Attempt to find and read the config file
 	if err := v.ReadInConfig(); err != nil {
-		// Config file MUST exist now if we rely on it solely for paths etc.
 		return nil, fmt.Errorf("failed to read mandatory config file: %w", err)
 	}
 
-	// Unmarshal the config read from the file into the cfg struct
-	if err := v.Unmarshal(&cfg); err != nil {
+	currentCfg := &Config{}
+	if err := v.Unmarshal(currentCfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	// Validate the configuration
-	if err := cfg.Validate(); err != nil {
+	var configFileDir string
+	configFilePath := v.ConfigFileUsed()
+	if configFilePath != "" {
+		configFileDir = filepath.Dir(configFilePath)
+	} else {
+		// Fallback if viper doesn't provide the config file path (e.g., if config is set programmatically without a file)
+		cwd, err := os.Getwd()
+		if err != nil {
+			// This is a more critical fallback failure, as we can't determine a base dir.
+			return nil, fmt.Errorf("could not determine config file directory: viper.ConfigFileUsed() is empty and os.Getwd() failed: %w", err)
+		}
+		configFileDir = cwd
+		// Potentially log a warning here if this path is taken in a non-test environment.
+	}
+
+	if err := currentCfg.Validate(configFileDir); err != nil {
 		return nil, fmt.Errorf("failed to validate config: %w", err)
 	}
 
-	return cfg, nil
+	return currentCfg, nil
 }
 
 // App represents the application configuration.
@@ -142,8 +158,8 @@ type Config struct {
 	Benchmarks map[string]BenchmarkEntry `mapstructure:"benchmarks"`
 }
 
-// String returns the configuration as a map of strings, useful for testing.
-func (c *Config) String() map[string]string {
+// ToMap converts the configuration to a map of strings.
+func (c *Config) ToMap() map[string]string {
 	marshalled := make(map[string]string)
 
 	// Setup Config
@@ -210,38 +226,43 @@ func (c *Config) Bytes() []byte {
 	return []byte(fmt.Sprintf("%+v", c))
 }
 
-// Validate checks the config for missing or invalid fields.
-func (cfg *Config) Validate() error {
-	// App Config
+// Validate checks the configuration for errors and resolves relative paths.
+// configFileDir is the directory containing the configuration file, used as a base for relative paths.
+func (cfg *Config) Validate(configFileDir string) error {
+	// Check for required fields
 	if cfg.Setup.App.Name == "" {
 		return fmt.Errorf("app.name is required")
 	}
 	if cfg.Setup.App.Version == "" {
 		return fmt.Errorf("app.version is required")
 	}
-
-	// Logging
 	if cfg.Setup.Logging.Level == "" {
 		return fmt.Errorf("logging.level is required")
 	}
-
-	// External
 	if cfg.Engine.External.OpenRocketVersion == "" {
 		return fmt.Errorf("external.openrocket_version is required")
 	}
-
-	// Options
 	if cfg.Engine.Options.MotorDesignation == "" {
 		return fmt.Errorf("options.motor_designation is required")
 	}
 	if cfg.Engine.Options.OpenRocketFile == "" {
 		return fmt.Errorf("options.openrocket_file is required")
 	}
-	if _, err := os.Stat(cfg.Engine.Options.OpenRocketFile); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("options.openrocket_file is invalid: %s", err)
-	}
 
-	// Launchrail
+	// Get the directory of the config file
+	// Resolve OpenRocketFile path relative to config file's directory
+	optionsFilePath := cfg.Engine.Options.OpenRocketFile
+	if !filepath.IsAbs(optionsFilePath) {
+		optionsFilePath = filepath.Join(configFileDir, optionsFilePath)
+	}
+	if _, err := os.Stat(optionsFilePath); os.IsNotExist(err) {
+		return fmt.Errorf("options.openrocket_file path does not exist: %s (resolved from %s)", optionsFilePath, cfg.Engine.Options.OpenRocketFile)
+	} else if err != nil {
+		return fmt.Errorf("error checking options.openrocket_file path '%s': %w", optionsFilePath, err)
+	}
+	cfg.Engine.Options.OpenRocketFile = optionsFilePath // Update with resolved absolute path
+
+	// Validate Launchrail
 	if cfg.Engine.Options.Launchrail.Length <= 0 {
 		return fmt.Errorf("options.launchrail.length must be greater than zero")
 	}
@@ -302,6 +323,18 @@ func (cfg *Config) Validate() error {
 	if len(cfg.Setup.Plugins.Paths) == 0 {
 		return fmt.Errorf("plugins.paths must contain at least one valid path")
 	}
+	// Optionally validate each plugin path exists, similar to benchmark files
+	for i, p := range cfg.Setup.Plugins.Paths {
+		pluginPath := p
+		if !filepath.IsAbs(pluginPath) {
+			pluginPath = filepath.Join(configFileDir, pluginPath)
+		}
+		if _, err := os.Stat(pluginPath); os.IsNotExist(err) {
+			return fmt.Errorf("plugins.paths[%d] path does not exist: %s (resolved from %s)", i, pluginPath, p)
+		} else if err != nil {
+			return fmt.Errorf("error checking plugins.paths[%d] path '%s': %w", i, pluginPath, err)
+		}
+	}
 
 	// Server
 	if cfg.Server.Port <= 0 || cfg.Server.Port > 65535 {
@@ -316,7 +349,6 @@ func (cfg *Config) Validate() error {
 		if benchmark.DesignFile == "" {
 			return fmt.Errorf("benchmark '%s': benchmark.design_file is required", tag)
 		}
-		// Removed os.Stat check that incorrectly used BaseDir here
 		if benchmark.DataDir == "" {
 			return fmt.Errorf("benchmark '%s': benchmark.data_dir is required", tag)
 		}
@@ -324,22 +356,28 @@ func (cfg *Config) Validate() error {
 			return fmt.Errorf("benchmark '%s': benchmark.motor_designation is required", tag)
 		}
 
-		// Check if DesignFile exists (relative to project root or absolute)
-		// Use the path directly as specified in config.yaml
-		if _, err := os.Stat(benchmark.DesignFile); os.IsNotExist(err) {
-			return fmt.Errorf("benchmark '%s' designFile path does not exist: %s", tag, benchmark.DesignFile)
+		// Resolve DesignFile path relative to config file's directory
+		designFilePath := benchmark.DesignFile
+		if !filepath.IsAbs(designFilePath) {
+			designFilePath = filepath.Join(configFileDir, designFilePath)
+		}
+		if _, err := os.Stat(designFilePath); os.IsNotExist(err) {
+			return fmt.Errorf("benchmark '%s' designFile path does not exist: %s (resolved from %s)", tag, designFilePath, benchmark.DesignFile)
 		} else if err != nil {
-			return fmt.Errorf("error checking benchmark '%s' designFile path '%s': %w", tag, benchmark.DesignFile, err)
+			return fmt.Errorf("error checking benchmark '%s' designFile path '%s': %w", tag, designFilePath, err)
 		}
 
-		// Check if DataDir exists (relative to project root or absolute)
-		// Use the path directly as specified in config.yaml
-		if stat, err := os.Stat(benchmark.DataDir); os.IsNotExist(err) {
-			return fmt.Errorf("benchmark '%s' dataDir path does not exist: %s", tag, benchmark.DataDir)
+		// Resolve DataDir path relative to config file's directory
+		dataDirPath := benchmark.DataDir
+		if !filepath.IsAbs(dataDirPath) {
+			dataDirPath = filepath.Join(configFileDir, dataDirPath)
+		}
+		if stat, err := os.Stat(dataDirPath); os.IsNotExist(err) {
+			return fmt.Errorf("benchmark '%s' dataDir path does not exist: %s (resolved from %s)", tag, dataDirPath, benchmark.DataDir)
 		} else if err != nil {
-			return fmt.Errorf("error checking benchmark '%s' dataDir path '%s': %w", tag, benchmark.DataDir, err)
+			return fmt.Errorf("error checking benchmark '%s' dataDir path '%s': %w", tag, dataDirPath, err)
 		} else if !stat.IsDir() {
-			return fmt.Errorf("benchmark '%s' dataDir path is not a directory: %s", tag, benchmark.DataDir)
+			return fmt.Errorf("benchmark '%s' dataDir path is not a directory: %s (resolved from %s)", tag, dataDirPath, benchmark.DataDir)
 		}
 	}
 

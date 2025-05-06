@@ -12,7 +12,7 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
-	loggerpkg "github.com/bxrne/launchrail/internal/logger"
+	logger "github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/plot_transformer"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
@@ -237,14 +237,6 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config, log *logf.Logger) 
 	// }
 	log.Debug("Manager initialized successfully within configFromCtx")
 
-	// Validate the configuration
-	log.Debug("Attempting to validate simConfig")
-	if err := simConfig.Validate(); err != nil {
-		log.Warn("simConfig.Validate() failed", "error", err)
-		return nil, fmt.Errorf("failed to validate config: %w", err)
-	}
-	log.Debug("simConfig.Validate() succeeded")
-
 	return &simConfig, nil
 }
 
@@ -259,17 +251,13 @@ func render(c *gin.Context, component templ.Component) {
 }
 
 func main() {
-	log := loggerpkg.GetLogger("debug")
+	log := logger.GetLogger("debug")
 	cfg, err := config.GetConfig()
 	if err != nil {
 		log.Warn("Failed to load config", "error", err)
 		return
 	}
 	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
-
-	// Bind the port flag to the server.port configuration key
-	// flag.IntVar(&cfg.Server.Port, "port", cfg.Server.Port, "Server port")
-	// flag.Parse()
 
 	r := gin.Default()
 	err = r.SetTrustedProxies(nil)
@@ -336,7 +324,7 @@ func main() {
 		api.GET("/spec", func(c *gin.Context) {
 			c.Redirect(http.StatusMovedPermanently, "/swagger/spec")
 		})
-		api.GET("/explore/:hash/report", dataHandler.DownloadReport)
+		api.GET("/explore/:hash/report", dataHandler.ReportAPIV2) // New endpoint for structured report data
 	}
 
 	// Web routes
@@ -410,6 +398,8 @@ func main() {
 		render(c, pages.Explorer(explorerData, cfg.Setup.App.Version))
 	})
 	r.GET("/explore/:hash/json", dataHandler.GetExplorerData)
+	r.GET("/explore/:hash/report", dataHandler.ReportAPIV2)
+
 	r.POST("/plot", func(c *gin.Context) {
 		hash := c.PostForm("hash")
 		source := c.PostForm("source")
@@ -476,7 +466,7 @@ func (h *DataHandler) handleSimRun(c *gin.Context) {
 	}
 
 	// Use the existing record manager from the DataHandler instance (h.records)
-	if err := runSim(simConfig, h.records, h.log); err != nil {
+	if err := runSim(simConfig, h.records.(*storage.RecordManager), h.log); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,15 +16,33 @@ import (
 	"github.com/bxrne/launchrail/internal/plot_transformer"
 	"github.com/bxrne/launchrail/internal/reporting"
 	"github.com/bxrne/launchrail/internal/storage"
+
 	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
 	"github.com/zerodha/logf"
 )
 
+// HandlerRecordManager defines the subset of storage.RecordManager methods used by DataHandler.
+type HandlerRecordManager interface {
+	ListRecords() ([]*storage.Record, error)
+	GetRecord(hash string) (*storage.Record, error)
+	DeleteRecord(hash string) error
+	GetStorageDir() string // Used by reporting.GenerateReportPackage
+}
+
 type DataHandler struct {
-	records *storage.RecordManager
+	records HandlerRecordManager
 	Cfg     *config.Config
 	log     *logf.Logger
+}
+
+// NewDataHandler creates a new instance of DataHandler.
+func NewDataHandler(records HandlerRecordManager, cfg *config.Config, log *logf.Logger) *DataHandler {
+	return &DataHandler{
+		records: records,
+		Cfg:     cfg,
+		log:     log,
+	}
 }
 
 // Helper method to render templ components
@@ -704,60 +724,63 @@ func min(a, b int) int {
 	return b
 }
 
-// DownloadReport handles downloading the simulation report for a specific hash.
-func (h *DataHandler) DownloadReport(c *gin.Context) {
+// ReportAPIV2 serves a specific report, potentially as a downloadable package or rendered view.
+// TODO: This currently returns JSON data. Needs to be adapted for actual report serving (HTML/Zip).
+func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 	hash := c.Param("hash")
 	if hash == "" {
-		h.log.Warn("DownloadReport request missing hash")
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Record hash is required"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Missing report hash"})
 		return
 	}
-	h.log.Debug("Received request to download report", "hash", hash)
+	// Validate that the hash is a safe single path component
+	if strings.Contains(hash, "/") || strings.Contains(hash, "\\") || strings.Contains(hash, "..") {
+		h.log.Warn("Invalid report hash provided", "hash", hash)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid report hash"})
+		return
+	}
+	h.log.Info("Report data requested", "hash", hash)
 
-	// Load simulation data
-	reportData, err := reporting.LoadSimulationData(h.records, hash)
+	// Use the RecordManager's configured storage directory
+	baseRecordsDir := h.records.GetStorageDir()
+	if baseRecordsDir == "" {
+		h.log.Error("Base records directory is not configured or accessible in RecordManager")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Internal server error: Records directory configuration error"})
+		return
+	}
+	reportSpecificDir := filepath.Join(baseRecordsDir, hash)
+	// Ensure the resolved path is within the base directory
+	absReportDir, err := filepath.Abs(reportSpecificDir)
+	if err != nil || !strings.HasPrefix(absReportDir, filepath.Clean(baseRecordsDir)+string(os.PathSeparator)) {
+		h.log.Warn("Resolved report directory is outside the base directory", "resolvedDir", absReportDir, "baseDir", baseRecordsDir)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid report hash"})
+		return
+	}
+
+	// Ensure h.records is not nil and is of type *storage.RecordManager
+	rm, ok := h.records.(*storage.RecordManager)
+	if !ok || rm == nil {
+		h.log.Error("RecordManager is not initialized or of incorrect type in handler")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Internal server error: Record manager not available"})
+		return
+	}
+
+	reportData, err := reporting.LoadSimulationData(hash, rm, reportSpecificDir, h.Cfg)
 	if err != nil {
 		h.log.Error("Failed to load simulation data for report", "hash", hash, "error", err)
-		if errors.Is(err, storage.ErrRecordNotFound) || strings.Contains(strings.ToLower(err.Error()), "not found") {
-			h.log.Warn("Report requested for non-existent record", "hash", hash)
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Failed to load data for report"})
+		if errors.Is(err, storage.ErrRecordNotFound) ||
+			strings.Contains(strings.ToLower(err.Error()), "record not found") ||
+			strings.Contains(err.Error(), "no such file or directory") || // Check for file system errors too
+			strings.Contains(err.Error(), "failed to get record") { // Check for our specific GetRecord error
+			h.log.Warn("Report requested for non-existent record or data loading failed", "hash", hash)
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Data for report not found or incomplete"})
 		} else {
-			h.renderTempl(c, pages.ErrorPage("Internal Server Error"), http.StatusInternalServerError)
+			// For other errors, return a generic server error or a more specific one if appropriate
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate report data"})
 		}
 		return
 	}
 
-	// Create the report
-	templateDir := "internal/reporting/templates"
-	reportGen, err := reporting.NewGenerator(templateDir)
-	if err != nil {
-		h.log.Error("Failed to create report generator", "error", err)
-		h.renderTempl(c, pages.ErrorPage("Report Generation Failed"), http.StatusInternalServerError) // Pass status
-		return
-	}
-
-	pdfBytes, err := reportGen.GeneratePDF(reportData) // Use GeneratePDF, pass by value
-	if err != nil {
-		h.log.Error("Failed to create PDF report", "hash", hash, "error", err)
-		h.renderTempl(c, pages.ErrorPage("Report Generation Failed"), http.StatusInternalServerError) // Pass status
-		return
-	}
-
-	// Set headers for file download
-	fileName := fmt.Sprintf("launch_report_%s.pdf", hash)
-	c.Header("Content-Disposition", "attachment; filename="+fileName)
-	c.Header("Content-Type", "application/pdf")
-	c.Header("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
-
-	// Write the PDF content to the response
-	if _, err := c.Writer.Write(pdfBytes); err != nil {
-		h.log.Error("Failed to write PDF report to response", "hash", hash, "fileName", fileName, "error", err)
-		// Attempt to render an error page if possible, though headers might already be sent
-		if !c.Writer.Written() {
-			h.renderTempl(c, pages.ErrorPage("Download Failed"), http.StatusInternalServerError) // Pass status
-		}
-		return
-	}
-
-	h.log.Info("Report sent successfully", "hash", hash, "fileName", fileName, "sizeBytes", len(pdfBytes))
+	c.JSON(http.StatusOK, reportData)
 }
+
+// CreateRecordAPI handles the creation of a new simulation record.

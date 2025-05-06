@@ -102,7 +102,7 @@ func (m *Motor) Update(dt float64) error {
 
 	// Update elapsed time
 	m.elapsedTime += dt
-	// Update thrust based on thrust curve
+	// Interpolate thrust based on elapsed time
 	m.thrust = m.interpolateThrust(m.elapsedTime)
 	// Update mass if still generating thrust
 	if m.thrust > 0 {

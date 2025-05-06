@@ -46,6 +46,7 @@ type Storage struct {
 	writer    *csv.Writer
 	file      *os.File
 	log       *logf.Logger
+	closed    bool
 }
 
 // Stores is a collection of storage services
@@ -84,35 +85,56 @@ func NewStorage(recordDir string, store SimStorageType) (*Storage, error) {
 		filePath:  filePath,
 		file:      file,
 		writer:    csv.NewWriter(file),
+		closed:    false,
 	}, nil
 }
 
 // Init ensures the header row is written if the file is new/empty.
+// It is non-destructive if the file already appears to be initialized.
 func (s *Storage) Init() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.log = logger.GetLogger("debug")
+	s.log = logger.GetLogger("debug") // Ensure logger is always initialized
 
-	// Truncate file before writing headers
-	if err := s.file.Truncate(0); err != nil {
-		return fmt.Errorf("failed to truncate file: %v", err)
+	// Check file size to determine if it's new or empty
+	fileInfo, err := s.file.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to get file stats for %s: %w", s.filePath, err)
 	}
 
-	// Reset file pointer to beginning
-	if _, err := s.file.Seek(0, 0); err != nil {
-		return fmt.Errorf("failed to seek to beginning: %v", err)
-	}
+	if fileInfo.Size() == 0 {
+		// File is empty, proceed to write headers
+		// Truncate is not strictly necessary for a 0-size file but ensures clean state if somehow not 0 but intended to be new.
+		if err := s.file.Truncate(0); err != nil {
+			return fmt.Errorf("failed to truncate empty file %s: %w", s.filePath, err)
+		}
+		if _, err := s.file.Seek(0, 0); err != nil {
+			return fmt.Errorf("failed to seek to beginning of empty file %s: %w", s.filePath, err)
+		}
 
-	// Write headers
-	headers := StorageHeaders[s.store]
-	s.log.Debug(fmt.Sprintf("Initializing storage headers for %s: headers=%v", s.filePath, headers))
-	if err := s.writer.Write(headers); err != nil {
-		s.log.Error(fmt.Sprintf("failed to write headers: %v", err))
-	}
-	s.writer.Flush()
-	if err := s.writer.Error(); err != nil {
-		s.log.Error(fmt.Sprintf("failed to flush headers: %v", err))
+		headers := StorageHeaders[s.store]
+		s.log.Debug(fmt.Sprintf("Initializing storage with headers for %s: headers=%v", s.filePath, headers))
+		if err := s.writer.Write(headers); err != nil {
+			s.log.Error(fmt.Sprintf("failed to write headers to %s: %v", s.filePath, err))
+			// Return the error to indicate Init failure
+			return fmt.Errorf("failed to write headers to %s: %w", s.filePath, err)
+		}
+		s.writer.Flush()
+		if err := s.writer.Error(); err != nil {
+			s.log.Error(fmt.Sprintf("failed to flush headers to %s: %v", s.filePath, err))
+			// Return the error to indicate Init failure
+			return fmt.Errorf("failed to flush headers to %s: %w", s.filePath, err)
+		}
+		s.log.Debug(fmt.Sprintf("Successfully initialized headers for %s", s.filePath))
+	} else {
+		// File is not empty, assume it's already initialized with headers.
+		// We need to ensure the CSV writer is ready for subsequent writes, even if we didn't write headers now.
+		// For csv.NewWriter, it's generally fine as it writes to the underlying io.Writer (s.file).
+		// However, the file pointer might be at the end. For reading, ReadAll seeks to start.
+		// For writing, we want to append, which os.O_APPEND handles at OS level.
+		// Ensure the writer is reset or aware of the file state if necessary, though typically it appends.
+		s.log.Debug(fmt.Sprintf("Storage file %s already exists and is not empty, assuming initialized.", s.filePath))
 	}
 
 	return nil
@@ -148,20 +170,37 @@ func (s *Storage) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.writer != nil {
-		s.writer.Flush()
-		if err := s.writer.Error(); err != nil {
-			s.log.Error(fmt.Sprintf("failed to flush on close: %v", err))
+	if s.closed {
+		return nil
+	}
+
+	var firstErr error
+
+	// Helper to capture and log the first error encountered
+	// It ensures that subsequent operations are still attempted.
+	setErr := func(err error, context string) {
+		if err != nil {
+			if s.log != nil { // s.log might be nil if Init() was never called or failed
+				s.log.Error(fmt.Sprintf("error during %s: %v", context, err))
+			}
+			if firstErr == nil {
+				firstErr = fmt.Errorf("%s: %w", context, err)
+			}
 		}
 	}
 
-	if s.file != nil {
-		if err := s.file.Sync(); err != nil {
-			s.log.Error(fmt.Sprintf("failed to sync file: %v", err))
-		}
-		return s.file.Close()
+	if s.writer != nil {
+		s.writer.Flush() // Attempt to flush any buffered data
+		setErr(s.writer.Error(), "csv writer flush/error")
 	}
-	return nil
+
+	if s.file != nil {
+		setErr(s.file.Sync(), "file sync")
+		setErr(s.file.Close(), "file close")
+	}
+
+	s.closed = true
+	return firstErr
 }
 
 // GetFilePath returns the file path of the storage service.

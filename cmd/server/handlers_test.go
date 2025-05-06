@@ -13,11 +13,14 @@ import (
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/internal/reporting"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var testLog = logger.GetLogger("debug") // Define testLog
 
 // Response structure for API tests
 type ListRecordsAPIResponse struct {
@@ -30,12 +33,11 @@ type ListRecordsAPIResponse struct {
 type RecordManagerInterface interface {
 	ListRecords() ([]*storage.Record, error)
 	GetRecord(hash string) (*storage.Record, error)
-	CreateRecord() (*storage.Record, error)
 	DeleteRecord(hash string) error
 	GetStorageDir() string
 }
 
-// TestRecordManager is a test implementation of RecordManagerInterface
+// TestRecordManager is a test implementation of RecordManagerInterface for testing.
 type TestRecordManager struct {
 	mock *MockRecordManager
 }
@@ -67,9 +69,6 @@ func newTestRecordManager(n int) RecordManagerInterface {
 	return &TestRecordManager{mock: mock}
 }
 
-// We don't need the AsRecordManager method anymore since we're directly using TestRecordManager
-// in our tests instead of trying to convert it to a storage.RecordManager
-
 // ListRecords implements storage.RecordManager interface
 func (t *TestRecordManager) ListRecords() ([]*storage.Record, error) {
 	return t.mock.records, nil
@@ -83,18 +82,6 @@ func (t *TestRecordManager) GetRecord(hash string) (*storage.Record, error) {
 		}
 	}
 	return nil, fmt.Errorf("record not found with hash: %s", hash)
-}
-
-// CreateRecord implements storage.RecordManager interface
-func (t *TestRecordManager) CreateRecord() (*storage.Record, error) {
-	hash := fmt.Sprintf("test-hash-%d", len(t.mock.records)+1)
-	record := &storage.Record{
-		Hash:         hash,
-		CreationTime: time.Now(),
-		LastModified: time.Now(),
-	}
-	t.mock.records = append(t.mock.records, record)
-	return record, nil
 }
 
 // DeleteRecord implements storage.RecordManager interface
@@ -201,10 +188,8 @@ func TestEmptyRecordsAPI(t *testing.T) {
 	}
 
 	// Create handler
-	handler := &TestDataHandler{
-		records: mockRecords,
-		Cfg:     cfg,
-	}
+	log := logger.GetLogger("debug")
+	handler := NewDataHandler(mockRecords, cfg, log)
 
 	// Register API route
 	apiPath := "/api/v0"
@@ -246,10 +231,8 @@ func TestPaginationAPI(t *testing.T) {
 	}
 
 	// Create handler
-	handler := &TestDataHandler{
-		records: mockRecords,
-		Cfg:     cfg,
-	}
+	log := logger.GetLogger("debug")
+	handler := NewDataHandler(mockRecords, cfg, log)
 
 	// Register API route
 	apiPath := "/api/v0"
@@ -349,10 +332,8 @@ func TestListRecordsHTML(t *testing.T) {
 	}
 
 	// Create handler
-	handler := &TestDataHandler{
-		records: mockRecords,
-		Cfg:     cfg,
-	}
+	log := logger.GetLogger("debug")
+	handler := NewDataHandler(mockRecords, cfg, log)
 
 	// Register route for HTML handler
 	router.GET("/data", handler.ListRecords)
@@ -405,7 +386,7 @@ func setupTestTemplate(t *testing.T) string {
 
 func TestDownloadReport(t *testing.T) {
 	// Arrange
-	_ = setupTestTemplate(t) // Create the dummy template file
+	_ = setupTestTemplate(t) // Create the dummy template file. Kept for now, though report.md isn't directly served.
 
 	// Use the real RecordManager in a temp directory
 	tempStorageDir := t.TempDir()
@@ -413,50 +394,130 @@ func TestDownloadReport(t *testing.T) {
 	require.NoError(t, err, "Failed to create real RecordManager for test")
 
 	// Create a dummy record using the real manager
-	dummyRecord, err := realManager.CreateRecord()
+	dummyRecord, err := realManager.CreateRecord() // CreateRecord takes no arguments
 	require.NoError(t, err, "Failed to create dummy record")
-	require.NotNil(t, dummyRecord)
-	recordHash := dummyRecord.Hash
-	defer dummyRecord.Close() // Close the record created by the real manager
 
-	cfg := &config.Config{ // Minimal config needed
+	// Populate dummy record with some data
+	motionData := [][]string{
+		{"0.0", "10.0", "0.0", "9.8", "0.0"},
+		{"1.0", "15.0", "5.0", "15.0", "0.0"},
+		{"2.0", "30.0", "10.0", "10.0", "0.0"}, // Apogee at t=2.0s, altitude=30.0
+		{"3.0", "25.0", "-5.0", "-9.8", "0.0"},
+		{"4.0", "10.5", "-10.0", "-9.8", "0.0"}, // Landing near t=4.0s
+	}
+	eventsData := [][]string{
+		{"0.0", "Liftoff", "", ""},
+		{"2.0", "Apogee", "", ""},
+		{"4.0", "Landing", "", ""},
+	}
+
+	err = dummyRecord.Motion.Init() // Call Init to write headers
+	require.NoError(t, err, "Failed to init motion data for dummy record")
+	for _, row := range motionData {
+		err = dummyRecord.Motion.Write(row)
+		require.NoError(t, err, "Failed to write motion data row to dummy record")
+	}
+
+	err = dummyRecord.Events.Init() // Call Init to write headers
+	require.NoError(t, err, "Failed to init events data for dummy record")
+	for _, row := range eventsData {
+		err = dummyRecord.Events.Write(row)
+		require.NoError(t, err, "Failed to write events data row to dummy record")
+	}
+
+	// The record hash is generated internally, so we need to get it from the record
+	actualHash := dummyRecord.Hash // Corrected from GetHash()
+
+	// Create a dummy engine_config.json in the record's directory for LoadSimulationData
+	recordDir := filepath.Join(tempStorageDir, actualHash)
+	err = os.MkdirAll(recordDir, 0755) // Ensure the specific record directory exists
+	require.NoError(t, err, "Failed to create record directory for engine_config.json")
+	dummyEngineConfig := config.Engine{
+		Options: config.Options{
+			OpenRocketFile:   "./testdata/l1.ork",
+			MotorDesignation: "TestMotor-ABC",
+		},
+	}
+	dummyEngineConfigBytes, err := json.Marshal(dummyEngineConfig)
+	require.NoError(t, err, "Failed to marshal dummy engine config")
+	err = os.WriteFile(filepath.Join(recordDir, "engine_config.json"), dummyEngineConfigBytes, 0644)
+	require.NoError(t, err, "Failed to write dummy engine_config.json")
+
+	// Close the record to flush data and release file handles before the handler tries to read them
+	err = dummyRecord.Close()
+	require.NoError(t, err, "Failed to close dummy record")
+
+	cfg := &config.Config{ // Minimal config needed by LoadSimulationData
 		Setup: config.Setup{
-			App:     config.App{Version: "test-report-v1"},
-			Logging: config.Logging{Level: "error"},
+			App: config.App{Version: "test-v0.1.0"},
 		},
 	}
 
-	// Initialize DataHandler with a logger
-	log := logger.GetLogger("debug")
-	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
-
-	gin.SetMode(gin.TestMode)
+	dataHandler := NewDataHandler(realManager, cfg, testLog)
 	router := gin.New()
-	router.Use(gin.Recovery()) // Add recovery middleware
-	router.GET("/explore/:hash/report", dataHandler.DownloadReport)
+	// The test was previously trying to hit /reports/{hash}/download, but ReportAPIV2 is mounted differently
+	// The actual route in main.go is /explore/:hash/report.
+	// For consistency with how TestDownloadReport_NotFound sets up the router, we'll use the versioned path.
+	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
+
+	w := httptest.NewRecorder()
+	reqURL := fmt.Sprintf("/api/v0/explore/%s/report", actualHash)
+	req, _ := http.NewRequest("GET", reqURL, nil)
 
 	// Act
-	req := httptest.NewRequest(http.MethodGet, "/explore/"+recordHash+"/report", nil)
-	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	// Assert
-	require.Equal(t, http.StatusOK, w.Code, "Expected OK status for report download")
+	require.Equal(t, http.StatusOK, w.Code, "Expected OK status for report data")
+	assert.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"), "Expected Content-Type to be application/json")
 
-	assert.Equal(t, "application/pdf", w.Header().Get("Content-Type"))
+	var reportDataResponse reporting.ReportData
+	err = json.Unmarshal(w.Body.Bytes(), &reportDataResponse)
+	require.NoError(t, err, "Failed to unmarshal JSON response from ReportAPIV2")
 
-	expectedFilename := fmt.Sprintf("launch_report_%s.pdf", recordHash)
-	contentDisposition := w.Header().Get("Content-Disposition")
-	assert.Contains(t, contentDisposition, "attachment; filename=")
-	assert.Contains(t, contentDisposition, expectedFilename)
+	// Verify some key fields in the ReportData
+	assert.Equal(t, actualHash, reportDataResponse.RecordID, "RecordID in response mismatch")
+	assert.Equal(t, "test-v0.1.0", reportDataResponse.Version, "Version in response mismatch")
+	assert.Equal(t, "l1.ork", reportDataResponse.RocketName, "RocketName in response mismatch")      // Based on dummyEngineConfig
+	assert.Equal(t, "TestMotor-ABC", reportDataResponse.MotorName, "MotorName in response mismatch") // Based on dummyEngineConfig
 
-	// Check body contains placeholder content (since PDF conversion is placeholder)
-	body := w.Body.String()
-	assert.NotEmpty(t, body)
-	assert.Contains(t, body, "--- PDF Conversion Placeholder ---") // From reporting.convertMarkdownToPDF placeholder
-	assert.Contains(t, body, recordHash)                           // Check if hash from template is included
+	// Check MotionMetrics (Apogee, MaxVelocity etc.) - These are calculated by processReportData
+	// which is called within LoadSimulationData. We need to ensure processReportData is robust.
+	// For now, let's assume LoadSimulationData populates these correctly based on the dummy data.
+	// Apogee was 30.0 at t=2.0. Max velocity was 10.0 at t=2.0.
+	// The current `LoadSimulationData` calls `processReportData` which should populate these.
+
+	// For dummy data: Apogee should be 30.0, MaxVelocity 10.0
+	// Need to ensure processReportData is called and populates these fields in ReportData.
+	// Directly asserting after LoadSimulationData would require processReportData to be called by it.
+	// Let's verify if MotionMetrics is not nil first.
+	assert.NotNil(t, reportDataResponse.MotionMetrics, "MotionMetrics should be populated")
+	if reportDataResponse.MotionMetrics != nil {
+		assert.InDelta(t, 30.0, reportDataResponse.MotionMetrics.MaxAltitude, 0.001, "Apogee mismatch")
+		assert.InDelta(t, 10.0, reportDataResponse.MotionMetrics.MaxVelocity, 0.001, "MaxVelocity mismatch")
+	}
+
+	// Check if EventsData is populated
+	assert.NotEmpty(t, reportDataResponse.EventsData, "EventsData should not be empty")
+	if len(reportDataResponse.EventsData) > 1 { // header + data rows
+		// Example: check the first data event (Liftoff)
+		// Assuming EventsData includes headers. If not, adjust index.
+		assert.Contains(t, reportDataResponse.EventsData[1], "Liftoff", "First event should be Liftoff")
+	}
+
+	// Check if plot data (placeholders for now, as it's SVG strings) exists
+	// The ReportAPIV2 and LoadSimulationData pipeline should generate plot data and include it.
+	// The `GeneratePlots` function inside `LoadSimulationData` should populate `rData.Plots`.
+	assert.NotEmpty(t, reportDataResponse.Plots, "Plots map should not be empty")
+	assert.Contains(t, reportDataResponse.Plots, "altitude_vs_time", "Altitude plot should exist")
+	assert.Contains(t, reportDataResponse.Plots, "velocity_vs_time", "Velocity plot should exist")
+	assert.Contains(t, reportDataResponse.Plots, "acceleration_vs_time", "Acceleration plot should exist")
+
+	// The old test checked for zip file contents. Now we check the JSON fields directly.
+	// Assertions about specific markdown content or SVG links are no longer applicable here.
 }
 
+// TestDownloadReport_NotFound tests the scenario where a report is requested for a non-existent hash.
 func TestDownloadReport_NotFound(t *testing.T) {
 	// Arrange
 	// _ = setupTestTemplate(t) // No longer needed as we abort before report generation
@@ -477,15 +538,15 @@ func TestDownloadReport_NotFound(t *testing.T) {
 
 	// Initialize DataHandler with a logger
 	log := logger.GetLogger("debug")
-	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+	dataHandler := NewDataHandler(realManager, cfg, log)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(gin.Recovery()) // Add recovery middleware
-	router.GET("/explore/:hash/report", dataHandler.DownloadReport)
+	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
 
 	// Act
-	req := httptest.NewRequest(http.MethodGet, "/explore/"+nonExistentHash+"/report", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v0/explore/"+nonExistentHash+"/report", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -497,7 +558,8 @@ func TestDownloadReport_NotFound(t *testing.T) {
 	var jsonResponse map[string]string
 	err = json.Unmarshal(w.Body.Bytes(), &jsonResponse)
 	require.NoError(t, err, "Response body should be valid JSON")
-	assert.Equal(t, "Failed to load data for report", jsonResponse["error"])
+	// Updated expected error message
+	assert.Equal(t, "Data for report not found or incomplete", jsonResponse["error"], "Error message for non-existent report mismatch")
 }
 
 // --- New Test for HTML ListRecords with Real Manager ---
@@ -530,7 +592,7 @@ func TestListRecords_RealManager(t *testing.T) {
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
 	log := logger.GetLogger("debug")
-	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+	dataHandler := NewDataHandler(realManager, cfg, log)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -587,7 +649,7 @@ func TestDeleteRecord(t *testing.T) {
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
 	log := logger.GetLogger("debug")
-	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+	dataHandler := NewDataHandler(realManager, cfg, log)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -647,7 +709,7 @@ func TestDeleteRecordAPI(t *testing.T) {
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
 	log := logger.GetLogger("debug")
-	dataHandler := &DataHandler{records: realManager, Cfg: cfg, log: log}
+	dataHandler := NewDataHandler(realManager, cfg, log)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -685,6 +747,7 @@ func TestDeleteRecordAPI(t *testing.T) {
 	var jsonResponse map[string]string
 	err = json.Unmarshal(w2.Body.Bytes(), &jsonResponse)
 	require.NoError(t, err, "Response body should be valid JSON for 404 error")
+	// Updated expected error message
 	assert.Equal(t, "Record not found", jsonResponse["error"], "Expected 'Record not found' error message")
 
 }

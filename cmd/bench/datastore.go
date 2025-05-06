@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // --- Data Structures for CSVs ---
@@ -23,7 +24,6 @@ type FlightInfo struct {
 type EventInfo struct {
 	Timestamp float64
 	Event     string
-	OutIdx    int // Assuming this is an integer index
 }
 
 // SimEventInfo holds data parsed from the simulation's EVENTS.csv output.
@@ -168,36 +168,38 @@ func LoadEventInfo(filePath string) ([]EventInfo, error) {
 	r := csv.NewReader(file)
 	// Skip header row
 	if _, err := r.Read(); err != nil {
-		return nil, fmt.Errorf("failed to read header from %s: %w", filePath, err)
+		// Handle EOF specifically for empty or header-only files
+		if err.Error() == "EOF" { // csv.ErrBareQuote or other errors might also mean empty/bad header
+			return nil, fmt.Errorf("failed to read header from %s (file might be empty or header-only): %w", filepath.Base(filePath), err)
+		}
+		return nil, fmt.Errorf("failed to read header from %s: %w", filepath.Base(filePath), err)
 	}
 
 	records, err := r.ReadAll()
 	if err != nil {
-		return nil, fmt.Errorf("failed to read records from %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to read records from %s: %w", filepath.Base(filePath), err)
 	}
 
-	// Handle header-only file
+	// Handle header-only file (no data records after header)
 	if len(records) == 0 {
 		return nil, fmt.Errorf("no data rows found in %s", filepath.Base(filePath))
 	}
 
 	data := make([]EventInfo, 0, len(records))
 	for i, record := range records {
-		// Expect 3 columns: timestamp, event, outidx
-		if len(record) != 3 {
-			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 3", filepath.Base(filePath), i+1, len(record))
+		// Expect 2 columns: timestamp, event
+		if len(record) != 2 {
+			return nil, fmt.Errorf("unexpected number of columns in %s, row %d (1-based data): got %d, want 2. Record: %v", filepath.Base(filePath), i+1, len(record), record)
 		}
 
 		// Parse column 0 (index 0) as timestamp
-		ts, err := parseFloat(record[0], i, "timestamp", filePath)
+		ts, err := parseFloat(record[0], i, "timestamp", filePath) // parseFloat is defined elsewhere in this file
 		if err != nil {
 			return nil, err
 		}
 
 		// Column 1 (index 1) is the event name (string)
-		eventName := record[1]
-
-		// Column 2 (out_idx) is ignored for this struct
+		eventName := strings.TrimSpace(record[1])
 
 		data = append(data, EventInfo{Timestamp: ts, Event: eventName})
 	}
@@ -313,7 +315,7 @@ func LoadSimEventData(filePath string) ([]SimEventInfo, error) {
 		}
 
 		// Column 1 is event name (string)
-		eventName := record[1]
+		eventName := strings.TrimSpace(record[1])
 
 		// Column 2 is motor status (string)
 		motorStatus := record[2]

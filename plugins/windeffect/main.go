@@ -3,6 +3,7 @@ package main
 import (
 	"math"
 
+	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/zerodha/logf"
 )
@@ -14,7 +15,7 @@ type WindEffectPlugin struct {
 
 var Plugin WindEffectPlugin
 
-func (p *WindEffectPlugin) Initialize(log logf.Logger) error {
+func (p *WindEffectPlugin) Initialize(log logf.Logger, cfg *config.Config) error {
 	p.log = log
 	p.windSpeed = 5.0 // m/s base wind speed
 	return nil
