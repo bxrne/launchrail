@@ -175,14 +175,15 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 	// --- Compare Event Times ---
 	eventMappings := map[string]string{
 		// GroundTruth Event Name : Sim Event Name
-		"Burnout":         "MOTOR_BURNOUT", // Corrected sim event name
-		"Drogue Deployed": "DROGUE_DEPLOY", // Corrected sim event name
-		"Main Deployed":   "MAIN_DEPLOY",   // Corrected sim event name
-		// Add more mappings if needed
+		"EV_MAIN_DEPLOYMENT": "MAIN_DEPLOYMENT",
+		// Standard events that usually match or are derived differently
+		// "EV_LIFTOFF": "LIFTOFF", // Liftoff usually time 0 or handled separately
+		// "EV_APOGEE": "APOGEE", // Apogee usually derived from dynamics data
+		// "EV_MAX_V": "MAX_VELOCITY", // Max Velocity usually derived from dynamics data
 	}
 
 	for gtEvent, simEvent := range eventMappings {
-		gtEventTime := findGroundTruthEventTime(eventInfoGroundTruth, gtEvent)
+		gtEventTime := findGroundTruthEventTime(eventInfoGroundTruth, gtEvent, logger) // Pass logger
 		if gtEventTime < 0 {
 			logger.Warn("Target ground truth event not found in data", "event_name", gtEvent)
 			metricName := fmt.Sprintf("%s Time", gtEvent)
@@ -314,12 +315,14 @@ func findGroundTruthMaxVelocity(gtData []FlightInfo) (float64, float64) {
 }
 
 // findGroundTruthEventTime finds the timestamp for a specific event from ground truth event info.
-func findGroundTruthEventTime(gtEvents []EventInfo, eventName string) float64 {
+func findGroundTruthEventTime(gtEvents []EventInfo, eventName string, logger *logf.Logger) float64 { // Add logger param
 	for _, e := range gtEvents {
 		// Need case-insensitive comparison or ensure ground truth event names match sim names exactly
+		logger.Debug("Comparing GT event", "expected", eventName, "actual_in_csv", e.Event, "equal_fold", strings.EqualFold(e.Event, eventName))
 		if strings.EqualFold(e.Event, eventName) { // Make comparison case-insensitive
 			return e.Timestamp
 		}
 	}
+	logger.Warn("Target ground truth event not found", "targetEvent", eventName)
 	return -1 // Indicate not found
 }

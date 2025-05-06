@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // --- Data Structures for CSVs ---
@@ -23,7 +24,7 @@ type FlightInfo struct {
 type EventInfo struct {
 	Timestamp float64
 	Event     string
-	OutIdx    int // Assuming this is an integer index
+	OutIdx    float64
 }
 
 // SimEventInfo holds data parsed from the simulation's EVENTS.csv output.
@@ -106,6 +107,15 @@ func parseFloat(s string, rowIdx int, colName string, fileName string) (float64,
 		return 0, fmt.Errorf("invalid float value '%s' in %s, row %d, column %s: %w", s, filepath.Base(fileName), rowIdx+2, colName, err) // +2 for 1-based index and header
 	}
 	return v, nil
+}
+
+// parseInt parses a string to an int, returning a more context-aware error.
+func parseInt(s string, recordIndex int, columnName string, filePath string) (int, error) {
+	val, err := strconv.Atoi(strings.TrimSpace(s))
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse %s '%s' at row %d in %s: %w", columnName, s, recordIndex+1, filepath.Base(filePath), err)
+	}
+	return val, nil
 }
 
 // LoadFlightInfo loads data from flight_info_processed.csv
@@ -194,13 +204,18 @@ func LoadEventInfo(filePath string) ([]EventInfo, error) {
 			return nil, err
 		}
 
-		// Column 1 (index 1) is the event name (string)
-		eventName := record[1]
+		// Parse column 1 (index 1) as outidx (now float64)
+		outIdx, err := parseFloat(record[1], i, "outidx", filePath)
+		if err != nil {
+			return nil, err
+		}
 
-		// Column 2 (out_idx) is ignored for this struct
-		// Column 3 (new column) is also ignored for this struct
+		// Column 2 (index 2) is the event name (string)
+		eventName := strings.TrimSpace(record[2])
 
-		data = append(data, EventInfo{Timestamp: ts, Event: eventName})
+		// Column 3 (new column) is ignored for this struct
+
+		data = append(data, EventInfo{Timestamp: ts, Event: eventName, OutIdx: outIdx})
 	}
 	return data, nil
 }
@@ -314,7 +329,7 @@ func LoadSimEventData(filePath string) ([]SimEventInfo, error) {
 		}
 
 		// Column 1 is event name (string)
-		eventName := record[1]
+		eventName := strings.TrimSpace(record[1])
 
 		// Column 2 is motor status (string)
 		motorStatus := record[2]
