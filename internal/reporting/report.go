@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -45,13 +46,53 @@ type ReportData struct {
 	MaxAccelerationMPS2 float64
 	TotalFlightTimeSec  float64
 	LandingVelocityMPS  float64
-	KeyFlightEvents     []FlightEvent
+	AllEvents           []FlightEvent
+
+	// Event Summaries / Highlights
+	MotorSummary     MotorHighlights
+	ParachuteSummary ParachuteHighlights
+	PhaseSummary     RocketPhaseHighlights
 
 	// Landing Information
 	LandingLatitude          float64
 	LandingLongitude         float64
 	LandingDistanceMeters    float64 // Distance from launch site
 	LandingRadius95PctMeters float64 // Placeholder for 95th percentile landing radius
+}
+
+// MotorHighlights summarizes key motor-related events.
+type MotorHighlights struct {
+	IgnitionTimeSec   float64
+	BurnoutTimeSec    float64
+	BurnDurationSec   float64
+	HasMotorEvents    bool // True if any motor-specific events were identified
+}
+
+// ParachuteEventDetail provides specifics for a single parachute event.
+type ParachuteEventDetail struct {
+	Name                     string  // e.g., "Drogue Deployed", "Main Deployed"
+	DeploymentTimeSec        float64
+	DeploymentAltitudeMeters float64
+	TimeToDeploySec          float64 // Relative to liftoff
+}
+
+// ParachuteHighlights summarizes parachute deployment events.
+type ParachuteHighlights struct {
+	Events               []ParachuteEventDetail
+	HasParachuteEvents   bool // True if any parachute events were identified
+}
+
+// RocketPhaseHighlights summarizes major flight phases and events.
+type RocketPhaseHighlights struct {
+	LiftoffTimeSec      float64 // From motion data or "Liftoff" event
+	ApogeeTimeSec       float64 // From motion data or "Apogee" event
+	LandingTimeSec      float64 // From "Landing" event
+	CoastStartTimeSec   float64 // Typically after motor burnout
+	CoastEndTimeSec     float64 // Typically at apogee or first parachute deployment
+	CoastDurationSec    float64
+	HasLiftoffEvent     bool
+	HasApogeeEvent      bool
+	HasLandingEvent     bool
 }
 
 // FlightEvent represents a significant event during the simulation.
@@ -100,9 +141,29 @@ Version: {{.Version}}
 
 | Event Name | Time (s) | Altitude (m) |
 | --- | --- | --- |
-{{ range .KeyFlightEvents }}
+{{ range .AllEvents }}
 | {{ .Name }} | {{printf "%.1f" .TimeSec }} | {{printf "%.1f" .AltitudeMeters }} |
 {{ end }}
+
+## Event Summaries
+
+### Motor Summary
+- Ignition Time: {{printf "%.1f" .MotorSummary.IgnitionTimeSec}} seconds
+- Burnout Time: {{printf "%.1f" .MotorSummary.BurnoutTimeSec}} seconds
+- Burn Duration: {{printf "%.1f" .MotorSummary.BurnDurationSec}} seconds
+
+### Parachute Summary
+{{ range .ParachuteSummary.Events }}
+- {{ .Name }}: {{printf "%.1f" .DeploymentTimeSec}} seconds at {{printf "%.1f" .DeploymentAltitudeMeters}} meters
+{{ end }}
+
+### Phase Summary
+- Liftoff Time: {{printf "%.1f" .PhaseSummary.LiftoffTimeSec}} seconds
+- Apogee Time: {{printf "%.1f" .PhaseSummary.ApogeeTimeSec}} seconds
+- Landing Time: {{printf "%.1f" .PhaseSummary.LandingTimeSec}} seconds
+- Coast Start Time: {{printf "%.1f" .PhaseSummary.CoastStartTimeSec}} seconds
+- Coast End Time: {{printf "%.1f" .PhaseSummary.CoastEndTimeSec}} seconds
+- Coast Duration: {{printf "%.1f" .PhaseSummary.CoastDurationSec}} seconds
 
 ## Landing Information
 
@@ -209,16 +270,16 @@ func LoadSimulationData(rm *storage.RecordManager, recordID string, reportSpecif
 		log.Debug("Raw events data for record %s (first 5 rows)", "recordID", recordID, "data", allEventsData[:min(5, len(allEventsData))])
 		if len(allEventsData) == 0 { // Completely empty file
 			log.Warn("EVENTS.csv is empty", "recordID", recordID) // Allow empty events, use placeholders later
-		} else if len(allEventsData) == 1 { // Only headers
+		} else if len(allEventsData) == 1 { // Only headers, no data rows
 			log.Warn("EVENTS.csv contains only headers", "recordID", recordID) // Allow empty events, use placeholders later
 		} else { // Has headers and data
-			keyEvents, err := parseEventsData(allEventsData)
+			parsedEvents, err := parseEventsDataFromCSV(allEventsData)
 			if err != nil {
 				log.Error("Failed to parse EVENTS.csv data", "recordID", recordID, "error", err)
 				return ReportData{}, fmt.Errorf("failed to parse events data for %s: %w", recordID, err)
 			}
-			data.KeyFlightEvents = keyEvents
-			log.Debug("Parsed events data for record %s (event count %d)", "recordID", recordID, "eventCount", len(data.KeyFlightEvents))
+			data.AllEvents = parsedEvents
+			log.Debug("Parsed events data for record %s (event count %d)", "recordID", recordID, "eventCount", len(data.AllEvents))
 
 		}
 
@@ -227,8 +288,8 @@ func LoadSimulationData(rm *storage.RecordManager, recordID string, reportSpecif
 		return ReportData{}, fmt.Errorf("events storage not available for record %s", recordID)
 	}
 
-	// If KeyFlightEvents is still empty after trying to parse (or if file was empty/headers only), add placeholders
-	if len(data.KeyFlightEvents) == 0 {
+	// If AllEvents is still empty after trying to parse (or if file was empty/headers only), add placeholders
+	if len(data.AllEvents) == 0 {
 		log.Info("No key flight events parsed or available, using placeholders", "recordID", recordID)
 		// Ensure ApogeeMeters and TotalFlightTimeSec are not zero to avoid division by zero or nonsensical time
 		apogeeTimeEstimate := 0.0
@@ -238,12 +299,15 @@ func LoadSimulationData(rm *storage.RecordManager, recordID string, reportSpecif
 				apogeeTimeEstimate = data.TotalFlightTimeSec / 2
 			}
 		}
-		data.KeyFlightEvents = []FlightEvent{
+		data.AllEvents = []FlightEvent{
 			{"Liftoff (placeholder)", 0.0, data.LaunchElevation},
 			{"Apogee (placeholder)", math.Max(0, apogeeTimeEstimate), data.ApogeeMeters},
 			{"Landing (placeholder)", math.Max(0, data.TotalFlightTimeSec), data.LaunchElevation},
 		}
 	}
+
+	// Process event highlights from AllEvents and motionMetrics
+	data.MotorSummary, data.ParachuteSummary, data.PhaseSummary = processEventHighlights(data.AllEvents, parsedMotionMetrics{ApogeeMeters: data.ApogeeMeters, MaxVelocityMPS: data.MaxVelocityMPS, MaxAccelerationMPS2: data.MaxAccelerationMPS2, TotalFlightTimeSec: data.TotalFlightTimeSec, LandingVelocityMPS: data.LandingVelocityMPS}, data.LaunchElevation)
 
 	// --- Create dummy plot assets ---
 	assetSubDir := "assets"
@@ -389,13 +453,14 @@ func parseMotionData(allRows [][]string, launchElevation float64, log *logf.Logg
 	return metrics, nil
 }
 
-func parseEventsData(allRows [][]string) ([]FlightEvent, error) {
+// parseEventsDataFromCSV processes raw string data from EVENTS.csv into a slice of FlightEvent.
+// This function now primarily focuses on parsing the CSV content.
+func parseEventsDataFromCSV(allRows [][]string) ([]FlightEvent, error) {
 	var events []FlightEvent
 	if len(allRows) == 0 { // No data at all
 		return events, nil
 	}
 	if len(allRows) == 1 { // Only headers, no data rows
-		// logger.GetLogger("").Info("EVENTS.csv contains only headers, no data rows to parse for events.")
 		return events, nil
 	}
 
@@ -434,8 +499,6 @@ func parseEventsData(allRows [][]string) ([]FlightEvent, error) {
 			altVal, parseErr := strconv.ParseFloat(altStr, 64)
 			if parseErr == nil {
 				altitude = altVal
-			} else {
-				// logger.GetLogger("").Warn("Failed to parse altitude for event, using 0.0", "event", eventName, "value", altStr, "error", parseErr)
 			}
 		}
 
@@ -444,12 +507,109 @@ func parseEventsData(allRows [][]string) ([]FlightEvent, error) {
 	return events, nil
 }
 
-// min is a helper function to prevent out-of-bounds access when logging slices.
-func min(a, b int) int {
-	if a < b {
-		return a
+// processEventHighlights analyzes parsed events and motion metrics to populate summary structures.
+func processEventHighlights(allEvents []FlightEvent, motionMetrics parsedMotionMetrics, launchElevation float64) (MotorHighlights, ParachuteHighlights, RocketPhaseHighlights) {
+	motorSummary := MotorHighlights{HasMotorEvents: false, IgnitionTimeSec: -1, BurnoutTimeSec: -1}
+	parachuteSummary := ParachuteHighlights{HasParachuteEvents: false}
+	phaseSummary := RocketPhaseHighlights{
+		LiftoffTimeSec:    0, // Usually time 0
+		ApogeeTimeSec:     motionMetrics.ApogeeMeters, // From motion data
+		LandingTimeSec:    motionMetrics.TotalFlightTimeSec,  // From motion data (overall flight time)
+		HasLiftoffEvent:   true, // Assume liftoff at t=0 if no specific event
+		HasApogeeEvent:    motionMetrics.ApogeeMeters > 0,
+		HasLandingEvent:   motionMetrics.TotalFlightTimeSec > 0 && motionMetrics.LandingVelocityMPS != 0, // Crude check
+		CoastStartTimeSec: -1,
+		CoastEndTimeSec:   -1,
 	}
-	return b
+
+	var liftoffTime float64 = 0 // Default to 0, can be updated by Liftoff event
+
+	for _, event := range allEvents {
+		nameLower := strings.ToLower(event.Name)
+
+		// Motor Events
+		if strings.Contains(nameLower, "motor ignition") || strings.Contains(nameLower, "ignition") && !strings.Contains(nameLower, "parachute") {
+			if motorSummary.IgnitionTimeSec < 0 || event.TimeSec < motorSummary.IgnitionTimeSec {
+				motorSummary.IgnitionTimeSec = event.TimeSec
+				motorSummary.HasMotorEvents = true
+			}
+		}
+		if strings.Contains(nameLower, "motor burnout") || strings.Contains(nameLower, "burnout") && !strings.Contains(nameLower, "parachute") {
+			if motorSummary.BurnoutTimeSec < 0 || event.TimeSec > motorSummary.BurnoutTimeSec { // Take the latest burnout if multiple
+				motorSummary.BurnoutTimeSec = event.TimeSec
+				motorSummary.HasMotorEvents = true
+			}
+		}
+
+		// Parachute Events
+		if strings.Contains(nameLower, "parachute deployed") || strings.Contains(nameLower, "deploy") && strings.Contains(nameLower, "parachute") {
+			parachuteDetail := ParachuteEventDetail{
+				Name:                     event.Name,
+				DeploymentTimeSec:        event.TimeSec,
+				DeploymentAltitudeMeters: event.AltitudeMeters,
+				TimeToDeploySec:          event.TimeSec - liftoffTime, // Calculated relative to liftoff
+			}
+			parachuteSummary.Events = append(parachuteSummary.Events, parachuteDetail)
+			parachuteSummary.HasParachuteEvents = true
+		}
+
+		// Phase Events
+		if strings.Contains(nameLower, "liftoff") {
+			phaseSummary.LiftoffTimeSec = event.TimeSec
+			liftoffTime = event.TimeSec // Update liftoff time for parachute calculations
+			phaseSummary.HasLiftoffEvent = true
+		}
+		if strings.Contains(nameLower, "apogee") {
+			// Prefer motion data if available and event confirms, otherwise use event
+			if !(motionMetrics.ApogeeMeters > 0) || (motionMetrics.ApogeeMeters > 0 && math.Abs(motionMetrics.ApogeeMeters-event.TimeSec) < 5.0) { // 5s tolerance
+				phaseSummary.ApogeeTimeSec = event.TimeSec
+			}
+			phaseSummary.HasApogeeEvent = true
+		}
+		if strings.Contains(nameLower, "landing") {
+			phaseSummary.LandingTimeSec = event.TimeSec
+			phaseSummary.HasLandingEvent = true
+		}
+	}
+
+	// Calculate motor burn duration
+	if motorSummary.IgnitionTimeSec >= 0 && motorSummary.BurnoutTimeSec > motorSummary.IgnitionTimeSec {
+		motorSummary.BurnDurationSec = motorSummary.BurnoutTimeSec - motorSummary.IgnitionTimeSec
+	}
+
+	// Calculate coast phase (very basic)
+	if motorSummary.HasMotorEvents && motorSummary.BurnoutTimeSec >= 0 {
+		phaseSummary.CoastStartTimeSec = motorSummary.BurnoutTimeSec
+	} else if phaseSummary.HasLiftoffEvent { // If no motor burnout, assume coast starts after liftoff (e.g. glider)
+		phaseSummary.CoastStartTimeSec = phaseSummary.LiftoffTimeSec
+	}
+
+	if phaseSummary.HasApogeeEvent && phaseSummary.ApogeeTimeSec > 0 {
+		phaseSummary.CoastEndTimeSec = phaseSummary.ApogeeTimeSec
+		// If parachute deploys before apogee, coast might end sooner
+		if parachuteSummary.HasParachuteEvents && len(parachuteSummary.Events) > 0 {
+			firstParachuteDeployTime := -1.0
+			for _, pEvent := range parachuteSummary.Events {
+				if firstParachuteDeployTime < 0 || pEvent.DeploymentTimeSec < firstParachuteDeployTime {
+					firstParachuteDeployTime = pEvent.DeploymentTimeSec
+				}
+			}
+			if firstParachuteDeployTime >= 0 && firstParachuteDeployTime < phaseSummary.ApogeeTimeSec {
+				phaseSummary.CoastEndTimeSec = firstParachuteDeployTime
+			}
+		}
+	}
+
+	if phaseSummary.CoastStartTimeSec >= 0 && phaseSummary.CoastEndTimeSec > phaseSummary.CoastStartTimeSec {
+		phaseSummary.CoastDurationSec = phaseSummary.CoastEndTimeSec - phaseSummary.CoastStartTimeSec
+	}
+
+	// Sort parachute events by time for consistent reporting
+	sort.Slice(parachuteSummary.Events, func(i, j int) bool {
+		return parachuteSummary.Events[i].DeploymentTimeSec < parachuteSummary.Events[j].DeploymentTimeSec
+	})
+
+	return motorSummary, parachuteSummary, phaseSummary
 }
 
 // Generator handles report generation.
@@ -507,4 +667,12 @@ func GenerateReportPackage(rm *storage.RecordManager, recordID string, baseRepor
 
 	log.Info("Successfully generated report package", "recordID", recordID, "outputDir", reportSpecificDir)
 	return reportSpecificDir, nil
+}
+
+// min is a helper function to prevent out-of-bounds access when logging slices.
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

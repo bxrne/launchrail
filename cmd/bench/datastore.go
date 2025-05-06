@@ -108,15 +108,6 @@ func parseFloat(s string, rowIdx int, colName string, fileName string) (float64,
 	return v, nil
 }
 
-// parseInt parses a string to an int, returning a more context-aware error.
-func parseInt(s string, recordIndex int, columnName string, filePath string) (int, error) {
-	val, err := strconv.Atoi(strings.TrimSpace(s))
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse %s '%s' at row %d in %s: %w", columnName, s, recordIndex+1, filepath.Base(filePath), err)
-	}
-	return val, nil
-}
-
 // LoadFlightInfo loads data from flight_info_processed.csv
 func LoadFlightInfo(filePath string) ([]FlightInfo, error) {
 	records, err := loadCSV(filePath)

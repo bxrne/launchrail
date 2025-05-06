@@ -6,9 +6,51 @@
 
 *Placeholder for summary.*
 
-## Events
+## Flight Summary
 
-*Placeholder for key flight events (ignition, burnout, apogee, parachute deploy, landing).*
+| Metric              | Value    |
+| ------------------- | -------- |
+| Apogee              | {{printf "%.1f" .ApogeeMeters}} meters |
+| Max Velocity        | {{printf "%.1f" .MaxVelocityMPS}} m/s |
+| Max Acceleration    | {{printf "%.1f" .MaxAccelerationMPS2}} m/s² |
+| Total Flight Time   | {{printf "%.1f" .TotalFlightTimeSec}} seconds |
+| Landing Velocity    | {{printf "%.1f" .LandingVelocityMPS}} m/s |
+
+## Event Summaries
+
+{{if .MotorSummary.HasMotorEvents}}
+### Motor Summary
+| Event          | Time (s) |
+| -------------- | -------- |
+| Ignition       | {{printf "%.1f" .MotorSummary.IgnitionTimeSec}} |
+| Burnout        | {{printf "%.1f" .MotorSummary.BurnoutTimeSec}} |
+| Burn Duration  | {{printf "%.1f" .MotorSummary.BurnDurationSec}} |
+{{else}}
+### Motor Summary
+*No motor events recorded.*
+{{end}}
+
+{{if .ParachuteSummary.HasParachuteEvents}}
+### Parachute Summary
+| Event Name                  | Deployment Time (s) | Deployment Altitude (m) | Time Since Liftoff (s) |
+| --------------------------- | ------------------- | ----------------------- | ---------------------- |
+{{ range .ParachuteSummary.Events }}| {{ .Name }} | {{printf "%.1f" .DeploymentTimeSec}} | {{printf "%.1f" .DeploymentAltitudeMeters}} | {{printf "%.1f" .TimeToDeploySec}} |
+{{ end }}{{else}}
+### Parachute Summary
+*No parachute deployment events recorded.*
+{{end}}
+
+### Phase Summary
+| Event          | Time (s) |
+| -------------- | -------- |
+{{if .PhaseSummary.HasLiftoffEvent}}| Liftoff        | {{printf "%.1f" .PhaseSummary.LiftoffTimeSec}} |
+{{end}}{{if .MotorSummary.HasMotorEvents}}| Coast Start    | {{printf "%.1f" .PhaseSummary.CoastStartTimeSec}} |
+{{end}}{{if .PhaseSummary.HasApogeeEvent}}| Apogee         | {{printf "%.1f" .PhaseSummary.ApogeeTimeSec}} |
+{{end}}{{if .ParachuteSummary.HasParachuteEvents}}| Coast End      | {{printf "%.1f" .PhaseSummary.CoastEndTimeSec}} |
+{{end}}{{if .PhaseSummary.HasLandingEvent}}| Landing        | {{printf "%.1f" .PhaseSummary.LandingTimeSec}} |
+{{end}}{{if .MotorSummary.HasMotorEvents}}
+| Coast Duration | {{printf "%.1f" .PhaseSummary.CoastDurationSec}} |
+{{end}}
 
 ## Atmospheric Conditions
 
@@ -41,3 +83,11 @@
 {{else}}
 *GPS Map data not available or generation failed.*
 {{end}}
+
+## Landing Information
+
+- Latitude: {{.LandingLatitude}}
+- Longitude: {{.LandingLongitude}}
+- Altitude: {{.LandingAltitude}} meters
+- Velocity: {{.LandingVelocity}} m/s
+- Time: {{.LandingTime}} seconds
