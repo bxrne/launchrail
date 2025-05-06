@@ -183,9 +183,9 @@ func LoadEventInfo(filePath string) ([]EventInfo, error) {
 
 	data := make([]EventInfo, 0, len(records))
 	for i, record := range records {
-		// Expect 3 columns: timestamp, event, outidx
-		if len(record) != 3 {
-			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 3", filepath.Base(filePath), i+1, len(record))
+		// Expect 4 columns: timestamp, event, outidx, <new_ignored_column>
+		if len(record) != 4 {
+			return nil, fmt.Errorf("unexpected number of columns in %s, row %d: got %d, want 4", filepath.Base(filePath), i+1, len(record))
 		}
 
 		// Parse column 0 (index 0) as timestamp
@@ -198,6 +198,7 @@ func LoadEventInfo(filePath string) ([]EventInfo, error) {
 		eventName := record[1]
 
 		// Column 2 (out_idx) is ignored for this struct
+		// Column 3 (new column) is also ignored for this struct
 
 		data = append(data, EventInfo{Timestamp: ts, Event: eventName})
 	}

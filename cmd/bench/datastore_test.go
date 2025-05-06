@@ -103,10 +103,10 @@ func TestLoadEventInfo(t *testing.T) {
 	}{
 		{
 			name: "Success",
-			csvContent: `timestamp,event,outidx
-1.5,LAUNCH,0
-10.2,APOGEE,1
-20.8,LANDING,2`, // Note: outidx is parsed as int
+			csvContent: `timestamp,event,outidx,ignored_col
+1.5,LAUNCH,0,dummy
+10.2,APOGEE,1,dummy
+20.8,LANDING,2,dummy`, // Note: outidx is parsed as int
 			expectedData: []EventInfo{
 				{Timestamp: 1.5, Event: "LAUNCH"},
 				{Timestamp: 10.2, Event: "APOGEE"},
@@ -122,8 +122,8 @@ func TestLoadEventInfo(t *testing.T) {
 		},
 		{
 			name: "Invalid Timestamp Float",
-			csvContent: `timestamp,event,outidx
-1.5x,LAUNCH,0`,
+			csvContent: `timestamp,event,outidx,ignored_col
+1.5x,LAUNCH,0,dummy`,
 			expectedErr: "invalid float value '1.5x'",
 		},
 		// Removed Invalid_OutIdx_Int test case as the column is now ignored
