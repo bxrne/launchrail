@@ -106,13 +106,13 @@ func (s *Storage) Init() error {
 
 	// Write headers
 	headers := StorageHeaders[s.store]
-	s.log.Debug("Initializing storage headers for %s: headers=%v", s.filePath, headers)
+	s.log.Debug(fmt.Sprintf("Initializing storage headers for %s: headers=%v", s.filePath, headers))
 	if err := s.writer.Write(headers); err != nil {
-		s.log.Error("failed to write headers: %v", err)
+		s.log.Error(fmt.Sprintf("failed to write headers: %v", err))
 	}
 	s.writer.Flush()
 	if err := s.writer.Error(); err != nil {
-		s.log.Error("failed to flush headers: %v", err)
+		s.log.Error(fmt.Sprintf("failed to flush headers: %v", err))
 	}
 
 	return nil
@@ -124,17 +124,19 @@ func (s *Storage) Write(data []string) error {
 	defer s.mu.Unlock()
 
 	headers := StorageHeaders[s.store]
-	s.log.Debug("Writing to %s: headers=%v, data=%v", s.filePath, headers, data)
+	s.log.Debug(fmt.Sprintf("Writing to %s: headers=%v, data=%v", s.filePath, headers, data))
 	if len(data) != len(headers) {
-		s.log.Error("data length (%d) does not match headers length (%d)", len(data), len(headers))
+		s.log.Error(fmt.Sprintf("data length (%d) does not match headers length (%d)", len(data), len(headers)))
+		// It's important to return an error here if this condition is problematic
+		return fmt.Errorf("data length (%d) does not match headers length (%d)", len(data), len(headers))
 	}
 
 	if err := s.writer.Write(data); err != nil {
-		s.log.Error("failed to write data: %v", err)
+		s.log.Error(fmt.Sprintf("failed to write data: %v", err))
 	}
 
 	if err := s.writer.Error(); err != nil {
-		s.log.Error("failed to flush data: %v", err)
+		s.log.Error(fmt.Sprintf("failed to flush data: %v", err))
 	}
 	s.writer.Flush()
 
@@ -149,13 +151,13 @@ func (s *Storage) Close() error {
 	if s.writer != nil {
 		s.writer.Flush()
 		if err := s.writer.Error(); err != nil {
-			s.log.Error("failed to flush on close: %v", err)
+			s.log.Error(fmt.Sprintf("failed to flush on close: %v", err))
 		}
 	}
 
 	if s.file != nil {
 		if err := s.file.Sync(); err != nil {
-			s.log.Error("failed to sync file: %v", err)
+			s.log.Error(fmt.Sprintf("failed to sync file: %v", err))
 		}
 		return s.file.Close()
 	}
@@ -174,13 +176,13 @@ func (s *Storage) ReadAll() ([][]string, error) {
 
 	// Seek to the beginning of the file
 	if _, err := s.file.Seek(0, 0); err != nil {
-		s.log.Error("failed to seek to beginning: %v", err)
+		s.log.Error(fmt.Sprintf("failed to seek to beginning: %v", err))
 	}
 
 	reader := csv.NewReader(s.file)
 	allData, err := reader.ReadAll()
 	if err != nil {
-		s.log.Error("failed to read CSV data: %v", err)
+		s.log.Error(fmt.Sprintf("failed to read CSV data: %v", err))
 	}
 
 	// Ensure there is at least one row (headers)
@@ -195,7 +197,7 @@ func (s *Storage) ReadAll() ([][]string, error) {
 func (s *Storage) ReadHeadersAndData() ([]string, [][]string, error) {
 	allData, err := s.ReadAll()
 	if err != nil {
-		s.log.Error("failed to read all data: %v", err)
+		s.log.Error(fmt.Sprintf("failed to read all data: %v", err))
 	}
 
 	// Separate headers and data
