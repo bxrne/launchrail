@@ -1,3 +1,24 @@
+## v0.7.0 (2025-05-06)
+
+### Feat
+
+- **reporting**: Implement report data API with SVG plot generation and JSON response format
+
+### Fix
+
+- **server**: Add os import for filepath operations
+- **reporting, bench**: Add flight event summaries and refactor event processing
+- **templates**: Update API version handling and upgrade templ from v0.3.857 to v0.3.865
+- **report, storage, server**: Add report generation with environmental conditions and flight metrics
+- **bench**: Update event mapping and parsing for EUROC24 ground truth data format
+- **bench**: Update CSV parser to handle new ignored column in event data files
+- **windeffect**: Add config param to WindEffectPlugin and support 4-column CSV format in datastore
+
+### Refactor
+
+- **reporting**: move report template to external file and add asset copying
+- **reporting, bench, server**: Refactor report generation to use markdown and improve event data handling
+
 ## v0.6.1 (2025-05-06)
 
 ### Fix
