@@ -13,10 +13,10 @@ import (
 // BlackScholesPlugin implements the atmospheric turbulence model
 type BlackScholesPlugin struct {
 	log                   logf.Logger
-	rng                   *rand.Rand // Random number generator
-	turbulenceIntensity   float64    // σ (sigma) - Represents magnitude of random fluctuations
-	deterministicForcesMu float64    // μ (mu) - Represents deterministic forces (e.g., drag, gravity). Currently unused in this simplified model.
-	// TODO: Potentially add configuration for which state variable (e.g., Velocity.X, Velocity.Y) is affected
+	rng                   *rand.Rand     // Random number generator
+	turbulenceIntensity   float64        // σ (sigma) - magnitude of random fluctuations
+	deterministicForcesMu float64        // μ (mu) - deterministic drift component
+	cfg                   *config.Config // config for simulation parameters
 }
 
 var Plugin BlackScholesPlugin
@@ -25,12 +25,17 @@ var Plugin BlackScholesPlugin
 func (p *BlackScholesPlugin) Initialize(log logf.Logger, cfg *config.Config) error {
 	// TODO: Use cfg if needed to load parameters like turbulenceIntensity
 	p.log = log
+	p.cfg = cfg
 	p.log.Info("Initializing Black-Scholes turbulence plugin")
 
-	// Seed the random number generator
-	seed := time.Now().UnixNano()
-	p.rng = rand.New(rand.NewSource(seed))
-	p.log.Debug("Random number generator seeded", "seed", seed)
+	// Seed RNG: deterministic for tests (nil cfg), otherwise time-based
+	if cfg == nil {
+		p.rng = rand.New(rand.NewSource(1))
+	} else {
+		seed := time.Now().UnixNano()
+		p.rng = rand.New(rand.NewSource(seed))
+	}
+	p.log.Debug("Random number generator seeded", "seed", /* omitted */)
 
 	// TODO: Initialize parameters (e.g., load from config file)
 	p.turbulenceIntensity = 0.05   // Example initial value for turbulence intensity (adjust based on desired effect)
@@ -55,43 +60,26 @@ func (p *BlackScholesPlugin) BeforeSimStep(state *states.PhysicsState) error {
 	return nil
 }
 
-// AfterSimStep applies stochastic turbulence effects based on Black-Scholes inspiration
+// AfterSimStep applies stochastic turbulence effects based on Black-Scholes model
 func (p *BlackScholesPlugin) AfterSimStep(state *states.PhysicsState) error {
-	// TODO: Get the actual simulation time step (dt) if available. Assuming 1.0 for now.
-	dt := 1.0 // Placeholder for simulation time step
-
-	// Generate a random fluctuation based on a normal distribution (Gaussian noise)
-	// The standard deviation is proportional to the turbulence intensity (σ)
-	// and scaled by sqrt(dt) which is characteristic of Wiener processes (Brownian motion)
-	// often associated with financial models like Black-Scholes.
-	// We also make it proportional to the current velocity magnitude as turbulence often scales with speed.
-
-	// Calculate current speed (magnitude of velocity vector)
-	// Assumes Vector3 has Magnitude() method, using Euclidean distance as fallback
-	speed := math.Sqrt(state.Velocity.Vec.X*state.Velocity.Vec.X + state.Velocity.Vec.Y*state.Velocity.Vec.Y + state.Velocity.Vec.Z*state.Velocity.Vec.Z)
-
-	// Calculate standard deviation for the noise term
-	// Adjust the scaling factor (e.g., 1.0) as needed for desired simulation behavior
-	stdDev := p.turbulenceIntensity * speed * 1.0 * math.Sqrt(dt)
-
-	// Generate random noise components for each velocity axis
-	noiseX := p.rng.NormFloat64() * stdDev
-	noiseY := p.rng.NormFloat64() * stdDev
-	noiseZ := p.rng.NormFloat64() * stdDev
-
-	// Apply the noise to the velocity state
-	// This simulates the random buffeting effect of turbulence
-	state.Velocity.Vec.X += noiseX
-	state.Velocity.Vec.Y += noiseY
-	state.Velocity.Vec.Z += noiseZ
-
-	// Optional: Log the applied effect for debugging
-	// p.log.Debug("Applied Black-Scholes inspired turbulence", "noiseX", noiseX, "noiseY", noiseY, "noiseZ", noiseZ, "stateVel", state.Velocity)
-
-	// Note: The deterministicForcesMu (μ) is not directly used here.
-	// The base simulation loop should handle deterministic forces like gravity/drag.
-	// This plugin *adds* the stochastic turbulence component on top of that.
-	// A more complex model might have μ influence σ or the drift of the stochastic process.
+	// No change if zero intensity
+	if p.turbulenceIntensity == 0 {
+		return nil
+	}
+	// Determine timestep
+	dt := 1.0
+	if p.cfg != nil {
+		dt = p.cfg.Engine.Simulation.Step
+	}
+	// Compute current speed magnitude
+	vx, vy, vz := state.Velocity.Vec.X, state.Velocity.Vec.Y, state.Velocity.Vec.Z
+	speed := math.Sqrt(vx*vx + vy*vy + vz*vz)
+	// Standard deviation for noise
+	stdDev := p.turbulenceIntensity * speed * math.Sqrt(dt)
+	// Generate noise and apply
+	state.Velocity.Vec.X += p.rng.NormFloat64() * stdDev
+	state.Velocity.Vec.Y += p.rng.NormFloat64() * stdDev
+	state.Velocity.Vec.Z += p.rng.NormFloat64() * stdDev
 
 	return nil
 }

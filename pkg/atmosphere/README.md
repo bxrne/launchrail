@@ -4,6 +4,13 @@
 - Provides functions for calculating atmospheric properties.
 - Implements models for atmospheric density, pressure, and temperature.
 
+### Contract
+- Defines `Model` interface for atmospheric data:
+  - `GetAtmosphere(altitude float64) AtmosphereData`
+  - `GetSpeedOfSound(altitude float64) float64`
+- Default implementation: `ISAModel`.
+- Plugins can override via `config.Setup.Plugins.Paths` by providing a custom `Model`.
+
 ### Scope
 - Atmospheric property calculation functions.
 - Atmospheric model definitions.
