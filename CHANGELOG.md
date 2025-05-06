@@ -1,3 +1,10 @@
+## v0.7.2 (2025-05-06)
+
+### Refactor
+
+- **bench, atmosphere, blackscholes**: simplify BlackScholes turbulence model and add atmosphere Model interface
+- **plugins**: implement geometric brownian motion for turbulence simulation
+
 ## v0.7.1 (2025-05-06)
 
 ### Fix
