@@ -10,6 +10,7 @@ import (
 	openrocket "github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func createMockOpenRocketData() *openrocket.RocketDocument {
@@ -179,4 +180,35 @@ func TestGetComponentConcurrency(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		<-done
 	}
+}
+
+func TestNewRocketEntity_NilData(t *testing.T) {
+	motor := &components.Motor{} // Dummy motor
+	rocket := entities.NewRocketEntity(nil, nil, motor)
+	assert.Nil(t, rocket, "Should return nil if ORK data is nil")
+
+	rocket = entities.NewRocketEntity(nil, &openrocket.RocketDocument{}, nil)
+	assert.Nil(t, rocket, "Should return nil if motor is nil")
+}
+
+func TestNewRocketEntity_ComponentErrors(t *testing.T) {
+	world := &ecs.World{}
+	// motor := &components.Motor{Props: &thrustcurves.MotorData{TotalMass: 0.1}} // Unused Basic valid motor
+
+	// Test case 1: Bodytube creation error (e.g., invalid ORK data)
+	// This requires ORK data that causes NewBodytubeFromORK to error.
+	// We might need a specific test ORK file or mock the function.
+	// For now, let's assume we can create such data or focus on other errors.
+
+	// Test case 2: Invalid initial motor mass
+	invalidMotor := &components.Motor{Props: &thrustcurves.MotorData{TotalMass: 0.0}}
+	orkDataValid, err := openrocket.Load("../../testdata/openrocket/l1.ork", "23.09")
+	require.NoError(t, err)                                                                   // Check error from Load
+	require.NotNil(t, orkDataValid)                                                           // Ensure data loaded
+	rocketInvalidMotor := entities.NewRocketEntity(world, &orkDataValid.Rocket, invalidMotor) // Pass address of Rocket field
+	assert.Nil(t, rocketInvalidMotor, "Should return nil if initial motor mass is invalid")
+
+	// Test case 3: Invalid total mass calculation
+	// This would require mocking component GetMass() or having components with zero/negative mass.
+	// Difficult to test directly without more control over component creation/mocking.
 }

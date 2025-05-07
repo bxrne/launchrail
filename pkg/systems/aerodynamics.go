@@ -264,7 +264,7 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 
 		// Moments handling: Assume moment from CalculateAerodynamicMoment is in body frame.
 		// Rotate to world frame before accumulation if there's a valid orientation.
-		_ = <-momentChan                  // Consume value from channel to avoid blocking
+		_ = <-momentChan                  //nolint:gosimple // Consume value from channel to avoid blocking
 		var momentBodyFrame types.Vector3 // Declare variable
 		var momentWorldFrame types.Vector3
 

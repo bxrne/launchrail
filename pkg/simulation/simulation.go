@@ -431,6 +431,11 @@ func (s *Simulation) updateSystems() error {
 	}
 	s.logger.Debug("Calculated Net Angular Acceleration (World)", "momentW", state.AccumulatedMoment, "angAccW", netAngularAccelerationWorld)
 
+	// --- START TEMPORARY DEBUG: Disable angular motion for altitude diagnosis ---
+	netAngularAccelerationWorld = types.Vector3{}
+	s.logger.Debug("TEMPORARY DEBUG: Angular acceleration zeroed for testing linear motion.")
+	// --- END TEMPORARY DEBUG ---
+
 	// 4. Integrate state using RK4
 	dt := s.config.Engine.Simulation.Step
 
@@ -441,96 +446,104 @@ func (s *Simulation) updateSystems() error {
 	// Initial state for the RK4 step
 	pos0 := state.Position.Vec
 	vel0 := state.Velocity.Vec
-	angVel0_val := *state.AngularVelocity // Value for calculations
-	orient0_val := state.Orientation.Quat // Value for calculations
+	angVel0Val := *state.AngularVelocity // Value for calculations
+	orient0Val := state.Orientation.Quat // Value for calculations
 
 	// Derivatives function f(state_vars_for_accel_calc) -> acceleration
-	rk_eval_linear_accel := func(current_eval_vel types.Vector3, current_eval_pos types.Vector3) types.Vector3 {
+	rkEvalLinearAccel := func(currentEvalVel types.Vector3, currentEvalPos types.Vector3) types.Vector3 {
 		return netAcceleration
 	}
 	// Simplified derivative function for angular acceleration (world frame)
-	rk_eval_angular_accel_world := func(current_eval_ang_vel types.Vector3, current_eval_orient types.Quaternion) types.Vector3 {
-		return netAngularAccelerationWorld
-	}
+	/*
+		rkEvalAngularAccelWorld := func(currentEvalAngVel types.Vector3, currentEvalOrient types.Quaternion) types.Vector3 {
+			return netAngularAccelerationWorld
+		}
+	*/
 	// Derivative function for quaternion: dQ/dt = 0.5 * Q * omega_q_body. Returns *Quaternion.
-	rk_eval_quaternion_deriv := func(q_eval_val types.Quaternion, omega_world_eval types.Vector3) *types.Quaternion {
-		q_eval_ptr := &q_eval_val // Operate with a pointer if methods expect it
-		q_eval_inv := q_eval_ptr.Inverse()
-		omega_body_vec := q_eval_inv.RotateVector(&omega_world_eval)
-		omega_q_body := types.NewQuaternion(0, omega_body_vec.X, omega_body_vec.Y, omega_body_vec.Z)
+	/*
+		rkEvalQuaternionDeriv := func(qEvalVal types.Quaternion, omegaWorldEval types.Vector3) *types.Quaternion {
+			qEvalPtr := &qEvalVal // Operate with a pointer if methods expect it
+			qEvalInv := qEvalPtr.Inverse()
+			omegaBodyVec := qEvalInv.RotateVector(&omegaWorldEval)
+			omegaQBody := types.NewQuaternion(0, omegaBodyVec.X, omegaBodyVec.Y, omegaBodyVec.Z)
 
-		// q_eval_ptr.Multiply(omega_q_body) returns *Quaternion
-		// .Scale(0.5) returns *Quaternion
-		return q_eval_ptr.Multiply(omega_q_body).Scale(0.5)
-	}
+			// qEvalPtr.Multiply(omegaQBody) returns *Quaternion
+			// .Scale(0.5) returns *Quaternion
+			return qEvalPtr.Multiply(omegaQBody).Scale(0.5)
+		}
+	*/
 
 	// --- RK4 for Translational Motion ---
-	k1_v_deriv := vel0
-	k1_a_deriv := rk_eval_linear_accel(vel0, pos0)
-	pos_for_k2_linear_eval := pos0.Add(k1_v_deriv.MultiplyScalar(dt / 2.0))
-	vel_for_k2_linear_eval := vel0.Add(k1_a_deriv.MultiplyScalar(dt / 2.0))
-	k2_v_deriv := vel_for_k2_linear_eval
-	k2_a_deriv := rk_eval_linear_accel(vel_for_k2_linear_eval, pos_for_k2_linear_eval)
-	pos_for_k3_linear_eval := pos0.Add(k2_v_deriv.MultiplyScalar(dt / 2.0))
-	vel_for_k3_linear_eval := vel0.Add(k2_a_deriv.MultiplyScalar(dt / 2.0))
-	k3_v_deriv := vel_for_k3_linear_eval
-	k3_a_deriv := rk_eval_linear_accel(vel_for_k3_linear_eval, pos_for_k3_linear_eval)
-	pos_for_k4_linear_eval := pos0.Add(k3_v_deriv.MultiplyScalar(dt))
-	vel_for_k4_linear_eval := vel0.Add(k3_a_deriv.MultiplyScalar(dt))
-	k4_v_deriv := vel_for_k4_linear_eval
-	k4_a_deriv := rk_eval_linear_accel(vel_for_k4_linear_eval, pos_for_k4_linear_eval)
+	k1VDeriv := vel0
+	k1ADeriv := rkEvalLinearAccel(vel0, pos0)
+	posForK2LinearEval := pos0.Add(k1VDeriv.MultiplyScalar(dt / 2.0))
+	velForK2LinearEval := vel0.Add(k1ADeriv.MultiplyScalar(dt / 2.0))
+	k2VDeriv := velForK2LinearEval
+	k2ADeriv := rkEvalLinearAccel(velForK2LinearEval, posForK2LinearEval)
+	posForK3LinearEval := pos0.Add(k2VDeriv.MultiplyScalar(dt / 2.0))
+	velForK3LinearEval := vel0.Add(k2ADeriv.MultiplyScalar(dt / 2.0))
+	k3VDeriv := velForK3LinearEval
+	k3ADeriv := rkEvalLinearAccel(velForK3LinearEval, posForK3LinearEval)
+	posForK4LinearEval := pos0.Add(k3VDeriv.MultiplyScalar(dt))
+	velForK4LinearEval := vel0.Add(k3ADeriv.MultiplyScalar(dt))
+	k4VDeriv := velForK4LinearEval
+	k4ADeriv := rkEvalLinearAccel(velForK4LinearEval, posForK4LinearEval)
 	state.Position.Vec = pos0.Add(
-		k1_v_deriv.Add(k2_v_deriv.MultiplyScalar(2.0)).Add(k3_v_deriv.MultiplyScalar(2.0)).Add(k4_v_deriv).MultiplyScalar(dt / 6.0),
+		k1VDeriv.Add(k2VDeriv.MultiplyScalar(2.0)).Add(k3VDeriv.MultiplyScalar(2.0)).Add(k4VDeriv).MultiplyScalar(dt / 6.0),
 	)
 	state.Velocity.Vec = vel0.Add(
-		k1_a_deriv.Add(k2_a_deriv.MultiplyScalar(2.0)).Add(k3_a_deriv.MultiplyScalar(2.0)).Add(k4_a_deriv).MultiplyScalar(dt / 6.0),
+		k1ADeriv.Add(k2ADeriv.MultiplyScalar(2.0)).Add(k3ADeriv.MultiplyScalar(2.0)).Add(k4ADeriv).MultiplyScalar(dt / 6.0),
 	)
 
 	// --- RK4 for Angular Velocity (World Frame) ---
-	// angVel0_val is types.Vector3
-	k1_ang_a_deriv := rk_eval_angular_accel_world(angVel0_val, orient0_val)
-	// ang_vel_for_kX_eval are types.Vector3
-	ang_vel_for_k2_eval := angVel0_val.Add(k1_ang_a_deriv.MultiplyScalar(dt / 2.0))
-	k2_ang_a_deriv := rk_eval_angular_accel_world(ang_vel_for_k2_eval, orient0_val)
-	ang_vel_for_k3_eval := angVel0_val.Add(k2_ang_a_deriv.MultiplyScalar(dt / 2.0))
-	k3_ang_a_deriv := rk_eval_angular_accel_world(ang_vel_for_k3_eval, orient0_val)
-	ang_vel_for_k4_eval := angVel0_val.Add(k3_ang_a_deriv.MultiplyScalar(dt))
-	k4_ang_a_deriv := rk_eval_angular_accel_world(ang_vel_for_k4_eval, orient0_val)
+	/*
+		// angVel0Val is types.Vector3
+		k1AngADeriv := rkEvalAngularAccelWorld(angVel0Val, orient0Val)
+		// angVelForKXEval are types.Vector3
+		angVelForK2Eval := angVel0Val.Add(k1AngADeriv.MultiplyScalar(dt / 2.0))
+		k2AngADeriv := rkEvalAngularAccelWorld(angVelForK2Eval, orient0Val)
+		angVelForK3Eval := angVel0Val.Add(k2AngADeriv.MultiplyScalar(dt / 2.0))
+		k3AngADeriv := rkEvalAngularAccelWorld(angVelForK3Eval, orient0Val)
+		angVelForK4Eval := angVel0Val.Add(k3AngADeriv.MultiplyScalar(dt))
+		k4AngADeriv := rkEvalAngularAccelWorld(angVelForK4Eval, orient0Val)
 
-	*state.AngularVelocity = angVel0_val.Add(
-		k1_ang_a_deriv.Add(k2_ang_a_deriv.MultiplyScalar(2.0)).Add(k3_ang_a_deriv.MultiplyScalar(2.0)).Add(k4_ang_a_deriv).MultiplyScalar(dt / 6.0),
-	)
+		*state.AngularVelocity = angVel0Val.Add(
+			k1AngADeriv.Add(k2AngADeriv.MultiplyScalar(2.0)).Add(k3AngADeriv.MultiplyScalar(2.0)).Add(k4AngADeriv).MultiplyScalar(dt / 6.0),
+		)
+	*/
 
 	// --- RK4 for Orientation (Quaternion) ---
-	// kX_q_deriv will be *types.Quaternion because rk_eval_quaternion_deriv returns *types.Quaternion
-	k1_q_deriv_ptr := rk_eval_quaternion_deriv(orient0_val, angVel0_val)
+	/*
+		// kXQDeriv will be *types.Quaternion because rkEvalQuaternionDeriv returns *types.Quaternion
+		k1QDerivPtr := rkEvalQuaternionDeriv(orient0Val, angVel0Val)
 
-	// q_for_kX_eval will be values (types.Quaternion) after dereferencing and normalizing pointer results
-	// orient0_val is types.Quaternion. Add method is on *Quaternion. Scale is on *Quaternion.
-	// Need to convert orient0_val to pointer for Add, or ensure Add can take value + pointer.
-	// Let's assume Quaternion methods Add, Scale, Normalize always return new *Quaternion.
-	temp_q1 := (&orient0_val).Add(k1_q_deriv_ptr.Scale(dt / 2.0))
-	q_for_k2_eval_val := *temp_q1.Normalize()
-	k2_q_deriv_ptr := rk_eval_quaternion_deriv(q_for_k2_eval_val, ang_vel_for_k2_eval)
+		// qForKXEval will be values (types.Quaternion) after dereferencing and normalizing pointer results
+		// orient0Val is types.Quaternion. Add method is on *Quaternion. Scale is on *Quaternion.
+		// Need to convert orient0Val to pointer for Add, or ensure Add can take value + pointer.
+		// Let's assume Quaternion methods Add, Scale, Normalize always return new *Quaternion.
+		tempQ1 := (&orient0Val).Add(k1QDerivPtr.Scale(dt / 2.0))
+		qForK2EvalVal := *tempQ1.Normalize()
+		k2QDerivPtr := rkEvalQuaternionDeriv(qForK2EvalVal, angVelForK2Eval)
 
-	temp_q2 := (&orient0_val).Add(k2_q_deriv_ptr.Scale(dt / 2.0))
-	q_for_k3_eval_val := *temp_q2.Normalize()
-	k3_q_deriv_ptr := rk_eval_quaternion_deriv(q_for_k3_eval_val, ang_vel_for_k3_eval)
+		tempQ2 := (&orient0Val).Add(k2QDerivPtr.Scale(dt / 2.0))
+		qForK3EvalVal := *tempQ2.Normalize()
+		k3QDerivPtr := rkEvalQuaternionDeriv(qForK3EvalVal, angVelForK3Eval)
 
-	temp_q3 := (&orient0_val).Add(k3_q_deriv_ptr.Scale(dt))
-	q_for_k4_eval_val := *temp_q3.Normalize()
-	k4_q_deriv_ptr := rk_eval_quaternion_deriv(q_for_k4_eval_val, ang_vel_for_k4_eval)
+		tempQ3 := (&orient0Val).Add(k3QDerivPtr.Scale(dt))
+		qForK4EvalVal := *tempQ3.Normalize()
+		k4QDerivPtr := rkEvalQuaternionDeriv(qForK4EvalVal, angVelForK4Eval)
 
-	// Sum of quaternion derivatives (all are *Quaternion, Scale returns *Quaternion, Add returns *Quaternion)
-	sum_q_deriv_ptr := k1_q_deriv_ptr.Scale(1.0).Add(k2_q_deriv_ptr.Scale(2.0)).Add(k3_q_deriv_ptr.Scale(2.0)).Add(k4_q_deriv_ptr.Scale(1.0))
+		// Sum of quaternion derivatives (all are *Quaternion, Scale returns *Quaternion, Add returns *Quaternion)
+		sumQDerivPtr := k1QDerivPtr.Scale(1.0).Add(k2QDerivPtr.Scale(2.0)).Add(k3QDerivPtr.Scale(2.0)).Add(k4QDerivPtr.Scale(1.0))
 
-	final_orientation_ptr := (&orient0_val).Add(sum_q_deriv_ptr.Scale(dt / 6.0))
-	state.Orientation.Quat = *final_orientation_ptr.Normalize()
+		finalOrientationPtr := (&orient0Val).Add(sumQDerivPtr.Scale(dt / 6.0))
+		state.Orientation.Quat = *finalOrientationPtr.Normalize()
+	*/
 
 	s.logger.Debug("RK4 Updated Position", "oldPos", pos0, "newPos", state.Position.Vec, "dt", dt)
 	s.logger.Debug("RK4 Updated Velocity", "oldVel", vel0, "newVel", state.Velocity.Vec, "dt", dt)
-	s.logger.Debug("RK4 Updated Angular Velocity", "oldAngVel", angVel0_val, "newAngVel", state.AngularVelocity, "dt", dt)
-	s.logger.Debug("RK4 Updated Orientation", "oldOrient", orient0_val, "newOrient", state.Orientation.Quat, "dt", dt)
+	s.logger.Debug("RK4 Updated Angular Velocity", "oldAngVel", angVel0Val, "newAngVel", state.AngularVelocity, "dt", dt)
+	s.logger.Debug("RK4 Updated Orientation", "oldOrient", orient0Val, "newOrient", state.Orientation.Quat, "dt", dt)
 
 	// Update Acceleration state for logging/output (with the acceleration at the START of the step)
 	state.Acceleration.Vec = netAcceleration

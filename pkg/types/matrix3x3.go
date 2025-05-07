@@ -121,6 +121,6 @@ func TransformInertiaBodyToWorld(inertiaBody *Matrix3x3, rotationMatrixBodyToWor
 	// Temp = I_body * R_transpose
 	temp := inertiaBody.MultiplyMatrix(RT)
 	// I_world = R * Temp
-	I_world := R.MultiplyMatrix(temp)
-	return I_world
+	iWorld := R.MultiplyMatrix(temp)
+	return iWorld
 }
