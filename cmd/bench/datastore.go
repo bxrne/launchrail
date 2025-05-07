@@ -158,8 +158,10 @@ func LoadFlightInfo(filePath string) ([]FlightInfo, error) {
 }
 
 // LoadEventInfo loads event data from a CSV file.
+// It expects a CSV with at least 3 columns, and uses column 2 for Timestamp and column 3 for Event.
+// Example format from hipr-euroc24: Index, Timestamp, Event, Value
 func LoadEventInfo(filePath string) ([]EventInfo, error) {
-	records, err := loadCSV(filePath) // Skips header
+	records, err := loadCSV(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -170,24 +172,30 @@ func LoadEventInfo(filePath string) ([]EventInfo, error) {
 	}
 
 	var eventInfos []EventInfo
-	const expectedCols = 2 // Timestamp, Event
+	// Expecting at least 3 columns for ground truth event files (e.g., Index, Timestamp, Event, OptionalValue)
+	// We will use column 1 (0-indexed) for Timestamp and column 2 (0-indexed) for Event.
+	const minExpectedCols = 3
 
 	for i, record := range records {
-		if len(record) != expectedCols {
-			return nil, fmt.Errorf("unexpected number of columns in %s, row %d (1-based data): got %d, want %d. Record: [%s]", filepath.Base(filePath), i+1, len(record), expectedCols, strings.Join(record, " "))
+		if len(record) < minExpectedCols {
+			return nil, fmt.Errorf("unexpected number of columns in %s, row %d (1-based data): got %d, want at least %d. Record: %v", filepath.Base(filePath), i+2, len(record), minExpectedCols, record)
 		}
 
-		ts, err := parseFloat(record[0], i, "timestamp", filePath)
+		// Timestamp is in the second column (index 1)
+		ts, err := parseFloat(record[1], i, "Timestamp", filePath)
 		if err != nil {
 			return nil, err
 		}
-		event := record[1]
+
+		// Event is in the third column (index 2)
+		eventName := strings.TrimSpace(record[2])
 
 		eventInfos = append(eventInfos, EventInfo{
 			Timestamp: ts,
-			Event:     event,
+			Event:     eventName,
 		})
 	}
+
 	return eventInfos, nil
 }
 

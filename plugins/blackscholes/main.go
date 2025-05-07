@@ -35,7 +35,7 @@ func (p *BlackScholesPlugin) Initialize(log logf.Logger, cfg *config.Config) err
 		seed := time.Now().UnixNano()
 		p.rng = rand.New(rand.NewSource(seed))
 	}
-	p.log.Debug("Random number generator seeded", "seed", /* omitted */)
+	p.log.Debug("Random number generator seeded", "seed" /* omitted */)
 
 	// TODO: Initialize parameters (e.g., load from config file)
 	p.turbulenceIntensity = 0.05   // Example initial value for turbulence intensity (adjust based on desired effect)

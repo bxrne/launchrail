@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -82,16 +83,15 @@ func writeMarkdownReport(runDir, tag string, results []BenchmarkResult) error {
 
 func main() {
 	// --- Setup Logger ---
-	// Initialize logger early for setup messages
-	// Use GetLogger with a default level initially
-	benchLogger = logger.GetLogger("debug") // Use debug for benchmark setup
+	// Logger will be initialized after config is loaded.
 
 	// --- Load Configuration ---
 	cfg, err := config.GetConfig()
 	if err != nil {
-		benchLogger.Fatal("Failed to load configuration", "error", err)
+		// Use standard log for critical early errors if config fails before logger is up
+		log.Fatalf("Failed to load configuration: %v", err)
 	}
-	// Re-initialize logger with config level
+	// Initialize logger with config level. This will be the first effective call.
 	benchLogger = logger.GetLogger(cfg.Setup.Logging.Level)
 
 	benchLogger.Info("--- Starting Benchmark Run --- ")

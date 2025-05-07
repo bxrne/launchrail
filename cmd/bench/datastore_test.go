@@ -103,11 +103,11 @@ func TestLoadEventInfo(t *testing.T) {
 	}{
 		{
 			name: "Success",
-			// Corrected to 2 columns: ts, event
-			csvContent: `ts,event
-0.0,LAUNCH
-30.5,APOGEE
-60.2,LANDED
+			// Now expecting 3 columns: idx, ts, event. LoadEventInfo uses 2nd (ts) and 3rd (event).
+			csvContent: `idx,ts,event
+0,0.0,LAUNCH
+1,30.5,APOGEE
+2,60.2,LANDED
 `,
 			expectedData: []EventInfo{
 				{Timestamp: 0.0, Event: "LAUNCH"},
@@ -119,52 +119,38 @@ func TestLoadEventInfo(t *testing.T) {
 		{
 			name:        "Empty File",
 			csvContent:  "",
-			expectedErr: "failed to read header from test.csv", // More specific error from current LoadEventInfo
+			expectedErr: "failed to read header from test.csv",
 		},
 		{
 			name: "Header Only",
-			// Content is just the header
-			csvContent: `ts,event
+			csvContent: `idx,ts,event
 `,
 			expectedErr: "no data rows found in test.csv",
 		},
 		{
 			name: "Wrong Column Count",
-			// Providing 3 columns when 2 are expected
-			csvContent: `ts,event,extra
-1.0,MY_EVENT,extra_data
+			// Providing 2 columns when at least 3 are expected
+			csvContent: `ts,event
+1.0,MY_EVENT
 `,
-			expectedErr: "unexpected number of columns in test.csv, row 1",
+			expectedErr: "unexpected number of columns in test.csv, row 2 (1-based data): got 2, want at least 3",
 		},
 		{
 			name: "Invalid Timestamp Float",
-			// Corrected to 2 columns, but timestamp is invalid
-			csvContent: `ts,event
-invalid,LAUNCH_ATTEMPT
+			// 3 columns, but timestamp (2nd col) is invalid
+			csvContent: `idx,ts,event
+0,invalid,LAUNCH_ATTEMPT
 `,
-			expectedErr: "invalid float value 'invalid' in test.csv, row 2, column timestamp",
+			expectedErr: "invalid float value 'invalid' in test.csv, row 2, column Timestamp",
 		},
 		{
-			name: "Wrong Column Name", // Testing if LoadEventInfo (via loadCSVWithHeader) handles missing required headers
-			csvContent: `timestamp,event_name
-1.0,EVENT
+			name: "Wrong Column Name", // LoadEventInfo doesn't check header names, only position/count.
+			// This test will pass if there are 3+ columns and data types are correct.
+			csvContent: `id,timestamp_val,event_text
+0,1.0,EVENT
 `,
-			// This test case might be for a version of LoadEventInfo that uses loadCSVWithHeader.
-			// The current simplified LoadEventInfo doesn't check header names, only column count.
-			// For now, expecting a column count error if loadCSVWithHeader isn't used, or a missing column if it is.
-			// Based on current LoadEventInfo, it will proceed and try to parse column 0 and 1 directly.
-			// Let's stick to what the current LoadEventInfo does: it doesn't validate header names, just count.
-			// So, this test case is functionally similar to 'Success' if column count is 2.
-			// If we want to test header name validation, LoadEventInfo needs to be more complex.
-			// For the *current* LoadEventInfo, this would pass as it only checks count.
-			// To make it a distinct test that *should* fail with current LoadEventInfo if headers were strictly checked:
-			// Let's assume it will pass if data is valid, as current LoadEventInfo doesn't check header names.
-			// However, the original error output implies it was checking headers through the `outidx` expectation.
-			// The test setup `createTempCSV` always names the file `test.csv`. The `r.Read()` for header in `LoadEventInfo` means
-			// it won't use `headerMap` from `loadCSVWithHeader` if that's not called.
-			// The version of LoadEventInfo from Step 82 doesn't use loadCSVWithHeader.
 			expectedData: []EventInfo{{Timestamp: 1.0, Event: "EVENT"}},
-			expectedErr:  "", // This should pass with the current LoadEventInfo from Step 82
+			expectedErr:  "",
 		},
 	}
 

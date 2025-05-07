@@ -251,12 +251,17 @@ func render(c *gin.Context, component templ.Component) {
 }
 
 func main() {
-	log := logger.GetLogger("debug")
+	// Load configuration first
 	cfg, err := config.GetConfig()
 	if err != nil {
-		log.Warn("Failed to load config", "error", err)
-		return
+		fmt.Println("Failed to load configuration:", err)
+		os.Exit(1)
 	}
+
+	// Initialize logger with the level from the loaded configuration
+	// This will be the first effective call to GetLogger in this cmd's lifecycle.
+	log := logger.GetLogger(cfg.Setup.Logging.Level)
+
 	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
 
 	r := gin.Default()

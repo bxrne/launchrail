@@ -53,8 +53,8 @@ func (s *BenchmarkSuite) AddBenchmark(b Benchmark) {
 }
 
 // RunAll runs all benchmarks in the suite.
-func (s *BenchmarkSuite) RunAll() (map[string][]BenchmarkResult, bool, error) {
-	benchLogger := logger.GetLogger("info")
+func (s *BenchmarkSuite) RunAll(logLevel string) (map[string][]BenchmarkResult, bool, error) {
+	benchLogger := logger.GetLogger(logLevel)
 
 	allResults := make(map[string][]BenchmarkResult)
 	overallPass := true
