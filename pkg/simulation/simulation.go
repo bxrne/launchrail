@@ -290,21 +290,69 @@ func (s *Simulation) getSafeMass(motor *components.Motor, mass *types.Mass) *typ
 
 // buildPhysicsState constructs a PhysicsState from the rocket and current time.
 func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass) *states.PhysicsState {
+	// Simplified inertia tensor calculation (diagonal body frame)
+	// TODO: Replace with more accurate inertia calculation, possibly from OpenRocket data
+	var Ixx, Iyy, Izz float64
+	bodytube := getComponent[components.Bodytube](s.rocket, "bodytube")
+
+	if bodytube != nil && mass != nil && mass.Value > 0 && bodytube.Radius > 0 {
+		r := bodytube.Radius
+		l := bodytube.Length
+		m := mass.Value
+
+		// Roll inertia (longitudinal axis, assuming X)
+		Ixx = 0.5 * m * r * r
+		// Pitch/Yaw inertia (transverse axes, assuming Y and Z are similar for a cylinder)
+		// Using the simplified inertia from aerodynamics.go for cylinder rod perpendicular to axis
+		// I = (1/12) * m * (3*r^2 + L^2) for pitch/yaw about CG
+		// This CalculateInertia might need to be adapted or made more accessible
+		// For now, let's call a static version if available, or use the formula.
+		// This calculation is a placeholder as `systems.CalculateInertia` expects a full PhysicsState.
+		if l > 0 {
+			Iyy = (1.0 / 12.0) * m * (3*r*r + l*l)
+			Izz = Iyy // Assume symmetry for pitch and yaw inertia
+		} else { // Fallback if length is zero (e.g. sphere)
+			Iyy = (2.0 / 5.0) * m * r * r
+			Izz = Iyy
+		}
+	} else {
+		// Fallback to unit inertia if components are missing
+		Ixx, Iyy, Izz = 1.0, 1.0, 1.0
+		s.logger.Warn("Using fallback unit inertia tensor due to missing rocket components or mass.")
+	}
+
+	inertiaBody := types.NewMatrix3x3(
+		Ixx, 0, 0,
+		0, Iyy, 0,
+		0, 0, Izz,
+	)
+	invInertiaBody := types.NewMatrix3x3(
+		1.0/Ixx, 0, 0,
+		0, 1.0/Iyy, 0,
+		0, 0, 1.0/Izz,
+	)
+	if Ixx == 0 || Iyy == 0 || Izz == 0 { // Avoid division by zero if any inertia is zero
+		s.logger.Error("Zero component in body inertia tensor, using identity for inverse.", "ixx", Ixx, "iyy", Iyy, "izz", Izz)
+		invInertiaBody = types.IdentityMatrix()
+	}
+
 	return &states.PhysicsState{
-		Time:                s.currentTime,
-		Entity:              s.rocket.BasicEntity,
-		Position:            s.rocket.Position,
-		Orientation:         s.rocket.Orientation,
-		AngularVelocity:     s.rocket.AngularVelocity,
-		AngularAcceleration: s.rocket.AngularAcceleration,
-		Velocity:            s.rocket.Velocity,
-		Acceleration:        s.rocket.Acceleration,
-		Mass:                mass,
-		Motor:               motor,
-		Bodytube:            getComponent[components.Bodytube](s.rocket, "bodytube"),
-		Nosecone:            getComponent[components.Nosecone](s.rocket, "nosecone"),
-		Finset:              getComponent[components.TrapezoidFinset](s.rocket, "finset"),
-		Parachute:           getComponent[components.Parachute](s.rocket, "parachute"),
+		Time:                     s.currentTime,
+		Entity:                   s.rocket.BasicEntity,
+		Position:                 s.rocket.Position,
+		Orientation:              s.rocket.Orientation,
+		AngularVelocity:          s.rocket.AngularVelocity,
+		AngularAcceleration:      s.rocket.AngularAcceleration,
+		Velocity:                 s.rocket.Velocity,
+		Acceleration:             s.rocket.Acceleration,
+		Mass:                     mass,
+		Motor:                    motor,
+		Bodytube:                 bodytube, // Use already fetched bodytube
+		Nosecone:                 getComponent[components.Nosecone](s.rocket, "nosecone"),
+		Finset:                   getComponent[components.TrapezoidFinset](s.rocket, "finset"),
+		Parachute:                getComponent[components.Parachute](s.rocket, "parachute"),
+		InertiaTensorBody:        *inertiaBody,
+		InverseInertiaTensorBody: *invInertiaBody,
 	}
 }
 
@@ -369,6 +417,20 @@ func (s *Simulation) updateSystems() error {
 	}
 	s.logger.Debug("Calculated Net Acceleration", "netForce", netForce, "mass", state.Mass.Value, "netAcc", netAcceleration)
 
+	// 3b. Calculate Net Angular Acceleration from Accumulated Moments (World Frame)
+	var netAngularAccelerationWorld types.Vector3
+	rotationMatrix := types.RotationMatrixFromQuaternion(&state.Orientation.Quat)
+	inertiaTensorWorld := types.TransformInertiaBodyToWorld(&state.InertiaTensorBody, rotationMatrix)
+	inverseInertiaTensorWorld := inertiaTensorWorld.Inverse()
+
+	if inverseInertiaTensorWorld != nil {
+		netAngularAccelerationWorld = *inverseInertiaTensorWorld.MultiplyVector(&state.AccumulatedMoment)
+	} else {
+		s.logger.Error("World inertia tensor is singular, cannot compute angular acceleration.")
+		netAngularAccelerationWorld = types.Vector3{}
+	}
+	s.logger.Debug("Calculated Net Angular Acceleration (World)", "momentW", state.AccumulatedMoment, "angAccW", netAngularAccelerationWorld)
+
 	// 4. Integrate state using RK4
 	dt := s.config.Engine.Simulation.Step
 
@@ -376,67 +438,104 @@ func (s *Simulation) updateSystems() error {
 	// y = [position, velocity]
 	// y_dot = [velocity, acceleration]
 
-	// RK4 for translational motion
-
 	// Initial state for the RK4 step
 	pos0 := state.Position.Vec
 	vel0 := state.Velocity.Vec
+	angVel0_val := *state.AngularVelocity // Value for calculations
+	orient0_val := state.Orientation.Quat // Value for calculations
 
 	// Derivatives function f(state_vars_for_accel_calc) -> acceleration
-	// For this simplified RK4, acceleration is based on forces computed at the start of the full timestep.
-	rk_eval_accel := func(current_eval_vel types.Vector3, current_eval_pos types.Vector3) types.Vector3 {
-		// In a more advanced RK4, this function would trigger a re-calculation of forces
-		// based on current_eval_pos, current_eval_vel to get a new acceleration.
-		// Here, we use netAcceleration computed once at the beginning of updateSystems().
+	rk_eval_linear_accel := func(current_eval_vel types.Vector3, current_eval_pos types.Vector3) types.Vector3 {
 		return netAcceleration
 	}
+	// Simplified derivative function for angular acceleration (world frame)
+	rk_eval_angular_accel_world := func(current_eval_ang_vel types.Vector3, current_eval_orient types.Quaternion) types.Vector3 {
+		return netAngularAccelerationWorld
+	}
+	// Derivative function for quaternion: dQ/dt = 0.5 * Q * omega_q_body. Returns *Quaternion.
+	rk_eval_quaternion_deriv := func(q_eval_val types.Quaternion, omega_world_eval types.Vector3) *types.Quaternion {
+		q_eval_ptr := &q_eval_val // Operate with a pointer if methods expect it
+		q_eval_inv := q_eval_ptr.Inverse()
+		omega_body_vec := q_eval_inv.RotateVector(&omega_world_eval)
+		omega_q_body := types.NewQuaternion(0, omega_body_vec.X, omega_body_vec.Y, omega_body_vec.Z)
 
-	// k1
-	k1_v_deriv := vel0                      // dv/dt at t0
-	k1_a_deriv := rk_eval_accel(vel0, pos0) // da/dt at t0 (effectively d(vel)/dt = accel)
+		// q_eval_ptr.Multiply(omega_q_body) returns *Quaternion
+		// .Scale(0.5) returns *Quaternion
+		return q_eval_ptr.Multiply(omega_q_body).Scale(0.5)
+	}
 
-	// k2
-	pos_for_k2_eval := pos0.Add(k1_v_deriv.MultiplyScalar(dt / 2.0))
-	vel_for_k2_eval := vel0.Add(k1_a_deriv.MultiplyScalar(dt / 2.0))
-	k2_v_deriv := vel_for_k2_eval
-	k2_a_deriv := rk_eval_accel(vel_for_k2_eval, pos_for_k2_eval)
-
-	// k3
-	pos_for_k3_eval := pos0.Add(k2_v_deriv.MultiplyScalar(dt / 2.0))
-	vel_for_k3_eval := vel0.Add(k2_a_deriv.MultiplyScalar(dt / 2.0))
-	k3_v_deriv := vel_for_k3_eval
-	k3_a_deriv := rk_eval_accel(vel_for_k3_eval, pos_for_k3_eval)
-
-	// k4
-	pos_for_k4_eval := pos0.Add(k3_v_deriv.MultiplyScalar(dt))
-	vel_for_k4_eval := vel0.Add(k3_a_deriv.MultiplyScalar(dt))
-	k4_v_deriv := vel_for_k4_eval
-	k4_a_deriv := rk_eval_accel(vel_for_k4_eval, pos_for_k4_eval)
-
-	// Update position: pos_final = pos0 + (dt/6.0) * (k1_v_deriv + 2*k2_v_deriv + 2*k3_v_deriv + k4_v_deriv)
+	// --- RK4 for Translational Motion ---
+	k1_v_deriv := vel0
+	k1_a_deriv := rk_eval_linear_accel(vel0, pos0)
+	pos_for_k2_linear_eval := pos0.Add(k1_v_deriv.MultiplyScalar(dt / 2.0))
+	vel_for_k2_linear_eval := vel0.Add(k1_a_deriv.MultiplyScalar(dt / 2.0))
+	k2_v_deriv := vel_for_k2_linear_eval
+	k2_a_deriv := rk_eval_linear_accel(vel_for_k2_linear_eval, pos_for_k2_linear_eval)
+	pos_for_k3_linear_eval := pos0.Add(k2_v_deriv.MultiplyScalar(dt / 2.0))
+	vel_for_k3_linear_eval := vel0.Add(k2_a_deriv.MultiplyScalar(dt / 2.0))
+	k3_v_deriv := vel_for_k3_linear_eval
+	k3_a_deriv := rk_eval_linear_accel(vel_for_k3_linear_eval, pos_for_k3_linear_eval)
+	pos_for_k4_linear_eval := pos0.Add(k3_v_deriv.MultiplyScalar(dt))
+	vel_for_k4_linear_eval := vel0.Add(k3_a_deriv.MultiplyScalar(dt))
+	k4_v_deriv := vel_for_k4_linear_eval
+	k4_a_deriv := rk_eval_linear_accel(vel_for_k4_linear_eval, pos_for_k4_linear_eval)
 	state.Position.Vec = pos0.Add(
 		k1_v_deriv.Add(k2_v_deriv.MultiplyScalar(2.0)).Add(k3_v_deriv.MultiplyScalar(2.0)).Add(k4_v_deriv).MultiplyScalar(dt / 6.0),
 	)
-
-	// Update velocity: vel_final = vel0 + (dt/6.0) * (k1_a_deriv + 2*k2_a_deriv + 2*k3_a_deriv + k4_a_deriv)
 	state.Velocity.Vec = vel0.Add(
 		k1_a_deriv.Add(k2_a_deriv.MultiplyScalar(2.0)).Add(k3_a_deriv.MultiplyScalar(2.0)).Add(k4_a_deriv).MultiplyScalar(dt / 6.0),
 	)
 
+	// --- RK4 for Angular Velocity (World Frame) ---
+	// angVel0_val is types.Vector3
+	k1_ang_a_deriv := rk_eval_angular_accel_world(angVel0_val, orient0_val)
+	// ang_vel_for_kX_eval are types.Vector3
+	ang_vel_for_k2_eval := angVel0_val.Add(k1_ang_a_deriv.MultiplyScalar(dt / 2.0))
+	k2_ang_a_deriv := rk_eval_angular_accel_world(ang_vel_for_k2_eval, orient0_val)
+	ang_vel_for_k3_eval := angVel0_val.Add(k2_ang_a_deriv.MultiplyScalar(dt / 2.0))
+	k3_ang_a_deriv := rk_eval_angular_accel_world(ang_vel_for_k3_eval, orient0_val)
+	ang_vel_for_k4_eval := angVel0_val.Add(k3_ang_a_deriv.MultiplyScalar(dt))
+	k4_ang_a_deriv := rk_eval_angular_accel_world(ang_vel_for_k4_eval, orient0_val)
+
+	*state.AngularVelocity = angVel0_val.Add(
+		k1_ang_a_deriv.Add(k2_ang_a_deriv.MultiplyScalar(2.0)).Add(k3_ang_a_deriv.MultiplyScalar(2.0)).Add(k4_ang_a_deriv).MultiplyScalar(dt / 6.0),
+	)
+
+	// --- RK4 for Orientation (Quaternion) ---
+	// kX_q_deriv will be *types.Quaternion because rk_eval_quaternion_deriv returns *types.Quaternion
+	k1_q_deriv_ptr := rk_eval_quaternion_deriv(orient0_val, angVel0_val)
+
+	// q_for_kX_eval will be values (types.Quaternion) after dereferencing and normalizing pointer results
+	// orient0_val is types.Quaternion. Add method is on *Quaternion. Scale is on *Quaternion.
+	// Need to convert orient0_val to pointer for Add, or ensure Add can take value + pointer.
+	// Let's assume Quaternion methods Add, Scale, Normalize always return new *Quaternion.
+	temp_q1 := (&orient0_val).Add(k1_q_deriv_ptr.Scale(dt / 2.0))
+	q_for_k2_eval_val := *temp_q1.Normalize()
+	k2_q_deriv_ptr := rk_eval_quaternion_deriv(q_for_k2_eval_val, ang_vel_for_k2_eval)
+
+	temp_q2 := (&orient0_val).Add(k2_q_deriv_ptr.Scale(dt / 2.0))
+	q_for_k3_eval_val := *temp_q2.Normalize()
+	k3_q_deriv_ptr := rk_eval_quaternion_deriv(q_for_k3_eval_val, ang_vel_for_k3_eval)
+
+	temp_q3 := (&orient0_val).Add(k3_q_deriv_ptr.Scale(dt))
+	q_for_k4_eval_val := *temp_q3.Normalize()
+	k4_q_deriv_ptr := rk_eval_quaternion_deriv(q_for_k4_eval_val, ang_vel_for_k4_eval)
+
+	// Sum of quaternion derivatives (all are *Quaternion, Scale returns *Quaternion, Add returns *Quaternion)
+	sum_q_deriv_ptr := k1_q_deriv_ptr.Scale(1.0).Add(k2_q_deriv_ptr.Scale(2.0)).Add(k3_q_deriv_ptr.Scale(2.0)).Add(k4_q_deriv_ptr.Scale(1.0))
+
+	final_orientation_ptr := (&orient0_val).Add(sum_q_deriv_ptr.Scale(dt / 6.0))
+	state.Orientation.Quat = *final_orientation_ptr.Normalize()
+
 	s.logger.Debug("RK4 Updated Position", "oldPos", pos0, "newPos", state.Position.Vec, "dt", dt)
 	s.logger.Debug("RK4 Updated Velocity", "oldVel", vel0, "newVel", state.Velocity.Vec, "dt", dt)
+	s.logger.Debug("RK4 Updated Angular Velocity", "oldAngVel", angVel0_val, "newAngVel", state.AngularVelocity, "dt", dt)
+	s.logger.Debug("RK4 Updated Orientation", "oldOrient", orient0_val, "newOrient", state.Orientation.Quat, "dt", dt)
 
 	// Update Acceleration state for logging/output (with the acceleration at the START of the step)
-	// A more representative acceleration for the step could be a weighted average of kx_a_deriv values.
 	state.Acceleration.Vec = netAcceleration
-	s.logger.Debug("Final State Acceleration set (from start of step for RK4 context)", "acc", state.Acceleration.Vec)
-
-	// TODO RK4 for angular motion:
-	// angVel0 := state.AngularVelocity.Vec
-	// angAcc0 := calculatedAngularAcceleration // Needs to be calculated from AccumulatedMoment and inertia tensor
-	// Similar k1,k2,k3,k4 steps for angular velocity and orientation (quaternion integration)
-	// state.AngularVelocity.Vec = ...
-	// state.Orientation.Quat = ... (quaternion integration is more complex than just adding angular velocity)
+	*state.AngularAcceleration = netAngularAccelerationWorld
+	s.logger.Debug("Final State Accel set (RK4 context)", "accel", state.Acceleration.Vec, "angAccel", state.AngularAcceleration)
 
 	// 5. Handle Ground Collision (Simplified: check *after* integration)
 	if state.Position.Vec.Y <= s.config.Engine.Simulation.GroundTolerance {

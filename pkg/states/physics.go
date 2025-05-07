@@ -23,6 +23,12 @@ type PhysicsState struct {
 	AccumulatedForce  types.Vector3
 	AccumulatedMoment types.Vector3
 
+	// Inertia Tensors (Body Frame)
+	// InertiaTensorBody is the 3x3 inertia tensor in the body frame.
+	// InverseInertiaTensorBody is its inverse, also in the body frame.
+	InertiaTensorBody        types.Matrix3x3
+	InverseInertiaTensorBody types.Matrix3x3
+
 	// Current event detected this timestep
 	CurrentEvent types.Event
 
