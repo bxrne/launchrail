@@ -1,3 +1,9 @@
+## v0.7.3 (2025-05-07)
+
+### Fix
+
+- **bench, server, logger, plugins**: update CSV event loading to handle 3-column format and improve logger initialization
+
 ## v0.7.2 (2025-05-06)
 
 ### Refactor
