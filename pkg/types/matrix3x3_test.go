@@ -6,32 +6,7 @@ import (
 
 	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
-
-const delta = 1e-9 // Tolerance for float comparisons
-
-// Helper function to assert matrix equality
-func assertMatrixEqual(t *testing.T, expected, actual *types.Matrix3x3, msgAndArgs ...interface{}) {
-	require.NotNil(t, actual, msgAndArgs...)
-	assert.InDelta(t, expected.M11, actual.M11, delta, msgAndArgs...)
-	assert.InDelta(t, expected.M12, actual.M12, delta, msgAndArgs...)
-	assert.InDelta(t, expected.M13, actual.M13, delta, msgAndArgs...)
-	assert.InDelta(t, expected.M21, actual.M21, delta, msgAndArgs...)
-	assert.InDelta(t, expected.M22, actual.M22, delta, msgAndArgs...)
-	assert.InDelta(t, expected.M23, actual.M23, delta, msgAndArgs...)
-	assert.InDelta(t, expected.M31, actual.M31, delta, msgAndArgs...)
-	assert.InDelta(t, expected.M32, actual.M32, delta, msgAndArgs...)
-	assert.InDelta(t, expected.M33, actual.M33, delta, msgAndArgs...)
-}
-
-// Helper function to assert vector equality
-func assertVectorEqual(t *testing.T, expected, actual *types.Vector3, msgAndArgs ...interface{}) {
-	require.NotNil(t, actual, msgAndArgs...)
-	assert.InDelta(t, expected.X, actual.X, delta, msgAndArgs...)
-	assert.InDelta(t, expected.Y, actual.Y, delta, msgAndArgs...)
-	assert.InDelta(t, expected.Z, actual.Z, delta, msgAndArgs...)
-}
 
 // TestNewMatrix3x3 tests the NewMatrix3x3 constructor.
 func TestNewMatrix3x3(t *testing.T) {
