@@ -147,17 +147,23 @@ type massProvider interface {
 func calculateTotalMassFromComponents(components map[string]interface{}) float64 {
 	log := logger.GetLogger("info") // Get logger instance
 	var totalMass float64
+	log.Info("Calculating total mass from components...") // Added
 	for name, comp := range components {
 		if provider, ok := comp.(massProvider); ok {
 			mass := provider.GetMass()
+			// Added detailed log for each component's mass
+			log.Info("Component Mass Contribution", "name", name, "type", fmt.Sprintf("%T", comp), "mass_kg", mass)
 			if math.IsNaN(mass) || mass < 0 {
 				log.Warn(fmt.Sprintf("Invalid mass (%.4f) from component, skipping.", mass), "component_name", name, "component_type", fmt.Sprintf("%T", comp))
 				continue // Skip negative mass components
 			}
 			totalMass += mass
+		} else { // Added
+			log.Warn("Component does not implement massProvider", "name", name, "type", fmt.Sprintf("%T", comp)) // Added
 		}
 	}
 
+	log.Info("Final calculated total mass from components", "total_mass_kg", totalMass) // Added
 	if totalMass <= 0 {
 		log.Warn(fmt.Sprintf("Final calculated total mass from components is invalid or zero (%.4f). Returning 0.", totalMass))
 		return 0.0

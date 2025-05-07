@@ -321,16 +321,16 @@ func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass
 		s.logger.Warn("Using fallback unit inertia tensor due to missing rocket components or mass.")
 	}
 
-	inertiaBody := types.NewMatrix3x3(
+	inertiaBody := types.NewMatrix3x3([]float64{
 		Ixx, 0, 0,
 		0, Iyy, 0,
 		0, 0, Izz,
-	)
-	invInertiaBody := types.NewMatrix3x3(
-		1.0/Ixx, 0, 0,
-		0, 1.0/Iyy, 0,
-		0, 0, 1.0/Izz,
-	)
+	})
+	invInertiaBody := types.NewMatrix3x3([]float64{
+		1.0 / Ixx, 0, 0,
+		0, 1.0 / Iyy, 0,
+		0, 0, 1.0 / Izz,
+	})
 	if Ixx == 0 || Iyy == 0 || Izz == 0 { // Avoid division by zero if any inertia is zero
 		s.logger.Error("Zero component in body inertia tensor, using identity for inverse.", "ixx", Ixx, "iyy", Iyy, "izz", Izz)
 		invInertiaBody = types.IdentityMatrix()

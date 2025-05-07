@@ -12,9 +12,19 @@ type Matrix3x3 struct {
 	M31, M32, M33 float64 // Row 3
 }
 
-// NewMatrix3x3 creates a new matrix from components.
-func NewMatrix3x3(m11, m12, m13, m21, m22, m23, m31, m32, m33 float64) *Matrix3x3 {
-	return &Matrix3x3{m11, m12, m13, m21, m22, m23, m31, m32, m33}
+// NewMatrix3x3 creates a new matrix from a slice of 9 elements (row-major).
+// Returns nil if the elements slice does not contain exactly 9 values.
+func NewMatrix3x3(elements []float64) *Matrix3x3 {
+	if len(elements) != 9 {
+		// Consider logging an error here as well, e.g., using a package-level logger
+		// For now, returning nil to indicate failure.
+		return nil
+	}
+	return &Matrix3x3{
+		M11: elements[0], M12: elements[1], M13: elements[2],
+		M21: elements[3], M22: elements[4], M23: elements[5],
+		M31: elements[6], M32: elements[7], M33: elements[8],
+	}
 }
 
 // IdentityMatrix returns an identity matrix.
