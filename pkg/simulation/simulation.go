@@ -363,28 +363,80 @@ func (s *Simulation) updateSystems() error {
 	var netAcceleration types.Vector3
 	if state.Mass.Value <= 0 {
 		s.logger.Error("Invalid mass for acceleration calculation", "mass", state.Mass.Value)
-		// Handle error: perhaps stop simulation or set acceleration to zero?
-		netAcceleration = types.Vector3{} // Avoid NaN/Inf
+		netAcceleration = types.Vector3{}
 	} else {
 		netAcceleration = netForce.DivideScalar(state.Mass.Value)
 	}
 	s.logger.Debug("Calculated Net Acceleration", "netForce", netForce, "mass", state.Mass.Value, "netAcc", netAcceleration)
 
-	// 4. Integrate state using Forward Euler
+	// 4. Integrate state using RK4
 	dt := s.config.Engine.Simulation.Step
-	currentVelocity := state.Velocity.Vec // Store current velocity for position update
 
-	// Update Velocity
-	state.Velocity.Vec = state.Velocity.Vec.Add(netAcceleration.MultiplyScalar(dt))
-	s.logger.Debug("Updated Velocity", "oldVel", currentVelocity, "newVel", state.Velocity.Vec, "dt", dt)
+	// State variables for RK4:
+	// y = [position, velocity]
+	// y_dot = [velocity, acceleration]
 
-	// Update Position (using velocity *before* this step's acceleration was applied)
-	state.Position.Vec = state.Position.Vec.Add(currentVelocity.MultiplyScalar(dt))
-	s.logger.Debug("Updated Position", "oldPos", state.Position.Vec, "newPos", state.Position.Vec, "dt", dt) // Log needs fix: show old *and* new
+	// RK4 for translational motion
 
-	// Update Acceleration state for logging/output
+	// Initial state for the RK4 step
+	pos0 := state.Position.Vec
+	vel0 := state.Velocity.Vec
+
+	// Derivatives function f(state_vars_for_accel_calc) -> acceleration
+	// For this simplified RK4, acceleration is based on forces computed at the start of the full timestep.
+	rk_eval_accel := func(current_eval_vel types.Vector3, current_eval_pos types.Vector3) types.Vector3 {
+		// In a more advanced RK4, this function would trigger a re-calculation of forces
+		// based on current_eval_pos, current_eval_vel to get a new acceleration.
+		// Here, we use netAcceleration computed once at the beginning of updateSystems().
+		return netAcceleration
+	}
+
+	// k1
+	k1_v_deriv := vel0                      // dv/dt at t0
+	k1_a_deriv := rk_eval_accel(vel0, pos0) // da/dt at t0 (effectively d(vel)/dt = accel)
+
+	// k2
+	pos_for_k2_eval := pos0.Add(k1_v_deriv.MultiplyScalar(dt / 2.0))
+	vel_for_k2_eval := vel0.Add(k1_a_deriv.MultiplyScalar(dt / 2.0))
+	k2_v_deriv := vel_for_k2_eval
+	k2_a_deriv := rk_eval_accel(vel_for_k2_eval, pos_for_k2_eval)
+
+	// k3
+	pos_for_k3_eval := pos0.Add(k2_v_deriv.MultiplyScalar(dt / 2.0))
+	vel_for_k3_eval := vel0.Add(k2_a_deriv.MultiplyScalar(dt / 2.0))
+	k3_v_deriv := vel_for_k3_eval
+	k3_a_deriv := rk_eval_accel(vel_for_k3_eval, pos_for_k3_eval)
+
+	// k4
+	pos_for_k4_eval := pos0.Add(k3_v_deriv.MultiplyScalar(dt))
+	vel_for_k4_eval := vel0.Add(k3_a_deriv.MultiplyScalar(dt))
+	k4_v_deriv := vel_for_k4_eval
+	k4_a_deriv := rk_eval_accel(vel_for_k4_eval, pos_for_k4_eval)
+
+	// Update position: pos_final = pos0 + (dt/6.0) * (k1_v_deriv + 2*k2_v_deriv + 2*k3_v_deriv + k4_v_deriv)
+	state.Position.Vec = pos0.Add(
+		k1_v_deriv.Add(k2_v_deriv.MultiplyScalar(2.0)).Add(k3_v_deriv.MultiplyScalar(2.0)).Add(k4_v_deriv).MultiplyScalar(dt / 6.0),
+	)
+
+	// Update velocity: vel_final = vel0 + (dt/6.0) * (k1_a_deriv + 2*k2_a_deriv + 2*k3_a_deriv + k4_a_deriv)
+	state.Velocity.Vec = vel0.Add(
+		k1_a_deriv.Add(k2_a_deriv.MultiplyScalar(2.0)).Add(k3_a_deriv.MultiplyScalar(2.0)).Add(k4_a_deriv).MultiplyScalar(dt / 6.0),
+	)
+
+	s.logger.Debug("RK4 Updated Position", "oldPos", pos0, "newPos", state.Position.Vec, "dt", dt)
+	s.logger.Debug("RK4 Updated Velocity", "oldVel", vel0, "newVel", state.Velocity.Vec, "dt", dt)
+
+	// Update Acceleration state for logging/output (with the acceleration at the START of the step)
+	// A more representative acceleration for the step could be a weighted average of kx_a_deriv values.
 	state.Acceleration.Vec = netAcceleration
-	s.logger.Debug("Final State Acceleration set", "acc", state.Acceleration.Vec)
+	s.logger.Debug("Final State Acceleration set (from start of step for RK4 context)", "acc", state.Acceleration.Vec)
+
+	// TODO RK4 for angular motion:
+	// angVel0 := state.AngularVelocity.Vec
+	// angAcc0 := calculatedAngularAcceleration // Needs to be calculated from AccumulatedMoment and inertia tensor
+	// Similar k1,k2,k3,k4 steps for angular velocity and orientation (quaternion integration)
+	// state.AngularVelocity.Vec = ...
+	// state.Orientation.Quat = ... (quaternion integration is more complex than just adding angular velocity)
 
 	// 5. Handle Ground Collision (Simplified: check *after* integration)
 	if state.Position.Vec.Y <= s.config.Engine.Simulation.GroundTolerance {
