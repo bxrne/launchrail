@@ -264,8 +264,14 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 
 		// Moments handling: Assume moment from CalculateAerodynamicMoment is in body frame.
 		// Rotate to world frame before accumulation if there's a valid orientation.
-		momentBodyFrame := <-momentChan
+		_ = <-momentChan                  // Consume value from channel to avoid blocking
+		var momentBodyFrame types.Vector3 // Declare variable
 		var momentWorldFrame types.Vector3
+
+		// --- TEMPORARY DEBUG: Disable aerodynamic moments ---
+		momentBodyFrame = types.Vector3{} // Override calculated moment (sets the declared variable)
+		// --- END TEMPORARY DEBUG ---
+
 		if entity.Orientation.Quat != (types.Quaternion{}) {
 			momentWorldFrame = *entity.Orientation.Quat.RotateVector(&momentBodyFrame)
 		} else {
@@ -337,29 +343,6 @@ func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity states.Physi
 	}
 
 	return baseCd
-}
-
-// getAtmosphericDensity implements the International Standard Atmosphere model
-func getAtmosphericDensity(altitude float64) float64 {
-	// Constants for ISA model
-	const (
-		rho0 = 1.225     // sea level density in kg/m^3
-		T0   = 288.15    // sea level temperature in K
-		L    = 0.0065    // temperature lapse rate in K/m
-		g    = 9.80665   // gravitational acceleration in m/s^2
-		R    = 287.05287 // specific gas constant for air in J/(kg·K)
-	)
-
-	// Limit altitude to avoid numerical instability
-	if altitude > 80000 {
-		return 0
-	}
-
-	if altitude < 11000 { // troposphere
-		return rho0 * math.Pow(1-(L*altitude)/T0, g/(R*L)-1)
-	}
-	// Add stratosphere calculations if needed
-	return rho0 * math.Exp(-g*altitude/(R*T0))
 }
 
 // calculateAerodynamicMoment calculates the aerodynamic moments on the entity

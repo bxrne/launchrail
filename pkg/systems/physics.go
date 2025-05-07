@@ -171,34 +171,6 @@ func (s *PhysicsSystem) validateEntity(entity *states.PhysicsState) error {
 	return nil
 }
 
-func (s *PhysicsSystem) handleGroundCollision(entity *states.PhysicsState) bool {
-	// Check if entity is at or below ground level and moving downwards or stationary vertically.
-	if entity.Position.Vec.Y <= s.groundTolerance && entity.Velocity.Vec.Y <= 0 {
-		// Set vertical position exactly to ground level
-		entity.Position.Vec.Y = 0
-		// Zero out all velocity components
-		entity.Velocity.Vec = types.Vector3{}
-		// Zero out all acceleration components
-		entity.Acceleration.Vec = types.Vector3{}
-		// Optionally, zero out angular velocity as well?
-		if entity.AngularVelocity != nil {
-			*entity.AngularVelocity = types.Vector3{}
-		}
-		if entity.AngularAcceleration != nil {
-			*entity.AngularAcceleration = types.Vector3{}
-		}
-
-		// Set landing event if not already landed
-		if entity.CurrentEvent != types.Land {
-			entity.CurrentEvent = types.Land
-		}
-		s.logger.Debug("Ground collision detected", "entity_id", entity.Entity.ID())
-
-		return true // Collision handled
-	}
-	return false // No collision detected or handled
-}
-
 // Add adds an entity to the system
 func (s *PhysicsSystem) Add(pe *states.PhysicsState) {
 	s.entities = append(s.entities, pe) // Store pointer directly
