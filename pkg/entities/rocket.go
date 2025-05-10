@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/EngoEngine/ecs"
-	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/zerodha/logf"
 	"github.com/bxrne/launchrail/pkg/components"
 	openrocket "github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/states"
@@ -23,12 +23,11 @@ type RocketEntity struct {
 }
 
 // NewRocketEntity creates a new rocket entity from OpenRocket data
-func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor *components.Motor) *RocketEntity {
+// NewRocketEntity creates a new rocket entity from OpenRocket data
+func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor *components.Motor, log *logf.Logger) *RocketEntity {
 	if orkData == nil || motor == nil {
 		return nil
 	}
-
-	log := logger.GetLogger("info") // Get logger instance
 
 	// --- 1. Create Components First ---
 	createdComponents := make(map[string]interface{}) // Use interface{} for flexibility
@@ -87,7 +86,7 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 	createdComponents["parachute"] = parachute
 
 	// --- 2. Calculate Total Mass from Created Components ---
-	initialMass := calculateTotalMassFromComponents(createdComponents)
+	initialMass := calculateTotalMassFromComponents(createdComponents, log)
 
 	// Validate mass before creating entity
 	if initialMass <= 0 {
@@ -144,8 +143,8 @@ type massProvider interface {
 }
 
 // calculateTotalMassFromComponents sums masses from a map of created components.
-func calculateTotalMassFromComponents(components map[string]interface{}) float64 {
-	log := logger.GetLogger("info") // Get logger instance
+// calculateTotalMassFromComponents sums masses from a map of created components.
+func calculateTotalMassFromComponents(components map[string]interface{}, log *logf.Logger) float64 {
 	var totalMass float64
 	log.Info("Calculating total mass from components...") // Added
 	for name, comp := range components {

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/EngoEngine/ecs"
+	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/designation"
 	"github.com/bxrne/launchrail/pkg/entities"
@@ -78,13 +79,14 @@ func createMockMotor() *components.Motor {
 
 // TEST: GIVEN valid OpenRocket data WHEN NewRocketEntity is called THEN a new rocket entity is created
 func TestNewRocketEntity(t *testing.T) {
+	log := logger.GetLogger("debug")
 	// Arrange
 	world := &ecs.World{}
 	orkData := createMockOpenRocketData()
 	motor := createMockMotor()
 
 	// Act
-	rocket := entities.NewRocketEntity(world, orkData, motor)
+	rocket := entities.NewRocketEntity(world, orkData, motor, log)
 
 	// Assert
 	assert.NotNil(t, rocket)
@@ -96,11 +98,12 @@ func TestNewRocketEntity(t *testing.T) {
 
 // TEST: GIVEN a rocket entity WHEN GetComponent is called with valid component name THEN the component is returned
 func TestGetComponent(t *testing.T) {
+	log := logger.GetLogger("debug")
 	// Arrange
 	world := &ecs.World{}
 	orkData := createMockOpenRocketData()
 	motor := createMockMotor()
-	rocket := entities.NewRocketEntity(world, orkData, motor)
+	rocket := entities.NewRocketEntity(world, orkData, motor, log)
 
 	tests := []struct {
 		name      string
@@ -149,7 +152,8 @@ func TestNewRocketEntityWithInvalidData(t *testing.T) {
 	motor := createMockMotor()
 
 	// Act
-	rocket := entities.NewRocketEntity(world, invalidOrkData, motor)
+	log := logger.GetLogger("debug")
+	rocket := entities.NewRocketEntity(world, invalidOrkData, motor, log)
 
 	// Assert
 	assert.Nil(t, rocket)
@@ -157,11 +161,12 @@ func TestNewRocketEntityWithInvalidData(t *testing.T) {
 
 // TEST: GIVEN a rocket entity with multiple components WHEN GetComponent is called concurrently THEN no race conditions occur
 func TestGetComponentConcurrency(t *testing.T) {
+	log := logger.GetLogger("debug")
 	// Arrange
 	world := &ecs.World{}
 	orkData := createMockOpenRocketData()
 	motor := createMockMotor()
-	rocket := entities.NewRocketEntity(world, orkData, motor)
+	rocket := entities.NewRocketEntity(world, orkData, motor, log)
 
 	// Act & Assert
 	done := make(chan bool)
@@ -184,10 +189,11 @@ func TestGetComponentConcurrency(t *testing.T) {
 
 func TestNewRocketEntity_NilData(t *testing.T) {
 	motor := &components.Motor{} // Dummy motor
-	rocket := entities.NewRocketEntity(nil, nil, motor)
+	log := logger.GetLogger("debug")
+	rocket := entities.NewRocketEntity(nil, nil, motor, log)
 	assert.Nil(t, rocket, "Should return nil if ORK data is nil")
 
-	rocket = entities.NewRocketEntity(nil, &openrocket.RocketDocument{}, nil)
+	rocket = entities.NewRocketEntity(nil, &openrocket.RocketDocument{}, nil, log)
 	assert.Nil(t, rocket, "Should return nil if motor is nil")
 }
 
@@ -205,7 +211,8 @@ func TestNewRocketEntity_ComponentErrors(t *testing.T) {
 	orkDataValid, err := openrocket.Load("../../testdata/openrocket/l1.ork", "23.09")
 	require.NoError(t, err)                                                                   // Check error from Load
 	require.NotNil(t, orkDataValid)                                                           // Ensure data loaded
-	rocketInvalidMotor := entities.NewRocketEntity(world, &orkDataValid.Rocket, invalidMotor) // Pass address of Rocket field
+	log := logger.GetLogger("debug")
+	rocketInvalidMotor := entities.NewRocketEntity(world, &orkDataValid.Rocket, invalidMotor, log) // Pass address of Rocket field
 	assert.Nil(t, rocketInvalidMotor, "Should return nil if initial motor mass is invalid")
 
 	// Test case 3: Invalid total mass calculation

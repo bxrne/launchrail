@@ -251,6 +251,8 @@ func render(c *gin.Context, component templ.Component) {
 }
 
 func main() {
+	// Set Gin to release mode for production logging
+	gin.SetMode(gin.ReleaseMode)
 	// Load configuration first
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -260,11 +262,17 @@ func main() {
 
 	// Initialize logger with the level from the loaded configuration
 	// This will be the first effective call to GetLogger in this cmd's lifecycle.
-	log := logger.GetLogger(cfg.Setup.Logging.Level)
+	// Initialize logger with file output (default to ./launchrail.log)
+	logFilePath := "./launchrail.log" // Can be made configurable in config.yaml
+	log := logger.GetLogger(cfg.Setup.Logging.Level, logFilePath)
 
 	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
 
-	r := gin.Default()
+	r := gin.New()
+	// Attach our custom LoggingMiddleware (logs to file and stdout)
+	r.Use(logger.LoggingMiddleware(log))
+	// Optionally, add Gin's Recovery middleware for panic handling
+	r.Use(gin.Recovery())
 	err = r.SetTrustedProxies(nil)
 	if err != nil {
 		log.Warn("Failed to set trusted proxies", "Error", err)

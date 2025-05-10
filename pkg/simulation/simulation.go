@@ -3,6 +3,7 @@ package simulation
 import (
 	"fmt"
 	"math"
+	"reflect"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
@@ -121,7 +122,7 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	}
 
 	// Create rocket entity with all components
-	s.rocket = entities.NewRocketEntity(s.world, orkData, motor)
+	s.rocket = entities.NewRocketEntity(s.world, orkData, motor, &s.logger)
 
 	// Create a single PhysicsEntity to reuse for all systems
 	sysEntity := &states.PhysicsState{
@@ -374,12 +375,14 @@ func (s *Simulation) updateSystems() error {
 	}
 	motor := getComponent[components.Motor](s.rocket, "motor")
 	mass := s.getSafeMass(motor, s.rocket.Mass)
-	state := s.buildPhysicsState(motor, mass)
+	state := s.buildPhysicsState(motor, mass) // state is a snapshot for systems to READ from
 
-	// 1. Reset Force/Moment Accumulators for this timestep
-	state.AccumulatedForce = types.Vector3{}
-	state.AccumulatedMoment = types.Vector3{} // Keep for consistency, though not used for integration yet
+	// 1. Reset Force/Moment Accumulators for this timestep ON THE MAIN ROCKET ENTITY
+	s.rocket.AccumulatedForce = types.Vector3{}
+	s.rocket.AccumulatedMoment = types.Vector3{}
+	s.logger.Debug("Accumulators reset on s.rocket", "s.rocket.AF", s.rocket.AccumulatedForce, "s.rocket.AM", s.rocket.AccumulatedMoment)
 
+	// 2. Run BeforeSimStep plugins
 	s.logger.Debug("Running BeforeSimStep plugins")
 	if err := runPlugins(s.pluginManager.GetPlugins(), func(p pluginapi.SimulationPlugin) error {
 		return p.BeforeSimStep(state)
@@ -395,59 +398,71 @@ func (s *Simulation) updateSystems() error {
 	}
 
 	s.logger.Debug("Starting system update loop")
-	for _, system := range s.systems {
-		s.logger.Debug("Updating system", "type", fmt.Sprintf("%T", system))
-		if err := system.Update(s.config.Engine.Simulation.Step); err != nil {
-			return fmt.Errorf("system %T update error: %w", system, err)
+	for _, sys := range s.systems {
+		sysName := reflect.TypeOf(sys).String() // Get system name for logging
+		s.logger.Debug("Updating system", "type", sysName)
+
+		// Pass dt to the system's Update method
+		if err := sys.Update(s.config.Engine.Simulation.Step); err != nil {
+			s.logger.Error("Error updating system", "type", sysName, "error", err)
+			// Potentially handle critical errors, e.g., by stopping the simulation
+			// For now, we'll let it continue to gather more data if one system fails minorly
+		}
+
+		// Log accumulated forces after specific system updates
+		switch sys.(type) {
+		case *systems.PhysicsSystem:
+			s.logger.Debug("s.rocket.AccumulatedForce after PhysicsSystem", "AF", s.rocket.AccumulatedForce)
+		case *systems.AerodynamicSystem:
+			s.logger.Debug("s.rocket.AccumulatedForce after AerodynamicSystem", "AF", s.rocket.AccumulatedForce)
 		}
 	}
 	s.logger.Debug("Finished system update loop")
+	s.logger.Debug("s.rocket.AccumulatedForce before netForce calculation", "AF", s.rocket.AccumulatedForce)
 
 	// Capture the detected event *after* running rules system
 	state.CurrentEvent = s.rulesSystem.GetLastEvent()
 
-	// 3. Calculate Net Acceleration from Accumulated Forces
-	netForce := state.AccumulatedForce
+	// 3. Calculate Net Acceleration from Accumulated Forces ON THE MAIN ROCKET ENTITY
+	netForce := s.rocket.AccumulatedForce // CRITICAL: Use s.rocket's accumulator
 	var netAcceleration types.Vector3
-	if state.Mass.Value <= 0 {
-		s.logger.Error("Invalid mass for acceleration calculation", "mass", state.Mass.Value)
+	if s.rocket.Mass.Value <= 0 { // CRITICAL: Use s.rocket's mass
+		s.logger.Error("Invalid mass for acceleration calculation", "mass", s.rocket.Mass.Value)
 		netAcceleration = types.Vector3{}
 	} else {
-		netAcceleration = netForce.DivideScalar(state.Mass.Value)
+		netAcceleration = netForce.DivideScalar(s.rocket.Mass.Value)
 	}
-	s.logger.Debug("Calculated Net Acceleration", "netForce", netForce, "mass", state.Mass.Value, "netAcc", netAcceleration)
+	s.logger.Debug("Calculated Net Acceleration", "netForce", netForce, "mass", s.rocket.Mass.Value, "netAcc", netAcceleration)
 
-	// 3b. Calculate Net Angular Acceleration from Accumulated Moments (World Frame)
+	// 3b. Calculate Net Angular Acceleration from Accumulated Moments (World Frame) ON THE MAIN ROCKET ENTITY
 	var netAngularAccelerationWorld types.Vector3
-	rotationMatrix := types.RotationMatrixFromQuaternion(&state.Orientation.Quat)
-	inertiaTensorWorld := types.TransformInertiaBodyToWorld(&state.InertiaTensorBody, rotationMatrix)
+	// CRITICAL: Use s.rocket for orientation and inertia tensor
+	rotationMatrix := types.RotationMatrixFromQuaternion(&s.rocket.Orientation.Quat)
+	inertiaTensorWorld := types.TransformInertiaBodyToWorld(&s.rocket.InertiaTensorBody, rotationMatrix)
 	inverseInertiaTensorWorld := inertiaTensorWorld.Inverse()
 
 	if inverseInertiaTensorWorld != nil {
-		netAngularAccelerationWorld = *inverseInertiaTensorWorld.MultiplyVector(&state.AccumulatedMoment)
+		netAngularAccelerationWorld = *inverseInertiaTensorWorld.MultiplyVector(&s.rocket.AccumulatedMoment) // CRITICAL: Use s.rocket's accumulator
 	} else {
 		s.logger.Error("World inertia tensor is singular, cannot compute angular acceleration.")
 		netAngularAccelerationWorld = types.Vector3{}
 	}
-	s.logger.Debug("Calculated Net Angular Acceleration (World)", "momentW", state.AccumulatedMoment, "angAccW", netAngularAccelerationWorld)
+	s.logger.Debug("Calculated Net Angular Acceleration (World)", "momentW", s.rocket.AccumulatedMoment, "angAccW", netAngularAccelerationWorld)
 
 	// --- START TEMPORARY DEBUG: Disable angular motion for altitude diagnosis ---
-	netAngularAccelerationWorld = types.Vector3{}
-	s.logger.Debug("TEMPORARY DEBUG: Angular acceleration zeroed for testing linear motion.")
+	// netAngularAccelerationWorld = types.Vector3{}
+	// s.logger.Debug("TEMPORARY DEBUG: Angular acceleration zeroed for testing linear motion.")
 	// --- END TEMPORARY DEBUG ---
 
-	// 4. Integrate state using RK4
-	dt := s.config.Engine.Simulation.Step
-
-	// State variables for RK4:
+	// --- RK4 for Translational Motion ---
 	// y = [position, velocity]
 	// y_dot = [velocity, acceleration]
 
-	// Initial state for the RK4 step
-	pos0 := state.Position.Vec
-	vel0 := state.Velocity.Vec
-	angVel0Val := *state.AngularVelocity // Value for calculations
-	orient0Val := state.Orientation.Quat // Value for calculations
+	// Initial state for the RK4 step, taken directly from s.rocket
+	pos0 := s.rocket.Position.Vec
+	vel0 := s.rocket.Velocity.Vec
+	angVel0Val := *s.rocket.AngularVelocity // Value for calculations
+	orient0Val := s.rocket.Orientation.Quat // Value for calculations
 
 	// Derivatives function f(state_vars_for_accel_calc) -> acceleration
 	rkEvalLinearAccel := func(currentEvalVel types.Vector3, currentEvalPos types.Vector3) types.Vector3 {
@@ -476,23 +491,23 @@ func (s *Simulation) updateSystems() error {
 	// --- RK4 for Translational Motion ---
 	k1VDeriv := vel0
 	k1ADeriv := rkEvalLinearAccel(vel0, pos0)
-	posForK2LinearEval := pos0.Add(k1VDeriv.MultiplyScalar(dt / 2.0))
-	velForK2LinearEval := vel0.Add(k1ADeriv.MultiplyScalar(dt / 2.0))
+	posForK2LinearEval := pos0.Add(k1VDeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
+	velForK2LinearEval := vel0.Add(k1ADeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
 	k2VDeriv := velForK2LinearEval
 	k2ADeriv := rkEvalLinearAccel(velForK2LinearEval, posForK2LinearEval)
-	posForK3LinearEval := pos0.Add(k2VDeriv.MultiplyScalar(dt / 2.0))
-	velForK3LinearEval := vel0.Add(k2ADeriv.MultiplyScalar(dt / 2.0))
+	posForK3LinearEval := pos0.Add(k2VDeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
+	velForK3LinearEval := vel0.Add(k2ADeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
 	k3VDeriv := velForK3LinearEval
 	k3ADeriv := rkEvalLinearAccel(velForK3LinearEval, posForK3LinearEval)
-	posForK4LinearEval := pos0.Add(k3VDeriv.MultiplyScalar(dt))
-	velForK4LinearEval := vel0.Add(k3ADeriv.MultiplyScalar(dt))
+	posForK4LinearEval := pos0.Add(k3VDeriv.MultiplyScalar(s.config.Engine.Simulation.Step))
+	velForK4LinearEval := vel0.Add(k3ADeriv.MultiplyScalar(s.config.Engine.Simulation.Step))
 	k4VDeriv := velForK4LinearEval
 	k4ADeriv := rkEvalLinearAccel(velForK4LinearEval, posForK4LinearEval)
-	state.Position.Vec = pos0.Add(
-		k1VDeriv.Add(k2VDeriv.MultiplyScalar(2.0)).Add(k3VDeriv.MultiplyScalar(2.0)).Add(k4VDeriv).MultiplyScalar(dt / 6.0),
+	finalPos := pos0.Add(
+		k1VDeriv.Add(k2VDeriv.MultiplyScalar(2.0)).Add(k3VDeriv.MultiplyScalar(2.0)).Add(k4VDeriv).MultiplyScalar(s.config.Engine.Simulation.Step / 6.0),
 	)
-	state.Velocity.Vec = vel0.Add(
-		k1ADeriv.Add(k2ADeriv.MultiplyScalar(2.0)).Add(k3ADeriv.MultiplyScalar(2.0)).Add(k4ADeriv).MultiplyScalar(dt / 6.0),
+	finalVel := vel0.Add(
+		k1ADeriv.Add(k2ADeriv.MultiplyScalar(2.0)).Add(k3ADeriv.MultiplyScalar(2.0)).Add(k4ADeriv).MultiplyScalar(s.config.Engine.Simulation.Step / 6.0),
 	)
 
 	// --- RK4 for Angular Velocity (World Frame) ---
@@ -500,15 +515,15 @@ func (s *Simulation) updateSystems() error {
 		// angVel0Val is types.Vector3
 		k1AngADeriv := rkEvalAngularAccelWorld(angVel0Val, orient0Val)
 		// angVelForKXEval are types.Vector3
-		angVelForK2Eval := angVel0Val.Add(k1AngADeriv.MultiplyScalar(dt / 2.0))
+		angVelForK2Eval := angVel0Val.Add(k1AngADeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
 		k2AngADeriv := rkEvalAngularAccelWorld(angVelForK2Eval, orient0Val)
-		angVelForK3Eval := angVel0Val.Add(k2AngADeriv.MultiplyScalar(dt / 2.0))
+		angVelForK3Eval := angVel0Val.Add(k2AngADeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
 		k3AngADeriv := rkEvalAngularAccelWorld(angVelForK3Eval, orient0Val)
-		angVelForK4Eval := angVel0Val.Add(k3AngADeriv.MultiplyScalar(dt))
+		angVelForK4Eval := angVel0Val.Add(k3AngADeriv.MultiplyScalar(s.config.Engine.Simulation.Step))
 		k4AngADeriv := rkEvalAngularAccelWorld(angVelForK4Eval, orient0Val)
 
 		*state.AngularVelocity = angVel0Val.Add(
-			k1AngADeriv.Add(k2AngADeriv.MultiplyScalar(2.0)).Add(k3AngADeriv.MultiplyScalar(2.0)).Add(k4AngADeriv).MultiplyScalar(dt / 6.0),
+			k1AngADeriv.Add(k2AngADeriv.MultiplyScalar(2.0)).Add(k3AngADeriv.MultiplyScalar(2.0)).Add(k4AngADeriv).MultiplyScalar(s.config.Engine.Simulation.Step / 6.0),
 		)
 	*/
 
@@ -521,29 +536,29 @@ func (s *Simulation) updateSystems() error {
 		// orient0Val is types.Quaternion. Add method is on *Quaternion. Scale is on *Quaternion.
 		// Need to convert orient0Val to pointer for Add, or ensure Add can take value + pointer.
 		// Let's assume Quaternion methods Add, Scale, Normalize always return new *Quaternion.
-		tempQ1 := (&orient0Val).Add(k1QDerivPtr.Scale(dt / 2.0))
+		tempQ1 := (&orient0Val).Add(k1QDerivPtr.Scale(s.config.Engine.Simulation.Step / 2.0))
 		qForK2EvalVal := *tempQ1.Normalize()
 		k2QDerivPtr := rkEvalQuaternionDeriv(qForK2EvalVal, angVelForK2Eval)
 
-		tempQ2 := (&orient0Val).Add(k2QDerivPtr.Scale(dt / 2.0))
+		tempQ2 := (&orient0Val).Add(k2QDerivPtr.Scale(s.config.Engine.Simulation.Step / 2.0))
 		qForK3EvalVal := *tempQ2.Normalize()
 		k3QDerivPtr := rkEvalQuaternionDeriv(qForK3EvalVal, angVelForK3Eval)
 
-		tempQ3 := (&orient0Val).Add(k3QDerivPtr.Scale(dt))
+		tempQ3 := (&orient0Val).Add(k3QDerivPtr.Scale(s.config.Engine.Simulation.Step))
 		qForK4EvalVal := *tempQ3.Normalize()
 		k4QDerivPtr := rkEvalQuaternionDeriv(qForK4EvalVal, angVelForK4Eval)
 
 		// Sum of quaternion derivatives (all are *Quaternion, Scale returns *Quaternion, Add returns *Quaternion)
 		sumQDerivPtr := k1QDerivPtr.Scale(1.0).Add(k2QDerivPtr.Scale(2.0)).Add(k3QDerivPtr.Scale(2.0)).Add(k4QDerivPtr.Scale(1.0))
 
-		finalOrientationPtr := (&orient0Val).Add(sumQDerivPtr.Scale(dt / 6.0))
+		finalOrientationPtr := (&orient0Val).Add(sumQDerivPtr.Scale(s.config.Engine.Simulation.Step / 6.0))
 		state.Orientation.Quat = *finalOrientationPtr.Normalize()
 	*/
 
-	s.logger.Debug("RK4 Updated Position", "oldPos", pos0, "newPos", state.Position.Vec, "dt", dt)
-	s.logger.Debug("RK4 Updated Velocity", "oldVel", vel0, "newVel", state.Velocity.Vec, "dt", dt)
-	s.logger.Debug("RK4 Updated Angular Velocity", "oldAngVel", angVel0Val, "newAngVel", state.AngularVelocity, "dt", dt)
-	s.logger.Debug("RK4 Updated Orientation", "oldOrient", orient0Val, "newOrient", state.Orientation.Quat, "dt", dt)
+	s.logger.Debug("RK4 Updated Position", "oldPos", pos0, "newPos", finalPos, "dt", s.config.Engine.Simulation.Step)
+	s.logger.Debug("RK4 Updated Velocity", "oldVel", vel0, "newVel", finalVel, "dt", s.config.Engine.Simulation.Step)
+	s.logger.Debug("RK4 Updated Angular Velocity", "oldAngVel", angVel0Val, "newAngVel", s.rocket.AngularVelocity, "dt", s.config.Engine.Simulation.Step)
+	s.logger.Debug("RK4 Updated Orientation", "oldOrient", orient0Val, "newOrient", s.rocket.Orientation.Quat, "dt", s.config.Engine.Simulation.Step)
 
 	// Update Acceleration state for logging/output (with the acceleration at the START of the step)
 	state.Acceleration.Vec = netAcceleration
@@ -572,12 +587,11 @@ func (s *Simulation) updateSystems() error {
 	}
 
 	s.logger.Debug("Updating rocket state from physics state")
-	s.rocket.Position.Vec = state.Position.Vec
-	s.rocket.Velocity.Vec = state.Velocity.Vec
-	s.rocket.Acceleration.Vec = state.Acceleration.Vec
-	if state.Mass.Value > 0 {
-		s.rocket.Mass.Value = state.Mass.Value
-	}
+	s.rocket.Position.Vec = finalPos // Update s.rocket directly
+	s.rocket.Velocity.Vec = finalVel // Update s.rocket directly
+	s.rocket.Acceleration.Vec = netAcceleration // Store the initial net acceleration for this step
+	// s.rocket.Mass.Value is updated by motor system if fuel is consumed.
+	// s.rocket.Orientation.Quat and s.rocket.AngularVelocity would be updated by angular RK4 if enabled.
 
 	s.logger.Debug("Sending state to channel")
 	select {

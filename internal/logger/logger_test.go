@@ -1,6 +1,8 @@
 package logger_test
 
 import (
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/bxrne/launchrail/internal/config"
@@ -60,3 +62,30 @@ func TestReset(t *testing.T) {
 		t.Error("Expected logger to be non-nil after reset")
 	}
 }
+
+// TEST: GIVEN logs are written to a file THEN the output contains no ANSI color codes
+func TestLogFileHasNoColorCodes(t *testing.T) {
+	logger.Reset()
+	logFile := "test_no_color.log"
+	defer func() { _ = os.Remove(logFile) }()
+
+	log := logger.GetLogger(cfg.Setup.Logging.Level, logFile)
+	log.Info("No color test log entry")
+	// No log.Sync() on logf.Logger; log file should be flushed immediately or on close
+
+	data, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("Failed to read log file: %v", err)
+	}
+	logContent := string(data)
+	if containsANSICodes(logContent) {
+		t.Errorf("Log file contains ANSI color codes: %q", logContent)
+	}
+}
+
+// containsANSICodes returns true if the string contains ANSI escape sequences
+func containsANSICodes(s string) bool {
+	// ANSI escape sequences start with \x1b[ or \033[
+	return strings.Contains(s, "\x1b[") || strings.Contains(s, "\033[")
+}
+
