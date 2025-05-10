@@ -93,7 +93,7 @@ func (b *BodyTube) String() string {
 type BodyTubeSubcomponents struct {
 	XMLName         xml.Name        `xml:"subcomponents"`
 	InnerTube       InnerTube       `xml:"innertube"`
-	TrapezoidFinset TrapezoidFinset `xml:"trapezoidfinset"`
+	TrapezoidFinsets []TrapezoidFinset `xml:"trapezoidfinset"` // Changed to slice
 	Parachute       Parachute       `xml:"parachute"`
 	CenteringRings  []CenteringRing `xml:"centeringring"`
 	Shockcord       Shockcord       `xml:"shockcord"`
@@ -101,6 +101,14 @@ type BodyTubeSubcomponents struct {
 
 // String returns full string representation of the BodyTubeSubcomponents
 func (b *BodyTubeSubcomponents) String() string {
+	var trapezoidFinsetStr string
+	for i, tf := range b.TrapezoidFinsets {
+		trapezoidFinsetStr += tf.String()
+		if i < len(b.TrapezoidFinsets)-1 {
+			trapezoidFinsetStr += ", "
+		}
+	}
+
 	var centeringRings string
 	for _, cr := range b.CenteringRings {
 		centeringRings += cr.String()
@@ -109,7 +117,7 @@ func (b *BodyTubeSubcomponents) String() string {
 		}
 	}
 
-	return fmt.Sprintf("BodyTubeSubcomponents{InnerTube=%s, TrapezoidFinset=%s, Parachute=%s, CenteringRings=(%s), Shockcord=%s}", b.InnerTube.String(), b.TrapezoidFinset.String(), b.Parachute.String(), centeringRings, b.Shockcord.String())
+	return fmt.Sprintf("BodyTubeSubcomponents{InnerTube=%s, TrapezoidFinset=(%s), Parachute=%s, CenteringRings=(%s), Shockcord=%s}", b.InnerTube.String(), trapezoidFinsetStr, b.Parachute.String(), centeringRings, b.Shockcord.String())
 }
 
 // InnerTube represents the inner tube element of the XML document

@@ -55,13 +55,15 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 	// Create Finset component if present in BodyTube subcomponents
 	var finset *components.TrapezoidFinset // Correct type
 	// Access stages via Subcomponents and check FinCount > 0
-	if len(orkData.Subcomponents.Stages) > 0 && orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinset.FinCount > 0 {
+	if len(orkData.Subcomponents.Stages) > 0 && 
+		len(orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets) > 0 &&
+		orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0].FinCount > 0 {
 		// Pass the whole document to the constructor, not just the finset part
 		createdFinset := components.NewTrapezoidFinsetFromORK(ecs.NewBasic(), orkData) // Correct constructor call
 
 		// Check if creation was successful (constructor might return nil on error)
 		if createdFinset == nil {
-			log.Error("Failed to create Finset component from ORK data", "finset_name", orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinset.Name)
+			log.Error("Failed to create Finset component from ORK data", "finset_name", orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0].Name)
 			// Decide if this is critical - maybe return nil or continue?
 		} else {
 			finset = createdFinset

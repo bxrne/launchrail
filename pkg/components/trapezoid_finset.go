@@ -25,7 +25,12 @@ func (f *TrapezoidFinset) GetMass() float64 {
 // NewTrapezoidFinsetFromORK creates a new TrapezoidFinset component from OpenRocket data
 func NewTrapezoidFinsetFromORK(basic ecs.BasicEntity, ork *openrocket.RocketDocument) *TrapezoidFinset {
 	stage := ork.Subcomponents.Stages[0]
-	finset := stage.SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinset
+	if len(stage.SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets) == 0 {
+		// Log or handle the case where no fin sets are defined
+		// For now, returning nil or a default/empty finset might be options
+		return nil // Or handle error appropriately
+	}
+	finset := stage.SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0] // Taking the first finset
 
 	return &TrapezoidFinset{
 		BasicEntity: basic,

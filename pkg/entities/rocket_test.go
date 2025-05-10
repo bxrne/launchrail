@@ -46,17 +46,19 @@ func createMockOpenRocketData() *openrocket.RocketDocument {
 								Parachute: openrocket.Parachute{
 									CD: "auto 1.0",
 								},
-								TrapezoidFinset: openrocket.TrapezoidFinset{
-									Material: openrocket.Material{
-										Density: 1.0,
-										Name:    "Test Material",
-										Type:    "BULK",
+								TrapezoidFinsets: []openrocket.TrapezoidFinset{
+									{
+										Material: openrocket.Material{
+											Density: 1.0,
+											Name:    "Test Material",
+											Type:    "BULK",
+										},
+										RootChord: 0.2,
+										TipChord:  0.1,
+										Height:    0.15,
+										Thickness: 0.003,
+										FinCount:  4,
 									},
-									RootChord: 0.2,
-									TipChord:  0.1,
-									Height:    0.15,
-									Thickness: 0.003,
-									FinCount:  4,
 								},
 							},
 						},

@@ -40,6 +40,7 @@ type Simulation struct {
 	currentTime       float64
 	systems           []systems.System
 	pluginManager     *plugin.Manager
+	gravity           float64
 }
 
 // NewSimulation creates a new rocket simulation
@@ -54,6 +55,7 @@ func NewSimulation(cfg *config.Config, log logf.Logger, stores *storage.Stores) 
 		doneChan:      make(chan struct{}),
 		stateChan:     make(chan *states.PhysicsState, 100),
 		pluginManager: plugin.NewManager(log, cfg), // Add cfg argument
+		gravity:       9.81,
 	}
 
 	for _, pluginPath := range cfg.Setup.Plugins.Paths {
@@ -424,85 +426,71 @@ func (s *Simulation) updateSystems() error {
 	state.CurrentEvent = s.rulesSystem.GetLastEvent()
 
 	// 3. Calculate Net Acceleration from Accumulated Forces ON THE MAIN ROCKET ENTITY
-	netForce := s.rocket.AccumulatedForce // CRITICAL: Use s.rocket's accumulator
-	var netAcceleration types.Vector3
-	if s.rocket.Mass.Value <= 0 { // CRITICAL: Use s.rocket's mass
-		s.logger.Error("Invalid mass for acceleration calculation", "mass", s.rocket.Mass.Value)
-		netAcceleration = types.Vector3{}
-	} else {
-		netAcceleration = netForce.DivideScalar(s.rocket.Mass.Value)
+	pos0 := s.rocket.Position.Vec       // Value type
+	vel0 := s.rocket.Velocity.Vec       // Value type
+	currentMass := s.rocket.Mass.Value
+	currentThrustMagnitude := 0.0
+	if s.rocket.Motor != nil && !s.rocket.Motor.IsCoasting() {
+		currentThrustMagnitude = s.rocket.Motor.GetThrust()
 	}
-	s.logger.Debug("Calculated Net Acceleration", "netForce", netForce, "mass", s.rocket.Mass.Value, "netAcc", netAcceleration)
+	currentOrientationQuat := s.rocket.Orientation.Quat // Assuming orientation doesn't change significantly within one RK4 step for thrust vector
 
-	// 3b. Calculate Net Angular Acceleration from Accumulated Moments (World Frame) ON THE MAIN ROCKET ENTITY
+	// Derivatives function f(state_vars_for_accel_calc) -> acceleration
+	rkEvalLinearAccel := func(currentEvalVel types.Vector3, currentEvalPos types.Vector3, mass float64, thrustMag float64, orientation types.Quaternion) types.Vector3 {
+		// Calculate Gravity Force (acts downwards in global frame)
+		gravityForce := types.Vector3{Y: -s.gravity * mass}
+
+		// Calculate Thrust Force (acts along rocket body axis, rotated to global frame)
+		var thrustForceWorld types.Vector3
+		if thrustMag > 0 {
+			localThrust := types.Vector3{Y: thrustMag} // Assume thrust acts along the rocket's local +Y axis
+			thrustForceWorld = *orientation.RotateVector(&localThrust)
+		} else {
+			thrustForceWorld = types.Vector3{}
+		}
+
+		netForceThisStage := gravityForce.Add(thrustForceWorld)
+		// Placeholder for aerodynamic forces if AerodynamicSystem is added later
+		// aeroForce := calculateAeroForce(currentEvalVel, currentEvalPos, s.atmosphericModel, s.rocket.AeroProperties)
+		// netForceThisStage = netForceThisStage.Add(aeroForce)
+
+		if mass <= 0 { // Prevent division by zero or negative mass
+			s.logger.Error("Invalid mass in rkEvalLinearAccel", "mass", mass)
+			return types.Vector3{}
+		}
+		return netForceThisStage.DivideScalar(mass)
+	}
+
+	// Calculate Net Angular Acceleration from Accumulated Moments (World Frame) ON THE MAIN ROCKET ENTITY
+	// This uses AccumulatedMoment which should be populated by systems like MotorSystem or AeroSystem if they apply moments.
 	var netAngularAccelerationWorld types.Vector3
-	// CRITICAL: Use s.rocket for orientation and inertia tensor
-	rotationMatrix := types.RotationMatrixFromQuaternion(&s.rocket.Orientation.Quat)
+	rotationMatrix := types.RotationMatrixFromQuaternion(&s.rocket.Orientation.Quat) // Use current orientation
 	inertiaTensorWorld := types.TransformInertiaBodyToWorld(&s.rocket.InertiaTensorBody, rotationMatrix)
 	inverseInertiaTensorWorld := inertiaTensorWorld.Inverse()
 
 	if inverseInertiaTensorWorld != nil {
-		netAngularAccelerationWorld = *inverseInertiaTensorWorld.MultiplyVector(&s.rocket.AccumulatedMoment) // CRITICAL: Use s.rocket's accumulator
+		netAngularAccelerationWorld = *inverseInertiaTensorWorld.MultiplyVector(&s.rocket.AccumulatedMoment)
 	} else {
 		s.logger.Error("World inertia tensor is singular, cannot compute angular acceleration.")
 		netAngularAccelerationWorld = types.Vector3{}
 	}
 	s.logger.Debug("Calculated Net Angular Acceleration (World)", "momentW", s.rocket.AccumulatedMoment, "angAccW", netAngularAccelerationWorld)
 
-	// --- START TEMPORARY DEBUG: Disable angular motion for altitude diagnosis ---
-	// netAngularAccelerationWorld = types.Vector3{}
-	// s.logger.Debug("TEMPORARY DEBUG: Angular acceleration zeroed for testing linear motion.")
-	// --- END TEMPORARY DEBUG ---
-
-	// --- RK4 for Translational Motion ---
-	// y = [position, velocity]
-	// y_dot = [velocity, acceleration]
-
-	// Initial state for the RK4 step, taken directly from s.rocket
-	pos0 := s.rocket.Position.Vec
-	vel0 := s.rocket.Velocity.Vec
-	angVel0Val := *s.rocket.AngularVelocity // Value for calculations
-	orient0Val := s.rocket.Orientation.Quat // Value for calculations
-
-	// Derivatives function f(state_vars_for_accel_calc) -> acceleration
-	rkEvalLinearAccel := func(currentEvalVel types.Vector3, currentEvalPos types.Vector3) types.Vector3 {
-		return netAcceleration
-	}
-	// Simplified derivative function for angular acceleration (world frame)
-	/*
-		rkEvalAngularAccelWorld := func(currentEvalAngVel types.Vector3, currentEvalOrient types.Quaternion) types.Vector3 {
-			return netAngularAccelerationWorld
-		}
-	*/
-	// Derivative function for quaternion: dQ/dt = 0.5 * Q * omega_q_body. Returns *Quaternion.
-	/*
-		rkEvalQuaternionDeriv := func(qEvalVal types.Quaternion, omegaWorldEval types.Vector3) *types.Quaternion {
-			qEvalPtr := &qEvalVal // Operate with a pointer if methods expect it
-			qEvalInv := qEvalPtr.Inverse()
-			omegaBodyVec := qEvalInv.RotateVector(&omegaWorldEval)
-			omegaQBody := types.NewQuaternion(0, omegaBodyVec.X, omegaBodyVec.Y, omegaBodyVec.Z)
-
-			// qEvalPtr.Multiply(omegaQBody) returns *Quaternion
-			// .Scale(0.5) returns *Quaternion
-			return qEvalPtr.Multiply(omegaQBody).Scale(0.5)
-		}
-	*/
-
 	// --- RK4 for Translational Motion ---
 	k1VDeriv := vel0
-	k1ADeriv := rkEvalLinearAccel(vel0, pos0)
+	k1ADeriv := rkEvalLinearAccel(vel0, pos0, currentMass, currentThrustMagnitude, currentOrientationQuat)
 	posForK2LinearEval := pos0.Add(k1VDeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
 	velForK2LinearEval := vel0.Add(k1ADeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
 	k2VDeriv := velForK2LinearEval
-	k2ADeriv := rkEvalLinearAccel(velForK2LinearEval, posForK2LinearEval)
+	k2ADeriv := rkEvalLinearAccel(velForK2LinearEval, posForK2LinearEval, currentMass, currentThrustMagnitude, currentOrientationQuat)
 	posForK3LinearEval := pos0.Add(k2VDeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
 	velForK3LinearEval := vel0.Add(k2ADeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
 	k3VDeriv := velForK3LinearEval
-	k3ADeriv := rkEvalLinearAccel(velForK3LinearEval, posForK3LinearEval)
+	k3ADeriv := rkEvalLinearAccel(velForK3LinearEval, posForK3LinearEval, currentMass, currentThrustMagnitude, currentOrientationQuat)
 	posForK4LinearEval := pos0.Add(k3VDeriv.MultiplyScalar(s.config.Engine.Simulation.Step))
 	velForK4LinearEval := vel0.Add(k3ADeriv.MultiplyScalar(s.config.Engine.Simulation.Step))
 	k4VDeriv := velForK4LinearEval
-	k4ADeriv := rkEvalLinearAccel(velForK4LinearEval, posForK4LinearEval)
+	k4ADeriv := rkEvalLinearAccel(velForK4LinearEval, posForK4LinearEval, currentMass, currentThrustMagnitude, currentOrientationQuat)
 	finalPos := pos0.Add(
 		k1VDeriv.Add(k2VDeriv.MultiplyScalar(2.0)).Add(k3VDeriv.MultiplyScalar(2.0)).Add(k4VDeriv).MultiplyScalar(s.config.Engine.Simulation.Step / 6.0),
 	)
@@ -510,60 +498,13 @@ func (s *Simulation) updateSystems() error {
 		k1ADeriv.Add(k2ADeriv.MultiplyScalar(2.0)).Add(k3ADeriv.MultiplyScalar(2.0)).Add(k4ADeriv).MultiplyScalar(s.config.Engine.Simulation.Step / 6.0),
 	)
 
-	// --- RK4 for Angular Velocity (World Frame) ---
-	/*
-		// angVel0Val is types.Vector3
-		k1AngADeriv := rkEvalAngularAccelWorld(angVel0Val, orient0Val)
-		// angVelForKXEval are types.Vector3
-		angVelForK2Eval := angVel0Val.Add(k1AngADeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
-		k2AngADeriv := rkEvalAngularAccelWorld(angVelForK2Eval, orient0Val)
-		angVelForK3Eval := angVel0Val.Add(k2AngADeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
-		k3AngADeriv := rkEvalAngularAccelWorld(angVelForK3Eval, orient0Val)
-		angVelForK4Eval := angVel0Val.Add(k3AngADeriv.MultiplyScalar(s.config.Engine.Simulation.Step))
-		k4AngADeriv := rkEvalAngularAccelWorld(angVelForK4Eval, orient0Val)
-
-		*state.AngularVelocity = angVel0Val.Add(
-			k1AngADeriv.Add(k2AngADeriv.MultiplyScalar(2.0)).Add(k3AngADeriv.MultiplyScalar(2.0)).Add(k4AngADeriv).MultiplyScalar(s.config.Engine.Simulation.Step / 6.0),
-		)
-	*/
-
-	// --- RK4 for Orientation (Quaternion) ---
-	/*
-		// kXQDeriv will be *types.Quaternion because rkEvalQuaternionDeriv returns *types.Quaternion
-		k1QDerivPtr := rkEvalQuaternionDeriv(orient0Val, angVel0Val)
-
-		// qForKXEval will be values (types.Quaternion) after dereferencing and normalizing pointer results
-		// orient0Val is types.Quaternion. Add method is on *Quaternion. Scale is on *Quaternion.
-		// Need to convert orient0Val to pointer for Add, or ensure Add can take value + pointer.
-		// Let's assume Quaternion methods Add, Scale, Normalize always return new *Quaternion.
-		tempQ1 := (&orient0Val).Add(k1QDerivPtr.Scale(s.config.Engine.Simulation.Step / 2.0))
-		qForK2EvalVal := *tempQ1.Normalize()
-		k2QDerivPtr := rkEvalQuaternionDeriv(qForK2EvalVal, angVelForK2Eval)
-
-		tempQ2 := (&orient0Val).Add(k2QDerivPtr.Scale(s.config.Engine.Simulation.Step / 2.0))
-		qForK3EvalVal := *tempQ2.Normalize()
-		k3QDerivPtr := rkEvalQuaternionDeriv(qForK3EvalVal, angVelForK3Eval)
-
-		tempQ3 := (&orient0Val).Add(k3QDerivPtr.Scale(s.config.Engine.Simulation.Step))
-		qForK4EvalVal := *tempQ3.Normalize()
-		k4QDerivPtr := rkEvalQuaternionDeriv(qForK4EvalVal, angVelForK4Eval)
-
-		// Sum of quaternion derivatives (all are *Quaternion, Scale returns *Quaternion, Add returns *Quaternion)
-		sumQDerivPtr := k1QDerivPtr.Scale(1.0).Add(k2QDerivPtr.Scale(2.0)).Add(k3QDerivPtr.Scale(2.0)).Add(k4QDerivPtr.Scale(1.0))
-
-		finalOrientationPtr := (&orient0Val).Add(sumQDerivPtr.Scale(s.config.Engine.Simulation.Step / 6.0))
-		state.Orientation.Quat = *finalOrientationPtr.Normalize()
-	*/
-
 	s.logger.Debug("RK4 Updated Position", "oldPos", pos0, "newPos", finalPos, "dt", s.config.Engine.Simulation.Step)
 	s.logger.Debug("RK4 Updated Velocity", "oldVel", vel0, "newVel", finalVel, "dt", s.config.Engine.Simulation.Step)
-	s.logger.Debug("RK4 Updated Angular Velocity", "oldAngVel", angVel0Val, "newAngVel", s.rocket.AngularVelocity, "dt", s.config.Engine.Simulation.Step)
-	s.logger.Debug("RK4 Updated Orientation", "oldOrient", orient0Val, "newOrient", s.rocket.Orientation.Quat, "dt", s.config.Engine.Simulation.Step)
 
 	// Update Acceleration state for logging/output (with the acceleration at the START of the step)
-	state.Acceleration.Vec = netAcceleration
-	*state.AngularAcceleration = netAngularAccelerationWorld
-	s.logger.Debug("Final State Accel set (RK4 context)", "accel", state.Acceleration.Vec, "angAccel", state.AngularAcceleration)
+	state.Acceleration.Vec = k1ADeriv
+	*state.AngularAcceleration = netAngularAccelerationWorld // Log the angular acceleration calculated at start of step
+	s.logger.Debug("Final State Accel set (RK4 context)", "accel", state.Acceleration.Vec, "angAccel", *state.AngularAcceleration)
 
 	// 5. Handle Ground Collision (Simplified: check *after* integration)
 	if state.Position.Vec.Y <= s.config.Engine.Simulation.GroundTolerance {
@@ -589,7 +530,7 @@ func (s *Simulation) updateSystems() error {
 	s.logger.Debug("Updating rocket state from physics state")
 	s.rocket.Position.Vec = finalPos            // Update s.rocket directly
 	s.rocket.Velocity.Vec = finalVel            // Update s.rocket directly
-	s.rocket.Acceleration.Vec = netAcceleration // Store the initial net acceleration for this step
+	s.rocket.Acceleration.Vec = k1ADeriv        // Store the initial net acceleration for this step
 	// s.rocket.Mass.Value is updated by motor system if fuel is consumed.
 	// s.rocket.Orientation.Quat and s.rocket.AngularVelocity would be updated by angular RK4 if enabled.
 

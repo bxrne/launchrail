@@ -75,10 +75,16 @@ func NewBodytubeFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument) 
 	crossSection := math.Pi * radius * radius
 	circumference := 2 * math.Pi * radius
 	surfaceArea := circumference * orkBodytube.Length
-	volume := crossSection * orkBodytube.Length * orkBodytube.Thickness
+	// Calculate material volume for a hollow cylinder
+	innerRadius := radius - orkBodytube.Thickness
+	// Ensure innerRadius is not negative, which could happen with bad data
+	if innerRadius < 0 {
+		innerRadius = 0
+	}
+	materialVolume := math.Pi * (math.Pow(radius, 2) - math.Pow(innerRadius, 2)) * orkBodytube.Length
 
 	// Calculate mass based on material density and volume
-	mass := orkBodytube.Material.Density * volume
+	mass := orkBodytube.Material.Density * materialVolume
 
 	return &Bodytube{
 		ID:           id,
@@ -93,7 +99,7 @@ func NewBodytubeFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument) 
 		MaterialType: orkBodytube.Material.Type,
 		CrossSection: crossSection,
 		SurfaceArea:  surfaceArea,
-		Volume:       volume,
+		Volume:       materialVolume, // Store the material volume
 	}, nil
 }
 

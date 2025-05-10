@@ -3,22 +3,20 @@ package components
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 
 	"github.com/EngoEngine/ecs"
-
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/zerodha/logf"
+
 )
 
-// Motor represents a rocket motor component
 type Motor struct {
-	ID          ecs.BasicEntity
-	Position    types.Vector3
+	ID ecs.BasicEntity
+	Position types.Vector3
 	Thrustcurve [][]float64
-	Mass        float64
+	Mass        float64 // Current total mass (casing + current propellant)
 	thrust      float64
 	Props       *thrustcurves.MotorData
 	FSM         *MotorFSM
@@ -27,6 +25,11 @@ type Motor struct {
 	burnTime    float64
 	logger      logf.Logger
 	coasting    bool
+
+	// New mass fields
+	initialPropellantMass float64
+	casingMass            float64
+	currentPropellantMass float64
 }
 
 // NewMotor creates a new motor component from thrust curve data
@@ -48,49 +51,52 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 			logger.Warn("Thrust curve ends before official burnTime; thrust will be zero after curve ends", "curveEnd", lastCurveTime, "burnTime", burnTime)
 		}
 	}
+
+	// Calculate initial propellant and casing mass
+	// md.WetMass is propellant mass in kg (from thrustcurves.Load)
+	// md.TotalMass is initial total motor mass in kg (from thrustcurves.Load)
+	initialPropellantMass := md.WetMass
+	casingMass := md.TotalMass - md.WetMass
+	if casingMass < 0 {
+		logger.Warn("Calculated casing mass is negative. Clamping to zero.", "totalMassKg", md.TotalMass, "propellantMassKg", md.WetMass)
+		casingMass = 0 // Or handle as an error if preferred
+	}
+
 	m := &Motor{
 		ID:          id,
 		Position:    types.Vector3{},
 		Thrustcurve: thrustcurve,
-		Mass:        md.TotalMass,
+		Mass:        md.TotalMass, // Initial total mass
 		Props:       md,
-		// Initialize thrust to first data point
-		thrust:   md.Thrust[0][1],
-		burnTime: burnTime,
-		logger:   logger,
-		// FSM is initialized below after m is fully defined
+		thrust:      0, // Initialize thrust to 0, will be set by FSM/Update
+		burnTime:    burnTime,
+		logger:      logger,
+
+		initialPropellantMass: initialPropellantMass,
+		casingMass:            casingMass,
+		currentPropellantMass: initialPropellantMass,
 	}
+
+	// Initialize thrust to first data point if available and burn time > 0
+	if len(m.Thrustcurve) > 0 && m.burnTime > 0 {
+		m.thrust = m.Thrustcurve[0][1]
+	} else {
+		m.thrust = 0
+	}
+
 	m.FSM = NewMotorFSM(m, logger) // Initialize FSM here, passing the motor instance
 
-	m.logger.Info("Motor created", "ID", m.ID.ID(), "Mass", m.Mass, "BurnTime", m.burnTime)
+	m.logger.Info("Motor created", "ID", m.ID.ID(),
+		"InitialTotalMassKg", m.Mass,
+		"InitialPropellantMassKg", m.initialPropellantMass,
+		"CasingMassKg", m.casingMass,
+		"BurnTimeSec", m.burnTime)
+
 	err := m.FSM.Event(context.Background(), "ignite")
 	if err != nil {
 		return nil, fmt.Errorf("failed to transition motor state to ignited: %w", err)
 	}
 	return m, nil
-}
-
-// validateThrustCurve ensures thrust curve data is valid and properly formatted
-func validateThrustCurve(curve [][]float64) [][]float64 {
-	if len(curve) < 2 {
-		panic("thrust curve must have at least 2 points")
-	}
-
-	// Ensure time points are monotonically increasing
-	for i := 1; i < len(curve); i++ {
-		if curve[i][0] <= curve[i-1][0] {
-			panic("thrust curve time points must be strictly increasing")
-		}
-	}
-
-	// Ensure no negative thrust values
-	for _, point := range curve {
-		if point[1] < 0 {
-			panic("negative thrust values are invalid")
-		}
-	}
-
-	return curve
 }
 
 func (m *Motor) Update(dt float64) error {
@@ -102,17 +108,45 @@ func (m *Motor) Update(dt float64) error {
 
 	// Update elapsed time
 	m.elapsedTime += dt
-	// Interpolate thrust based on elapsed time
-	m.thrust = m.interpolateThrust(m.elapsedTime)
-	// Update mass if still generating thrust
-	if m.thrust > 0 {
-		propellantMassFlow := m.Props.TotalMass / m.burnTime
-		massLoss := propellantMassFlow * dt
-		m.Mass = math.Max(0, m.Mass-massLoss)
+
+	currentState := m.FSM.Current()
+
+	if currentState == "burn" && m.currentPropellantMass > 0 && m.burnTime > 0 {
+		// Interpolate thrust based on elapsed time
+		m.thrust = m.interpolateThrust(m.elapsedTime)
+
+		// Calculate mass loss for this step
+		// Ensure burnTime is not zero to avoid division by zero
+		var propellantMassFlowRate float64
+		if m.burnTime > 1e-9 { // Use a small epsilon to check for non-zero burn time
+			propellantMassFlowRate = m.initialPropellantMass / m.burnTime
+		}
+		massLoss := propellantMassFlowRate * dt
+
+		m.currentPropellantMass -= massLoss
+		if m.currentPropellantMass < 0 {
+			m.currentPropellantMass = 0
+		}
+
+		m.Mass = m.casingMass + m.currentPropellantMass
+
+		// If propellant is depleted, ensure thrust is zero
+		if m.currentPropellantMass == 0 {
+			m.thrust = 0
+			// Optionally, trigger FSM event like 'burnout' if not handled by time
+			// if m.FSM.Current() != "coast" { m.FSM.Event(context.Background(), "burnout") }
+		}
+
 	} else {
-		m.coasting = true
+		// If not burning (e.g., pre-ignition, coasting, or depleted), thrust is zero
+		m.thrust = 0
+		// If it was supposed to be burning but propellant ran out or burnTime is zero
+		if currentState == "burn" {
+			m.coasting = true // Or transition FSM state if appropriate
+		}
 	}
-	// Update the motor FSM state
+
+	// Update the motor FSM state (might transition based on time or other conditions)
 	err := m.FSM.UpdateState(m.Mass, m.elapsedTime, m.burnTime)
 	if err != nil {
 		return fmt.Errorf("failed to update motor state: %w", err)
@@ -212,6 +246,28 @@ func (m *Motor) GetElapsedTime() float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.elapsedTime
+}
+
+func validateThrustCurve(curve [][]float64) [][]float64 {
+	if len(curve) < 2 {
+		panic("thrust curve must have at least 2 points")
+	}
+
+	// Ensure time points are monotonically increasing
+	for i := 1; i < len(curve); i++ {
+		if curve[i][0] <= curve[i-1][0] {
+			panic("thrust curve time points must be strictly increasing")
+		}
+	}
+
+	// Ensure no negative thrust values
+	for _, point := range curve {
+		if point[1] < 0 {
+			panic("negative thrust values are invalid")
+		}
+	}
+
+	return curve
 }
 
 func findMaxThrust(thrustData [][]float64) float64 {

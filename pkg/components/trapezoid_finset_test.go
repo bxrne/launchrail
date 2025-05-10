@@ -73,13 +73,20 @@ func TestNewTrapezoidFinsetFromORK(t *testing.T) {
 					SustainerSubcomponents: openrocket.SustainerSubcomponents{
 						BodyTube: openrocket.BodyTube{
 							Subcomponents: openrocket.BodyTubeSubcomponents{
-								TrapezoidFinset: openrocket.TrapezoidFinset{
-									RootChord:   0.1,
-									TipChord:    0.05,
-									Height:      0.15,
-									SweepLength: 0.05,
-									AxialOffset: openrocket.AxialOffset{
-										Value: 1.0,
+								TrapezoidFinsets: []openrocket.TrapezoidFinset{
+									{
+										Name:     "TestFinset",
+										FinCount: 4,
+										RootChord: 0.1,
+										TipChord:  0.05,
+										Height:    0.07,
+										SweepLength: 0.02, // Assuming this is sweep distance
+										Thickness: 0.003,
+										Material: openrocket.Material{
+											Type:    "bulk",
+											Density: 1250,
+											Name:    "PLA",
+										},
 									},
 								},
 							},

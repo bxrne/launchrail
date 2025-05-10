@@ -53,11 +53,11 @@ func NewNoseconeFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument) 
 	baseArea := math.Pi * orkNosecone.AftRadius * orkNosecone.AftRadius
 	slantHeight := math.Sqrt(orkNosecone.Length*orkNosecone.Length + orkNosecone.AftRadius*orkNosecone.AftRadius)
 	lateralArea := math.Pi * orkNosecone.AftRadius * slantHeight
-	volume := (baseArea * orkNosecone.Length) / 3.0
+	// volume := (baseArea * orkNosecone.Length) / 3.0 // This was solid volume, removed as unused
 	surfaceArea := lateralArea + baseArea
 
 	// Calculate total mass including any additional mass components
-	materialVolume := volume * orkNosecone.Thickness
+	materialVolume := lateralArea * orkNosecone.Thickness
 	bodyMass := materialVolume * orkNosecone.Material.Density
 	additionalMass := orkNosecone.Subcomponents.MassComponent.Mass
 	totalMass := bodyMass + additionalMass
