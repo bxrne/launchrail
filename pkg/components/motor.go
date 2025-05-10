@@ -24,7 +24,6 @@ type Motor struct {
 	mu          sync.RWMutex
 	burnTime    float64
 	logger      logf.Logger
-	coasting    bool
 
 	// New mass fields
 	initialPropellantMass float64
@@ -109,9 +108,15 @@ func (m *Motor) Update(dt float64) error {
 	// Update elapsed time
 	m.elapsedTime += dt
 
+	// Update the motor FSM state first based on new elapsed time
+	err := m.FSM.UpdateState(m.Mass, m.elapsedTime, m.burnTime)
+	if err != nil {
+		return fmt.Errorf("failed to update motor state: %w", err)
+	}
+
 	currentState := m.FSM.Current()
 
-	if currentState == "burn" && m.currentPropellantMass > 0 && m.burnTime > 0 {
+	if currentState == StateBurning && m.currentPropellantMass > 0 && m.burnTime > 0 {
 		// Interpolate thrust based on elapsed time
 		m.thrust = m.interpolateThrust(m.elapsedTime)
 
@@ -140,16 +145,8 @@ func (m *Motor) Update(dt float64) error {
 	} else {
 		// If not burning (e.g., pre-ignition, coasting, or depleted), thrust is zero
 		m.thrust = 0
-		// If it was supposed to be burning but propellant ran out or burnTime is zero
-		if currentState == "burn" {
-			m.coasting = true // Or transition FSM state if appropriate
-		}
-	}
-
-	// Update the motor FSM state (might transition based on time or other conditions)
-	err := m.FSM.UpdateState(m.Mass, m.elapsedTime, m.burnTime)
-	if err != nil {
-		return fmt.Errorf("failed to update motor state: %w", err)
+		// The FSM, updated earlier, handles state transitions (e.g., to coasting)
+		// if it was burning but propellant ran out or burn time expired.
 	}
 	return nil
 }
@@ -195,7 +192,7 @@ func (m *Motor) GetThrust() float64 {
 func (m *Motor) IsCoasting() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.coasting
+	return m.FSM.Current() == "coast"
 }
 
 func (m *Motor) GetState() string {
@@ -210,7 +207,7 @@ func (m *Motor) Reset() {
 	m.elapsedTime = 0
 	m.Mass = m.Props.TotalMass
 	m.thrust = m.Thrustcurve[0][1]
-	m.coasting = false
+	// m.coasting = false // Removed, FSM handles state
 	m.FSM = NewMotorFSM(m, m.logger) // Pass motor and logger
 	err := m.FSM.Event(context.Background(), "ignite")
 	if err != nil {
