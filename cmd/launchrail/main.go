@@ -21,13 +21,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize logger
-	log := logger.GetLogger(cfg.Setup.Logging.Level)
-	log.Info("Logger initialized", "level", cfg.Setup.Logging.Level)
-
 	// Determine simulation base output directory from config (with env vars)
 	homedir := os.Getenv("HOME")
 	outputBase := filepath.Join(homedir, ".launchrail")
+	logsDir := filepath.Join(outputBase, "logs")
+	if err := os.MkdirAll(logsDir, 0o755); err != nil {
+		fmt.Printf("Failed to create logs directory: %v\n", err)
+		os.Exit(1)
+	}
+	logFilePath := filepath.Join(logsDir, "simulation.log")
+
+	// Initialize logger (write to both stdout and file)
+	log := logger.GetLogger(cfg.Setup.Logging.Level, logFilePath)
+	log.Info("Logger initialized", "level", cfg.Setup.Logging.Level)
 	log.Info("Using simulation base output directory", "path", outputBase)
 	// Ensure base output directory exists
 	if err := os.MkdirAll(outputBase, 0o755); err != nil {

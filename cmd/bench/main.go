@@ -82,6 +82,7 @@ func writeMarkdownReport(runDir, tag string, results []BenchmarkResult) error {
 }
 
 func main() {
+	var homeDir string
 	// --- Setup Logger ---
 	// Logger will be initialized after config is loaded.
 
@@ -91,13 +92,23 @@ func main() {
 		// Use standard log for critical early errors if config fails before logger is up
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
+	// Ensure logs directory exists
+	homeDir, err = os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("Failed to get user home directory: %v", err)
+	}
+	logsDir := filepath.Join(homeDir, ".launchrail", "logs")
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		log.Fatalf("Failed to create logs directory: %v", err)
+	}
+	logFilePath := filepath.Join(logsDir, "bench.log")
 	// Initialize logger with config level. This will be the first effective call.
-	benchLogger = logger.GetLogger(cfg.Setup.Logging.Level)
+	benchLogger = logger.GetLogger(cfg.Setup.Logging.Level, logFilePath)
 
 	benchLogger.Info("--- Starting Benchmark Run --- ")
 
 	// --- Create Base Output Directory ---
-	homeDir, err := os.UserHomeDir()
+	homeDir, err = os.UserHomeDir()
 	if err != nil {
 		benchLogger.Fatal("Failed to get user home directory", "error", err)
 	}

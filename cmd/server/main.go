@@ -260,10 +260,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize logger with the level from the loaded configuration
-	// This will be the first effective call to GetLogger in this cmd's lifecycle.
-	// Initialize logger with file output (default to ./launchrail.log)
-	logFilePath := "./launchrail.log" // Can be made configurable in config.yaml
+	// Ensure logs directory exists
+	homedir := os.Getenv("HOME")
+	outputBase := filepath.Join(homedir, ".launchrail")
+	logsDir := filepath.Join(outputBase, "logs")
+	if err := os.MkdirAll(logsDir, 0o755); err != nil {
+		fmt.Printf("Failed to create logs directory: %v\n", err)
+		os.Exit(1)
+	}
+	logFilePath := filepath.Join(logsDir, "server.log")
+	// Initialize logger
 	log := logger.GetLogger(cfg.Setup.Logging.Level, logFilePath)
 
 	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
