@@ -12,6 +12,7 @@ import (
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zerodha/logf"
 )
 
@@ -82,7 +83,19 @@ func TestCalculateNetForce_InvalidMass(t *testing.T) {
 // TEST: GIVEN an entity with rotation WHEN updating THEN updates angular state
 func TestUpdate_AngularMotion(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger, 1)
+	// Provide a config with gravity for the test
+	cfg := &config.Engine{
+		Options: config.Options{
+			Launchsite: config.Launchsite{
+				Atmosphere: config.Atmosphere{
+					ISAConfiguration: config.ISAConfiguration{
+						GravitationalAccel: 9.81,
+					},
+				},
+			},
+		},
+	}
+	system := systems.NewPhysicsSystem(world, cfg, testLogger, 1)
 
 	// Create minimal valid motor data
 	md := &thrustcurves.MotorData{
@@ -115,12 +128,21 @@ func TestUpdate_AngularMotion(t *testing.T) {
 	err = system.Update(0.01)
 	assert.NoError(t, err)
 
-	// Check if angular velocity increased as expected based on initial acceleration
-	// The updateEntityState function integrates AngularVelocity using AngularAcceleration
-	assert.InDelta(t, 1.005, entity.AngularVelocity.Y, 1e-9, "Angular velocity Y did not update correctly based on initial angular acceleration")
+	// Assertions:
+	require.NoError(t, err, "Update should not return an error")
 
-	// Also check orientation changed (simple check: not identity anymore)
-	assert.False(t, entity.Orientation.Quat.IsIdentity(), "Orientation should change after angular update")
+	// Check if force was applied correctly (e.g., gravity)
+	require.InDelta(t, 0, entity.AccumulatedForce.X, 1e-9, "Force X should be zero")
+	require.InDelta(t, -98.1, entity.AccumulatedForce.Y, 1e-9, "Force Y should be gravity * mass")
+	require.InDelta(t, 0, entity.AccumulatedForce.Z, 1e-9, "Force Z should be zero")
+
+	// Angular velocity and orientation are no longer updated by PhysicsSystem directly.
+	// Integration happens in the main simulation loop.
+	// Removing checks for angular velocity and orientation changes here.
+	/*
+		require.InDelta(t, 1.005, entity.AngularVelocity.Y, 1e-9, "Angular velocity Y did not update correctly based on initial angular acceleration")
+		require.False(t, entity.Orientation.Quat.IsIdentity(), "Orientation should change after angular update")
+	*/
 }
 
 // TEST: GIVEN an entity with invalid timestep WHEN updating THEN returns error
@@ -192,7 +214,22 @@ func TestUpdate_MissingComponents(t *testing.T) {
 // TEST: GIVEN an entity at ground level WHEN updating THEN ground collision handled
 func TestUpdate_GroundCollision(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger, 1)
+	// Provide a config with gravity for the test
+	cfg := &config.Engine{
+		Options: config.Options{
+			Launchsite: config.Launchsite{
+				Atmosphere: config.Atmosphere{
+					ISAConfiguration: config.ISAConfiguration{
+						GravitationalAccel: 9.81,
+					},
+				},
+			},
+		},
+		Simulation: config.Simulation{
+			GroundTolerance: 0.1, // Also provide ground tolerance from config
+		},
+	}
+	system := systems.NewPhysicsSystem(world, cfg, testLogger, 1)
 	e := ecs.NewBasic()
 	entity := &states.PhysicsState{
 		Entity:       &e,
@@ -207,6 +244,18 @@ func TestUpdate_GroundCollision(t *testing.T) {
 	system.Add(entity)
 	err := system.Update(0.01)
 	assert.NoError(t, err)
-	assert.Equal(t, 0.0, entity.Velocity.Vec.Y, "Velocity should be zero after ground collision")
-	assert.Equal(t, 0.0, entity.Position.Vec.Y, "Position should remain at ground level after collision")
+
+	// Assertions:
+	// PhysicsSystem no longer handles ground collision directly; this happens in simulation loop.
+	// We can check that forces were applied, but velocity/position clamping won't happen here.
+	// For example, check accumulated force (should include gravity)
+	require.InDelta(t, -9.81*entity.Mass.Value, entity.AccumulatedForce.Y, 1e-9, "Gravity should still be accumulated")
+
+	// Removing checks for velocity/position clamping, as it's done in simulation loop.
+	/*
+		require.Equal(t, 0.0, entity.Position.Vec.Y, "Position should be clamped to ground")
+		require.Equal(t, 0.0, entity.Velocity.Vec.Y, "Velocity should be zero after ground collision")
+		require.Equal(t, 0.0, entity.Velocity.Vec.X, "Velocity should be zero after ground collision")
+		require.Equal(t, 0.0, entity.Velocity.Vec.Z, "Velocity should be zero after ground collision")
+	*/
 }

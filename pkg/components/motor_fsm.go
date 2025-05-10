@@ -12,6 +12,7 @@ const (
 	StateIdle    = "idle"
 	StateBurning = "burning"
 	StateIgnited = "IGNITED"
+	StateCoasting = "coast"
 )
 
 // MotorFSM represents the finite state machine for the motor
@@ -28,8 +29,9 @@ func NewMotorFSM(motor *Motor, log logf.Logger) *MotorFSM {
 			string(StateIdle), // Set initial state to "idle"
 			fsm.Events{
 				{Name: "ignite", Src: []string{string(StateIdle)}, Dst: string(StateIgnited)},
-				{Name: "burnout", Src: []string{string(StateBurning)}, Dst: string(StateIdle)},
+				{Name: "burnout", Src: []string{string(StateBurning)}, Dst: string(StateCoasting)},
 				{Name: "start_burning", Src: []string{string(StateIgnited)}, Dst: string(StateBurning)},
+				{Name: "reset", Src: []string{string(StateCoasting), string(StateBurning), string(StateIgnited)}, Dst: string(StateIdle)},
 			},
 			fsm.Callbacks{},
 		),
@@ -73,7 +75,10 @@ func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime flo
 	currentState := fsm.FSM.Current()
 
 	if elapsedTime < burnTime && mass > 0 {
-		return fsm.handleBurningTransition(ctx, currentState)
+		if currentState == StateIdle || currentState == StateIgnited {
+			return fsm.handleBurningTransition(ctx, currentState)
+		} 
+		return nil
 	}
 
 	if currentState == StateBurning {

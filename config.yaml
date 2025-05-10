@@ -8,7 +8,7 @@ setup:
   plugins:
     paths:
       - "./plugins/windeffect.so"
-      - "./plugins/blackscholes.so"
+      # - "./plugins/blackscholes.so"
 
 server:
   port: 8080

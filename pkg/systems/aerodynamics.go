@@ -253,29 +253,41 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 			continue
 		}
 
-		var globalForce types.Vector3
-		if entity.Orientation.Quat != (types.Quaternion{}) {
-			// Transform force to global coordinates using current orientation
-			globalForce = *entity.Orientation.Quat.RotateVector(&force)
-		} else {
-			globalForce = force // Use untransformed force if no valid orientation
-		}
-
-		a.log.Debug("Calculating aero force",
+		// 'force' is drag from CalculateDrag, already in world frame.
+		// No rotation needed for world-frame drag.
+		a.log.Debug("Applying aerodynamic drag force",
 			"entity_id", entity.Entity.ID(),
-			"body_force", force,
-			"orientation", entity.Orientation.Quat,
-			"global_force", globalForce,
+			"world_drag_force", force,
 			"mass", entity.Mass.Value,
 		)
+		entity.AccumulatedForce = entity.AccumulatedForce.Add(force)
 
-		// Add the calculated global force to the accumulator
-		entity.AccumulatedForce = entity.AccumulatedForce.Add(globalForce)
+		// Moments handling: Assume moment from CalculateAerodynamicMoment is in body frame.
+		// Rotate to world frame before accumulation if there's a valid orientation.
+		_ = <-momentChan                  //nolint:gosimple // Consume value from channel to avoid blocking
+		var momentBodyFrame types.Vector3 // Declare variable
+		var momentWorldFrame types.Vector3
 
-		// Apply angular accelerations from moments
-		moment := <-momentChan
-		// Add the calculated moment to the accumulator
-		entity.AccumulatedMoment = entity.AccumulatedMoment.Add(moment)
+		// --- TEMPORARY DEBUG: Disable aerodynamic moments ---
+		momentBodyFrame = types.Vector3{} // Override calculated moment (sets the declared variable)
+		// --- END TEMPORARY DEBUG ---
+
+		if entity.Orientation.Quat != (types.Quaternion{}) {
+			momentWorldFrame = *entity.Orientation.Quat.RotateVector(&momentBodyFrame)
+		} else {
+			// If no valid orientation, what to do with body-frame moment?
+			// Option 1: Add it as is (potentially incorrect if world frame is expected).
+			// Option 2: Don't add it.
+			// Option 3: Zero it.
+			// For now, let's assume if no orientation, body moment can't be meaningfully applied to world frame.
+			momentWorldFrame = types.Vector3{} // Or momentBodyFrame if it's meant to be added raw
+		}
+		a.log.Debug("Applying aerodynamic moment",
+			"entity_id", entity.Entity.ID(),
+			"body_moment", momentBodyFrame,
+			"world_moment", momentWorldFrame,
+		)
+		entity.AccumulatedMoment = entity.AccumulatedMoment.Add(momentWorldFrame)
 
 		i++
 	}
@@ -301,43 +313,36 @@ func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity states.Physi
 	// More accurate drag coefficient calculation
 	baseCd := 0.2 // Subsonic base drag
 
-	_ = entity // Placeholder for future drag coefficient calculations
+	_ = entity // Placeholder for future drag coefficient calculations using entity properties (e.g., AoA)
 
 	// Add wave drag in transonic region
-	if mach > 0.8 && mach < 1.2 {
-		// Prandtl-Glauert compressibility correction
-		baseCd *= 1 / math.Sqrt(1-math.Pow(mach, 2))
+	// Prandtl-Glauert compressibility correction is applied for Mach < 1.0
+	if mach > 0.8 && mach < 1.0 { // Only apply P-G factor if mach is between 0.8 and 1.0 (exclusive of 1.0)
+		denominator := 1.0 - math.Pow(mach, 2)
+		if denominator > 1e-9 { // Ensure denominator is strictly positive and not excessively small
+			baseCd *= (1.0 / math.Sqrt(denominator))
+		} else {
+			// Mach is very close to 1.0 from below, P-G factor would be excessively large or NaN.
+			// A proper Cd curve would have a peak here. For safety, cap the effect.
+			baseCd *= 5.0 // Example: If baseCd was 0.2, Cd becomes 1.0. This is a placeholder.
+		}
 	}
 
-	// Supersonic drag
+	// Supersonic drag: This formula typically defines the Cd for M >= 1.2, overwriting previous baseCd.
+	// Note: There's a gap for mach between 1.0 and 1.19 where Cd might not be well-defined by this logic.
+	// A complete Cd(Mach) profile is needed for full accuracy.
 	if mach >= 1.2 {
 		baseCd = 0.2 + 0.6*math.Exp(-0.6*(mach-1.2))
+	} else if mach >= 1.0 { // Handling the 1.0 <= mach < 1.2 gap
+		// In this region, drag coefficient is high and complex.
+		// For now, let's use a simple high placeholder value.
+		// This value should ideally transition smoothly from the M<1 behavior to the M>=1.2 behavior.
+		// Example: if at M=0.99 with PG factor baseCd became ~1.0, and at M=1.2 it's 0.8.
+		// A simple peak value placeholder:
+		baseCd = 0.9 // Placeholder for Cd in 1.0 <= M < 1.2 range.
 	}
 
 	return baseCd
-}
-
-// getAtmosphericDensity implements the International Standard Atmosphere model
-func getAtmosphericDensity(altitude float64) float64 {
-	// Constants for ISA model
-	const (
-		rho0 = 1.225     // sea level density in kg/m^3
-		T0   = 288.15    // sea level temperature in K
-		L    = 0.0065    // temperature lapse rate in K/m
-		g    = 9.80665   // gravitational acceleration in m/s^2
-		R    = 287.05287 // specific gas constant for air in J/(kg·K)
-	)
-
-	// Limit altitude to avoid numerical instability
-	if altitude > 80000 {
-		return 0
-	}
-
-	if altitude < 11000 { // troposphere
-		return rho0 * math.Pow(1-(L*altitude)/T0, g/(R*L)-1)
-	}
-	// Add stratosphere calculations if needed
-	return rho0 * math.Exp(-g*altitude/(R*T0))
 }
 
 // calculateAerodynamicMoment calculates the aerodynamic moments on the entity

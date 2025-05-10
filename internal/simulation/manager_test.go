@@ -2,7 +2,6 @@ package simulation_test
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/bxrne/launchrail/internal/config"
@@ -308,22 +307,13 @@ func TestManager_Run(t *testing.T) {
 }
 
 func TestManager_Close(t *testing.T) {
-	dataFile := filepath.Join(t.TempDir(), "motion.csv")
 	log := logf.New(logf.Opts{})
-
-	// Create a test file to verify it gets closed
-	f, err := os.Create(dataFile)
-	require.NoError(t, err)
-	f.Close()
-
 	cfg := &config.Config{
-		Setup: config.Setup{
-			App: config.App{
-				Name:    "TestApp",
-				Version: "0.0.1",
-			},
-		},
 		Engine: config.Engine{
+			Simulation: config.Simulation{
+				Step:    0.01,
+				MaxTime: 10,
+			},
 			Options: config.Options{
 				MotorDesignation: "269H110-14A",
 				OpenRocketFile:   "../../testdata/openrocket/l1.ork",
@@ -331,17 +321,12 @@ func TestManager_Close(t *testing.T) {
 			External: config.External{
 				OpenRocketVersion: "23.09",
 			},
-			Simulation: config.Simulation{
-				Step:    0.01,
-				MaxTime: 10,
-			},
 		},
 	}
 
 	recordDir := t.TempDir()
 	motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
 	require.NoError(t, err)
-	// Don't defer close here; manager.Close() should handle it.
 	eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
 	require.NoError(t, err)
 	dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
@@ -356,8 +341,68 @@ func TestManager_Close(t *testing.T) {
 	err = manager.Initialize(stores)
 	require.NoError(t, err)
 
-	// Simulate some activity (optional, but good practice)
-
+	// First close
 	err = manager.Close()
 	assert.NoError(t, err)
+	assert.Equal(t, simulation.StatusClosed, manager.GetStatus())
+
+	// Second close - should be no-op and no error
+	err = manager.Close()
+	assert.NoError(t, err)
+	assert.Equal(t, simulation.StatusClosed, manager.GetStatus())
 }
+
+func TestManager_GetStatus(t *testing.T) {
+	log := logf.New(logf.Opts{})
+	cfg := &config.Config{
+		Engine: config.Engine{
+			Simulation: config.Simulation{
+				Step:    0.01,
+				MaxTime: 0.01, // Short run time
+			},
+			Options: config.Options{
+				MotorDesignation: "269H110-14A",
+				OpenRocketFile:   "../../testdata/openrocket/l1.ork",
+			},
+			External: config.External{
+				OpenRocketVersion: "23.09",
+			},
+		},
+	}
+
+	recordDir := t.TempDir()
+	motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
+	require.NoError(t, err)
+	eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
+	require.NoError(t, err)
+	dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
+	require.NoError(t, err)
+	stores := &storage.Stores{
+		Motion:   motionStore,
+		Events:   eventsStore,
+		Dynamics: dynamicsStore,
+	}
+
+	manager := simulation.NewManager(cfg, log)
+
+	// 1. Before Initialize
+	assert.Equal(t, simulation.StatusIdle, manager.GetStatus(), "Initial status should be Idle")
+
+	// 2. Initialize
+	err = manager.Initialize(stores)
+	require.NoError(t, err)
+	assert.Equal(t, simulation.StatusIdle, manager.GetStatus(), "Status after successful Initialize should be Idle")
+
+	// 3. Run
+	err = manager.Run()
+	require.NoError(t, err)
+	assert.Equal(t, simulation.StatusCompleted, manager.GetStatus(), "Status after successful Run should be Completed")
+
+	// 4. Close
+	err = manager.Close()
+	require.NoError(t, err)
+	assert.Equal(t, simulation.StatusClosed, manager.GetStatus(), "Status after Close should be Closed")
+}
+
+// TODO: Add test case for Initialize failing due to plugin compilation
+// TODO: Add test case for Run failing due to simulation error

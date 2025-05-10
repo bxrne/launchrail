@@ -30,18 +30,6 @@ func (v Vector3) Subtract(other Vector3) Vector3 {
 	}
 }
 
-// Magnitude returns the length of the vector
-// INFO: Calculating the magnitude as the Euclidean norm.
-func (v Vector3) Magnitude() float64 {
-	return math.Sqrt(v.X*v.X + v.Y*v.Y + v.Z*v.Z)
-}
-
-// String returns a string representation of the vector
-// INFO: Format the vector components to two decimal places for readability.
-func (v Vector3) String() string {
-	return fmt.Sprintf("Vector3{X: %.2f, Y: %.2f, Z: %.2f}", v.X, v.Y, v.Z)
-}
-
 // MultiplyScalar returns the vector multiplied by a scalar
 // INFO: Scaling the vector components by the given scalar.
 func (v Vector3) MultiplyScalar(scalar float64) Vector3 {
@@ -64,6 +52,23 @@ func (v Vector3) DivideScalar(scalar float64) Vector3 {
 		Y: v.Y * invScalar,
 		Z: v.Z * invScalar,
 	}
+}
+
+// Dot returns the dot product of two vectors.
+func (v Vector3) Dot(other Vector3) float64 {
+	return v.X*other.X + v.Y*other.Y + v.Z*other.Z
+}
+
+// Magnitude returns the length of the vector
+// INFO: Calculating the magnitude as the Euclidean norm.
+func (v Vector3) Magnitude() float64 {
+	return math.Sqrt(v.X*v.X + v.Y*v.Y + v.Z*v.Z)
+}
+
+// String returns a string representation of the vector
+// INFO: Format the vector components to two decimal places for readability.
+func (v Vector3) String() string {
+	return fmt.Sprintf("Vector3{X: %.2f, Y: %.2f, Z: %.2f}", v.X, v.Y, v.Z)
 }
 
 // Normalize returns the unit vector in the same direction as v.

@@ -4,12 +4,14 @@ import (
 	"testing"
 
 	"github.com/EngoEngine/ecs"
+	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/designation"
 	"github.com/bxrne/launchrail/pkg/entities"
 	openrocket "github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func createMockOpenRocketData() *openrocket.RocketDocument {
@@ -44,17 +46,19 @@ func createMockOpenRocketData() *openrocket.RocketDocument {
 								Parachute: openrocket.Parachute{
 									CD: "auto 1.0",
 								},
-								TrapezoidFinset: openrocket.TrapezoidFinset{
-									Material: openrocket.Material{
-										Density: 1.0,
-										Name:    "Test Material",
-										Type:    "BULK",
+								TrapezoidFinsets: []openrocket.TrapezoidFinset{
+									{
+										Material: openrocket.Material{
+											Density: 1.0,
+											Name:    "Test Material",
+											Type:    "BULK",
+										},
+										RootChord: 0.2,
+										TipChord:  0.1,
+										Height:    0.15,
+										Thickness: 0.003,
+										FinCount:  4,
 									},
-									RootChord: 0.2,
-									TipChord:  0.1,
-									Height:    0.15,
-									Thickness: 0.003,
-									FinCount:  4,
 								},
 							},
 						},
@@ -77,13 +81,14 @@ func createMockMotor() *components.Motor {
 
 // TEST: GIVEN valid OpenRocket data WHEN NewRocketEntity is called THEN a new rocket entity is created
 func TestNewRocketEntity(t *testing.T) {
+	log := logger.GetLogger("debug")
 	// Arrange
 	world := &ecs.World{}
 	orkData := createMockOpenRocketData()
 	motor := createMockMotor()
 
 	// Act
-	rocket := entities.NewRocketEntity(world, orkData, motor)
+	rocket := entities.NewRocketEntity(world, orkData, motor, log)
 
 	// Assert
 	assert.NotNil(t, rocket)
@@ -95,11 +100,12 @@ func TestNewRocketEntity(t *testing.T) {
 
 // TEST: GIVEN a rocket entity WHEN GetComponent is called with valid component name THEN the component is returned
 func TestGetComponent(t *testing.T) {
+	log := logger.GetLogger("debug")
 	// Arrange
 	world := &ecs.World{}
 	orkData := createMockOpenRocketData()
 	motor := createMockMotor()
-	rocket := entities.NewRocketEntity(world, orkData, motor)
+	rocket := entities.NewRocketEntity(world, orkData, motor, log)
 
 	tests := []struct {
 		name      string
@@ -148,7 +154,8 @@ func TestNewRocketEntityWithInvalidData(t *testing.T) {
 	motor := createMockMotor()
 
 	// Act
-	rocket := entities.NewRocketEntity(world, invalidOrkData, motor)
+	log := logger.GetLogger("debug")
+	rocket := entities.NewRocketEntity(world, invalidOrkData, motor, log)
 
 	// Assert
 	assert.Nil(t, rocket)
@@ -156,11 +163,12 @@ func TestNewRocketEntityWithInvalidData(t *testing.T) {
 
 // TEST: GIVEN a rocket entity with multiple components WHEN GetComponent is called concurrently THEN no race conditions occur
 func TestGetComponentConcurrency(t *testing.T) {
+	log := logger.GetLogger("debug")
 	// Arrange
 	world := &ecs.World{}
 	orkData := createMockOpenRocketData()
 	motor := createMockMotor()
-	rocket := entities.NewRocketEntity(world, orkData, motor)
+	rocket := entities.NewRocketEntity(world, orkData, motor, log)
 
 	// Act & Assert
 	done := make(chan bool)
@@ -179,4 +187,37 @@ func TestGetComponentConcurrency(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		<-done
 	}
+}
+
+func TestNewRocketEntity_NilData(t *testing.T) {
+	motor := &components.Motor{} // Dummy motor
+	log := logger.GetLogger("debug")
+	rocket := entities.NewRocketEntity(nil, nil, motor, log)
+	assert.Nil(t, rocket, "Should return nil if ORK data is nil")
+
+	rocket = entities.NewRocketEntity(nil, &openrocket.RocketDocument{}, nil, log)
+	assert.Nil(t, rocket, "Should return nil if motor is nil")
+}
+
+func TestNewRocketEntity_ComponentErrors(t *testing.T) {
+	world := &ecs.World{}
+	// motor := &components.Motor{Props: &thrustcurves.MotorData{TotalMass: 0.1}} // Unused Basic valid motor
+
+	// Test case 1: Bodytube creation error (e.g., invalid ORK data)
+	// This requires ORK data that causes NewBodytubeFromORK to error.
+	// We might need a specific test ORK file or mock the function.
+	// For now, let's assume we can create such data or focus on other errors.
+
+	// Test case 2: Invalid initial motor mass
+	invalidMotor := &components.Motor{Props: &thrustcurves.MotorData{TotalMass: 0.0}}
+	orkDataValid, err := openrocket.Load("../../testdata/openrocket/l1.ork", "23.09")
+	require.NoError(t, err)         // Check error from Load
+	require.NotNil(t, orkDataValid) // Ensure data loaded
+	log := logger.GetLogger("debug")
+	rocketInvalidMotor := entities.NewRocketEntity(world, &orkDataValid.Rocket, invalidMotor, log) // Pass address of Rocket field
+	assert.Nil(t, rocketInvalidMotor, "Should return nil if initial motor mass is invalid")
+
+	// Test case 3: Invalid total mass calculation
+	// This would require mocking component GetMass() or having components with zero/negative mass.
+	// Difficult to test directly without more control over component creation/mocking.
 }

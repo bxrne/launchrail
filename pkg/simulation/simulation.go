@@ -3,6 +3,7 @@ package simulation
 import (
 	"fmt"
 	"math"
+	"reflect"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
@@ -39,6 +40,7 @@ type Simulation struct {
 	currentTime       float64
 	systems           []systems.System
 	pluginManager     *plugin.Manager
+	gravity           float64
 }
 
 // NewSimulation creates a new rocket simulation
@@ -53,6 +55,7 @@ func NewSimulation(cfg *config.Config, log logf.Logger, stores *storage.Stores) 
 		doneChan:      make(chan struct{}),
 		stateChan:     make(chan *states.PhysicsState, 100),
 		pluginManager: plugin.NewManager(log, cfg), // Add cfg argument
+		gravity:       9.81,
 	}
 
 	for _, pluginPath := range cfg.Setup.Plugins.Paths {
@@ -121,7 +124,7 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	}
 
 	// Create rocket entity with all components
-	s.rocket = entities.NewRocketEntity(s.world, orkData, motor)
+	s.rocket = entities.NewRocketEntity(s.world, orkData, motor, &s.logger)
 
 	// Create a single PhysicsEntity to reuse for all systems
 	sysEntity := &states.PhysicsState{
@@ -290,21 +293,69 @@ func (s *Simulation) getSafeMass(motor *components.Motor, mass *types.Mass) *typ
 
 // buildPhysicsState constructs a PhysicsState from the rocket and current time.
 func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass) *states.PhysicsState {
+	// Simplified inertia tensor calculation (diagonal body frame)
+	// TODO: Replace with more accurate inertia calculation, possibly from OpenRocket data
+	var Ixx, Iyy, Izz float64
+	bodytube := getComponent[components.Bodytube](s.rocket, "bodytube")
+
+	if bodytube != nil && mass != nil && mass.Value > 0 && bodytube.Radius > 0 {
+		r := bodytube.Radius
+		l := bodytube.Length
+		m := mass.Value
+
+		// Roll inertia (longitudinal axis, assuming X)
+		Ixx = 0.5 * m * r * r
+		// Pitch/Yaw inertia (transverse axes, assuming Y and Z are similar for a cylinder)
+		// Using the simplified inertia from aerodynamics.go for cylinder rod perpendicular to axis
+		// I = (1/12) * m * (3*r^2 + L^2) for pitch/yaw about CG
+		// This CalculateInertia might need to be adapted or made more accessible
+		// For now, let's call a static version if available, or use the formula.
+		// This calculation is a placeholder as `systems.CalculateInertia` expects a full PhysicsState.
+		if l > 0 {
+			Iyy = (1.0 / 12.0) * m * (3*r*r + l*l)
+			Izz = Iyy // Assume symmetry for pitch and yaw inertia
+		} else { // Fallback if length is zero (e.g. sphere)
+			Iyy = (2.0 / 5.0) * m * r * r
+			Izz = Iyy
+		}
+	} else {
+		// Fallback to unit inertia if components are missing
+		Ixx, Iyy, Izz = 1.0, 1.0, 1.0
+		s.logger.Warn("Using fallback unit inertia tensor due to missing rocket components or mass.")
+	}
+
+	inertiaBody := types.NewMatrix3x3([]float64{
+		Ixx, 0, 0,
+		0, Iyy, 0,
+		0, 0, Izz,
+	})
+	invInertiaBody := types.NewMatrix3x3([]float64{
+		1.0 / Ixx, 0, 0,
+		0, 1.0 / Iyy, 0,
+		0, 0, 1.0 / Izz,
+	})
+	if Ixx == 0 || Iyy == 0 || Izz == 0 { // Avoid division by zero if any inertia is zero
+		s.logger.Error("Zero component in body inertia tensor, using identity for inverse.", "ixx", Ixx, "iyy", Iyy, "izz", Izz)
+		invInertiaBody = types.IdentityMatrix()
+	}
+
 	return &states.PhysicsState{
-		Time:                s.currentTime,
-		Entity:              s.rocket.BasicEntity,
-		Position:            s.rocket.Position,
-		Orientation:         s.rocket.Orientation,
-		AngularVelocity:     s.rocket.AngularVelocity,
-		AngularAcceleration: s.rocket.AngularAcceleration,
-		Velocity:            s.rocket.Velocity,
-		Acceleration:        s.rocket.Acceleration,
-		Mass:                mass,
-		Motor:               motor,
-		Bodytube:            getComponent[components.Bodytube](s.rocket, "bodytube"),
-		Nosecone:            getComponent[components.Nosecone](s.rocket, "nosecone"),
-		Finset:              getComponent[components.TrapezoidFinset](s.rocket, "finset"),
-		Parachute:           getComponent[components.Parachute](s.rocket, "parachute"),
+		Time:                     s.currentTime,
+		Entity:                   s.rocket.BasicEntity,
+		Position:                 s.rocket.Position,
+		Orientation:              s.rocket.Orientation,
+		AngularVelocity:          s.rocket.AngularVelocity,
+		AngularAcceleration:      s.rocket.AngularAcceleration,
+		Velocity:                 s.rocket.Velocity,
+		Acceleration:             s.rocket.Acceleration,
+		Mass:                     mass,
+		Motor:                    motor,
+		Bodytube:                 bodytube, // Use already fetched bodytube
+		Nosecone:                 getComponent[components.Nosecone](s.rocket, "nosecone"),
+		Finset:                   getComponent[components.TrapezoidFinset](s.rocket, "finset"),
+		Parachute:                getComponent[components.Parachute](s.rocket, "parachute"),
+		InertiaTensorBody:        *inertiaBody,
+		InverseInertiaTensorBody: *invInertiaBody,
 	}
 }
 
@@ -326,12 +377,14 @@ func (s *Simulation) updateSystems() error {
 	}
 	motor := getComponent[components.Motor](s.rocket, "motor")
 	mass := s.getSafeMass(motor, s.rocket.Mass)
-	state := s.buildPhysicsState(motor, mass)
+	state := s.buildPhysicsState(motor, mass) // state is a snapshot for systems to READ from
 
-	// 1. Reset Force/Moment Accumulators for this timestep
-	state.AccumulatedForce = types.Vector3{}
-	state.AccumulatedMoment = types.Vector3{} // Keep for consistency, though not used for integration yet
+	// 1. Reset Force/Moment Accumulators for this timestep ON THE MAIN ROCKET ENTITY
+	s.rocket.AccumulatedForce = types.Vector3{}
+	s.rocket.AccumulatedMoment = types.Vector3{}
+	s.logger.Debug("Accumulators reset on s.rocket", "s.rocket.AF", s.rocket.AccumulatedForce, "s.rocket.AM", s.rocket.AccumulatedMoment)
 
+	// 2. Run BeforeSimStep plugins
 	s.logger.Debug("Running BeforeSimStep plugins")
 	if err := runPlugins(s.pluginManager.GetPlugins(), func(p pluginapi.SimulationPlugin) error {
 		return p.BeforeSimStep(state)
@@ -347,44 +400,111 @@ func (s *Simulation) updateSystems() error {
 	}
 
 	s.logger.Debug("Starting system update loop")
-	for _, system := range s.systems {
-		s.logger.Debug("Updating system", "type", fmt.Sprintf("%T", system))
-		if err := system.Update(s.config.Engine.Simulation.Step); err != nil {
-			return fmt.Errorf("system %T update error: %w", system, err)
+	for _, sys := range s.systems {
+		sysName := reflect.TypeOf(sys).String() // Get system name for logging
+		s.logger.Debug("Updating system", "type", sysName)
+
+		// Pass dt to the system's Update method
+		if err := sys.Update(s.config.Engine.Simulation.Step); err != nil {
+			s.logger.Error("Error updating system", "type", sysName, "error", err)
+			// Potentially handle critical errors, e.g., by stopping the simulation
+			// For now, we'll let it continue to gather more data if one system fails minorly
+		}
+
+		// Log accumulated forces after specific system updates
+		switch sys.(type) {
+		case *systems.PhysicsSystem:
+			s.logger.Debug("s.rocket.AccumulatedForce after PhysicsSystem", "AF", s.rocket.AccumulatedForce)
+		case *systems.AerodynamicSystem:
+			s.logger.Debug("s.rocket.AccumulatedForce after AerodynamicSystem", "AF", s.rocket.AccumulatedForce)
 		}
 	}
 	s.logger.Debug("Finished system update loop")
+	s.logger.Debug("s.rocket.AccumulatedForce before netForce calculation", "AF", s.rocket.AccumulatedForce)
 
 	// Capture the detected event *after* running rules system
 	state.CurrentEvent = s.rulesSystem.GetLastEvent()
 
-	// 3. Calculate Net Acceleration from Accumulated Forces
-	netForce := state.AccumulatedForce
-	var netAcceleration types.Vector3
-	if state.Mass.Value <= 0 {
-		s.logger.Error("Invalid mass for acceleration calculation", "mass", state.Mass.Value)
-		// Handle error: perhaps stop simulation or set acceleration to zero?
-		netAcceleration = types.Vector3{} // Avoid NaN/Inf
-	} else {
-		netAcceleration = netForce.DivideScalar(state.Mass.Value)
+	// 3. Calculate Net Acceleration from Accumulated Forces ON THE MAIN ROCKET ENTITY
+	pos0 := s.rocket.Position.Vec       // Value type
+	vel0 := s.rocket.Velocity.Vec       // Value type
+	currentMass := s.rocket.Mass.Value
+	currentThrustMagnitude := 0.0
+	if s.rocket.Motor != nil && !s.rocket.Motor.IsCoasting() {
+		currentThrustMagnitude = s.rocket.Motor.GetThrust()
 	}
-	s.logger.Debug("Calculated Net Acceleration", "netForce", netForce, "mass", state.Mass.Value, "netAcc", netAcceleration)
+	currentOrientationQuat := s.rocket.Orientation.Quat // Assuming orientation doesn't change significantly within one RK4 step for thrust vector
 
-	// 4. Integrate state using Forward Euler
-	dt := s.config.Engine.Simulation.Step
-	currentVelocity := state.Velocity.Vec // Store current velocity for position update
+	// Derivatives function f(state_vars_for_accel_calc) -> acceleration
+	rkEvalLinearAccel := func(currentEvalVel types.Vector3, currentEvalPos types.Vector3, mass float64, thrustMag float64, orientation types.Quaternion) types.Vector3 {
+		// Calculate Gravity Force (acts downwards in global frame)
+		gravityForce := types.Vector3{Y: -s.gravity * mass}
 
-	// Update Velocity
-	state.Velocity.Vec = state.Velocity.Vec.Add(netAcceleration.MultiplyScalar(dt))
-	s.logger.Debug("Updated Velocity", "oldVel", currentVelocity, "newVel", state.Velocity.Vec, "dt", dt)
+		// Calculate Thrust Force (acts along rocket body axis, rotated to global frame)
+		var thrustForceWorld types.Vector3
+		if thrustMag > 0 {
+			localThrust := types.Vector3{Y: thrustMag} // Assume thrust acts along the rocket's local +Y axis
+			thrustForceWorld = *orientation.RotateVector(&localThrust)
+		} else {
+			thrustForceWorld = types.Vector3{}
+		}
 
-	// Update Position (using velocity *before* this step's acceleration was applied)
-	state.Position.Vec = state.Position.Vec.Add(currentVelocity.MultiplyScalar(dt))
-	s.logger.Debug("Updated Position", "oldPos", state.Position.Vec, "newPos", state.Position.Vec, "dt", dt) // Log needs fix: show old *and* new
+		netForceThisStage := gravityForce.Add(thrustForceWorld)
+		// Placeholder for aerodynamic forces if AerodynamicSystem is added later
+		// aeroForce := calculateAeroForce(currentEvalVel, currentEvalPos, s.atmosphericModel, s.rocket.AeroProperties)
+		// netForceThisStage = netForceThisStage.Add(aeroForce)
 
-	// Update Acceleration state for logging/output
-	state.Acceleration.Vec = netAcceleration
-	s.logger.Debug("Final State Acceleration set", "acc", state.Acceleration.Vec)
+		if mass <= 0 { // Prevent division by zero or negative mass
+			s.logger.Error("Invalid mass in rkEvalLinearAccel", "mass", mass)
+			return types.Vector3{}
+		}
+		return netForceThisStage.DivideScalar(mass)
+	}
+
+	// Calculate Net Angular Acceleration from Accumulated Moments (World Frame) ON THE MAIN ROCKET ENTITY
+	// This uses AccumulatedMoment which should be populated by systems like MotorSystem or AeroSystem if they apply moments.
+	var netAngularAccelerationWorld types.Vector3
+	rotationMatrix := types.RotationMatrixFromQuaternion(&s.rocket.Orientation.Quat) // Use current orientation
+	inertiaTensorWorld := types.TransformInertiaBodyToWorld(&s.rocket.InertiaTensorBody, rotationMatrix)
+	inverseInertiaTensorWorld := inertiaTensorWorld.Inverse()
+
+	if inverseInertiaTensorWorld != nil {
+		netAngularAccelerationWorld = *inverseInertiaTensorWorld.MultiplyVector(&s.rocket.AccumulatedMoment)
+	} else {
+		s.logger.Error("World inertia tensor is singular, cannot compute angular acceleration.")
+		netAngularAccelerationWorld = types.Vector3{}
+	}
+	s.logger.Debug("Calculated Net Angular Acceleration (World)", "momentW", s.rocket.AccumulatedMoment, "angAccW", netAngularAccelerationWorld)
+
+	// --- RK4 for Translational Motion ---
+	k1VDeriv := vel0
+	k1ADeriv := rkEvalLinearAccel(vel0, pos0, currentMass, currentThrustMagnitude, currentOrientationQuat)
+	posForK2LinearEval := pos0.Add(k1VDeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
+	velForK2LinearEval := vel0.Add(k1ADeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
+	k2VDeriv := velForK2LinearEval
+	k2ADeriv := rkEvalLinearAccel(velForK2LinearEval, posForK2LinearEval, currentMass, currentThrustMagnitude, currentOrientationQuat)
+	posForK3LinearEval := pos0.Add(k2VDeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
+	velForK3LinearEval := vel0.Add(k2ADeriv.MultiplyScalar(s.config.Engine.Simulation.Step / 2.0))
+	k3VDeriv := velForK3LinearEval
+	k3ADeriv := rkEvalLinearAccel(velForK3LinearEval, posForK3LinearEval, currentMass, currentThrustMagnitude, currentOrientationQuat)
+	posForK4LinearEval := pos0.Add(k3VDeriv.MultiplyScalar(s.config.Engine.Simulation.Step))
+	velForK4LinearEval := vel0.Add(k3ADeriv.MultiplyScalar(s.config.Engine.Simulation.Step))
+	k4VDeriv := velForK4LinearEval
+	k4ADeriv := rkEvalLinearAccel(velForK4LinearEval, posForK4LinearEval, currentMass, currentThrustMagnitude, currentOrientationQuat)
+	finalPos := pos0.Add(
+		k1VDeriv.Add(k2VDeriv.MultiplyScalar(2.0)).Add(k3VDeriv.MultiplyScalar(2.0)).Add(k4VDeriv).MultiplyScalar(s.config.Engine.Simulation.Step / 6.0),
+	)
+	finalVel := vel0.Add(
+		k1ADeriv.Add(k2ADeriv.MultiplyScalar(2.0)).Add(k3ADeriv.MultiplyScalar(2.0)).Add(k4ADeriv).MultiplyScalar(s.config.Engine.Simulation.Step / 6.0),
+	)
+
+	s.logger.Debug("RK4 Updated Position", "oldPos", pos0, "newPos", finalPos, "dt", s.config.Engine.Simulation.Step)
+	s.logger.Debug("RK4 Updated Velocity", "oldVel", vel0, "newVel", finalVel, "dt", s.config.Engine.Simulation.Step)
+
+	// Update Acceleration state for logging/output (with the acceleration at the START of the step)
+	state.Acceleration.Vec = k1ADeriv
+	*state.AngularAcceleration = netAngularAccelerationWorld // Log the angular acceleration calculated at start of step
+	s.logger.Debug("Final State Accel set (RK4 context)", "accel", state.Acceleration.Vec, "angAccel", *state.AngularAcceleration)
 
 	// 5. Handle Ground Collision (Simplified: check *after* integration)
 	if state.Position.Vec.Y <= s.config.Engine.Simulation.GroundTolerance {
@@ -408,12 +528,11 @@ func (s *Simulation) updateSystems() error {
 	}
 
 	s.logger.Debug("Updating rocket state from physics state")
-	s.rocket.Position.Vec = state.Position.Vec
-	s.rocket.Velocity.Vec = state.Velocity.Vec
-	s.rocket.Acceleration.Vec = state.Acceleration.Vec
-	if state.Mass.Value > 0 {
-		s.rocket.Mass.Value = state.Mass.Value
-	}
+	s.rocket.Position.Vec = finalPos            // Update s.rocket directly
+	s.rocket.Velocity.Vec = finalVel            // Update s.rocket directly
+	s.rocket.Acceleration.Vec = k1ADeriv        // Store the initial net acceleration for this step
+	// s.rocket.Mass.Value is updated by motor system if fuel is consumed.
+	// s.rocket.Orientation.Quat and s.rocket.AngularVelocity would be updated by angular RK4 if enabled.
 
 	s.logger.Debug("Sending state to channel")
 	select {

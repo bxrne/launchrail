@@ -23,6 +23,7 @@ func createTestMotor() (*components.Motor, *thrustcurves.MotorData) {
 	motorData := &thrustcurves.MotorData{
 		Thrust:    thrustData,
 		TotalMass: 10.0, // Initial mass
+		WetMass:   10.0, // Assuming all initial mass is propellant for this test
 		BurnTime:  2.0,  // 2 second burn
 		AvgThrust: 10.0, // Average thrust
 	}
