@@ -43,3 +43,6 @@ func (p *WindEffectPlugin) AfterSimStep(state *states.PhysicsState) error {
 func (p *WindEffectPlugin) Cleanup() error {
 	return nil
 }
+
+// main is required for Go plugins.
+func main() {}

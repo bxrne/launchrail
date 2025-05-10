@@ -126,3 +126,31 @@ func (n *Nosecone) GetSurfaceArea() float64 {
 func (n *Nosecone) GetDensity() float64 {
 	return n.Density
 }
+
+// GetPosition returns the nosecone's reference position (e.g., its tip) in rocket coordinates.
+func (nc *Nosecone) GetPosition() types.Vector3 {
+	// TODO: Ensure nc.Position is correctly set during NewNoseconeFromORK relative to a common rocket origin.
+	return nc.Position
+}
+
+// GetCenterOfMassLocal returns the nosecone's center of mass relative to its Position (tip).
+// This is a simplified placeholder. Actual CG depends on shape and wall thickness.
+func (nc *Nosecone) GetCenterOfMassLocal() types.Vector3 {
+	// Assuming Position is the tip and the nosecone extends along the positive X-axis.
+	// For many common shapes (cone, ogive), the CG is roughly 0.4 to 0.5 * Length from the tip.
+	// Using 0.5 * Length as a rough placeholder. A more precise calculation is needed.
+	// Note: OpenRocket typically defines component positions from the tip of the nosecone downwards (positive X).
+	// So, if nc.Position is the tip (0,0,0 in local frame), CG is at (+X_cg_local, 0, 0).
+	localCgX := 0.5 * nc.Length 
+	// TODO: Implement accurate local CG calculation based on nc.Shape, nc.Thickness, etc.
+	// log.Warn("Nosecone.GetCenterOfMassLocal() returning placeholder.")
+	return types.Vector3{X: localCgX, Y: 0, Z: 0}
+}
+
+// GetInertiaTensorLocal returns the nosecone's inertia tensor about its local CG, aligned with rocket axes.
+// This is a placeholder, returning a zero matrix.
+func (nc *Nosecone) GetInertiaTensorLocal() types.Matrix3x3 {
+	// TODO: Implement accurate inertia tensor calculation for the nosecone based on its shape, mass distribution.
+	// log.Warn("Nosecone.GetInertiaTensorLocal() returning placeholder (zero matrix).")
+	return types.Matrix3x3{}
+}

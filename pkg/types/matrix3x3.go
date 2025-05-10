@@ -1,9 +1,5 @@
 package types
 
-import (
-	"math"
-)
-
 // Matrix3x3 represents a 3x3 matrix.
 // Components are row-major: M11, M12, M13 are the first row.
 type Matrix3x3 struct {
@@ -33,6 +29,15 @@ func IdentityMatrix() *Matrix3x3 {
 		1, 0, 0,
 		0, 1, 0,
 		0, 0, 1,
+	}
+}
+
+// IdentityMatrix3x3 returns an identity matrix.
+func IdentityMatrix3x3() Matrix3x3 {
+	return Matrix3x3{
+		M11: 1, M12: 0, M13: 0,
+		M21: 0, M22: 1, M23: 0,
+		M31: 0, M32: 0, M33: 1,
 	}
 }
 
@@ -72,31 +77,64 @@ func (m *Matrix3x3) MultiplyMatrix(other *Matrix3x3) *Matrix3x3 {
 	}
 }
 
-// Inverse computes the inverse of a 3x3 matrix.
-// Returns nil if the matrix is singular (determinant is zero).
-func (m *Matrix3x3) Inverse() *Matrix3x3 {
-	det := m.M11*(m.M22*m.M33-m.M23*m.M32) -
-		m.M12*(m.M21*m.M33-m.M23*m.M31) +
-		m.M13*(m.M21*m.M32-m.M22*m.M31)
+// Add returns the sum of two matrices (m + other).
+func (m Matrix3x3) Add(other Matrix3x3) Matrix3x3 {
+	return Matrix3x3{
+		M11: m.M11 + other.M11, M12: m.M12 + other.M12, M13: m.M13 + other.M13,
+		M21: m.M21 + other.M21, M22: m.M22 + other.M22, M23: m.M23 + other.M23,
+		M31: m.M31 + other.M31, M32: m.M32 + other.M32, M33: m.M33 + other.M33,
+	}
+}
 
-	if math.Abs(det) < 1e-9 { // Consider very small determinant as singular
-		return nil
+// Subtract returns the difference of two matrices (m - other).
+func (m Matrix3x3) Subtract(other Matrix3x3) Matrix3x3 {
+	return Matrix3x3{
+		M11: m.M11 - other.M11, M12: m.M12 - other.M12, M13: m.M13 - other.M13,
+		M21: m.M21 - other.M21, M22: m.M22 - other.M22, M23: m.M23 - other.M23,
+		M31: m.M31 - other.M31, M32: m.M32 - other.M32, M33: m.M33 - other.M33,
+	}
+}
+
+// MultiplyScalar returns the matrix scaled by a scalar.
+func (m Matrix3x3) MultiplyScalar(s float64) Matrix3x3 {
+	return Matrix3x3{
+		M11: m.M11 * s, M12: m.M12 * s, M13: m.M13 * s,
+		M21: m.M21 * s, M22: m.M22 * s, M23: m.M23 * s,
+		M31: m.M31 * s, M32: m.M32 * s, M33: m.M33 * s,
+	}
+}
+
+// Determinant calculates the determinant of the matrix.
+func (m Matrix3x3) Determinant() float64 {
+	return m.M11*(m.M22*m.M33-m.M23*m.M32) -
+		   m.M12*(m.M21*m.M33-m.M23*m.M31) +
+		   m.M13*(m.M21*m.M32-m.M22*m.M31)
+}
+
+// Inverse calculates the inverse of the matrix.
+// Returns nil if the matrix is singular (determinant is zero or very close to zero).
+func (m Matrix3x3) Inverse() *Matrix3x3 {
+	det := m.Determinant()
+	// Use a small epsilon for singularity check to handle floating point inaccuracies
+	if det > -1e-9 && det < 1e-9 {
+		return nil // Singular matrix
 	}
 
 	invDet := 1.0 / det
-	inv := &Matrix3x3{}
+	adj := Matrix3x3{
+		M11: (m.M22*m.M33 - m.M23*m.M32) * invDet,
+		M12: (m.M13*m.M32 - m.M12*m.M33) * invDet,
+		M13: (m.M12*m.M23 - m.M13*m.M22) * invDet,
 
-	inv.M11 = (m.M22*m.M33 - m.M23*m.M32) * invDet
-	inv.M12 = (m.M13*m.M32 - m.M12*m.M33) * invDet
-	inv.M13 = (m.M12*m.M23 - m.M13*m.M22) * invDet
-	inv.M21 = (m.M23*m.M31 - m.M21*m.M33) * invDet
-	inv.M22 = (m.M11*m.M33 - m.M13*m.M31) * invDet
-	inv.M23 = (m.M13*m.M21 - m.M11*m.M23) * invDet
-	inv.M31 = (m.M21*m.M32 - m.M22*m.M31) * invDet
-	inv.M32 = (m.M12*m.M31 - m.M11*m.M32) * invDet
-	inv.M33 = (m.M11*m.M22 - m.M12*m.M21) * invDet
+		M21: (m.M23*m.M31 - m.M21*m.M33) * invDet,
+		M22: (m.M11*m.M33 - m.M13*m.M31) * invDet,
+		M23: (m.M13*m.M21 - m.M11*m.M23) * invDet,
 
-	return inv
+		M31: (m.M21*m.M32 - m.M22*m.M31) * invDet,
+		M32: (m.M12*m.M31 - m.M11*m.M32) * invDet,
+		M33: (m.M11*m.M22 - m.M12*m.M21) * invDet,
+	}
+	return &adj
 }
 
 // RotationMatrixFromQuaternion converts a Quaternion to a 3x3 rotation matrix.

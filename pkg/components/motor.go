@@ -245,6 +245,29 @@ func (m *Motor) GetElapsedTime() float64 {
 	return m.elapsedTime
 }
 
+func (m *Motor) GetPosition() types.Vector3 {
+	// TODO: Ensure m.Position is correctly set during NewMotorFromORK relative to a common rocket origin.
+	return m.Position
+}
+
+func (m *Motor) GetCenterOfMassLocal() types.Vector3 {
+	m.logger.Warn("Motor.GetCenterOfMassLocal() returning placeholder (zero vector). Accurate CG calculation needed based on geometry and propellant burn.")
+	// TODO: Implement accurate local CG calculation for the motor.
+	// This requires motor dimensions (length) and understanding how propellant burns (e.g., from one end or radially).
+	// For a solid motor burning from one end, CG shifts over time.
+	// As a simplification, could assume CG of (casing + remaining propellant) is at geometric center of remaining propellant for now.
+	return types.Vector3{X: 0, Y: 0, Z: 0} 
+}
+
+func (m *Motor) GetInertiaTensorLocal() types.Matrix3x3 {
+	m.logger.Warn("Motor.GetInertiaTensorLocal() returning placeholder (zero matrix). Accurate inertia tensor calculation needed.")
+	// TODO: Implement accurate inertia tensor calculation for the motor.
+	// This requires motor dimensions (length, radius) and mass distribution (casing, propellant).
+	// For a solid cylinder: Ixx = 0.5*m*r^2; Iyy = Izz = (1/12)*m*(3*r^2 + L^2).
+	// This also changes as propellant burns.
+	return types.Matrix3x3{}
+}
+
 func validateThrustCurve(curve [][]float64) [][]float64 {
 	if len(curve) < 2 {
 		panic("thrust curve must have at least 2 points")

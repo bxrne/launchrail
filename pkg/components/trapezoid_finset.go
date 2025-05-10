@@ -371,3 +371,43 @@ func NewTrapezoidFinsetFromORK(orkFinset *openrocket.TrapezoidFinset, orkPositio
 
 	return simFinset, nil
 }
+
+// GetPosition returns the finset's reference position (attachment point) in rocket coordinates.
+func (fs *TrapezoidFinset) GetPosition() types.Vector3 {
+	return fs.Position
+}
+
+// GetCenterOfMassLocal returns the finset's center of mass relative to its Position (attachment point).
+func (fs *TrapezoidFinset) GetCenterOfMassLocal() types.Vector3 {
+	// fs.CenterOfMass is stored as the global CG of the finset.
+	// To get local CG relative to fs.Position, we subtract fs.Position.
+	// This requires Vector3.Subtract() to be implemented.
+	// For now, assuming it exists and is called as fs.CenterOfMass.Subtract(fs.Position)
+	// If Vector3.Subtract() is not available, this will need adjustment or direct calculation.
+	// Placeholder if Subtract isn't ready, but the logic is to make it local.
+	// return fs.CenterOfMass.Subtract(fs.Position) // Ideal
+	
+	// Temporary direct calculation assuming X is the primary axis of displacement from position
+	// This depends on how fs.CenterOfMass and fs.Position are defined and calculated initially.
+	// Reviewing NewTrapezoidFinsetFromORK: fs.CenterOfMass = fs.Position.Add(cmLocal)
+	// So, cmLocal = fs.CenterOfMass.Subtract(fs.Position)
+	// This requires fs.CenterOfMass to be correctly populated before this call.
+	
+	// Assuming fs.CenterOfMass = {GlobalX, GlobalY, GlobalZ}
+	// and fs.Position = {AttachX, AttachY, AttachZ}
+	// LocalCG = {GlobalX - AttachX, GlobalY - AttachY, GlobalZ - AttachZ}
+	// This is essentially fs.CenterOfMass.Subtract(fs.Position)
+	// Until Vector3 operations are added, this will be a conceptual placeholder:
+	return types.Vector3{ 
+		X: fs.CenterOfMass.X - fs.Position.X,
+		Y: fs.CenterOfMass.Y - fs.Position.Y,
+		Z: fs.CenterOfMass.Z - fs.Position.Z,
+	}
+}
+
+// GetInertiaTensorLocal returns the finset's inertia tensor about its own CG, aligned with rocket axes.
+func (fs *TrapezoidFinset) GetInertiaTensorLocal() types.Matrix3x3 {
+	// The comment for fs.InertiaTensor states it's "of the entire fin set about its CM".
+	// This is assumed to be what's needed for the local inertia tensor in aggregation.
+	return fs.InertiaTensor
+}

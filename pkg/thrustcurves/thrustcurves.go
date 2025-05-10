@@ -22,12 +22,16 @@ func Load(designationString string, client http_client.HTTPClient) (*MotorData, 
 		return nil, fmt.Errorf("failed to get motor ID: %s", err)
 	}
 
+	if len(props.Results) == 0 {
+		return nil, fmt.Errorf("no search results from ThrustCurve.org for %s", designationString)
+	}
+
 	curve, err := getMotorCurve(props.Results[0].MotorID, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get motor curve: %s", err)
 	}
 
-	return &MotorData{
+	finalMotorData := &MotorData{
 		Designation:  des,
 		ID:           props.Results[0].MotorID,
 		Thrust:       curve,
@@ -37,7 +41,9 @@ func Load(designationString string, client http_client.HTTPClient) (*MotorData, 
 		TotalMass:    props.Results[0].TotalMass / 1000, // Convert grams to kg
 		WetMass:      props.Results[0].WetMass / 1000,   // Convert grams to kg
 		MaxThrust:    props.Results[0].MaxThrust,
-	}, nil
+	}
+
+	return finalMotorData, nil
 
 }
 
