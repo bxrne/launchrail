@@ -88,4 +88,3 @@ func containsANSICodes(s string) bool {
 	// ANSI escape sequences start with \x1b[ or \033[
 	return strings.Contains(s, "\x1b[") || strings.Contains(s, "\033[")
 }
-

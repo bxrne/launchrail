@@ -6,11 +6,11 @@ import (
 	"sync"
 
 	"github.com/EngoEngine/ecs"
-	"github.com/zerodha/logf"
 	"github.com/bxrne/launchrail/pkg/components"
 	openrocket "github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/types"
+	"github.com/zerodha/logf"
 )
 
 // RocketEntity represents a complete rocket with all its components

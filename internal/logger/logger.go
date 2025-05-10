@@ -19,7 +19,7 @@ var (
 	defaultOpts = logf.Opts{
 		EnableCaller:    true,
 		TimestampFormat: "15:04:05",
-		EnableColor:     false, // Disable color globally so log file output has no ANSI codes
+		EnableColor:     false,          // Disable color globally so log file output has no ANSI codes
 		Level:           logf.InfoLevel, // Default level
 	}
 )
@@ -90,7 +90,6 @@ func LoggingMiddleware(log *logf.Logger) gin.HandlerFunc {
 		)
 	}
 }
-
 
 // Reset is for testing so that we can reset the logger singleton
 func Reset() {

@@ -587,8 +587,8 @@ func (s *Simulation) updateSystems() error {
 	}
 
 	s.logger.Debug("Updating rocket state from physics state")
-	s.rocket.Position.Vec = finalPos // Update s.rocket directly
-	s.rocket.Velocity.Vec = finalVel // Update s.rocket directly
+	s.rocket.Position.Vec = finalPos            // Update s.rocket directly
+	s.rocket.Velocity.Vec = finalVel            // Update s.rocket directly
 	s.rocket.Acceleration.Vec = netAcceleration // Store the initial net acceleration for this step
 	// s.rocket.Mass.Value is updated by motor system if fuel is consumed.
 	// s.rocket.Orientation.Quat and s.rocket.AngularVelocity would be updated by angular RK4 if enabled.

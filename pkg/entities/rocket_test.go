@@ -209,8 +209,8 @@ func TestNewRocketEntity_ComponentErrors(t *testing.T) {
 	// Test case 2: Invalid initial motor mass
 	invalidMotor := &components.Motor{Props: &thrustcurves.MotorData{TotalMass: 0.0}}
 	orkDataValid, err := openrocket.Load("../../testdata/openrocket/l1.ork", "23.09")
-	require.NoError(t, err)                                                                   // Check error from Load
-	require.NotNil(t, orkDataValid)                                                           // Ensure data loaded
+	require.NoError(t, err)         // Check error from Load
+	require.NotNil(t, orkDataValid) // Ensure data loaded
 	log := logger.GetLogger("debug")
 	rocketInvalidMotor := entities.NewRocketEntity(world, &orkDataValid.Rocket, invalidMotor, log) // Pass address of Rocket field
 	assert.Nil(t, rocketInvalidMotor, "Should return nil if initial motor mass is invalid")
