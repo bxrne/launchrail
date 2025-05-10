@@ -268,7 +268,7 @@ func main() {
 		fmt.Printf("Failed to create logs directory: %v\n", err)
 		os.Exit(1)
 	}
-	logFilePath := filepath.Join(logsDir, "server.log")
+	logFilePath := filepath.Join(logsDir, "server-20250510-152030.log")
 	// Initialize logger
 	log := logger.GetLogger(cfg.Setup.Logging.Level, logFilePath)
 

@@ -101,7 +101,7 @@ func main() {
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		log.Fatalf("Failed to create logs directory: %v", err)
 	}
-	logFilePath := filepath.Join(logsDir, "bench.log")
+	logFilePath := filepath.Join(logsDir, "bench-20250510-152030.log")
 	// Initialize logger with config level. This will be the first effective call.
 	benchLogger = logger.GetLogger(cfg.Setup.Logging.Level, logFilePath)
 
