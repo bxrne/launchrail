@@ -8,6 +8,7 @@ import (
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
 	"github.com/bxrne/launchrail/pkg/types"
+	"github.com/zerodha/logf"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,8 +18,10 @@ func TestNewLaunchRailSystem(t *testing.T) {
 	length := 2.0
 	angle := 5.0
 	orientation := 0.0
+	logfLogger := logf.New(logf.Opts{})
+	logger := &logfLogger
 
-	system := systems.NewLaunchRailSystem(world, length, angle, orientation)
+	system := systems.NewLaunchRailSystem(world, length, angle, orientation, logger)
 
 	assert.NotNil(t, system)
 	assert.Equal(t, length, system.GetRail().Length)
@@ -29,7 +32,9 @@ func TestNewLaunchRailSystem(t *testing.T) {
 // TEST: GIVEN a launch rail system WHEN adding an entity THEN entity is tracked
 func TestAddEntity(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewLaunchRailSystem(world, 2.0, 5.0, 0.0)
+	logfLogger := logf.New(logf.Opts{})
+	logger := &logfLogger
+	system := systems.NewLaunchRailSystem(world, 2.0, 5.0, 0.0, logger)
 
 	entity := &states.PhysicsState{
 		Position:     &types.Position{Vec: types.Vector3{X: 0, Y: 0}},
@@ -45,7 +50,9 @@ func TestAddEntity(t *testing.T) {
 // TEST: GIVEN a stationary rocket WHEN no thrust THEN stays at start of rail
 func TestUpdateNoThrust(t *testing.T) {
 	world := &ecs.World{}
-	system := systems.NewLaunchRailSystem(world, 2.0, 5.0, 0.0)
+	logfLogger := logf.New(logf.Opts{})
+	logger := &logfLogger
+	system := systems.NewLaunchRailSystem(world, 2.0, 5.0, 0.0, logger)
 
 	entity := &states.PhysicsState{
 		Position:     &types.Position{Vec: types.Vector3{X: 0, Y: 0}},

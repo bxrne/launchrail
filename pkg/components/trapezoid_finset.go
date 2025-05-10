@@ -15,18 +15,18 @@ import (
 // Individual fin properties are used to calculate set properties.
 type TrapezoidFinset struct {
 	ecs.BasicEntity
-	Name          string             // Name of the component
-	RootChord     float64            // Root chord of a single fin
-	TipChord      float64            // Tip chord of a single fin
-	Span          float64            // Span (height) of a single fin
-	SweepDistance float64            // Sweep distance (or length) of the leading edge of a single fin
-	Thickness     float64            // Thickness of a single fin
-	FinCount      int                // Number of fins in the set
+	Name          string              // Name of the component
+	RootChord     float64             // Root chord of a single fin
+	TipChord      float64             // Tip chord of a single fin
+	Span          float64             // Span (height) of a single fin
+	SweepDistance float64             // Sweep distance (or length) of the leading edge of a single fin
+	Thickness     float64             // Thickness of a single fin
+	FinCount      int                 // Number of fins in the set
 	Material      openrocket.Material // Material of the fins
-	Position      types.Vector3      // Axial position of the fin set's attachment point (e.g., leading edge of root chord of fin 0)
-	Mass          float64            // Total mass of the entire fin set (all fins)
-	CenterOfMass  types.Vector3      // CM of the entire fin set, relative to rocket origin
-	InertiaTensor types.Matrix3x3    // Inertia tensor of the entire fin set about its CM, aligned with rocket body axes
+	Position      types.Vector3       // Axial position of the fin set's attachment point (e.g., leading edge of root chord of fin 0)
+	Mass          float64             // Total mass of the entire fin set (all fins)
+	CenterOfMass  types.Vector3       // CM of the entire fin set, relative to rocket origin
+	InertiaTensor types.Matrix3x3     // Inertia tensor of the entire fin set about its CM, aligned with rocket body axes
 }
 
 // --- Inertia Calculation Helper Functions (to be fully implemented) ---
@@ -49,7 +49,7 @@ func getRightTriangleInertia(base, height float64, orientationFactor float64) (i
 	// Ixy is -b^2h^2/72 if origin at right angle vertex, axes along legs.
 	// The sign depends on how the triangle is oriented relative to the fin's overall geometry.
 	// orientationFactor could be +1 or -1 based on the triangle's position (e.g., leading/trailing edge section)
-	ixy = orientationFactor * (math.Pow(base, 2) * math.Pow(height, 2)) / 72.0 
+	ixy = orientationFactor * (math.Pow(base, 2) * math.Pow(height, 2)) / 72.0
 	// Note: The standard formula is often -b^2h^2/72. If the triangle is in a different quadrant
 	// for a composite shape, this sign might change or the dx, dy for parallel axis theorem will handle it.
 	// For now, using a factor, but this needs careful geometric consideration.
@@ -186,7 +186,7 @@ func (f *TrapezoidFinset) calculateAndSetInertiaTensor() {
 	IxxSingleFinMassCm := MassPerUnitArea * totalIxxFinAreaCm
 	IyySingleFinMassCm := MassPerUnitArea * totalIyyFinAreaCm
 	// For a thin plate, Izz = Ixx + Iyy. Assuming fin lies in XY plane of its local CM.
-	IzzSingleFinMassCm := IxxSingleFinMassCm + IyySingleFinMassCm 
+	IzzSingleFinMassCm := IxxSingleFinMassCm + IyySingleFinMassCm
 	IxySingleFinMassCm := MassPerUnitArea * totalIxyFinAreaCm
 	IzxSingleFinMassCm := 0.0 // Product of inertia involving z-axis is zero for thin plate in xy plane
 	IyzSingleFinMassCm := 0.0
@@ -271,9 +271,9 @@ func (f *TrapezoidFinset) calculateAndSetInertiaTensor() {
 
 		// Outer product d_i (tensor) d_i
 		d_outer_d := types.Matrix3x3{
-			M11: d_i.X*d_i.X, M12: d_i.X*d_i.Y, M13: d_i.X*d_i.Z,
-			M21: d_i.Y*d_i.X, M22: d_i.Y*d_i.Y, M23: d_i.Y*d_i.Z,
-			M31: d_i.Z*d_i.X, M32: d_i.Z*d_i.Y, M33: d_i.Z*d_i.Z,
+			M11: d_i.X * d_i.X, M12: d_i.X * d_i.Y, M13: d_i.X * d_i.Z,
+			M21: d_i.Y * d_i.X, M22: d_i.Y * d_i.Y, M23: d_i.Y * d_i.Z,
+			M31: d_i.Z * d_i.X, M32: d_i.Z * d_i.Y, M33: d_i.Z * d_i.Z,
 		}
 
 		// pat_bracket_term = term1 - d_outer_d (Manual Subtract)
@@ -386,19 +386,19 @@ func (fs *TrapezoidFinset) GetCenterOfMassLocal() types.Vector3 {
 	// If Vector3.Subtract() is not available, this will need adjustment or direct calculation.
 	// Placeholder if Subtract isn't ready, but the logic is to make it local.
 	// return fs.CenterOfMass.Subtract(fs.Position) // Ideal
-	
+
 	// Temporary direct calculation assuming X is the primary axis of displacement from position
 	// This depends on how fs.CenterOfMass and fs.Position are defined and calculated initially.
 	// Reviewing NewTrapezoidFinsetFromORK: fs.CenterOfMass = fs.Position.Add(cmLocal)
 	// So, cmLocal = fs.CenterOfMass.Subtract(fs.Position)
 	// This requires fs.CenterOfMass to be correctly populated before this call.
-	
+
 	// Assuming fs.CenterOfMass = {GlobalX, GlobalY, GlobalZ}
 	// and fs.Position = {AttachX, AttachY, AttachZ}
 	// LocalCG = {GlobalX - AttachX, GlobalY - AttachY, GlobalZ - AttachZ}
 	// This is essentially fs.CenterOfMass.Subtract(fs.Position)
 	// Until Vector3 operations are added, this will be a conceptual placeholder:
-	return types.Vector3{ 
+	return types.Vector3{
 		X: fs.CenterOfMass.X - fs.Position.X,
 		Y: fs.CenterOfMass.Y - fs.Position.Y,
 		Z: fs.CenterOfMass.Z - fs.Position.Z,

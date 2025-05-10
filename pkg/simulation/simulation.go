@@ -73,14 +73,15 @@ func NewSimulation(cfg *config.Config, log logf.Logger, stores *storage.Stores) 
 
 	// Initialize launch rail system with config values
 	sim.launchRailSystem = systems.NewLaunchRailSystem(
-		world,
-		cfg.Engine.Options.Launchrail.Length,
-		cfg.Engine.Options.Launchrail.Angle,
-		cfg.Engine.Options.Launchrail.Orientation,
+		sim.world,
+		sim.config.Engine.Options.Launchrail.Length,
+		sim.config.Engine.Options.Launchrail.Angle,
+		sim.config.Engine.Options.Launchrail.Orientation,
+		&sim.logger,
 	)
 
 	// Initialize parasite systems with specific store types
-	sim.logParasiteSystem = systems.NewLogParasiteSystem(world, log)
+	sim.logParasiteSystem = systems.NewLogParasiteSystem(world, sim.logger)
 	sim.motionParasite = systems.NewStorageParasiteSystem(world, stores.Motion, storage.MOTION)
 	sim.eventsParasite = systems.NewStorageParasiteSystem(world, stores.Events, storage.EVENTS)
 	sim.dynamicsParasite = systems.NewStorageParasiteSystem(world, stores.Dynamics, storage.DYNAMICS)
@@ -152,6 +153,10 @@ func (s *Simulation) LoadRocket(orkData *openrocket.RocketDocument, motorData *t
 	s.motionParasite.Add(sysEntity)
 	s.dynamicsParasite.Add(sysEntity)
 	s.eventsParasite.Add(sysEntity)
+
+	// Initialize rocket position based on launch rail AFTER all systems are set up and components are ready
+	s.launchRailSystem.InitializeRocketPosition(sysEntity)
+	s.logger.Info("Rocket position initialized by LaunchRailSystem", "initialPosY", sysEntity.Position.Vec.Y)
 
 	return nil
 }
@@ -225,19 +230,6 @@ func logPeriodicSimState(s *Simulation, state *entities.RocketEntity, hasMotor b
 	}
 }
 
-// shouldStopSimulation checks if the simulation should stop and logs the reason.
-func (s *Simulation) shouldStopSimulation() bool {
-	if s.rulesSystem.GetLastEvent() == types.Land {
-		s.logger.Info("Rocket has landed; stopping simulation")
-		return true
-	}
-	if s.currentTime >= s.config.Engine.Simulation.MaxTime {
-		s.logger.Info("Reached maximum simulation time")
-		return true
-	}
-	return false
-}
-
 // Run executes the simulation
 func (s *Simulation) Run() error {
 	defer func() {
@@ -259,9 +251,33 @@ func (s *Simulation) Run() error {
 		if err := s.assertAndLogPhysicsSanity(state); err != nil {
 			return err
 		}
-		if s.shouldStopSimulation() {
-			break
+
+		// Check for NaN/Inf in primary rocket state after updateSystems and clamping as a final safeguard
+		if math.IsNaN(s.rocket.Position.Vec.Y) || math.IsInf(s.rocket.Position.Vec.Y, 0) {
+			s.logger.Error("CRITICAL: Rocket Y position is NaN or Inf after update and clamping. Stopping simulation.", "posY", s.rocket.Position.Vec.Y)
+			break // Exit loop
 		}
+
+		// Ground collision check (using clamped s.rocket.Position.Vec.Y)
+		// Ensure currentTime > 0 to allow simulation to start if rocket is initially on the ground (e.g., Y <= tolerance)
+		if s.rocket.Position.Vec.Y <= s.config.Engine.Simulation.GroundTolerance && s.currentTime > s.config.Engine.Simulation.Step { // Compare with Timestep to ensure at least one step has run
+			s.logger.Info("Ground impact detected: Rocket altitude at or below ground tolerance. Stopping simulation.",
+				"altitude", s.rocket.Position.Vec.Y, "tolerance", s.config.Engine.Simulation.GroundTolerance, "vy", s.rocket.Velocity.Vec.Y)
+			break // Exit loop
+		}
+
+		// Rules system land event check
+		if s.rulesSystem.GetLastEvent() == types.Land && s.currentTime > s.config.Engine.Simulation.Step { // Avoid stopping at t=0 if initial state is Land
+			s.logger.Info("RulesSystem reported Land event. Stopping simulation.", "lastEvent", s.rulesSystem.GetLastEvent())
+			break // Exit loop
+		}
+
+		// Max simulation time check
+		if s.currentTime >= s.config.Engine.Simulation.MaxTime {
+			s.logger.Info("Reached maximum simulation time. Stopping simulation.", "maxTime", s.config.Engine.Simulation.MaxTime)
+			break // Exit loop
+		}
+
 		s.currentTime += s.config.Engine.Simulation.Step
 	}
 
@@ -426,8 +442,8 @@ func (s *Simulation) updateSystems() error {
 	state.CurrentEvent = s.rulesSystem.GetLastEvent()
 
 	// 3. Calculate Net Acceleration from Accumulated Forces ON THE MAIN ROCKET ENTITY
-	pos0 := s.rocket.Position.Vec       // Value type
-	vel0 := s.rocket.Velocity.Vec       // Value type
+	pos0 := s.rocket.Position.Vec // Value type
+	vel0 := s.rocket.Velocity.Vec // Value type
 	currentMass := s.rocket.Mass.Value
 	currentThrustMagnitude := 0.0
 	if s.rocket.Motor != nil && !s.rocket.Motor.IsCoasting() {
@@ -498,41 +514,72 @@ func (s *Simulation) updateSystems() error {
 		k1ADeriv.Add(k2ADeriv.MultiplyScalar(2.0)).Add(k3ADeriv.MultiplyScalar(2.0)).Add(k4ADeriv).MultiplyScalar(s.config.Engine.Simulation.Step / 6.0),
 	)
 
+	// NaN/Inf checks for calculated final position and velocity BEFORE assigning to s.rocket
+	prevY := s.rocket.Position.Vec.Y
+	prevVY := s.rocket.Velocity.Vec.Y
+	if math.IsNaN(finalPos.Y) || math.IsInf(finalPos.Y, 0) {
+		s.logger.Error("CRITICAL: Calculated finalPos.Y is NaN or Inf. Using previous Y position.", "finalPosY_error", finalPos.Y, "prevY", prevY)
+		finalPos.Y = prevY // Use previous valid Y to prevent state corruption
+	}
+	if math.IsNaN(finalVel.Y) || math.IsInf(finalVel.Y, 0) {
+		s.logger.Error("CRITICAL: Calculated finalVel.Y is NaN or Inf. Resetting Y velocity to previous.", "finalVelY_error", finalVel.Y, "prevVY", prevVY)
+		// If prevVY is also suspect (e.g. if NaN propagated from previous step), consider resetting to 0.
+		// For now, using prevVY to attempt to maintain some continuity if possible.
+		finalVel.Y = prevVY
+	}
+
 	s.logger.Debug("RK4 Updated Position", "oldPos", pos0, "newPos", finalPos, "dt", s.config.Engine.Simulation.Step)
 	s.logger.Debug("RK4 Updated Velocity", "oldVel", vel0, "newVel", finalVel, "dt", s.config.Engine.Simulation.Step)
 
-	// Update Acceleration state for logging/output (with the acceleration at the START of the step)
-	state.Acceleration.Vec = k1ADeriv
-	*state.AngularAcceleration = netAngularAccelerationWorld // Log the angular acceleration calculated at start of step
-	s.logger.Debug("Final State Accel set (RK4 context)", "accel", state.Acceleration.Vec, "angAccel", *state.AngularAcceleration)
+	// Update rocket's state with potentially corrected values
+	s.rocket.Position.Vec = finalPos
+	s.rocket.Velocity.Vec = finalVel
+	s.rocket.Acceleration.Vec = k1ADeriv // Storing accel from start of step for logging
+	// s.rocket.Orientation.Quat = finalOrientation // TODO: Restore when finalOrientation is available from RK4
+	// s.rocket.Mass is updated by MotorSystem.Update()
 
-	// 5. Handle Ground Collision (Simplified: check *after* integration)
-	if state.Position.Vec.Y <= s.config.Engine.Simulation.GroundTolerance {
-		s.logger.Debug("Ground collision detected", "posY", state.Position.Vec.Y, "velY", state.Velocity.Vec.Y)
-		state.Position.Vec.Y = 0 // Clamp to ground
-		if state.Velocity.Vec.Y < 0 {
-			state.Velocity.Vec.Y = 0 // Stop downward motion
-		}
-		// Also zero out acceleration? Prevents 'bouncing' calculation on next step if net force is still downwards
-		if state.Acceleration.Vec.Y < 0 {
-			state.Acceleration.Vec.Y = 0
-		}
-		s.logger.Debug("State after ground collision adjustment", "pos", state.Position.Vec, "vel", state.Velocity.Vec, "acc", state.Acceleration.Vec)
+	// --- Ground Collision Detection and Response on s.rocket ---
+	if s.rocket.Position.Vec.Y < s.config.Engine.Simulation.GroundTolerance && s.rocket.Velocity.Vec.Y < 0 {
+		s.logger.Debug("Ground impact: clamping Y position and velocity on s.rocket",
+			"y_pos_before_clamp", s.rocket.Position.Vec.Y,
+			"y_vel_before_clamp", s.rocket.Velocity.Vec.Y,
+			"ground_tolerance", s.config.Engine.Simulation.GroundTolerance)
+
+		s.rocket.Position.Vec.Y = s.config.Engine.Simulation.GroundTolerance
+		s.rocket.Velocity.Vec.Y = 0
+		// Optionally, zero out other velocities/rotations if it's a full stop on ground
+		// s.rocket.Velocity.Vec.X = 0
+		// s.rocket.Velocity.Vec.Z = 0
+		// s.rocket.AngularVelocity.Vec = types.Vector3{X: 0, Y: 0, Z: 0}
 	}
+
+	// Absolute clamp to ensure altitude is not negative for s.rocket
+	if s.rocket.Position.Vec.Y < 0 {
+		s.logger.Debug("s.rocket altitude clamped to 0 to prevent negative values", "original_y_pos", s.rocket.Position.Vec.Y)
+		s.rocket.Position.Vec.Y = 0
+	}
+
+	// Populate the 'state' object that will be recorded and passed to plugins/channels.
+	// This 'state' object was passed into updateSystems.
+	// *state.AngularAcceleration was already set using netAngularAccelerationWorld.
+	state.Time = s.currentTime                 // Assuming PhysicsState has a 'Time' field
+	state.Position = s.rocket.Position         // Reflects clamped position
+	state.Velocity = s.rocket.Velocity         // Reflects clamped velocity
+	state.Acceleration = s.rocket.Acceleration // This is k1ADeriv (accel at start of step)
+	state.Mass = s.rocket.Mass                 // Assign pointer directly, assuming state.Mass is *types.Mass
+	state.Orientation = s.rocket.Orientation
+	state.AngularVelocity = s.rocket.AngularVelocity // s.rocket.AngularVelocity is types.Vector3, state.AngularVelocity should match
+	// state.AngularAcceleration is already populated.
 
 	s.logger.Debug("Running AfterSimStep plugins")
 	if err := runPlugins(s.pluginManager.GetPlugins(), func(p pluginapi.SimulationPlugin) error {
-		return p.AfterSimStep(state)
+		return p.AfterSimStep(state) // Pass the fully updated and clamped state
 	}); err != nil {
-		return fmt.Errorf("plugin %s AfterSimStep error: %w", "unknown", err)
+		pluginName := "unknown" // Placeholder
+		// Consider adding a way to get the actual plugin name if an error occurs
+		s.logger.Error("Plugin AfterSimStep error", "plugin", pluginName, "error", err)
+		return fmt.Errorf("plugin %s AfterSimStep error: %w", pluginName, err)
 	}
-
-	s.logger.Debug("Updating rocket state from physics state")
-	s.rocket.Position.Vec = finalPos            // Update s.rocket directly
-	s.rocket.Velocity.Vec = finalVel            // Update s.rocket directly
-	s.rocket.Acceleration.Vec = k1ADeriv        // Store the initial net acceleration for this step
-	// s.rocket.Mass.Value is updated by motor system if fuel is consumed.
-	// s.rocket.Orientation.Quat and s.rocket.AngularVelocity would be updated by angular RK4 if enabled.
 
 	s.logger.Debug("Sending state to channel")
 	select {
@@ -543,4 +590,4 @@ func (s *Simulation) updateSystems() error {
 
 	s.logger.Debug("updateSystems finished")
 	return nil
-}
+} // Closing brace for updateSystems

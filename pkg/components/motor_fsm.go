@@ -9,9 +9,9 @@ import (
 
 // MotorState represents the states of the motor
 const (
-	StateIdle    = "idle"
-	StateBurning = "burning"
-	StateIgnited = "IGNITED"
+	StateIdle     = "idle"
+	StateBurning  = "burning"
+	StateIgnited  = "IGNITED"
 	StateCoasting = "coast"
 )
 
@@ -77,7 +77,7 @@ func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime flo
 	if elapsedTime < burnTime && mass > 0 {
 		if currentState == StateIdle || currentState == StateIgnited {
 			return fsm.handleBurningTransition(ctx, currentState)
-		} 
+		}
 		return nil
 	}
 

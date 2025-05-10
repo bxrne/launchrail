@@ -50,7 +50,7 @@ type Fillet struct {
 
 // String returns a string representation of the Fillet.
 func (f *Fillet) String() string {
-	return fmt.Sprintf("Fillet{Name='%s', ID='%s', Length=%.3f, Radius=%.3f, Material='%s'}", 
+	return fmt.Sprintf("Fillet{Name='%s', ID='%s', Length=%.3f, Radius=%.3f, Material='%s'}",
 		f.Name, f.ID, f.Length, f.Radius, f.Material.Name)
 }
 

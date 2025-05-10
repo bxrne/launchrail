@@ -9,14 +9,15 @@ import (
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/bxrne/launchrail/pkg/types"
 	"github.com/zerodha/logf"
-
 )
 
 type Motor struct {
-	ID ecs.BasicEntity
-	Position types.Vector3
+	ID          ecs.BasicEntity
+	Position    types.Vector3
 	Thrustcurve [][]float64
 	Mass        float64 // Current total mass (casing + current propellant)
+	Length      float64 // Length of the motor casing
+	Diameter    float64 // Diameter of the motor casing
 	thrust      float64
 	Props       *thrustcurves.MotorData
 	FSM         *MotorFSM
@@ -66,6 +67,8 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 		Position:    types.Vector3{},
 		Thrustcurve: thrustcurve,
 		Mass:        md.TotalMass, // Initial total mass
+		Length:      0,            // Initialize length to 0, will be set from ORK data
+		Diameter:    0,            // Initialize diameter to 0, will be set from ORK data
 		Props:       md,
 		thrust:      0, // Initialize thrust to 0, will be set by FSM/Update
 		burnTime:    burnTime,
@@ -251,21 +254,49 @@ func (m *Motor) GetPosition() types.Vector3 {
 }
 
 func (m *Motor) GetCenterOfMassLocal() types.Vector3 {
-	m.logger.Warn("Motor.GetCenterOfMassLocal() returning placeholder (zero vector). Accurate CG calculation needed based on geometry and propellant burn.")
-	// TODO: Implement accurate local CG calculation for the motor.
-	// This requires motor dimensions (length) and understanding how propellant burns (e.g., from one end or radially).
-	// For a solid motor burning from one end, CG shifts over time.
-	// As a simplification, could assume CG of (casing + remaining propellant) is at geometric center of remaining propellant for now.
-	return types.Vector3{X: 0, Y: 0, Z: 0} 
+	// Assuming motor is aligned with local Z-axis, base at Z=0, tip at Z=m.Length.
+	// Simplified: CG is at the geometric center of the motor casing.
+	// More accurate model would account for propellant burn-off and shift in CG.
+	if m.Length == 0 {
+		m.logger.Warn("Motor.GetCenterOfMassLocal() called with zero length. Returning zero vector.")
+		return types.Vector3{X: 0, Y: 0, Z: 0}
+	}
+	return types.Vector3{X: 0, Y: 0, Z: m.Length / 2.0}
 }
 
 func (m *Motor) GetInertiaTensorLocal() types.Matrix3x3 {
-	m.logger.Warn("Motor.GetInertiaTensorLocal() returning placeholder (zero matrix). Accurate inertia tensor calculation needed.")
-	// TODO: Implement accurate inertia tensor calculation for the motor.
-	// This requires motor dimensions (length, radius) and mass distribution (casing, propellant).
-	// For a solid cylinder: Ixx = 0.5*m*r^2; Iyy = Izz = (1/12)*m*(3*r^2 + L^2).
-	// This also changes as propellant burns.
-	return types.Matrix3x3{}
+	// Approximating the motor as a solid cylinder of total current mass `m.Mass`,
+	// length `m.Length`, and radius `R = m.Diameter / 2`.
+	// The inertia tensor is calculated about its CG (assumed at m.Length/2 along Z-axis),
+	// with Z-axis aligned with the motor's length.
+
+	if m.Mass <= 1e-9 { // Effectively zero mass
+		m.logger.Warn("Motor.GetInertiaTensorLocal() called with near-zero mass. Returning zero matrix.")
+		return types.Matrix3x3{}
+	}
+	if m.Length == 0 || m.Diameter == 0 {
+		m.logger.Warn("Motor.GetInertiaTensorLocal() called with zero length or diameter. Returning zero matrix.")
+		return types.Matrix3x3{}
+	}
+
+	mass := m.GetMass() // Use GetMass() to ensure thread-safety if underlying mass changes
+	length := m.Length
+	radius := m.Diameter / 2.0
+
+	// Formulas for a solid cylinder about its CG:
+	// Ixx = Iyy = (1/12) * mass * (3*radius^2 + length^2)
+	// Izz = (1/2) * mass * radius^2
+	// Assuming Z is the longitudinal axis of the motor.
+
+	ixx := (1.0 / 12.0) * mass * (3*radius*radius + length*length)
+	iyy := ixx // Symmetric for a cylinder about X and Y axes perpendicular to Z
+	izz := (1.0 / 2.0) * mass * radius * radius
+
+	return types.Matrix3x3{
+		M11: ixx, M12: 0, M13: 0,
+		M21: 0, M22: iyy, M23: 0,
+		M31: 0, M32: 0, M33: izz,
+	}
 }
 
 func validateThrustCurve(curve [][]float64) [][]float64 {

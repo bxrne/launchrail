@@ -35,10 +35,10 @@ func TestSchemaTrapezoidFinsetString(t *testing.T) {
 			Density: 0.0,
 			Name:    "",
 		},
-		RootChord:    0.0,
-		TipChord:     0.0,
-		SweepLength:  0.0,
-		Height:       0.0,
+		RootChord:   0.0,
+		TipChord:    0.0,
+		SweepLength: 0.0,
+		Height:      0.0,
 	}
 
 	expected := "TrapezoidFinset{Name=name, ID=id, InstanceCount=0, FinCount=0, RadiusOffset=RadiusOffset{Method=, Value=0.00}, AngleOffset=AngleOffset{Method=, Value=0.00}, Rotation=0.00, AxialOffset=AxialOffset{Method=, Value=0.00}, Position=Position{Value=0.00, Type=}, Finish=finish, Material=Material{Type=, Density=0.00, Name=}, Thickness=0.00, CrossSection=cross, Cant=0.00, TabHeight=0.00, TabLength=0.00, TabPositions=(TabPosition{RelativeTo=RootChord, Value=0.01}, TabPosition{RelativeTo=TipChord, Value=0.02}), FilletRadius=0.00, FilletMaterial=FilletMaterial{Type=, Density=0.00, Name=}, RootChord=0.00, TipChord=0.00, SweepLength=0.00, Height=0.00, Subcomponents={Fillets=()}}"

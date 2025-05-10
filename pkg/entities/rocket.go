@@ -43,6 +43,30 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 	}
 	createdComponents["motor"] = motor // Add validated motor
 
+	// Populate motor dimensions from OpenRocket data
+	// Ensure path is valid for the specific ORK file structure
+	if len(orkData.Subcomponents.Stages) > 0 {
+		// Path to the motor definition within the OpenRocket structure.
+		// Assumes the first stage and a specific component layout typical in basic ORK files.
+		orkDefinitionMotor := orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.InnerTube.MotorMount.Motor
+
+		// Check if a motor is actually defined at this path by looking at its designation.
+		if orkDefinitionMotor.Designation != "" {
+			// Assuming 'motor' (the one passed in and in createdComponents) is the one we want to update
+			if m, ok := createdComponents["motor"].(*components.Motor); ok {
+				m.Length = orkDefinitionMotor.Length
+				m.Diameter = orkDefinitionMotor.Diameter
+				log.Info("Updated motor dimensions from ORK data", "name", motorName, "length", m.Length, "diameter", m.Diameter)
+			} else {
+				log.Warn("Motor component in createdComponents is not of type *components.Motor, cannot update dimensions")
+			}
+		} else {
+			log.Warn("Motor definition in OpenRocket data seems incomplete (empty designation); dimensions not updated.")
+		}
+	} else {
+		log.Warn("No stages found in OpenRocket data; cannot update motor dimensions.")
+	}
+
 	// Bodytube
 	bodytube, err := components.NewBodytubeFromORK(ecs.NewBasic(), orkData)
 	if err != nil {
@@ -55,10 +79,10 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 	// Create Finset component if present in BodyTube subcomponents
 	var finset *components.TrapezoidFinset // Correct type
 	// Access stages via Subcomponents and check FinCount > 0
-	if len(orkData.Subcomponents.Stages) > 0 && 
+	if len(orkData.Subcomponents.Stages) > 0 &&
 		len(orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets) > 0 &&
 		orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0].FinCount > 0 {
-		
+
 		orkSpecificFinset := orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0]
 		// Assuming position from ORK is the X-offset for the finset attachment point (e.g., LE of root chord)
 		// Y and Z are assumed to be 0 in this local frame of attachment for now.
@@ -116,21 +140,21 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 		// Global position of component's CG = component.Position (its ref point) + component.GetCenterOfMassLocal()
 		for _, compGeneric := range createdComponents {
 			var mass_c float64
-			var pos_c_ref_global types.Vector3   // Component's reference point in rocket global coordinates
-			var pos_c_cm_local types.Vector3     // Component's CM relative to its reference point
+			var pos_c_ref_global types.Vector3 // Component's reference point in rocket global coordinates
+			var pos_c_cm_local types.Vector3   // Component's CM relative to its reference point
 
 			switch comp := compGeneric.(type) {
 			case *components.Motor:
 				mass_c = comp.GetMass()
-				pos_c_ref_global = comp.GetPosition() // Needs GetPosition() method
+				pos_c_ref_global = comp.GetPosition()        // Needs GetPosition() method
 				pos_c_cm_local = comp.GetCenterOfMassLocal() // Needs GetCenterOfMassLocal()
 			case *components.Bodytube:
 				mass_c = comp.GetMass()
-				pos_c_ref_global = comp.Position // Directly access if public, or add GetPosition()
+				pos_c_ref_global = comp.Position        // Directly access if public, or add GetPosition()
 				pos_c_cm_local = comp.GetCenterOfMass() // Existing method
 			case *components.Nosecone:
 				mass_c = comp.GetMass()
-				pos_c_ref_global = comp.GetPosition() // Needs GetPosition()
+				pos_c_ref_global = comp.GetPosition()        // Needs GetPosition()
 				pos_c_cm_local = comp.GetCenterOfMassLocal() // Needs GetCenterOfMassLocal()
 			case *components.TrapezoidFinset:
 				mass_c = comp.GetMass()
@@ -146,7 +170,7 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 			}
 
 			if mass_c > 1e-9 {
-				pos_c_cm_global := pos_c_ref_global.Add(pos_c_cm_local) // Vector3.Add() needed
+				pos_c_cm_global := pos_c_ref_global.Add(pos_c_cm_local)                               // Vector3.Add() needed
 				sumWeightedPosition = sumWeightedPosition.Add(pos_c_cm_global.MultiplyScalar(mass_c)) // Vector3.MultiplyScalar() needed
 			}
 		}
@@ -180,7 +204,7 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 				mass_c = comp.GetMass()
 				pos_c_ref_global = comp.Position
 				pos_c_cm_local = comp.GetCenterOfMassLocal() // Needs local CM
-				I_c_local_cm = comp.GetInertiaTensorLocal()      // Changed to GetInertiaTensorLocal for consistency
+				I_c_local_cm = comp.GetInertiaTensorLocal()  // Changed to GetInertiaTensorLocal for consistency
 			default:
 				continue
 			}
@@ -205,7 +229,7 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 				}
 				term2 := dOuterProduct.MultiplyScalar(mass_c)
 
-				parallelAxisCorrection := term1.Subtract(term2) // Matrix3x3.Subtract() needed
+				parallelAxisCorrection := term1.Subtract(term2)         // Matrix3x3.Subtract() needed
 				I_c_shifted := I_c_local_cm.Add(parallelAxisCorrection) // Matrix3x3.Add() needed
 
 				totalInertiaTensorBody = totalInertiaTensorBody.Add(I_c_shifted)
@@ -216,14 +240,13 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 		if inversePtr != nil {
 			inverseTotalInertiaTensorBody = *inversePtr
 		} else {
-			log.Error("Calculated total rocket body inertia tensor is singular!")
-			// Keep inverseTotalInertiaTensorBody as zero matrix if singular
+			log.Error("Calculated total rocket body inertia tensor is singular! Using identity matrix as fallback for its inverse.")
+			inverseTotalInertiaTensorBody = types.IdentityMatrix3x3() // Fallback to identity matrix
 		}
 	} else {
 		log.Warn("Rocket initial mass is zero, skipping CG and inertia tensor calculation.")
 		// totalInertiaTensorBody and inverseTotalInertiaTensorBody remain zero matrices
 	}
-
 
 	// --- 3. Create Rocket Entity ---
 	basic := ecs.NewBasic()

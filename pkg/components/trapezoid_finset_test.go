@@ -74,13 +74,13 @@ func TestNewTrapezoidFinsetFromORK(t *testing.T) {
 							Subcomponents: openrocket.BodyTubeSubcomponents{
 								TrapezoidFinsets: []openrocket.TrapezoidFinset{
 									{
-										Name:     "TestFinset",
-										FinCount: 4,
-										RootChord: 0.1,
-										TipChord:  0.05,
-										Height:    0.07,
+										Name:        "TestFinset",
+										FinCount:    4,
+										RootChord:   0.1,
+										TipChord:    0.05,
+										Height:      0.07,
 										SweepLength: 0.02, // Assuming this is sweep distance
-										Thickness: 0.003,
+										Thickness:   0.003,
 										Material: openrocket.Material{
 											Type:    "bulk",
 											Density: 1250,
@@ -102,7 +102,7 @@ func TestNewTrapezoidFinsetFromORK(t *testing.T) {
 	assert.True(t, len(ork.Subcomponents.Stages) > 0, "No stages in ORK data")
 	assert.True(t, len(ork.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets) > 0, "No trapezoid finsets in ORK data")
 	orkSpecificFinset := ork.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0]
-	
+
 	finsetPosition := types.Vector3{X: orkSpecificFinset.Position.Value, Y: 0, Z: 0}
 	finsetMaterial := orkSpecificFinset.Material
 

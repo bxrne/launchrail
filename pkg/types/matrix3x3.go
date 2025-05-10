@@ -107,8 +107,8 @@ func (m Matrix3x3) MultiplyScalar(s float64) Matrix3x3 {
 // Determinant calculates the determinant of the matrix.
 func (m Matrix3x3) Determinant() float64 {
 	return m.M11*(m.M22*m.M33-m.M23*m.M32) -
-		   m.M12*(m.M21*m.M33-m.M23*m.M31) +
-		   m.M13*(m.M21*m.M32-m.M22*m.M31)
+		m.M12*(m.M21*m.M33-m.M23*m.M31) +
+		m.M13*(m.M21*m.M32-m.M22*m.M31)
 }
 
 // Inverse calculates the inverse of the matrix.

@@ -14,20 +14,20 @@ import (
 
 // Bodytube represents the bodytube entity of a rocket
 type Bodytube struct {
-	ID           ecs.BasicEntity
-	Position     types.Vector3
-	Radius       float64
-	Length       float64
-	Mass         float64
-	Thickness    float64
-	Density      float64 // Material density
-	Finish       string  // Surface finish
-	MaterialName string  // Name of material
-	MaterialType string  // Type of material
-	CrossSection float64 // Cross-sectional area
-	SurfaceArea  float64 // Total surface area
-	Volume       float64 // Volume of material
-	CenterOfMass types.Vector3
+	ID            ecs.BasicEntity
+	Position      types.Vector3
+	Radius        float64
+	Length        float64
+	Mass          float64
+	Thickness     float64
+	Density       float64 // Material density
+	Finish        string  // Surface finish
+	MaterialName  string  // Name of material
+	MaterialType  string  // Type of material
+	CrossSection  float64 // Cross-sectional area
+	SurfaceArea   float64 // Total surface area
+	Volume        float64 // Volume of material
+	CenterOfMass  types.Vector3
 	InertiaTensor types.Matrix3x3
 }
 
@@ -166,7 +166,7 @@ func (bt *Bodytube) calculateAndSetProperties() {
 
 	// Calculate Surface Area and Cross Section (simplified)
 	bt.SurfaceArea = 2 * math.Pi * bt.Radius * bt.Length // Outer surface area
-	bt.CrossSection = math.Pi * bt.Radius * bt.Radius   // Outer cross-sectional area
+	bt.CrossSection = math.Pi * bt.Radius * bt.Radius    // Outer cross-sectional area
 
 	// Calculate Center of Mass
 	// For a uniform cylinder, the CM is at its geometric center.

@@ -91,12 +91,12 @@ func (b *BodyTube) String() string {
 
 // BodyTubeSubcomponents represents the nested subcomponents element of the XML document
 type BodyTubeSubcomponents struct {
-	XMLName         xml.Name        `xml:"subcomponents"`
-	InnerTube       InnerTube       `xml:"innertube"`
+	XMLName          xml.Name          `xml:"subcomponents"`
+	InnerTube        InnerTube         `xml:"innertube"`
 	TrapezoidFinsets []TrapezoidFinset `xml:"trapezoidfinset"` // Changed to slice
-	Parachute       Parachute       `xml:"parachute"`
-	CenteringRings  []CenteringRing `xml:"centeringring"`
-	Shockcord       Shockcord       `xml:"shockcord"`
+	Parachute        Parachute         `xml:"parachute"`
+	CenteringRings   []CenteringRing   `xml:"centeringring"`
+	Shockcord        Shockcord         `xml:"shockcord"`
 }
 
 // String returns full string representation of the BodyTubeSubcomponents
