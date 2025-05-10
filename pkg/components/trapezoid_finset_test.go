@@ -65,7 +65,6 @@ func TestGetTrapezoidPlanformArea(t *testing.T) {
 
 func TestNewTrapezoidFinsetFromORK(t *testing.T) {
 	// Arrange
-	basic := ecs.NewBasic()
 	ork := &openrocket.RocketDocument{
 		Subcomponents: openrocket.Subcomponents{
 			Stages: []openrocket.RocketStage{
@@ -99,16 +98,33 @@ func TestNewTrapezoidFinsetFromORK(t *testing.T) {
 		},
 	}
 
+	// Extract the specific OpenRocket finset data needed for the constructor
+	assert.True(t, len(ork.Subcomponents.Stages) > 0, "No stages in ORK data")
+	assert.True(t, len(ork.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets) > 0, "No trapezoid finsets in ORK data")
+	orkSpecificFinset := ork.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0]
+	
+	finsetPosition := types.Vector3{X: orkSpecificFinset.Position.Value, Y: 0, Z: 0}
+	finsetMaterial := orkSpecificFinset.Material
+
 	// Act
-	finset := components.NewTrapezoidFinsetFromORK(basic, ork)
+	finset, err := components.NewTrapezoidFinsetFromORK(&orkSpecificFinset, finsetPosition, finsetMaterial)
 
 	// Assert
+	assert.NoError(t, err) // Check for errors during creation
 	assert.NotNil(t, finset)
 	assert.Equal(t, 0.1, finset.RootChord)
 	assert.Equal(t, 0.05, finset.TipChord)
 	assert.Equal(t, 0.07, finset.Span)
 	assert.Equal(t, 0.02, finset.SweepDistance)
 	assert.Equal(t, types.Vector3{X: 1.0, Y: 0, Z: 0}, finset.Position) // Assert component's attachment position
+
+	// Assert Mass
+	// Expected PlanformArea = (0.1 + 0.05) * 0.07 / 2 = 0.00525
+	// Expected SingleFinVolume = 0.00525 * 0.003 = 0.00001575
+	// Expected SingleFinMass = 0.00001575 * 1250 = 0.0196875
+	// Expected TotalMass = 0.0196875 * 4 = 0.07875
+	expectedMass := 0.07875
+	assert.InDelta(t, expectedMass, finset.GetMass(), 1e-6, "Calculated mass does not match expected")
 
 	// Calculate expected CenterOfMass.X
 	// xCgLocalNum := (SweepDistance * (RootChord + 2*TipChord)) + (RootChord^2 + RootChord*TipChord + TipChord^2)

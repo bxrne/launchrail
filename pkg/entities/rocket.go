@@ -58,13 +58,20 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor
 	if len(orkData.Subcomponents.Stages) > 0 && 
 		len(orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets) > 0 &&
 		orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0].FinCount > 0 {
-		// Pass the whole document to the constructor, not just the finset part
-		createdFinset := components.NewTrapezoidFinsetFromORK(ecs.NewBasic(), orkData) // Correct constructor call
+		
+		orkSpecificFinset := orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0]
+		// Assuming position from ORK is the X-offset for the finset attachment point (e.g., LE of root chord)
+		// Y and Z are assumed to be 0 in this local frame of attachment for now.
+		finsetPosition := types.Vector3{X: orkSpecificFinset.Position.Value, Y: 0, Z: 0}
+		finsetMaterial := orkSpecificFinset.Material
+
+		createdFinset, err := components.NewTrapezoidFinsetFromORK(&orkSpecificFinset, finsetPosition, finsetMaterial)
 
 		// Check if creation was successful (constructor might return nil on error)
-		if createdFinset == nil {
-			log.Error("Failed to create Finset component from ORK data", "finset_name", orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0].Name)
-			// Decide if this is critical - maybe return nil or continue?
+		if err != nil {
+			log.Error("Failed to create Finset component from ORK data", "finset_name", orkSpecificFinset.Name, "error", err)
+		} else if createdFinset == nil {
+			log.Error("Failed to create Finset component from ORK data (nil returned without error)", "finset_name", orkSpecificFinset.Name)
 		} else {
 			finset = createdFinset
 			createdComponents["finset"] = finset
