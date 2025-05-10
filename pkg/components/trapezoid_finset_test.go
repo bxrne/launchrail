@@ -87,6 +87,8 @@ func TestNewTrapezoidFinsetFromORK(t *testing.T) {
 											Density: 1250,
 											Name:    "PLA",
 										},
+										// Mock the Position field correctly
+										Position: openrocket.Position{Value: 1.0},
 									},
 								},
 							},
@@ -104,7 +106,25 @@ func TestNewTrapezoidFinsetFromORK(t *testing.T) {
 	assert.NotNil(t, finset)
 	assert.Equal(t, 0.1, finset.RootChord)
 	assert.Equal(t, 0.05, finset.TipChord)
-	assert.Equal(t, 0.15, finset.Span)
-	assert.Equal(t, 0.05, finset.SweepAngle)
-	assert.Equal(t, types.Vector3{X: 1.0, Y: 0, Z: 0}, finset.Position.Vec)
+	assert.Equal(t, 0.07, finset.Span)
+	assert.Equal(t, 0.02, finset.SweepDistance)
+	assert.Equal(t, types.Vector3{X: 1.0, Y: 0, Z: 0}, finset.Position) // Assert component's attachment position
+
+	// Calculate expected CenterOfMass.X
+	// xCgLocalNum := (SweepDistance * (RootChord + 2*TipChord)) + (RootChord^2 + RootChord*TipChord + TipChord^2)
+	// xCgLocalDen := 3 * (RootChord + TipChord)
+	// xCgLocal := xCgLocalNum / xCgLocalDen
+	// Expected x_cg_local = (0.02 * (0.1 + 2*0.05) + (0.1*0.1 + 0.1*0.05 + 0.05*0.05)) / (3 * (0.1 + 0.05))
+	// Expected x_cg_local = (0.02 * 0.2 + (0.01 + 0.005 + 0.0025)) / (3 * 0.15)
+	// Expected x_cg_local = (0.004 + 0.0175) / 0.45
+	// Expected x_cg_local = 0.0215 / 0.45 = 0.04777777777
+	expectedXcgLocal := 0.0215 / 0.45
+	expectedCM := types.Vector3{
+		X: finset.Position.X + expectedXcgLocal,
+		Y: 0,
+		Z: 0,
+	}
+	assert.InDelta(t, expectedCM.X, finset.CenterOfMass.X, 1e-6, "CenterOfMass.X does not match expected")
+	assert.InDelta(t, expectedCM.Y, finset.CenterOfMass.Y, 1e-6, "CenterOfMass.Y does not match expected")
+	assert.InDelta(t, expectedCM.Z, finset.CenterOfMass.Z, 1e-6, "CenterOfMass.Z does not match expected")
 }
