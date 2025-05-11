@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -14,8 +15,8 @@ import (
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
 	logger "github.com/bxrne/launchrail/internal/logger"
-	"github.com/bxrne/launchrail/internal/plugin"
 	"github.com/bxrne/launchrail/internal/plot_transformer"
+	"github.com/bxrne/launchrail/internal/plugin"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/templates/pages"
@@ -32,13 +33,31 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager, log *logf.
 	// Create simulation manager using the old logger
 	simManager := simulation.NewManager(cfg, *oldLog)
 
-	// Create a record for this simulation run *before* initializing the manager
-	record, err := recordManager.CreateRecord()
+	// Serialize configuration for deterministic hashing using JSON marshaling
+	configJSON, err := json.Marshal(cfg)
+	if err != nil {
+		oldLog.Error("Failed to serialize config for record hashing", "Error", err)
+		return fmt.Errorf("failed to serialize config for deterministic hashing: %w", err)
+	}
+	
+	// Read OpenRocket data as bytes
+	orkData := []byte{}
+	if cfg.Engine.Options.OpenRocketFile != "" {
+		orkData, err = os.ReadFile(cfg.Engine.Options.OpenRocketFile)
+		if err != nil {
+			oldLog.Error("Failed to read OpenRocket file for hashing", "path", cfg.Engine.Options.OpenRocketFile, "Error", err)
+			// Continue with empty data rather than failing
+			orkData = []byte{}
+		}
+	}
+	
+	// Create a record with deterministic hash based on config and OpenRocket data
+	record, err := recordManager.CreateRecordWithConfig(configJSON, orkData)
 	if err != nil {
 		oldLog.Error("Failed to create simulation record", "Error", err)
 		return fmt.Errorf("failed to create simulation record: %w", err)
 	}
-	oldLog.Info("Simulation record created", "path", record.Path)
+	oldLog.Info("Simulation record created with deterministic hash", "path", record.Path)
 
 	// Create the Stores object from the record's initialized stores
 	stores := &storage.Stores{
@@ -334,6 +353,12 @@ func main() {
 			specStr := strings.ReplaceAll(string(spec), "${VERSION}", cfg.Setup.App.Version)
 			c.Data(http.StatusOK, "application/yaml", []byte(specStr))
 		})
+	}
+
+	// Serve static files
+	static := r.Group("/static")
+	{
+		static.Static("/", "./static")
 	}
 
 	// API endpoints group with version from config

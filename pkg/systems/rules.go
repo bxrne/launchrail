@@ -106,7 +106,8 @@ func (s *RulesSystem) ProcessRules(entity *states.PhysicsState) types.Event {
 }
 
 func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
-	const velocityWindow = 0.5 // m/s window to detect velocity near zero
+	// Increased velocity window to be more lenient in detecting apogee
+	const velocityWindow = 1.0 // m/s window to detect velocity near zero or negative
 
 	// Ensure entity and its relevant fields are not nil before accessing them
 	if entity == nil || entity.Entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Motor == nil || entity.Parachute == nil {
@@ -117,20 +118,6 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 	// Log initial state when function is called
 	s.logger.Info("DetectApogee attempt", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "velocityY", entity.Velocity.Vec.Y, "motorState", string(entity.Motor.FSM.Current()), "parachuteDeployed", entity.Parachute.Deployed)
 
-	// Must be near zero vertical velocity
-	if math.Abs(entity.Velocity.Vec.Y) > velocityWindow {
-		s.logger.Info("DetectApogee REJECT: vertical velocity outside window", "velocityY", entity.Velocity.Vec.Y, "targetWindow", velocityWindow)
-		return false
-	}
-	s.logger.Debug("DetectApogee PASS: vertical velocity WITHIN window", "velocityY", entity.Velocity.Vec.Y)
-
-	// Motor must be idle
-	if entity.Motor.FSM.Current() != components.StateIdle {
-		s.logger.Info("DetectApogee REJECT: motor not idle", "motorState", string(entity.Motor.FSM.Current()))
-		return false
-	}
-	s.logger.Debug("DetectApogee PASS: motor is IDLE")
-
 	// Check parachute status - ensure it's not already deployed
 	if entity.Parachute.Deployed {
 		s.logger.Info("DetectApogee REJECT: parachute already deployed", "parachuteDeployed", entity.Parachute.Deployed)
@@ -138,8 +125,7 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 	}
 	s.logger.Debug("DetectApogee PASS: parachute OK (not deployed)")
 
-	// Must be above a minimum safe deployment altitude (e.g., > 10m, could be configurable)
-	// For now, just check if above ground to match previous logic, but consider a minimum deployment altitude.
+	// Must be above a minimum safe deployment altitude
 	minDeploymentAltitude := 10.0 // Example minimum altitude
 	if entity.Position.Vec.Y <= minDeploymentAltitude { 
 		s.logger.Info("DetectApogee REJECT: not sufficiently above ground for deployment", "altitude", entity.Position.Vec.Y, "minAltitude", minDeploymentAltitude)
@@ -147,9 +133,24 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 	}
 	s.logger.Debug("DetectApogee PASS: IS ABOVE MINIMUM DEPLOYMENT ALTITUDE")
 
-	// Deploy parachute if conditions met
-	s.logger.Info("APOGEE DETECTED: Deploying parachute!", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y)
-	entity.Parachute.Deploy() // We should also check what Deploy() does
+	// Vertical velocity check - at apogee velocity is near zero or becoming negative
+	// Detect apogee in two ways:
+	// 1. When velocity is close to zero (standard apogee)
+	// 2. OR when velocity has become negative (we might have missed the exact zero-crossing)
+	if math.Abs(entity.Velocity.Vec.Y) <= velocityWindow || entity.Velocity.Vec.Y < 0 {
+		// Motor should be done burning, but accept any non-burning state
+		// This makes apogee detection more robust by allowing StateCoast or other states
+		if entity.Motor.FSM.Current() == components.StateBurning {
+			s.logger.Info("DetectApogee REJECT: motor still burning", "motorState", string(entity.Motor.FSM.Current()))
+			return false
+		}
+		
+		// Deploy parachute if conditions met
+		s.logger.Info("APOGEE DETECTED: Deploying parachute!", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "velocityY", entity.Velocity.Vec.Y)
+		entity.Parachute.Deploy()
+		return true
+	}
 
-	return true
+	s.logger.Info("DetectApogee REJECT: vertical velocity outside window and not negative", "velocityY", entity.Velocity.Vec.Y, "targetWindow", velocityWindow)
+	return false
 }

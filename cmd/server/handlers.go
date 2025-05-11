@@ -22,6 +22,11 @@ import (
 	"github.com/zerodha/logf"
 )
 
+var (
+	// TODO: Populate from viper config
+	simulationDirName string = ".launchrail/simulations"
+)
+
 // HandlerRecordManager defines the subset of storage.RecordManager methods used by DataHandler.
 type HandlerRecordManager interface {
 	ListRecords() ([]*storage.Record, error)
@@ -89,6 +94,7 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 	params.Page = page
 
 	records, err := h.records.ListRecords()
+
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		h.renderTempl(c, pages.ErrorPage("Failed to list records"), http.StatusInternalServerError) // Pass status
@@ -637,6 +643,22 @@ func sortRecords(records []*storage.Record, ascending bool) {
 // @Router /api/v1/data [get]
 func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 	records, err := h.records.ListRecords()
+
+	// Filter out system directories in .launchrail
+	if records != nil {
+		filteredRecords := make([]*storage.Record, 0, len(records))
+		for _, record := range records {
+			// Skip records from logs, reports, and benchmarks directories
+			if strings.Contains(record.Path, ".launchrail/logs") ||
+				strings.Contains(record.Path, ".launchrail/reports") ||
+				strings.Contains(record.Path, ".launchrail/benchmarks") {
+				continue
+			}
+			filteredRecords = append(filteredRecords, record)
+		}
+		records = filteredRecords
+	}
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

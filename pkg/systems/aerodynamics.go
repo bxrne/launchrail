@@ -139,13 +139,9 @@ func (a *AerodynamicSystem) getTemperature(altitude float64) float64 {
 }
 
 // CalculateDrag now handles atmospheric effects and Mach number
-func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vector3 {
+func (a *AerodynamicSystem) CalculateDrag(entity *states.PhysicsState) types.Vector3 {
 	// Validate inputs
-	if a == nil || a.isa == nil || entity.Position == nil || entity.Velocity == nil || entity.Nosecone == nil || entity.Bodytube == nil {
-		return types.Vector3{}
-	}
-
-	if entity == (states.PhysicsState{}) {
+	if a == nil || a.isa == nil || entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Nosecone == nil || entity.Bodytube == nil {
 		return types.Vector3{}
 	}
 
@@ -164,6 +160,11 @@ func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vect
 		return types.Vector3{} // No force if velocity is invalid or too low
 	}
 
+	// Apply force in opposite direction of velocity (prepare unit vector for both rocket and parachute drag)
+	velVec := types.Vector3{X: entity.Velocity.Vec.X, Y: entity.Velocity.Vec.Y, Z: entity.Velocity.Vec.Z}
+	velUnitVec := velVec.Normalize()
+
+	// Calculate rocket body drag
 	// Prevent division by zero if sound speed is invalid
 	if atmData.soundSpeed <= 0 {
 		return types.Vector3{} // Cannot calculate Mach, return zero drag
@@ -185,12 +186,47 @@ func (a *AerodynamicSystem) CalculateDrag(entity states.PhysicsState) types.Vect
 		return types.Vector3{} // No force if magnitude calculation is invalid
 	}
 
-	// Apply force in opposite direction of velocity
-	velVec := types.Vector3{X: entity.Velocity.Vec.X, Y: entity.Velocity.Vec.Y, Z: entity.Velocity.Vec.Z}
-	velUnitVec := velVec.Normalize()
+	// Apply rocket body drag force
 	dragForce.X = -velUnitVec.X * forceMagnitude
 	dragForce.Y = -velUnitVec.Y * forceMagnitude
 	dragForce.Z = -velUnitVec.Z * forceMagnitude
+
+	// Add parachute drag if deployed
+	if entity.Parachute != nil && entity.Parachute.IsDeployed() {
+		// Calculate parachute drag force with significantly higher Cd
+		parachuteCd := 1.8 // Fixed higher drag coefficient for parachute
+		if entity.Parachute.DragCoefficient > 0 {
+			parachuteCd = entity.Parachute.DragCoefficient
+		}
+		
+		// Use the full parachute area, ensuring it's properly calculated
+		parachuteArea := entity.Parachute.Area
+		if parachuteArea <= 0 && entity.Parachute.Diameter > 0 {
+			// Recalculate area if it wasn't properly set
+			parachuteArea = 0.25 * math.Pi * entity.Parachute.Diameter * entity.Parachute.Diameter
+		}
+		
+		// Apply an additional factor to ensure parachute has enough effect
+		parachuteEffectFactor := 2.0
+		
+		// Calculate parachute force magnitude with amplified effect
+		parachuteForceMagnitude := parachuteCd * q * parachuteArea * parachuteEffectFactor
+		
+		if !math.IsNaN(parachuteForceMagnitude) && !math.IsInf(parachuteForceMagnitude, 0) {
+			// Log parachute drag details
+			a.log.Info("Applying parachute drag", 
+				"velocity", velocity,
+				"area", parachuteArea,
+				"cd", parachuteCd,
+				"factor", parachuteEffectFactor,
+				"force", parachuteForceMagnitude)
+				
+			// Add parachute force to total drag force
+			dragForce.X = -velUnitVec.X * parachuteForceMagnitude // Replace (=) instead of add (+=) to make parachute drag dominant
+			dragForce.Y = -velUnitVec.Y * parachuteForceMagnitude
+			dragForce.Z = -velUnitVec.Z * parachuteForceMagnitude
+		}
+	}
 
 	return *dragForce
 }
@@ -224,7 +260,7 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 					continue
 				}
 				a.log.Debug("Worker processing entity", "worker_id", workerID, "entity_id", entity.Entity.ID())
-				force := a.CalculateDrag(*entity)
+				force := a.CalculateDrag(entity)
 				moment := a.CalculateAerodynamicMoment(*entity)
 				a.log.Debug("Worker calculated force/moment", "worker_id", workerID, "entity_id", entity.Entity.ID(), "force", force, "moment", moment)
 				resultChan <- force
@@ -309,11 +345,14 @@ func (a *AerodynamicSystem) GetSpeedOfSound(altitude float64) float64 {
 }
 
 // calculateDragCoeff calculates the drag coefficient based on Mach number
-func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity states.PhysicsState) float64 {
+func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity *states.PhysicsState) float64 {
 	// More accurate drag coefficient calculation
-	baseCd := 0.2 // Subsonic base drag
+	baseCd := 0.5 // Increased subsonic base drag for better realism
 
-	_ = entity // Placeholder for future drag coefficient calculations using entity properties (e.g., AoA)
+	// Check if the parachute is deployed and apply much higher drag if it is
+	if entity != nil && entity.Parachute != nil && entity.Parachute.IsDeployed() {
+		return 1.5 // Much higher drag coefficient for deployed parachute
+	}
 
 	// Add wave drag in transonic region
 	// Prandtl-Glauert compressibility correction is applied for Mach < 1.0

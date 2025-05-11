@@ -31,6 +31,8 @@ const (
 	ParachuteTriggerNone ParachuteTrigger = "none"
 	// ParachuteTriggerApogee represents an apogee trigger
 	ParachuteTriggerApogee ParachuteTrigger = "apogee"
+	// ParachuteTriggerEjection represents an ejection charge trigger
+	ParachuteTriggerEjection ParachuteTrigger = "ejection"
 )
 
 // String returns a string representation of the Parachute struct
@@ -78,6 +80,12 @@ func NewParachuteFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument)
 		return nil, fmt.Errorf("invalid drag coefficient '%s': %w", orkParachuteDefinition.CD, err)
 	}
 
+	// Prioritize deployment configuration event over main deploy event
+	deployEvent := orkParachuteDefinition.DeployEvent
+	if orkParachuteDefinition.DeploymentConfig.DeployEvent != "" {
+		deployEvent = orkParachuteDefinition.DeploymentConfig.DeployEvent
+	}
+
 	return &Parachute{
 		ID:              id,
 		Position:        types.Vector3{X: 0, Y: 0, Z: 0}, 
@@ -85,7 +93,7 @@ func NewParachuteFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument)
 		DragCoefficient: drag,
 		Strands:         orkParachuteDefinition.LineCount,
 		Area:            0.25 * math.Pi * orkParachuteDefinition.Diameter * orkParachuteDefinition.Diameter, 
-		Trigger:         ParachuteTrigger(orkParachuteDefinition.DeployEvent),
+		Trigger:         ParachuteTrigger(deployEvent),
 	}, nil
 }
 

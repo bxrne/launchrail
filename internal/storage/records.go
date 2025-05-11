@@ -126,16 +126,56 @@ func NewRecordManager(baseDir string) (*RecordManager, error) {
 	}, nil
 }
 
-// CreateRecord creates a new record with a unique hash
+// CreateRecord creates a new record with a unique hash based on the current time
+// DEPRECATED: Use CreateRecordWithConfig for deterministic hashing based on simulation parameters
 func (rm *RecordManager) CreateRecord() (*Record, error) {
 	pc, file, line, _ := runtime.Caller(1)
 	log := logger.GetLogger("")
-	log.Info("CreateRecord called", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
+	log.Warn("DEPRECATED: CreateRecord called without config data. This may cause duplicate records.", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	// Use nanoseconds for higher collision resistance
-	hashInput := fmt.Sprintf("%d", time.Now().UnixNano())
+	
+	// Use a fixed prefix with the current day (without time) to make simulations run on the same day 
+	// have the same hash, avoiding duplicate result sets
+	currentDate := time.Now().Format("2006-01-02")
+	hashInput := fmt.Sprintf("simulation-%s", currentDate)
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(hashInput)))
+
+	// Use rm.baseDir as the root for record directories.
+	// rm.baseDir should already be an absolute path, created by NewRecordManager.
+	// MkdirAll is still good practice in case baseDir was removed externally or for subdirs.
+	err := os.MkdirAll(rm.baseDir, 0755) // Ensure baseDir itself exists
+	if err != nil {
+		return nil, fmt.Errorf("failed to ensure base directory exists %s: %w", rm.baseDir, err)
+	}
+
+	// Create hash-named directory inside rm.baseDir
+	recordDir := filepath.Join(rm.baseDir, hash)
+	if err := os.MkdirAll(recordDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create record directory %s: %w", recordDir, err)
+	}
+
+	// Create record with its storage services
+	return NewRecord(recordDir, hash)
+}
+
+// CreateRecordWithConfig creates a new record with a hash derived from configuration and OpenRocket data
+func (rm *RecordManager) CreateRecordWithConfig(configData []byte, orkData []byte) (*Record, error) {
+	pc, file, line, _ := runtime.Caller(1)
+	log := logger.GetLogger("")
+	log.Info("CreateRecordWithConfig called", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	
+	// Hash the configuration and OpenRocket data
+	combinedData := append(configData, orkData...)
+	// Add a prefix to ensure consistency in hash generation
+	combinedData = append([]byte("launchrail-config-"), combinedData...)
+	hashInput := sha256.Sum256(combinedData)
+	hash := fmt.Sprintf("%x", hashInput)
+	
+	// Truncate to a reasonable length (first 16 characters)
+	hash = hash[:16]
 
 	// Use rm.baseDir as the root for record directories.
 	// rm.baseDir should already be an absolute path, created by NewRecordManager.

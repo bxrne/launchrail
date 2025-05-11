@@ -104,7 +104,7 @@ func TestAerodynamicSystem_CalculateDrag(t *testing.T) {
 		Bodytube: &components.Bodytube{Radius: 0.1, Length: 1.0},
 	}
 
-	dragForce := system.CalculateDrag(*entity)
+	dragForce := system.CalculateDrag(entity)
 
 	// Verify drag force is negative (opposing motion)
 	if dragForce.Y >= 0 {
