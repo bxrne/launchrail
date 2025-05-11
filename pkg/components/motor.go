@@ -101,6 +101,37 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 	return m, nil
 }
 
+// updateBurningState handles the motor's logic when it's in the burning state.
+// This includes interpolating thrust, calculating mass loss, and updating mass.
+// This method assumes it's called when m.FSM.Current() == StateBurning,
+// m.currentPropellantMass > 0, and m.burnTime > 0.
+func (m *Motor) updateBurningState(dt float64) {
+	// Interpolate thrust based on elapsed time
+	m.thrust = m.interpolateThrust(m.elapsedTime)
+
+	// Calculate mass loss for this step
+	// Ensure burnTime is not zero to avoid division by zero
+	var propellantMassFlowRate float64
+	if m.burnTime > 1e-9 { // Use a small epsilon to check for non-zero burn time
+		propellantMassFlowRate = m.initialPropellantMass / m.burnTime
+	}
+	massLoss := propellantMassFlowRate * dt
+
+	m.currentPropellantMass -= massLoss
+	if m.currentPropellantMass < 0 {
+		m.currentPropellantMass = 0
+	}
+
+	m.Mass = m.casingMass + m.currentPropellantMass
+
+	// If propellant is depleted, ensure thrust is zero
+	if m.currentPropellantMass == 0 {
+		m.thrust = 0
+		// Optionally, trigger FSM event like 'burnout' if not handled by time
+		// if m.FSM.Current() != "coast" { m.FSM.Event(context.Background(), "burnout") }
+	}
+}
+
 func (m *Motor) Update(dt float64) error {
 	if dt < 0 {
 		return fmt.Errorf("invalid negative timestep")
@@ -120,31 +151,7 @@ func (m *Motor) Update(dt float64) error {
 	currentState := m.FSM.Current()
 
 	if currentState == StateBurning && m.currentPropellantMass > 0 && m.burnTime > 0 {
-		// Interpolate thrust based on elapsed time
-		m.thrust = m.interpolateThrust(m.elapsedTime)
-
-		// Calculate mass loss for this step
-		// Ensure burnTime is not zero to avoid division by zero
-		var propellantMassFlowRate float64
-		if m.burnTime > 1e-9 { // Use a small epsilon to check for non-zero burn time
-			propellantMassFlowRate = m.initialPropellantMass / m.burnTime
-		}
-		massLoss := propellantMassFlowRate * dt
-
-		m.currentPropellantMass -= massLoss
-		if m.currentPropellantMass < 0 {
-			m.currentPropellantMass = 0
-		}
-
-		m.Mass = m.casingMass + m.currentPropellantMass
-
-		// If propellant is depleted, ensure thrust is zero
-		if m.currentPropellantMass == 0 {
-			m.thrust = 0
-			// Optionally, trigger FSM event like 'burnout' if not handled by time
-			// if m.FSM.Current() != "coast" { m.FSM.Event(context.Background(), "burnout") }
-		}
-
+		m.updateBurningState(dt)
 	} else {
 		// If not burning (e.g., pre-ignition, coasting, or depleted), thrust is zero
 		m.thrust = 0

@@ -165,12 +165,12 @@ func (n *Nosecone) GetInertiaTensorLocal() types.Matrix3x3 {
 	// Ixx_cg = Iyy_cg = mass * ( (3/20)*R^2 + (3/80)*h^2 )
 	// Izz_cg = (3/10) * mass * R^2
 
-	ixx_iyy_cg := mass * ((3.0/20.0)*radius*radius + (3.0/80.0)*height*height)
-	izz_cg := (3.0 / 10.0) * mass * radius * radius
+	ixxIyyCg := mass * ((3.0/20.0)*radius*radius + (3.0/80.0)*height*height)
+	izzCg := (3.0 / 10.0) * mass * radius * radius
 
 	return types.Matrix3x3{
-		M11: ixx_iyy_cg, M12: 0, M13: 0,
-		M21: 0, M22: ixx_iyy_cg, M23: 0,
-		M31: 0, M32: 0, M33: izz_cg,
+		M11: ixxIyyCg, M12: 0, M13: 0,
+		M21: 0, M22: ixxIyyCg, M23: 0,
+		M31: 0, M32: 0, M33: izzCg,
 	}
 }

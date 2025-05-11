@@ -168,7 +168,7 @@ func TestNewParachuteFromORK(t *testing.T) {
 			name:            "Nil ORK Data",
 			orkData:         nil,
 			wantErr:         true,
-			wantErrContains: "invalid OpenRocket data",
+			wantErrContains: "OpenRocket data is nil",
 		},
 		{
 			name: "Missing Stages",
@@ -178,7 +178,7 @@ func TestNewParachuteFromORK(t *testing.T) {
 				},
 			},
 			wantErr:         true,
-			wantErrContains: "invalid OpenRocket data: missing stages",
+			wantErrContains: "OpenRocket data has no stages, cannot retrieve parachute information",
 		},
 		{
 			name: "Invalid CD format",

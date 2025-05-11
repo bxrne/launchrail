@@ -64,31 +64,33 @@ func parseAuto(auto string) (float64, error) {
 
 // NewParachuteFromORK creates a new parachute instance from an ORK Document
 func NewParachuteFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument) (*Parachute, error) {
-	if orkData == nil || len(orkData.Subcomponents.Stages) == 0 {
-		return nil, fmt.Errorf("invalid OpenRocket data: missing stages")
+	if orkData == nil {
+		return nil, fmt.Errorf("OpenRocket data is nil")
+	}
+	if len(orkData.Subcomponents.Stages) == 0 {
+		return nil, fmt.Errorf("OpenRocket data has no stages, cannot retrieve parachute information")
 	}
 
-	orkParachute := orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.Parachute
+	orkParachuteDefinition := orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.Parachute
 
-	// take auto out of the cd "auto 0.75" -> 0.75
-	drag, err := parseAuto(orkParachute.CD)
+	drag, err := parseAuto(orkParachuteDefinition.CD)
 	if err != nil {
-		return nil, fmt.Errorf("invalid drag coefficient: %s", orkParachute.CD)
+		return nil, fmt.Errorf("invalid drag coefficient '%s': %w", orkParachuteDefinition.CD, err)
 	}
+
 	return &Parachute{
 		ID:              id,
-		Position:        types.Vector3{X: 0, Y: 0, Z: 0},
-		Diameter:        orkParachute.Diameter,
+		Position:        types.Vector3{X: 0, Y: 0, Z: 0}, 
+		Diameter:        orkParachuteDefinition.Diameter,
 		DragCoefficient: drag,
-		Strands:         orkParachute.LineCount,
-		Area:            0.25 * 3.14159 * orkParachute.Diameter * orkParachute.Diameter,
-		Trigger:         ParachuteTrigger(orkParachute.DeployEvent),
+		Strands:         orkParachuteDefinition.LineCount,
+		Area:            0.25 * math.Pi * orkParachuteDefinition.Diameter * orkParachuteDefinition.Diameter, 
+		Trigger:         ParachuteTrigger(orkParachuteDefinition.DeployEvent),
 	}, nil
 }
 
 // Update updates the parachute component
 func (p *Parachute) Update(dt float64) error {
-	// INFO: Empty, just meeting interface requirements
 	return nil
 }
 
@@ -102,7 +104,7 @@ func (p *Parachute) GetPlanformArea() float64 {
 	return p.Area
 }
 
-// GetMass returns the mass of the Parachute
+// GetMass returns the mass of the parachute component in kg
 func (p *Parachute) GetMass() float64 {
 	return 0.0
 }

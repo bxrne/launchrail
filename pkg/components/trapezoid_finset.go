@@ -91,14 +91,14 @@ func (f *TrapezoidFinset) calculateAndSetInertiaTensor() {
 		f.InertiaTensor = types.Matrix3x3{}
 		return
 	}
-	SingleFinMass := f.Mass / float64(f.FinCount)
-	FinArea := (f.RootChord + f.TipChord) * f.Span / 2.0
-	if FinArea <= 1e-9 { // Avoid division by zero or near-zero area
-		log.Printf("Error: FinArea is %f, cannot calculate inertia for finset '%s'. Setting to zero.", FinArea, f.Material.Name)
+	singleFinMass := f.Mass / float64(f.FinCount)
+	finArea := (f.RootChord + f.TipChord) * f.Span / 2.0
+	if finArea <= 1e-9 { // Avoid division by zero or near-zero area
+		log.Printf("Error: FinArea is %f, cannot calculate inertia for finset '%s'. Setting to zero.", finArea, f.Material.Name)
 		f.InertiaTensor = types.Matrix3x3{}
 		return
 	}
-	MassPerUnitArea := SingleFinMass / FinArea
+	massPerUnitArea := singleFinMass / finArea
 
 	// --- Step 3: Decompose Fin Planform into Rectangle and Triangles (Revised) ---
 	// Origin for local fin coordinates: Leading edge of the root chord.
@@ -106,14 +106,14 @@ func (f *TrapezoidFinset) calculateAndSetInertiaTensor() {
 
 	// --- Step 5: Overall Fin Planform's CM (local coordinates) ---
 	// xFinCmLocal: Chordwise CM of the fin planform relative to its root chord leading edge.
-	num_x_cm := f.RootChord*f.RootChord + f.RootChord*f.TipChord + f.TipChord*f.TipChord + f.SweepDistance*(f.RootChord+2*f.TipChord)
-	den_cm := 3 * (f.RootChord + f.TipChord)
-	if den_cm == 0 { // Should be caught by FinArea check, but as a safeguard
+	numXCm := f.RootChord*f.RootChord + f.RootChord*f.TipChord + f.TipChord*f.TipChord + f.SweepDistance*(f.RootChord+2*f.TipChord)
+	denCm := 3 * (f.RootChord + f.TipChord)
+	if denCm == 0 { // Should be caught by FinArea check, but as a safeguard
 		log.Printf("Error: Sum of RootChord and TipChord is zero for finset '%s'. Setting inertia to zero.", f.Material.Name)
 		f.InertiaTensor = types.Matrix3x3{}
 		return
 	}
-	xFinCmLocal := num_x_cm / den_cm
+	xFinCmLocal := numXCm / denCm
 
 	// yFinCmLocal: Spanwise CM of the fin planform relative to its root chord.
 	// Corrected formula for y_cm of a trapezoid: (h/3) * (b + 2a) / (b + a)
@@ -183,21 +183,21 @@ func (f *TrapezoidFinset) calculateAndSetInertiaTensor() {
 	}
 
 	// --- Step 8: Convert to Mass Moments for Single Fin (Thin Plate) ---
-	IxxSingleFinMassCm := MassPerUnitArea * totalIxxFinAreaCm
-	IyySingleFinMassCm := MassPerUnitArea * totalIyyFinAreaCm
+	iXxSingleFinMassCm := massPerUnitArea * totalIxxFinAreaCm
+	iYySingleFinMassCm := massPerUnitArea * totalIyyFinAreaCm
 	// For a thin plate, Izz = Ixx + Iyy. Assuming fin lies in XY plane of its local CM.
-	IzzSingleFinMassCm := IxxSingleFinMassCm + IyySingleFinMassCm
-	IxySingleFinMassCm := MassPerUnitArea * totalIxyFinAreaCm
-	IzxSingleFinMassCm := 0.0 // Product of inertia involving z-axis is zero for thin plate in xy plane
-	IyzSingleFinMassCm := 0.0
+	iZzSingleFinMassCm := iXxSingleFinMassCm + iYySingleFinMassCm
+	iXySingleFinMassCm := massPerUnitArea * totalIxyFinAreaCm
+	iZxSingleFinMassCm := 0.0 // Product of inertia involving z-axis is zero for thin plate in xy plane
+	iYzSingleFinMassCm := 0.0
 
 	// Local Inertia Tensor for ONE fin, about its own CM, aligned with fin's local x,y,z axes
 	// (x along chord, y along span, z normal to fin surface)
 	// Tensor components are: [[Ixx, -Ixy, -Izx], [-Ixy, Iyy, -Iyz], [-Izx, -Iyz, Izz]]
 	localFinInertiaTensorCm := types.Matrix3x3{
-		M11: IxxSingleFinMassCm, M12: -IxySingleFinMassCm, M13: -IzxSingleFinMassCm,
-		M21: -IxySingleFinMassCm, M22: IyySingleFinMassCm, M23: -IyzSingleFinMassCm,
-		M31: -IzxSingleFinMassCm, M32: -IyzSingleFinMassCm, M33: IzzSingleFinMassCm,
+		M11: iXxSingleFinMassCm, M12: -iXySingleFinMassCm, M13: -iZxSingleFinMassCm,
+		M21: -iXySingleFinMassCm, M22: iYySingleFinMassCm, M23: -iYzSingleFinMassCm,
+		M31: -iZxSingleFinMassCm, M32: -iYzSingleFinMassCm, M33: iZzSingleFinMassCm,
 	}
 
 	// --- Step 9: Rotate and Sum for All Fins in the Set ---
@@ -219,10 +219,11 @@ func (f *TrapezoidFinset) calculateAndSetInertiaTensor() {
 	// Attachment point of the finset (e.g. leading edge of root chord of fin 0) is f.Position
 	// CM of a single fin in its own local 2D planform coordinates (origin at LE root): (xFinCmLocal, yFinCmLocal)
 
+	totalInertia := types.Matrix3x3{}
 	for i := 0; i < f.FinCount; i++ {
 		finAngle := (2.0 * math.Pi / float64(f.FinCount)) * float64(i)
 
-		// Rotation Matrix R_i: Transforms from fin's local axes to rocket body axes.
+		// Rotation Matrix Ri: Transforms from fin's local axes to rocket body axes.
 		// Fin's local x (chord) aligns with rocket's X (longitudinal).
 		// Fin's local y (span) rotates in rocket's YZ plane.
 		// Fin's local z (normal) also rotates in rocket's YZ plane.
@@ -231,79 +232,57 @@ func (f *TrapezoidFinset) calculateAndSetInertiaTensor() {
 		sinAngle := math.Sin(finAngle)
 
 		// Rotation matrix for rotation around X-axis
-		R_i := types.Matrix3x3{
+		ri := types.Matrix3x3{
 			M11: 1, M12: 0, M13: 0,
 			M21: 0, M22: cosAngle, M23: -sinAngle,
 			M31: 0, M32: sinAngle, M33: cosAngle,
 		}
 
 		// Transform local fin inertia tensor to rocket body axes (still about fin's own CM)
-		// I_fin_body_axes_cm = R_i * localFinInertiaTensorCm * R_i_transpose
-		R_i_T := R_i.Transpose()
-		I_fin_body_axes_cm_ptr := R_i.MultiplyMatrix(&localFinInertiaTensorCm).MultiplyMatrix(R_i_T)
-		I_fin_body_axes_cm := *I_fin_body_axes_cm_ptr // Dereference to value type
+		// I_fin_body_axes_cm = Ri * localFinInertiaTensorCm * Ri_transpose
+		riT := ri.Transpose()
+		iFinBodyAxesCmPtr := ri.MultiplyMatrix(&localFinInertiaTensorCm).MultiplyMatrix(riT) // Corrected: &RiT -> RiT
+		iFinBodyAxesCm := *iFinBodyAxesCmPtr
 
 		// Calculate displacement vector d_i from finset's CM (f.CenterOfMass) to this fin's CM.
 		// CM of this fin (cm_fin_i) in rocket body coordinates:
-		// Axial component: f.Position.X + xFinCmLocal (assuming f.Position is LE of root chord)
-		// Radial components depend on finAngle and yFinCmLocal (distance from root chord along span)
-		// This yFinCmLocal is along the fin's spanwise axis.
-		cm_fin_i_x := f.Position.X + xFinCmLocal
-		cm_fin_i_y := (f.Position.Y + yFinCmLocal) * cosAngle // If fin 0 is along +Y
-		cm_fin_i_z := (f.Position.Y + yFinCmLocal) * sinAngle // If fin 0 is along +Y
-		// Note: f.Position.Y is typically the body tube radius if fins are surface mounted and fin 0 is on Y.
-		// If f.Position.Y is 0 (centerline), then yFinCmLocal is the radial distance directly.
-		// Let's assume f.Position.Y represents the radial distance to the root chord leading edge for fin 0.
+		// The fin's own CM (xFinCmLocal, yFinCmLocal) is in the fin's local coordinate system.
+		// We need to rotate this local CM vector by R_i to get it into body axes,
+		// then add the offset of the fin's root leading edge from the rocket's reference point (usually nose tip).
+		// Finally, we add the finset's CG position.
+		cmFinLocal := types.Vector3{X: xFinCmLocal, Y: yFinCmLocal, Z: 0} // Z=0 in fin's own 2D planform coords
+		cmFinBodyAxes := ri.MultiplyVector(&cmFinLocal)
 
-		cm_fin_i_global := types.Vector3{X: cm_fin_i_x, Y: cm_fin_i_y, Z: cm_fin_i_z}
+		// d_x, d_y, d_z are components of the vector from finset CG to fin_i CG in rocket body axes
+		dX := f.Position.X + cmFinBodyAxes.X - f.CenterOfMass.X
+		dY := f.Position.Y + cmFinBodyAxes.Y - f.CenterOfMass.Y // Corrected: removed extra *cosAngle
+		dZ := f.Position.Z + cmFinBodyAxes.Z - f.CenterOfMass.Z // Corrected: use cmFinBodyAxes.Z
 
-		// Displacement vector d_i = cm_fin_i_global - f.CenterOfMass (of the finset)
-		d_i := cm_fin_i_global.Subtract(f.CenterOfMass)
+		// Parallel Axis Theorem: I_total_fin_i = I_fin_body_axes_cm + M_fin * ( (d . d)E - d (outer_product) d )
+		dSq := dX*dX + dY*dY + dZ*dZ // d . d
 
-		// Parallel Axis Theorem: I_shifted = I_cm + m * ( (d.d)E - d (outer_product) d )
-		dot_d_i := d_i.X*d_i.X + d_i.Y*d_i.Y + d_i.Z*d_i.Z // Manual dot product
-		// term1 = (d_i . d_i)E  (Scaled Identity Matrix)
-		term1 := types.Matrix3x3{
-			M11: dot_d_i, M12: 0, M13: 0,
-			M21: 0, M22: dot_d_i, M23: 0,
-			M31: 0, M32: 0, M33: dot_d_i,
+		term2DiagXx := singleFinMass * (dSq - dX*dX)
+		term2DiagYy := singleFinMass * (dSq - dY*dY)
+		term2DiagZz := singleFinMass * (dSq - dZ*dZ)
+		term2OffdiagXy := -singleFinMass * dX * dY
+		term2OffdiagXz := -singleFinMass * dX * dZ
+		term2OffdiagYz := -singleFinMass * dY * dZ
+
+		iTotalFinI := types.Matrix3x3{
+			M11: iFinBodyAxesCm.M11 + term2DiagXx,
+			M12: iFinBodyAxesCm.M12 + term2OffdiagXy,
+			M13: iFinBodyAxesCm.M13 + term2OffdiagXz,
+			M21: iFinBodyAxesCm.M21 + term2OffdiagXy, // M21 = M12
+			M22: iFinBodyAxesCm.M22 + term2DiagYy,
+			M23: iFinBodyAxesCm.M23 + term2OffdiagYz,
+			M31: iFinBodyAxesCm.M31 + term2OffdiagXz, // M31 = M13
+			M32: iFinBodyAxesCm.M32 + term2OffdiagYz, // M32 = M23
+			M33: iFinBodyAxesCm.M33 + term2DiagZz,
 		}
-
-		// Outer product d_i (tensor) d_i
-		d_outer_d := types.Matrix3x3{
-			M11: d_i.X * d_i.X, M12: d_i.X * d_i.Y, M13: d_i.X * d_i.Z,
-			M21: d_i.Y * d_i.X, M22: d_i.Y * d_i.Y, M23: d_i.Y * d_i.Z,
-			M31: d_i.Z * d_i.X, M32: d_i.Z * d_i.Y, M33: d_i.Z * d_i.Z,
-		}
-
-		// pat_bracket_term = term1 - d_outer_d (Manual Subtract)
-		pat_bracket_term := types.Matrix3x3{
-			M11: term1.M11 - d_outer_d.M11, M12: term1.M12 - d_outer_d.M12, M13: term1.M13 - d_outer_d.M13,
-			M21: term1.M21 - d_outer_d.M21, M22: term1.M22 - d_outer_d.M22, M23: term1.M23 - d_outer_d.M23,
-			M31: term1.M31 - d_outer_d.M31, M32: term1.M32 - d_outer_d.M32, M33: term1.M33 - d_outer_d.M33,
-		}
-		// pat_mass_term = pat_bracket_term * SingleFinMass (Manual Scale)
-		pat_mass_term := types.Matrix3x3{
-			M11: pat_bracket_term.M11 * SingleFinMass, M12: pat_bracket_term.M12 * SingleFinMass, M13: pat_bracket_term.M13 * SingleFinMass,
-			M21: pat_bracket_term.M21 * SingleFinMass, M22: pat_bracket_term.M22 * SingleFinMass, M23: pat_bracket_term.M23 * SingleFinMass,
-			M31: pat_bracket_term.M31 * SingleFinMass, M32: pat_bracket_term.M32 * SingleFinMass, M33: pat_bracket_term.M33 * SingleFinMass,
-		}
-
-		// I_shifted = I_fin_body_axes_cm + pat_mass_term (Manual Add)
-		I_shifted := types.Matrix3x3{
-			M11: I_fin_body_axes_cm.M11 + pat_mass_term.M11, M12: I_fin_body_axes_cm.M12 + pat_mass_term.M12, M13: I_fin_body_axes_cm.M13 + pat_mass_term.M13,
-			M21: I_fin_body_axes_cm.M21 + pat_mass_term.M21, M22: I_fin_body_axes_cm.M22 + pat_mass_term.M22, M23: I_fin_body_axes_cm.M23 + pat_mass_term.M23,
-			M31: I_fin_body_axes_cm.M31 + pat_mass_term.M31, M32: I_fin_body_axes_cm.M32 + pat_mass_term.M32, M33: I_fin_body_axes_cm.M33 + pat_mass_term.M33,
-		}
-
-		// f.InertiaTensor = f.InertiaTensor + I_shifted (Manual Add)
-		f.InertiaTensor = types.Matrix3x3{
-			M11: f.InertiaTensor.M11 + I_shifted.M11, M12: f.InertiaTensor.M12 + I_shifted.M12, M13: f.InertiaTensor.M13 + I_shifted.M13,
-			M21: f.InertiaTensor.M21 + I_shifted.M21, M22: f.InertiaTensor.M22 + I_shifted.M22, M23: f.InertiaTensor.M23 + I_shifted.M23,
-			M31: f.InertiaTensor.M31 + I_shifted.M31, M32: f.InertiaTensor.M32 + I_shifted.M32, M33: f.InertiaTensor.M33 + I_shifted.M33,
-		}
+		totalInertia = totalInertia.Add(iTotalFinI) // Corrected: pass value, not pointer
 	}
 
+	f.InertiaTensor = totalInertia
 	log.Printf("SUCCESS: Inertia tensor for finset component (name: %s) calculated. Tensor: %+v", f.Name, f.InertiaTensor)
 }
 

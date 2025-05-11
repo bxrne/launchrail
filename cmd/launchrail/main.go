@@ -25,17 +25,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Determine simulation base output directory (for records, not logs)
-	homedir := os.Getenv("HOME") // Consider using os.UserHomeDir() for robustness
-	if homedir == "" {
-		usr, uerr := os.UserHomeDir()
-		if uerr != nil {
-			log.Fatal("Failed to determine home directory", "error", uerr)
-		}
-		homedir = usr
-	}
-
-	// Generate unique run ID based on timestamp
 	ork_file_bytes, err := os.ReadFile(cfg.Engine.Options.OpenRocketFile)
 	if err != nil {
 		log.Fatal("Failed to read openrocket file", "path", cfg.Engine.Options.OpenRocketFile, "error", err)
