@@ -138,7 +138,7 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 	// Use a fixed prefix with the current day (without time) to make simulations run on the same day 
 	// have the same hash, avoiding duplicate result sets
 	currentDate := time.Now().Format("2006-01-02")
-	hashInput := fmt.Sprintf("simulation-%s", currentDate)
+	hashInput := fmt.Sprintf("simulation-%s-%d", currentDate, time.Now().UnixNano()) // Add nanoseconds for uniqueness
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(hashInput)))
 
 	// Use rm.baseDir as the root for record directories.
@@ -243,6 +243,7 @@ func (rm *RecordManager) DeleteRecord(hash string) error {
 	}
 
 	// Directory exists, proceed with deletion
+	rm.log.Debug("Attempting to delete record directory", "recordPath", recordPath, "baseDir", rm.baseDir)
 	if err := os.RemoveAll(recordPath); err != nil {
 		// Error during deletion
 		return fmt.Errorf("failed to delete record directory: %w", err)
