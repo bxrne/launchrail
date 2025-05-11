@@ -1,13 +1,12 @@
 package systems_test
 
 import (
-	"testing"
-
 	"io"
+	"testing"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
-	"github.com/bxrne/launchrail/internal/logger"
+	ilogger "github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
@@ -29,7 +28,7 @@ func TestProcessRules_NilEntity(t *testing.T) {
 }
 
 func TestDetectApogee_HighVelocity(t *testing.T) {
-	lg := logger.GetLogger("debug")
+	lg := ilogger.GetLogger("debug")
 	world := &ecs.World{}
 	cfg := &config.Engine{Simulation: config.Simulation{GroundTolerance: 0.1}}
 	logger := logf.New(logf.Opts{Writer: io.Discard})
@@ -75,18 +74,23 @@ func TestApogeeDetection(t *testing.T) {
 	logger := logf.New(logf.Opts{Writer: io.Discard})
 	rs := systems.NewRulesSystem(world, cfg, logger)
 
+	mockEntityID := ecs.NewBasic() // Create a mock ecs.BasicEntity
+
 	motorProps := &thrustcurves.MotorData{}
 	motor := &components.Motor{
 		Props: motorProps,
+		ID:    ecs.NewBasic(), // motor also needs an ID if accessed via entity.Motor.ID
 	}
 	motor.FSM = components.NewMotorFSM(motor, logger)
 	motor.FSM.SetState(components.StateIdle)
 
 	entity := &states.PhysicsState{
-		Position:  &types.Position{Vec: types.Vector3{Y: 100}},
-		Velocity:  &types.Velocity{Vec: types.Vector3{Y: -0.01}},
-		Motor:     motor,
-		Parachute: &components.Parachute{Trigger: "apogee", Deployed: false},
+		Entity:       &mockEntityID, // Initialize the Entity field
+		Position:     &types.Position{Vec: types.Vector3{Y: 100}},
+		Velocity:     &types.Velocity{Vec: types.Vector3{Y: -0.01}},
+		Acceleration: &types.Acceleration{Vec: types.Vector3{}}, // Initialize Acceleration
+		Motor:        motor,
+		Parachute:    &components.Parachute{Trigger: "apogee", Deployed: false, ID: ecs.NewBasic()},
 	}
 
 	rs.Add(entity)
@@ -117,19 +121,25 @@ func TestLandingDetection(t *testing.T) {
 	world := &ecs.World{}
 	logger := logf.New(logf.Opts{Writer: io.Discard})
 	rs := systems.NewRulesSystem(world, cfg, logger)
+
+	mockEntityID := ecs.NewBasic() // Create a mock ecs.BasicEntity
+
 	motorProps := &thrustcurves.MotorData{}
 	motor := &components.Motor{
 		Props: motorProps,
+		ID:    ecs.NewBasic(),
 	}
 	motor.FSM = components.NewMotorFSM(motor, logger)
-	entity := &states.PhysicsState{
-		Position:     &types.Position{Vec: types.Vector3{Y: 0.0}}, // Start at ground level
-		Velocity:     &types.Velocity{Vec: types.Vector3{Y: 0.0}},
-		Acceleration: &types.Acceleration{Vec: types.Vector3{}},
-		Motor:        motor,
-		Parachute:    &components.Parachute{Trigger: "apogee", Deployed: false},
-	}
+	motor.FSM.SetState(components.StateIdle)
 
+	entity := &states.PhysicsState{
+		Entity:       &mockEntityID, // Initialize the Entity field
+		Position:     &types.Position{Vec: types.Vector3{Y: 200.0}},
+		Velocity:     &types.Velocity{Vec: types.Vector3{Y: 0.0}},
+		Acceleration: &types.Acceleration{Vec: types.Vector3{}}, // Initialize Acceleration
+		Motor:        motor,
+		Parachute:    &components.Parachute{Trigger: "apogee", Deployed: false, ID: ecs.NewBasic()},
+	}
 	rs.Add(entity)
 
 	// 1. Simulate Liftoff

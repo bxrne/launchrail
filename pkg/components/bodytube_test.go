@@ -49,17 +49,43 @@ func TestNewBodytube(t *testing.T) {
 	id := ecs.NewBasic()
 	radius := 1.0
 	length := 2.0
-	mass := 0.5
+	// mass := 0.5 // This is the target mass
 	thickness := 0.1
 
-	bt := components.NewBodytube(id, radius, length, mass, thickness)
+	// Calculate required density for expectedMass = 0.5
+	// Mass = Volume * Density  => Density = Mass / Volume
+	// Volume = Pi * (R_outer^2 - R_inner^2) * L
+	outerVolume := math.Pi * radius * radius * length
+	innerRadius := radius - thickness
+	if innerRadius < 0 {
+		innerRadius = 0
+	}
+	innerVolume := math.Pi * innerRadius * innerRadius * length
+	volume := outerVolume - innerVolume
+
+	expectedMass := 0.5
+	var density float64
+	if volume > 1e-9 { // Avoid division by zero if volume is too small
+		density = expectedMass / volume
+	} else {
+		// If volume is zero (or very small) and we expect non-zero mass, this test setup is problematic.
+		// For this test, assume dimensions will yield a valid volume for the expected mass.
+		// If expectedMass was 0, density could also be 0.
+		density = 0
+		if expectedMass > 1e-9 {
+			t.Fatalf("Cannot achieve expected mass %.2f with near-zero volume (%.2e) for given dimensions", expectedMass, volume)
+		}
+	}
+
+	bt := components.NewBodytube(id, radius, length, thickness, density)
 
 	assert.NotNil(t, bt, "Bodytube should be created")
 	assert.Equal(t, id, bt.ID, "Bodytube ID should match")
 	assert.Equal(t, radius, bt.Radius, "Bodytube radius should match")
 	assert.Equal(t, length, bt.Length, "Bodytube length should match")
-	assert.Equal(t, mass, bt.Mass, "Bodytube mass should match")
+	assert.InDelta(t, expectedMass, bt.Mass, 1e-9, "Bodytube mass should match")
 	assert.Equal(t, thickness, bt.Thickness, "Bodytube thickness should match")
+	assert.InDelta(t, density, bt.Density, 1e-9, "Bodytube density should match") // Also check density
 }
 
 // TEST: GIVEN a new Bodytube WHEN NewBodytubeFromORK is called THEN a new Bodytube is created

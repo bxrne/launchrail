@@ -32,14 +32,14 @@ type Bodytube struct {
 }
 
 // NewBodytube creates a new bodytube instance
-func NewBodytube(id ecs.BasicEntity, radius, length, mass, thickness float64) *Bodytube {
+func NewBodytube(id ecs.BasicEntity, radius, length, thickness, density float64) *Bodytube {
 	bt := &Bodytube{
 		ID:        id,
 		Position:  types.Vector3{X: 0, Y: 0, Z: 0},
 		Radius:    radius,
 		Length:    length,
-		Mass:      mass,
 		Thickness: thickness,
+		Density:   density,
 	}
 	bt.calculateAndSetProperties()
 	return bt

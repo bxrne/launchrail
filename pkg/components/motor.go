@@ -258,6 +258,9 @@ func (m *Motor) GetCenterOfMassLocal() types.Vector3 {
 	// Simplified: CG is at the geometric center of the motor casing.
 	// More accurate model would account for propellant burn-off and shift in CG.
 	if m.Length == 0 {
+		// m.logger is a struct, so it cannot be nil.
+		// It's assumed to be initialized by NewMotor. If its internal writer is nil,
+		// the logf methods should handle that or it's an initialization bug in NewMotor.
 		m.logger.Warn("Motor.GetCenterOfMassLocal() called with zero length. Returning zero vector.")
 		return types.Vector3{X: 0, Y: 0, Z: 0}
 	}
