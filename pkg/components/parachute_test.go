@@ -127,25 +127,27 @@ func TestNewParachuteFromORK(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		orkData         *openrocket.RocketDocument
+		orkData         *openrocket.OpenrocketDocument
 		wantErr         bool
 		wantErrContains string
 		wantParachute   *components.Parachute // Only check key fields
 	}{
 		{
 			name: "Success",
-			orkData: &openrocket.RocketDocument{
-				Subcomponents: openrocket.Subcomponents{
-					Stages: []openrocket.RocketStage{
-						{
-							SustainerSubcomponents: openrocket.SustainerSubcomponents{
-								BodyTube: openrocket.BodyTube{
-									Subcomponents: openrocket.BodyTubeSubcomponents{
-										Parachute: openrocket.Parachute{
-											Diameter:    1.5,
-											CD:          "auto 0.8",
-											LineCount:   8,
-											DeployEvent: string(components.ParachuteTriggerApogee),
+			orkData: &openrocket.OpenrocketDocument{
+				Rocket: openrocket.RocketDocument{
+					Subcomponents: openrocket.Subcomponents{
+						Stages: []openrocket.RocketStage{
+							{
+								SustainerSubcomponents: openrocket.SustainerSubcomponents{
+									BodyTube: openrocket.BodyTube{
+										Subcomponents: openrocket.BodyTubeSubcomponents{
+											Parachute: openrocket.Parachute{
+												Diameter:    1.5,
+												CD:          "auto 0.8",
+												LineCount:   8,
+												DeployEvent: string(components.ParachuteTriggerApogee),
+											},
 										},
 									},
 								},
@@ -172,9 +174,11 @@ func TestNewParachuteFromORK(t *testing.T) {
 		},
 		{
 			name: "Missing Stages",
-			orkData: &openrocket.RocketDocument{
-				Subcomponents: openrocket.Subcomponents{
-					Stages: []openrocket.RocketStage{},
+			orkData: &openrocket.OpenrocketDocument{
+				Rocket: openrocket.RocketDocument{
+					Subcomponents: openrocket.Subcomponents{
+						Stages: []openrocket.RocketStage{},
+					},
 				},
 			},
 			wantErr:         true,
@@ -182,18 +186,20 @@ func TestNewParachuteFromORK(t *testing.T) {
 		},
 		{
 			name: "Invalid CD format",
-			orkData: &openrocket.RocketDocument{
-				Subcomponents: openrocket.Subcomponents{
-					Stages: []openrocket.RocketStage{
-						{
-							SustainerSubcomponents: openrocket.SustainerSubcomponents{
-								BodyTube: openrocket.BodyTube{
-									Subcomponents: openrocket.BodyTubeSubcomponents{
-										Parachute: openrocket.Parachute{
-											Diameter:    1.0,
-											CD:          "invalid", // Invalid format
-											LineCount:   8,
-											DeployEvent: "apogee",
+			orkData: &openrocket.OpenrocketDocument{
+				Rocket: openrocket.RocketDocument{
+					Subcomponents: openrocket.Subcomponents{
+						Stages: []openrocket.RocketStage{
+							{
+								SustainerSubcomponents: openrocket.SustainerSubcomponents{
+									BodyTube: openrocket.BodyTube{
+										Subcomponents: openrocket.BodyTubeSubcomponents{
+											Parachute: openrocket.Parachute{
+												Diameter:    1.0,
+												CD:          "invalid", // Invalid format
+												LineCount:   8,
+												DeployEvent: "apogee",
+											},
 										},
 									},
 								},

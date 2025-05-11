@@ -111,7 +111,7 @@ func (m *Manager) Initialize(stores *storage.Stores) error {
 	}
 
 	// Load rocket data
-	if err := m.sim.LoadRocket(&orkData.Rocket, motorData); err != nil {
+	if err := m.sim.LoadRocket(orkData, motorData); err != nil {
 		m.status = StatusFailed
 		return err
 	}

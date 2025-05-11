@@ -46,12 +46,12 @@ func NewBodytube(id ecs.BasicEntity, radius, length, thickness, density float64)
 }
 
 // NewBodytubeFromORK creates a new bodytube instance from an ORK Document
-func NewBodytubeFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument) (*Bodytube, error) {
-	if orkData == nil || len(orkData.Subcomponents.Stages) == 0 {
-		return nil, fmt.Errorf("invalid OpenRocket data: missing stages")
+func NewBodytubeFromORK(id ecs.BasicEntity, orkData *openrocket.OpenrocketDocument) (*Bodytube, error) {
+	if orkData == nil || orkData.Rocket.XMLName.Local == "" || len(orkData.Rocket.Subcomponents.Stages) == 0 {
+		return nil, fmt.Errorf("invalid OpenRocket data: missing rocket, stages, or nil orkData")
 	}
 
-	orkBodytube := orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube
+	orkBodytube := orkData.Rocket.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube
 
 	// Parse radius which may be in "auto X.XX" format
 	radiusStr := orkBodytube.Radius

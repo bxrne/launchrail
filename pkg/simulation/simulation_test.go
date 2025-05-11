@@ -98,7 +98,7 @@ func TestLoadRocket(t *testing.T) {
 		MaxThrust:    200.0,
 	}
 
-	err = sim.LoadRocket(&orkData.Rocket, motorData)
+	err = sim.LoadRocket(orkData, motorData)
 	require.NoError(t, err)
 }
 
@@ -119,7 +119,7 @@ func TestLoadRocket_MotorError(t *testing.T) {
 		Thrust:      nil, // Invalid
 	}
 
-	err = sim.LoadRocket(&orkData.Rocket, motorData)
+	err = sim.LoadRocket(orkData, motorData)
 	require.Error(t, err) // Expect an error from NewMotor
 }
 
@@ -156,7 +156,7 @@ func TestRun(t *testing.T) {
 		MaxThrust:    200.0,
 	}
 
-	err = sim.LoadRocket(&orkData.Rocket, motorData)
+	err = sim.LoadRocket(orkData, motorData)
 	require.NoError(t, err)
 
 	err = sim.Run()
@@ -219,7 +219,7 @@ func TestRun_StopConditions(t *testing.T) {
 		Thrust:    [][]float64{{0, 10}, {1, 10}}, // Constant thrust
 		TotalMass: 0.1, BurnTime: 1.0, WetMass: 0.2,
 	}
-	err = sim.LoadRocket(&orkData.Rocket, motorData)
+	err = sim.LoadRocket(orkData, motorData)
 	require.NoError(t, err)
 
 	// Run the simulation - it should stop due to MaxTime
@@ -274,7 +274,7 @@ func TestRun_AssertNonPositiveMass(t *testing.T) {
 	// (This is generally bad practice for tests, but needed to test private function logic)
 	// If we cannot access the internal rocket easily, this test might need refactoring
 	// of the simulation package to make sanity checks more testable.
-	err = sim.LoadRocket(&orkData.Rocket, motorData)
+	err = sim.LoadRocket(orkData, motorData)
 	require.NoError(t, err)
 
 	// How to access sim.rocket.Mass? It's private.

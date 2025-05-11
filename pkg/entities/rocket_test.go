@@ -1,6 +1,7 @@
 package entities_test
 
 import (
+	"encoding/xml"
 	"testing"
 
 	"github.com/EngoEngine/ecs"
@@ -15,50 +16,54 @@ import (
 	"github.com/zerodha/logf"
 )
 
-func createMockOpenRocketData() *openrocket.RocketDocument {
-	return &openrocket.RocketDocument{
-		Subcomponents: openrocket.Subcomponents{
-			Stages: []openrocket.RocketStage{
-				{
-					SustainerSubcomponents: openrocket.SustainerSubcomponents{
-						Nosecone: openrocket.Nosecone{
-							Material: openrocket.Material{
-								Density: 1.0,
-								Name:    "Test Material",
-								Type:    "BULK",
-							},
-							Length:         1.0,
-							Thickness:      0.1,
-							AftRadius:      0.5,
-							ShapeParameter: 0.5,
-							Shape:          "OGIVE",
-							Subcomponents:  openrocket.NoseSubcomponents{},
-						},
-						BodyTube: openrocket.BodyTube{
-							Material: openrocket.Material{
-								Density: 1.0,
-								Name:    "Test Material",
-								Type:    "BULK",
-							},
-							Length:    2.0,
-							Thickness: 0.1,
-							Radius:    "0.5",
-							Subcomponents: openrocket.BodyTubeSubcomponents{
-								Parachute: openrocket.Parachute{
-									CD: "auto 1.0",
+func createMockOpenRocketData() *openrocket.OpenrocketDocument {
+	return &openrocket.OpenrocketDocument{
+		XMLName: xml.Name{Local: "openrocket"},
+		Rocket: openrocket.RocketDocument{
+			XMLName: xml.Name{Local: "rocket"},
+			Subcomponents: openrocket.Subcomponents{
+				Stages: []openrocket.RocketStage{
+					{
+						SustainerSubcomponents: openrocket.SustainerSubcomponents{
+							Nosecone: openrocket.Nosecone{
+								Material: openrocket.Material{
+									Density: 1.0,
+									Name:    "Test Material",
+									Type:    "BULK",
 								},
-								TrapezoidFinsets: []openrocket.TrapezoidFinset{
-									{
-										Material: openrocket.Material{
-											Density: 1.0,
-											Name:    "Test Material",
-											Type:    "BULK",
+								Length:         1.0,
+								Thickness:      0.1,
+								AftRadius:      0.5,
+								ShapeParameter: 0.5,
+								Shape:          "OGIVE",
+								Subcomponents:  openrocket.NoseSubcomponents{},
+							},
+							BodyTube: openrocket.BodyTube{
+								Material: openrocket.Material{
+									Density: 1.0,
+									Name:    "Test Material",
+									Type:    "BULK",
+								},
+								Length:    2.0,
+								Thickness: 0.1,
+								Radius:    "0.5",
+								Subcomponents: openrocket.BodyTubeSubcomponents{
+									Parachute: openrocket.Parachute{
+										CD: "auto 1.0",
+									},
+									TrapezoidFinsets: []openrocket.TrapezoidFinset{
+										{
+											Material: openrocket.Material{
+												Density: 1.0,
+												Name:    "Test Material",
+												Type:    "BULK",
+											},
+											RootChord: 0.2,
+											TipChord:  0.1,
+											Height:    0.15,
+											Thickness: 0.003,
+											FinCount:  4,
 										},
-										RootChord: 0.2,
-										TipChord:  0.1,
-										Height:    0.15,
-										Thickness: 0.003,
-										FinCount:  4,
 									},
 								},
 							},
@@ -136,13 +141,15 @@ func TestGetComponent(t *testing.T) {
 
 func TestNewRocketEntityWithInvalidData(t *testing.T) {
 	world := &ecs.World{}
-	invalidOrkData := &openrocket.RocketDocument{
-		Subcomponents: openrocket.Subcomponents{
-			Stages: []openrocket.RocketStage{
-				{
-					SustainerSubcomponents: openrocket.SustainerSubcomponents{
-						BodyTube: openrocket.BodyTube{
-							Radius: "invalid",
+	invalidOrkData := &openrocket.OpenrocketDocument{
+		Rocket: openrocket.RocketDocument{
+			Subcomponents: openrocket.Subcomponents{
+				Stages: []openrocket.RocketStage{
+					{
+						SustainerSubcomponents: openrocket.SustainerSubcomponents{
+							BodyTube: openrocket.BodyTube{
+								Radius: "invalid",
+							},
 						},
 					},
 				},
@@ -184,7 +191,7 @@ func TestNewRocketEntity_NilData(t *testing.T) {
 	rocket := entities.NewRocketEntity(nil, nil, motor, logPtr)
 	assert.Nil(t, rocket, "Should return nil if ORK data is nil")
 
-	rocket = entities.NewRocketEntity(nil, &openrocket.RocketDocument{}, nil, logPtr)
+	rocket = entities.NewRocketEntity(nil, &openrocket.OpenrocketDocument{Rocket: openrocket.RocketDocument{}}, nil, logPtr)
 	assert.Nil(t, rocket, "Should return nil if motor is nil")
 }
 
@@ -195,6 +202,6 @@ func TestNewRocketEntity_ComponentErrors(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, orkDataValid)
 	logPtr := logger.GetLogger("debug")
-	rocketInvalidMotor := entities.NewRocketEntity(world, &orkDataValid.Rocket, invalidMotor, logPtr)
+	rocketInvalidMotor := entities.NewRocketEntity(world, orkDataValid, invalidMotor, logPtr)
 	assert.Nil(t, rocketInvalidMotor, "Should return nil if initial motor mass is invalid")
 }

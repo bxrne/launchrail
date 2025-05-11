@@ -23,7 +23,7 @@ type RocketEntity struct {
 }
 
 // initComponentsFromORK creates and initializes rocket components from OpenRocket data.
-func initComponentsFromORK(orkData *openrocket.RocketDocument, motor *components.Motor, log *logf.Logger) (map[string]interface{}, *components.Bodytube, *components.Nosecone, *components.TrapezoidFinset, *components.Parachute, error) {
+func initComponentsFromORK(orkData *openrocket.OpenrocketDocument, motor *components.Motor, log *logf.Logger) (map[string]interface{}, *components.Bodytube, *components.Nosecone, *components.TrapezoidFinset, *components.Parachute, error) {
 	createdComponents := make(map[string]interface{}) // Use interface{} for flexibility
 
 	// Motor (already created, just validate and add)
@@ -37,8 +37,8 @@ func initComponentsFromORK(orkData *openrocket.RocketDocument, motor *components
 	createdComponents["motor"] = motor // Add validated motor
 
 	// Populate motor dimensions from OpenRocket data
-	if len(orkData.Subcomponents.Stages) > 0 {
-		orkDefinitionMotor := orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.InnerTube.MotorMount.Motor
+	if len(orkData.Rocket.Subcomponents.Stages) > 0 { // MODIFIED: Access via orkData.Rocket
+		orkDefinitionMotor := orkData.Rocket.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.InnerTube.MotorMount.Motor // MODIFIED: Access via orkData.Rocket
 		if orkDefinitionMotor.Designation != "" {
 			if m, ok := createdComponents["motor"].(*components.Motor); ok {
 				m.Length = orkDefinitionMotor.Length
@@ -55,7 +55,7 @@ func initComponentsFromORK(orkData *openrocket.RocketDocument, motor *components
 	}
 
 	// Bodytube
-	bodytube, err := components.NewBodytubeFromORK(ecs.NewBasic(), orkData)
+	bodytube, err := components.NewBodytubeFromORK(ecs.NewBasic(), orkData) // This function now expects *OpenrocketDocument
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("error creating Bodytube from ORK: %w", err)
 	}
@@ -64,11 +64,11 @@ func initComponentsFromORK(orkData *openrocket.RocketDocument, motor *components
 
 	// Finset (optional)
 	var finset *components.TrapezoidFinset
-	if len(orkData.Subcomponents.Stages) > 0 &&
-		len(orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets) > 0 &&
-		orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0].FinCount > 0 {
+	if len(orkData.Rocket.Subcomponents.Stages) > 0 && // MODIFIED: Access via orkData.Rocket
+		len(orkData.Rocket.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets) > 0 && // MODIFIED: Access via orkData.Rocket
+		orkData.Rocket.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0].FinCount > 0 { // MODIFIED: Access via orkData.Rocket
 
-		orkSpecificFinset := orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0]
+		orkSpecificFinset := orkData.Rocket.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.TrapezoidFinsets[0] // MODIFIED: Access via orkData.Rocket
 		finsetPosition := types.Vector3{X: orkSpecificFinset.Position.Value, Y: 0, Z: 0}
 		finsetMaterial := orkSpecificFinset.Material
 
@@ -86,14 +86,14 @@ func initComponentsFromORK(orkData *openrocket.RocketDocument, motor *components
 	}
 
 	// Nosecone
-	nosecone := components.NewNoseconeFromORK(ecs.NewBasic(), orkData)
+	nosecone := components.NewNoseconeFromORK(ecs.NewBasic(), orkData) // This function now expects *OpenrocketDocument
 	if nosecone == nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("error creating Nosecone from ORK (nil returned)")
 	}
 	createdComponents["nosecone"] = nosecone
 
 	// Parachute
-	parachute, err := components.NewParachuteFromORK(ecs.NewBasic(), orkData)
+	parachute, err := components.NewParachuteFromORK(ecs.NewBasic(), orkData) // This call should now be correct
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("error creating Parachute from ORK: %w", err)
 	}
@@ -257,7 +257,7 @@ func createPhysicsState(basic ecs.BasicEntity, overallRocketCG types.Vector3, to
 }
 
 // NewRocketEntity creates a new rocket entity from OpenRocket data
-func NewRocketEntity(world *ecs.World, orkData *openrocket.RocketDocument, motor *components.Motor, log *logf.Logger) *RocketEntity {
+func NewRocketEntity(world *ecs.World, orkData *openrocket.OpenrocketDocument, motor *components.Motor, log *logf.Logger) *RocketEntity {
 	if orkData == nil || motor == nil {
 		log.Error("Cannot create RocketEntity: orkData or motor is nil")
 		return nil

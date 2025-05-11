@@ -1,6 +1,7 @@
 package components_test
 
 import (
+	"encoding/xml"
 	"fmt"
 	"math"
 	"testing"
@@ -67,32 +68,36 @@ func TestNosecone_Update(t *testing.T) {
 // TEST: GIVEN a new Nosecone WHEN Remove is called THEN the component is removed
 func TestNoseconeFromORK(t *testing.T) {
 	id := ecs.NewBasic()
-	orkDoc := &openrocket.RocketDocument{
-		Subcomponents: openrocket.Subcomponents{
-			Stages: []openrocket.RocketStage{{
-				SustainerSubcomponents: openrocket.SustainerSubcomponents{
-					Nosecone: openrocket.Nosecone{
-						AftRadius:      0.5,
-						Length:         2.0,
-						Thickness:      0.1,
-						Shape:          "ogive",
-						ShapeParameter: 0.5,
-						Material: openrocket.Material{
-							Name:    "Test Material",
-							Type:    "BULK",
-							Density: 1.2,
-						},
-						Finish:            "Smooth",
-						AftShoulderRadius: 0.4,
-						AftShoulderLength: 0.3,
-						Subcomponents: openrocket.NoseSubcomponents{
-							MassComponent: openrocket.MassComponent{
-								Mass: 0.1,
+	orkDoc := &openrocket.OpenrocketDocument{
+		XMLName: xml.Name{Local: "openrocket"},
+		Rocket: openrocket.RocketDocument{
+			XMLName: xml.Name{Local: "rocket"},
+			Subcomponents: openrocket.Subcomponents{
+				Stages: []openrocket.RocketStage{{
+					SustainerSubcomponents: openrocket.SustainerSubcomponents{
+						Nosecone: openrocket.Nosecone{
+							AftRadius:      0.5,
+							Length:         2.0,
+							Thickness:      0.1,
+							Shape:          "ogive",
+							ShapeParameter: 0.5,
+							Material: openrocket.Material{
+								Name:    "Test Material",
+								Type:    "BULK",
+								Density: 1.2,
+							},
+							Finish:            "Smooth",
+							AftShoulderRadius: 0.4,
+							AftShoulderLength: 0.3,
+							Subcomponents: openrocket.NoseSubcomponents{
+								MassComponent: openrocket.MassComponent{
+									Mass: 0.1,
+								},
 							},
 						},
 					},
-				},
-			}},
+				}},
+			},
 		},
 	}
 

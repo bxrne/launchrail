@@ -46,8 +46,15 @@ func NewNosecone(id ecs.BasicEntity, radius, length, mass, shapeParameter float6
 }
 
 // NewNoseconeFromORK creates a new nosecone instance from an ORK Document
-func NewNoseconeFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument) *Nosecone {
-	orkNosecone := orkData.Subcomponents.Stages[0].SustainerSubcomponents.Nosecone
+func NewNoseconeFromORK(id ecs.BasicEntity, orkData *openrocket.OpenrocketDocument) *Nosecone {
+	if orkData == nil || orkData.Rocket.XMLName.Local == "" || len(orkData.Rocket.Subcomponents.Stages) == 0 {
+		// Optionally log an error or return nil if critical data is missing
+		// For now, proceeding assuming valid structure for simplicity, but real-world might need robust error handling.
+		// If we return nil, the caller (e.g., initComponentsFromORK) needs to handle it.
+		// Returning an empty/default Nosecone might also be an option if that's preferable to nil.
+		return nil // Or handle error appropriately
+	}
+	orkNosecone := orkData.Rocket.Subcomponents.Stages[0].SustainerSubcomponents.Nosecone
 
 	// Calculate volume and surface area (simplified approximation)
 	baseArea := math.Pi * orkNosecone.AftRadius * orkNosecone.AftRadius

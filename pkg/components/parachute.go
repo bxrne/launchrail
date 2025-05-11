@@ -14,12 +14,16 @@ import (
 // and control its descent rate.
 type Parachute struct {
 	ID              ecs.BasicEntity
+	Name            string
 	Position        types.Vector3
 	Diameter        float64
 	DragCoefficient float64
 	Strands         int
+	LineLength      float64
 	Area            float64
 	Trigger         ParachuteTrigger
+	DeployAltitude  float64
+	DeployDelay     float64
 	Deployed        bool
 }
 
@@ -37,19 +41,23 @@ const (
 
 // String returns a string representation of the Parachute struct
 func (p *Parachute) String() string {
-	return fmt.Sprintf("Parachute{ID={%d %v %v}, Position=%v, Diameter=%.2f, DragCoefficient=%.2f, Strands=%d, Area=%.2f}", p.ID.ID()-1, p.ID.Parent(), p.ID.Children(), p.Position, p.Diameter, p.DragCoefficient, p.Strands, p.Area)
+	return fmt.Sprintf("Parachute{ID={%d %v %v}, Name=%s, Position=%v, Diameter=%.2f, DragCoefficient=%.2f, Strands=%d, LineLength=%.2f, Area=%.2f, Trigger=%s, DeployAltitude=%.2f, DeployDelay=%.2f}", p.ID.ID()-1, p.ID.Parent(), p.ID.Children(), p.Name, p.Position, p.Diameter, p.DragCoefficient, p.Strands, p.LineLength, p.Area, p.Trigger, p.DeployAltitude, p.DeployDelay)
 }
 
 // NewParachute creates a new parachute instance
 func NewParachute(id ecs.BasicEntity, diameter, dragCoefficient float64, strands int, trigger ParachuteTrigger) *Parachute {
 	return &Parachute{
 		ID:              id,
+		Name:            "",
 		Position:        types.Vector3{X: 0, Y: 0, Z: 0},
 		Diameter:        diameter,
 		DragCoefficient: dragCoefficient,
 		Strands:         strands,
+		LineLength:      0,
 		Area:            0.25 * math.Pi * diameter * diameter,
 		Trigger:         trigger,
+		DeployAltitude:  0,
+		DeployDelay:     0,
 	}
 }
 
@@ -59,28 +67,42 @@ func parseAuto(auto string) (float64, error) {
 		return 0, fmt.Errorf("empty string")
 	}
 	if auto == "auto" {
-		return 0, nil
+		return 0.8, nil
 	}
-	return strconv.ParseFloat(auto[5:], 64)
+	val, err := strconv.ParseFloat(auto, 64)
+	if err == nil {
+		return val, nil
+	}
+	if len(auto) > 5 && auto[:5] == "auto " {
+		return strconv.ParseFloat(auto[5:], 64)
+	}
+	return 0, fmt.Errorf("cannot parse '%s' as float or 'auto <value>'", auto)
 }
 
 // NewParachuteFromORK creates a new parachute instance from an ORK Document
-func NewParachuteFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument) (*Parachute, error) {
+func NewParachuteFromORK(id ecs.BasicEntity, orkData *openrocket.OpenrocketDocument) (*Parachute, error) {
 	if orkData == nil {
 		return nil, fmt.Errorf("OpenRocket data is nil")
 	}
-	if len(orkData.Subcomponents.Stages) == 0 {
-		return nil, fmt.Errorf("OpenRocket data has no stages, cannot retrieve parachute information")
+	if len(orkData.Rocket.Subcomponents.Stages) == 0 ||
+		orkData.Rocket.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.ID == "" {
+		return nil, fmt.Errorf("parachute definition not found or invalid rocket structure in ORK data: no stages or bodytube missing or BodyTube ID is empty")
 	}
 
-	orkParachuteDefinition := orkData.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.Parachute
+	orkParachuteDefinition := &orkData.Rocket.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.Parachute
+
+	if orkParachuteDefinition.ID == "" {
+		return nil, fmt.Errorf("parachute definition not found or invalid rocket structure in ORK data: parachute missing or ID is empty")
+	}
 
 	drag, err := parseAuto(orkParachuteDefinition.CD)
 	if err != nil {
-		return nil, fmt.Errorf("invalid drag coefficient '%s': %w", orkParachuteDefinition.CD, err)
+		drag = 0.8
+	}
+	if drag <= 0 {
+		drag = 0.8
 	}
 
-	// Prioritize deployment configuration event over main deploy event
 	deployEvent := orkParachuteDefinition.DeployEvent
 	if orkParachuteDefinition.DeploymentConfig.DeployEvent != "" {
 		deployEvent = orkParachuteDefinition.DeploymentConfig.DeployEvent
@@ -88,12 +110,17 @@ func NewParachuteFromORK(id ecs.BasicEntity, orkData *openrocket.RocketDocument)
 
 	return &Parachute{
 		ID:              id,
-		Position:        types.Vector3{X: 0, Y: 0, Z: 0}, 
+		Name:            orkParachuteDefinition.Name,
+		Position:        types.Vector3{X: 0, Y: 0, Z: 0},
 		Diameter:        orkParachuteDefinition.Diameter,
 		DragCoefficient: drag,
 		Strands:         orkParachuteDefinition.LineCount,
-		Area:            0.25 * math.Pi * orkParachuteDefinition.Diameter * orkParachuteDefinition.Diameter, 
+		LineLength:      orkParachuteDefinition.LineLength,
+		Area:            0.25 * math.Pi * orkParachuteDefinition.Diameter * orkParachuteDefinition.Diameter,
 		Trigger:         ParachuteTrigger(deployEvent),
+		DeployAltitude:  orkParachuteDefinition.DeployAltitude,
+		DeployDelay:     orkParachuteDefinition.DeployDelay,
+		Deployed:        false,
 	}, nil
 }
 

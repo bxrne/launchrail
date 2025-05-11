@@ -1,6 +1,7 @@
 package components_test
 
 import (
+	"encoding/xml"
 	"fmt"
 	"math"
 	"testing"
@@ -91,23 +92,27 @@ func TestNewBodytube(t *testing.T) {
 // TEST: GIVEN a new Bodytube WHEN NewBodytubeFromORK is called THEN a new Bodytube is created
 func TestBodytubeFromORK(t *testing.T) {
 	id := ecs.NewBasic()
-	orkDoc := &openrocket.RocketDocument{
-		Subcomponents: openrocket.Subcomponents{
-			Stages: []openrocket.RocketStage{{
-				SustainerSubcomponents: openrocket.SustainerSubcomponents{
-					BodyTube: openrocket.BodyTube{
-						Radius:    "auto 0.5",
-						Length:    2.0,
-						Thickness: 0.1,
-						Material: openrocket.Material{
-							Name:    "Test Material",
-							Type:    "BULK",
-							Density: 1.2,
+	orkDoc := &openrocket.OpenrocketDocument{
+		XMLName: xml.Name{Local: "openrocket"},
+		Rocket: openrocket.RocketDocument{
+			XMLName: xml.Name{Local: "rocket"},
+			Subcomponents: openrocket.Subcomponents{
+				Stages: []openrocket.RocketStage{{
+					SustainerSubcomponents: openrocket.SustainerSubcomponents{
+						BodyTube: openrocket.BodyTube{
+							Radius:    "auto 0.5",
+							Length:    2.0,
+							Thickness: 0.1,
+							Material: openrocket.Material{
+								Name:    "Test Material",
+								Type:    "BULK",
+								Density: 1.2,
+							},
+							Finish: "Smooth",
 						},
-						Finish: "Smooth",
 					},
-				},
-			}},
+				}},
+			},
 		},
 	}
 
@@ -155,15 +160,19 @@ func TestBodytubeGetters(t *testing.T) {
 // TEST: GIVEN a new Bodytube WHEN NewBodytubeFromORK is called THEN a new Bodytube is created with auto radius
 func TestBodytubeFromORKInvalidRadius(t *testing.T) {
 	id := ecs.NewBasic()
-	orkDoc := &openrocket.RocketDocument{
-		Subcomponents: openrocket.Subcomponents{
-			Stages: []openrocket.RocketStage{{
-				SustainerSubcomponents: openrocket.SustainerSubcomponents{
-					BodyTube: openrocket.BodyTube{
-						Radius: "invalid",
+	orkDoc := &openrocket.OpenrocketDocument{
+		XMLName: xml.Name{Local: "openrocket"},
+		Rocket: openrocket.RocketDocument{
+			XMLName: xml.Name{Local: "rocket"},
+			Subcomponents: openrocket.Subcomponents{
+				Stages: []openrocket.RocketStage{{
+					SustainerSubcomponents: openrocket.SustainerSubcomponents{
+						BodyTube: openrocket.BodyTube{
+							Radius: "invalid",
+						},
 					},
-				},
-			}},
+				}},
+			},
 		},
 	}
 
