@@ -21,11 +21,14 @@ func createMockOpenRocketData() *openrocket.OpenrocketDocument {
 		XMLName: xml.Name{Local: "openrocket"},
 		Rocket: openrocket.RocketDocument{
 			XMLName: xml.Name{Local: "rocket"},
+			ID:      "testRocketID",
 			Subcomponents: openrocket.Subcomponents{
 				Stages: []openrocket.RocketStage{
 					{
+						ID: "testStageID",
 						SustainerSubcomponents: openrocket.SustainerSubcomponents{
 							Nosecone: openrocket.Nosecone{
+								ID: "testNoseconeID",
 								Material: openrocket.Material{
 									Density: 1.0,
 									Name:    "Test Material",
@@ -39,6 +42,7 @@ func createMockOpenRocketData() *openrocket.OpenrocketDocument {
 								Subcomponents:  openrocket.NoseSubcomponents{},
 							},
 							BodyTube: openrocket.BodyTube{
+								ID: "testBodyTubeID",
 								Material: openrocket.Material{
 									Density: 1.0,
 									Name:    "Test Material",
@@ -49,10 +53,12 @@ func createMockOpenRocketData() *openrocket.OpenrocketDocument {
 								Radius:    "0.5",
 								Subcomponents: openrocket.BodyTubeSubcomponents{
 									Parachute: openrocket.Parachute{
+										ID: "testParachuteID",
 										CD: "auto 1.0",
 									},
 									TrapezoidFinsets: []openrocket.TrapezoidFinset{
 										{
+											ID: "testFinsetID",
 											Material: openrocket.Material{
 												Density: 1.0,
 												Name:    "Test Material",

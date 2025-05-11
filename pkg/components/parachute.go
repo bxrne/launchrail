@@ -41,7 +41,7 @@ const (
 
 // String returns a string representation of the Parachute struct
 func (p *Parachute) String() string {
-	return fmt.Sprintf("Parachute{ID={%d %v %v}, Name=%s, Position=%v, Diameter=%.2f, DragCoefficient=%.2f, Strands=%d, LineLength=%.2f, Area=%.2f, Trigger=%s, DeployAltitude=%.2f, DeployDelay=%.2f}", p.ID.ID()-1, p.ID.Parent(), p.ID.Children(), p.Name, p.Position, p.Diameter, p.DragCoefficient, p.Strands, p.LineLength, p.Area, p.Trigger, p.DeployAltitude, p.DeployDelay)
+	return fmt.Sprintf("Parachute{ID:{%d %v %v}, Name=%s, Position=%v, Diameter=%.2f, DragCoefficient=%.2f, Strands=%d, LineLength=%.2f, Area=%.2f, Trigger=%s, DeployAltitude=%.2f, DeployDelay=%.2f}", p.ID.ID()-1, p.ID.Parent(), p.ID.Children(), p.Name, p.Position, p.Diameter, p.DragCoefficient, p.Strands, p.LineLength, p.Area, p.Trigger, p.DeployAltitude, p.DeployDelay)
 }
 
 // NewParachute creates a new parachute instance
@@ -79,22 +79,45 @@ func parseAuto(auto string) (float64, error) {
 	return 0, fmt.Errorf("cannot parse '%s' as float or 'auto <value>'", auto)
 }
 
-// NewParachuteFromORK creates a new parachute instance from an ORK Document
+// NewParachuteFromORK creates a new Parachute component from OpenRocket data.
+// It attempts to find the first available parachute definition within the rocket's stages.
 func NewParachuteFromORK(id ecs.BasicEntity, orkData *openrocket.OpenrocketDocument) (*Parachute, error) {
-	if orkData == nil {
-		return nil, fmt.Errorf("OpenRocket data is nil")
-	}
-	if len(orkData.Rocket.Subcomponents.Stages) == 0 ||
-		orkData.Rocket.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.ID == "" {
-		return nil, fmt.Errorf("parachute definition not found or invalid rocket structure in ORK data: no stages or bodytube missing or BodyTube ID is empty")
+	if orkData == nil || orkData.Rocket.ID == "" { // Check if orkData is nil or Rocket is uninitialized
+		return nil, fmt.Errorf("OpenRocket data is nil or rocket definition is empty")
 	}
 
-	orkParachuteDefinition := &orkData.Rocket.Subcomponents.Stages[0].SustainerSubcomponents.BodyTube.Subcomponents.Parachute
-
-	if orkParachuteDefinition.ID == "" {
-		return nil, fmt.Errorf("parachute definition not found or invalid rocket structure in ORK data: parachute missing or ID is empty")
+	// Check if there are any stages defined
+	if len(orkData.Rocket.Subcomponents.Stages) == 0 {
+		return nil, fmt.Errorf("OpenRocket data has no stages, cannot retrieve parachute information")
 	}
 
+	var orkParachuteDefinition *openrocket.Parachute
+	found := false
+
+	if len(orkData.Rocket.Subcomponents.Stages) > 0 {
+		for _, stage := range orkData.Rocket.Subcomponents.Stages {
+			// Check the primary body tube within the sustainer's subcomponents for a parachute.
+			// Assumes stage.SustainerSubcomponents.BodyTube refers to the main body tube,
+			// and that BodyTube.Subcomponents.Parachute is a single struct.
+			if stage.SustainerSubcomponents.BodyTube.ID != "" && stage.SustainerSubcomponents.BodyTube.Subcomponents.Parachute.ID != "" {
+				orkParachuteDefinition = &stage.SustainerSubcomponents.BodyTube.Subcomponents.Parachute
+				found = true
+				break // Found in this stage, exit stage loop
+			}
+
+			// Note: If a stage can have multiple body tubes each with parachutes,
+			// the schema for SustainerSubcomponents would need to list them (e.g., as a slice),
+			// and additional iteration logic would be needed here.
+			// The previous loop for `stage.Subcomponents.BodyTube` was incorrect as
+			// `RocketStage` does not have a `Subcomponents` field; it has `SustainerSubcomponents`.
+		}
+	}
+
+	if !found || orkParachuteDefinition == nil {
+		return nil, fmt.Errorf("no parachute definition found in ORK data")
+	}
+
+	// Convert string values from ORK to appropriate types
 	drag, err := parseAuto(orkParachuteDefinition.CD)
 	if err != nil {
 		drag = 0.8

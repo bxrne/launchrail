@@ -97,11 +97,14 @@ func TestAerodynamicSystem_CalculateDrag(t *testing.T) {
 	system := systems.NewAerodynamicSystem(&ecs.World{}, 1, cfg, testLogger) // Pass empty world and logger
 
 	// Create test entity
+	basicID := ecs.NewBasic()
 	entity := &states.PhysicsState{
+		Entity:   &basicID, // Initialize Entity field
 		Position: &types.Position{Vec: types.Vector3{Y: 0}},   // Sea level
 		Velocity: &types.Velocity{Vec: types.Vector3{Y: 100}}, // 100 m/s upward
 		Nosecone: &components.Nosecone{Radius: 0.1},
 		Bodytube: &components.Bodytube{Radius: 0.1, Length: 1.0},
+		// Parachute remains nil for this test (body drag case)
 	}
 
 	dragForce := system.CalculateDrag(entity)
