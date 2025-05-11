@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -263,10 +264,19 @@ func (rm *RecordManager) ListRecords() ([]*Record, error) {
 		return nil, fmt.Errorf("failed to read directory %s: %w", rm.baseDir, err)
 	}
 
+	// Regex to match a 64-character hexadecimal string (SHA256 hash)
+	hashRegex := regexp.MustCompile(`^[0-9a-f]{64}$`)
+
 	var records []*Record
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
+		}
+
+		// Check if the directory name matches the SHA256 hash pattern
+		if !hashRegex.MatchString(entry.Name()) {
+			rm.log.Debug("Skipping non-record directory", "name", entry.Name(), "baseDir", rm.baseDir)
+			continue // Skip directories like 'logs', 'benchmarks', etc.
 		}
 
 		// Construct recordPath relative to rm.baseDir
