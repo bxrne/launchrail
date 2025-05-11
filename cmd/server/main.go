@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/bxrne/launchrail/internal/config"
 	logger "github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/internal/plugin"
 	"github.com/bxrne/launchrail/internal/plot_transformer"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
@@ -256,53 +258,58 @@ func main() {
 	// Load configuration first
 	cfg, err := config.GetConfig()
 	if err != nil {
-		fmt.Println("Failed to load configuration:", err)
+		fmt.Println("CRITICAL: Failed to load configuration:", err)
 		os.Exit(1)
 	}
 
-	// Ensure logs directory exists
-	homedir := os.Getenv("HOME")
-	outputBase := filepath.Join(homedir, ".launchrail")
-	logsDir := filepath.Join(outputBase, "logs")
-	if err := os.MkdirAll(logsDir, 0o755); err != nil {
-		fmt.Printf("Failed to create logs directory: %v\n", err)
+	lg, err := logger.InitFileLogger(cfg.Setup.Logging.Level, "server")
+	if err != nil {
+		// Use standard log for critical failures before our logger is fully up.
+		log.Fatalf("CRITICAL: Failed to initialize file logger: %v. Exiting.", err)
+	}
+
+	// Compile all plugins at server startup
+	lg.Info("Compiling all external plugins at server startup...")
+	if err := plugin.CompileAllPlugins("./plugins", "./plugins", *lg); err != nil {
+		lg.Fatal("Failed to compile one or more plugins during server startup", "error", err)
+		// os.Exit(1) is implicitly called by lg.Fatal
+	}
+	lg.Info("External plugin compilation finished successfully.")
+
+	// Initialize RecordManager
+	usr, err := user.Current()
+	if err != nil {
+		lg.Fatal("Failed to get current user for RecordManager path", "error", err)
+	}
+	homedir := usr.HomeDir
+	recordOutputBase := filepath.Join(homedir, ".launchrail")
+
+	recordManager, err := storage.NewRecordManager(recordOutputBase) // Pass the specific records path
+	if err != nil {
+		lg.Error("Failed to initialize record manager", "error", err)
 		os.Exit(1)
 	}
-	logFilePath := filepath.Join(logsDir, "server-20250510-152030.log")
-	// Initialize logger
-	log := logger.GetLogger(cfg.Setup.Logging.Level, logFilePath)
 
-	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
+	// Set up data handler with the initialized logger and configuration
+	dataHandler := &DataHandler{
+		Cfg:     cfg,
+		log:     lg,
+		records: recordManager,
+	}
 
+	// Initialize Gin router
 	r := gin.New()
 	// Attach our custom LoggingMiddleware (logs to file and stdout)
-	r.Use(logger.LoggingMiddleware(log))
+	r.Use(logger.LoggingMiddleware(lg))
 	// Optionally, add Gin's Recovery middleware for panic handling
 	r.Use(gin.Recovery())
 	err = r.SetTrustedProxies(nil)
 	if err != nil {
-		log.Warn("Failed to set trusted proxies", "Error", err)
+		lg.Warn("Failed to set trusted proxies", "Error", err)
 		os.Exit(1) // Exit on fatal error
 	}
 
-	// Get user's home directory
-	usr, err := user.Current()
-	if err != nil {
-		log.Warn("Failed to get user's home directory", "error", err)
-		os.Exit(1) // Exit on fatal error
-	}
-	baseDir := filepath.Join(usr.HomeDir, ".launchrail") // Use ~/.launchrail
-
-	// Initialize RecordManager
-	recordManager, err := storage.NewRecordManager(baseDir)
-	if err != nil {
-		log.Warn("Failed to initialize record manager", "error", err)
-		os.Exit(1) // Exit on fatal error
-	}
-	dataHandler := &DataHandler{records: recordManager, Cfg: cfg, log: log} // Pass cfg and logger here
-
-	// Serve static files (CSS, JS)
-	r.Static("/static", "./static")
+	lg.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
 
 	// Documentation & API spec routes
 	docs := r.Group("/docs")
@@ -466,10 +473,19 @@ func main() {
 		})
 	})
 
-	log.Info("Server started", "Port", cfg.Server.Port)
-	portStr := fmt.Sprintf(":%d", cfg.Server.Port)
-	if err := r.Run(portStr); err != nil {
-		log.Warn("Failed to start server", "error", err)
+	lg.Info("Server started", "Port", cfg.Server.Port)
+	srv := &http.Server{
+		Addr:           fmt.Sprintf(":%d", cfg.Server.Port),
+		Handler:        r, // Use the gin router 'r'
+		ReadTimeout:    time.Duration(cfg.Server.ReadTimeout) * time.Second,
+		WriteTimeout:   time.Duration(cfg.Server.WriteTimeout) * time.Second,
+		IdleTimeout:    time.Duration(cfg.Server.IdleTimeout) * time.Second,
+		MaxHeaderBytes: 1 << 20, // Example: 1 MB Max Header
+		ErrorLog:       log.New(lg.Writer, "http_server: ", log.LstdFlags),
+	}
+
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		lg.Warn("Failed to start server", "error", err)
 	}
 }
 

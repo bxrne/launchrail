@@ -83,8 +83,6 @@ func writeMarkdownReport(runDir, tag string, results []BenchmarkResult) error {
 
 func main() {
 	var homeDir string
-	// --- Setup Logger ---
-	// Logger will be initialized after config is loaded.
 
 	// --- Load Configuration ---
 	cfg, err := config.GetConfig()
@@ -92,30 +90,24 @@ func main() {
 		// Use standard log for critical early errors if config fails before logger is up
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
-	// Ensure logs directory exists
-	homeDir, err = os.UserHomeDir()
+
+	// Initialize logger using the new centralized function
+	benchLogger, err = logger.InitFileLogger(cfg.Setup.Logging.Level, "bench")
 	if err != nil {
-		log.Fatalf("Failed to get user home directory: %v", err)
+		log.Fatalf("CRITICAL: Failed to initialize file logger: %v", err) // Use standard log
 	}
-	logsDir := filepath.Join(homeDir, ".launchrail", "logs")
-	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		log.Fatalf("Failed to create logs directory: %v", err)
-	}
-	logFilePath := filepath.Join(logsDir, "bench-20250510-152030.log")
-	// Initialize logger with config level. This will be the first effective call.
-	benchLogger = logger.GetLogger(cfg.Setup.Logging.Level, logFilePath)
 
 	benchLogger.Info("--- Starting Benchmark Run --- ")
 
-	// --- Create Base Output Directory ---
+	// --- Create Base Output Directory for benchmark results ---
 	homeDir, err = os.UserHomeDir()
 	if err != nil {
-		benchLogger.Fatal("Failed to get user home directory", "error", err)
+		benchLogger.Fatal("Failed to get user home directory for benchmark output", "error", err)
 	}
 	timestamp := time.Now().Format("20060102-150405")
 	baseOutputDir := filepath.Join(homeDir, ".launchrail", "benchmarks", timestamp)
 	if err := os.MkdirAll(baseOutputDir, 0755); err != nil {
-		benchLogger.Fatal("Failed to create base output directory", "path", baseOutputDir, "error", err)
+		benchLogger.Fatal("Failed to create base benchmark output directory", "path", baseOutputDir, "error", err)
 	}
 	benchLogger.Info("Benchmark results will be stored in", "directory", baseOutputDir)
 

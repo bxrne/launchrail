@@ -133,7 +133,9 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 	log.Info("CreateRecord called", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(time.Now().String())))
+	// Use nanoseconds for higher collision resistance
+	hashInput := fmt.Sprintf("%d", time.Now().UnixNano())
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(hashInput)))
 
 	// Use rm.baseDir as the root for record directories.
 	// rm.baseDir should already be an absolute path, created by NewRecordManager.

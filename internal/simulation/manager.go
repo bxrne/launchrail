@@ -58,16 +58,16 @@ func (m *Manager) Initialize(stores *storage.Stores) error {
 	// Store the provided stores
 	m.stores = stores
 
-	// Compile plugins first
-	m.log.Info("Compiling external plugins...")
-	if err := plugin.CompilePlugins("./plugins", "./plugins", m.log); err != nil {
-		m.log.Error("Failed to compile one or more plugins", "error", err)
-		// Depending on requirements, we might want to allow proceeding even if some plugins fail.
-		// For now, treat compilation failure as a fatal initialization error.
-		m.status = StatusFailed
-		return fmt.Errorf("plugin compilation failed: %w", err)
-	}
-	m.log.Info("Plugin compilation finished.")
+	// Plugin compilation moved to server startup
+	// m.log.Info("Compiling external plugins...")
+	// if err := plugin.CompilePlugins("./plugins", "./plugins", m.log); err != nil {
+	// 	m.log.Error("Failed to compile one or more plugins", "error", err)
+	// 	// Depending on requirements, we might want to allow proceeding even if some plugins fail.
+	// 	// For now, treat compilation failure as a fatal initialization error.
+	// 	m.status = StatusFailed
+	// 	return fmt.Errorf("plugin compilation failed: %w", err)
+	// }
+	// m.log.Info("Plugin compilation finished.")
 
 	// Validate config consistency for step & max_time
 	simStep := m.cfg.Engine.Simulation.Step

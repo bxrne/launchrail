@@ -4,14 +4,16 @@ setup:
     version: "0.0.1"
 
   logging:
-    level: "info"
+    level: "debug"
   plugins:
     paths:
       - "./plugins/windeffect.so"
-      # - "./plugins/blackscholes.so"
+      # - "./plugins/blackscholes.so"
 
 server:
   port: 8080
+  read_timeout_seconds: 10
+  write_timeout_seconds: 10
 
 engine:
   simulation:

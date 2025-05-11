@@ -1,9 +1,12 @@
 package logger
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
+	"os/user"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -12,24 +15,50 @@ import (
 )
 
 var (
-	logger      logf.Logger
-	once        sync.Once
-	logFile     *os.File
-	logFilePath string
+	globalLogger logf.Logger
+	once         sync.Once
+	logFile      *os.File
 	defaultOpts = logf.Opts{
 		EnableCaller:    true,
 		TimestampFormat: "15:04:05",
-		EnableColor:     false,          // Disable color globally so log file output has no ANSI codes
-		Level:           logf.InfoLevel, // Default level
+		EnableColor:     false,
+		Level:           logf.InfoLevel,
 	}
 )
 
+// InitFileLogger sets up the global logger with file output.
+// It ensures the log directory exists and creates a timestamped log file.
+func InitFileLogger(configuredLevel string, appName string) (*logf.Logger, error) {
+	usr, err := user.Current()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current user: %w", err)
+	}
+	homedir := usr.HomeDir
+	outputBase := filepath.Join(homedir, ".launchrail")
+	logsDir := filepath.Join(outputBase, "logs")
+
+	if err := os.MkdirAll(logsDir, 0o755); err != nil {
+		return nil, fmt.Errorf("failed to create logs directory '%s': %w", logsDir, err)
+	}
+
+	currentTime := time.Now().Format("2006-01-02_15-04-05")
+	logFileName := fmt.Sprintf("%s-%s.log", appName, currentTime)
+	fullLogFilePath := filepath.Join(logsDir, logFileName)
+
+	// GetLogger will be called with the determined path and level.
+	// The sync.Once inside GetLogger will handle the singleton initialization.
+	lg := GetLogger(configuredLevel, fullLogFilePath)
+	lg.Info("File logger initialized", "app", appName, "path", fullLogFilePath, "level", configuredLevel)
+	return lg, nil
+}
+
 // GetLogger returns the singleton instance of the logger.
-// The 'level' parameter is only effective on the first call that initializes the logger.
-// The 'filePath' parameter is optional and only effective on the first call.
+// If filePath is provided (typically by InitFileLogger), it attempts to set up file logging.
+// Otherwise, or if file opening fails, it defaults to stdout.
+// The 'level' and 'filePath' parameters are only effective on the first call that initializes the logger.
 func GetLogger(level string, filePath ...string) *logf.Logger {
 	once.Do(func() {
-		currentOpts := defaultOpts // Start with defaults
+		currentOpts := defaultOpts
 		var logLevel logf.Level
 		switch level {
 		case "debug":
@@ -43,26 +72,30 @@ func GetLogger(level string, filePath ...string) *logf.Logger {
 		case "fatal":
 			logLevel = logf.FatalLevel
 		default:
-			logLevel = defaultOpts.Level
+			logLevel = defaultOpts.Level // Use default if level string is unrecognized
 		}
 		currentOpts.Level = logLevel
 
 		var writers []io.Writer
-		writers = append(writers, os.Stdout)
+		writers = append(writers, os.Stdout) // Always log to stdout
+
 		if len(filePath) > 0 && filePath[0] != "" {
 			var err error
-			logFilePath = filePath[0]
-			logFile, err = os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			// Use the first path provided. It's expected to be set by InitFileLogger.
+			actualLogFilePath := filePath[0]
+			logFile, err = os.OpenFile(actualLogFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
-				log.Printf("[logger] Failed to open log file '%s': %v", logFilePath, err)
+				// Use standard log package for this specific error, as logf isn't fully set up yet.
+				// This message will go to stdout.
+				log.Printf("[logger] Failed to open log file '%s': %v. Continuing with stdout only.", actualLogFilePath, err)
 			} else {
 				writers = append(writers, logFile)
 			}
 		}
 		currentOpts.Writer = io.MultiWriter(writers...)
-		logger = logf.New(currentOpts)
+		globalLogger = logf.New(currentOpts)
 	})
-	return &logger
+	return &globalLogger
 }
 
 // LoggingMiddleware returns a Gin middleware that logs all HTTP requests with details.
@@ -98,5 +131,5 @@ func Reset() {
 		_ = logFile.Close()
 		logFile = nil
 	}
-	logger = logf.Logger{}
+	globalLogger = logf.Logger{}
 }

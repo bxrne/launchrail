@@ -109,44 +109,47 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 	const velocityWindow = 0.5 // m/s window to detect velocity near zero
 
 	// Ensure entity and its relevant fields are not nil before accessing them
-	if entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Motor == nil || entity.Parachute == nil {
+	if entity == nil || entity.Entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Motor == nil || entity.Parachute == nil {
 		s.logger.Error("DetectApogee: entity or critical component is nil")
 		return false
 	}
 
-	s.logger.Debug("DetectApogee called", "entityID", entity.Entity.ID(), "posY", entity.Position.Vec.Y, "velY", entity.Velocity.Vec.Y)
+	// Log initial state when function is called
+	s.logger.Info("DetectApogee attempt", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "velocityY", entity.Velocity.Vec.Y, "motorState", string(entity.Motor.FSM.Current()), "parachuteDeployed", entity.Parachute.Deployed)
 
 	// Must be near zero vertical velocity
 	if math.Abs(entity.Velocity.Vec.Y) > velocityWindow {
-		s.logger.Debug("DetectApogee: vertical velocity outside window", "velY", entity.Velocity.Vec.Y, "window", velocityWindow)
+		s.logger.Info("DetectApogee REJECT: vertical velocity outside window", "velocityY", entity.Velocity.Vec.Y, "targetWindow", velocityWindow)
 		return false
 	}
-	s.logger.Debug("DetectApogee: vertical velocity WITHIN window", "velY", entity.Velocity.Vec.Y)
+	s.logger.Debug("DetectApogee PASS: vertical velocity WITHIN window", "velocityY", entity.Velocity.Vec.Y)
 
 	// Motor must be idle
 	if entity.Motor.FSM.Current() != components.StateIdle {
-		s.logger.Debug("DetectApogee: motor not idle", "motorState", string(entity.Motor.FSM.Current()))
+		s.logger.Info("DetectApogee REJECT: motor not idle", "motorState", string(entity.Motor.FSM.Current()))
 		return false
 	}
-	s.logger.Debug("DetectApogee: motor is IDLE")
+	s.logger.Debug("DetectApogee PASS: motor is IDLE")
 
 	// Check parachute status - ensure it's not already deployed
 	if entity.Parachute.Deployed {
-		s.logger.Debug("DetectApogee: parachute already deployed", "parachuteDeployed", entity.Parachute.Deployed)
+		s.logger.Info("DetectApogee REJECT: parachute already deployed", "parachuteDeployed", entity.Parachute.Deployed)
 		return false
 	}
-	s.logger.Debug("DetectApogee: parachute OK (exists and not deployed)")
+	s.logger.Debug("DetectApogee PASS: parachute OK (not deployed)")
 
-	// Must be above ground
-	if entity.Position.Vec.Y <= 0 {
-		s.logger.Debug("DetectApogee: not above ground", "posY", entity.Position.Vec.Y)
+	// Must be above a minimum safe deployment altitude (e.g., > 10m, could be configurable)
+	// For now, just check if above ground to match previous logic, but consider a minimum deployment altitude.
+	minDeploymentAltitude := 10.0 // Example minimum altitude
+	if entity.Position.Vec.Y <= minDeploymentAltitude { 
+		s.logger.Info("DetectApogee REJECT: not sufficiently above ground for deployment", "altitude", entity.Position.Vec.Y, "minAltitude", minDeploymentAltitude)
 		return false
 	}
-	s.logger.Debug("DetectApogee: IS ABOVE GROUND")
+	s.logger.Debug("DetectApogee PASS: IS ABOVE MINIMUM DEPLOYMENT ALTITUDE")
 
 	// Deploy parachute if conditions met
 	s.logger.Info("APOGEE DETECTED: Deploying parachute!", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y)
-	entity.Parachute.Deploy()
+	entity.Parachute.Deploy() // We should also check what Deploy() does
 
 	return true
 }

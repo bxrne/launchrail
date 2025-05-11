@@ -30,9 +30,20 @@ func (p *WindEffectPlugin) Version() string {
 }
 
 func (p *WindEffectPlugin) BeforeSimStep(state *states.PhysicsState) error {
+	// Calculate the intended acceleration component from the "wind"
+	// This simulates a wind that varies sinusoidally with time,
+	// and its strength is p.windSpeed.
+	// If p.windSpeed is 5.0, this means the wind can cause up to 5 m/s^2 of acceleration.
+	accelerationX := p.windSpeed * math.Sin(state.Time)
 
-	f := p.windSpeed * math.Sin(state.Time)
-	state.Velocity.Vec.X += f
+	// Calculate the force to apply: F = m * a
+	// state.Mass.Value holds the scalar mass of the rocket.
+	forceX := state.Mass.Value * accelerationX
+
+	// Apply this force to the X component of the accumulated forces.
+	// The physics engine will then use this accumulated force to update velocity.
+	state.AccumulatedForce.X += forceX
+	p.log.Debug("WindEffect applied force", "time", state.Time, "wind_accel_x", accelerationX, "mass", state.Mass.Value, "applied_force_x", forceX, "total_accum_force_x", state.AccumulatedForce.X)
 	return nil
 }
 
