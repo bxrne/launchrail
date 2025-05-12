@@ -98,21 +98,8 @@ func (s *PhysicsSystem) Update(dt float64) error {
 					s.logger.Warn("Skipping gravity calculation due to invalid mass", "entity_id", entity.Entity.ID())
 				}
 
-				// Calculate Thrust Force (acts along rocket body axis, rotated to global frame)
-				var thrustForce types.Vector3
-				if entity.Motor != nil && !entity.Motor.IsCoasting() && entity.Orientation != nil && entity.Orientation.Quat != (types.Quaternion{}) {
-					thrustMagnitude := entity.Motor.GetThrust()
-					// Assume thrust acts along the rocket's local +Y axis
-					localThrust := types.Vector3{Y: thrustMagnitude}
-					thrustForce = *entity.Orientation.Quat.RotateVector(&localThrust)
-					entity.AccumulatedForce = entity.AccumulatedForce.Add(thrustForce)
-				} else if entity.Motor != nil && !entity.Motor.IsCoasting() {
-					// Fallback if orientation is missing/invalid? Assume vertical thrust? Log warning?
-					s.logger.Warn("Calculating thrust without valid orientation, assuming vertical", "entity_id", entity.Entity.ID())
-					thrustMagnitude := entity.Motor.GetThrust()
-					thrustForce = types.Vector3{Y: thrustMagnitude} // Vertical thrust
-					entity.AccumulatedForce = entity.AccumulatedForce.Add(thrustForce)
-				}
+				// NOTE: Thrust force is now handled in simulation.go's RK4 integrator
+				// to avoid double-counting thrust forces
 
 				// *** Apply accumulated forces and update state *** // THIS COMMENT IS MISLEADING NOW
 				// s.updateEntityState(entity, entity.AccumulatedForce, dt) // THIS CALL IS REMOVED

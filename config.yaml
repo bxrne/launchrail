@@ -17,7 +17,7 @@ server:
 
 engine:
   simulation:
-    step: 0.001
+    step: 0.01
     max_time: 300.0
     ground_tolerance: 0.01
   external:

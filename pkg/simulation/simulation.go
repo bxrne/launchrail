@@ -341,7 +341,7 @@ func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass
 		// For a cylinder rod perpendicular to axis: I_transverse = (1/12) * m * (3*r^2 + L^2)
 		if l > 0 {
 			Iyy = (1.0 / 12.0) * m * (3*r*r + l*l) // Pitch inertia about Y
-			Izz = Iyy                                 // Yaw inertia about Z (assuming symmetry)
+			Izz = Iyy                              // Yaw inertia about Z (assuming symmetry)
 		} else { // Fallback if length is zero (e.g. sphere or point mass approx)
 			Iyy = (2.0 / 5.0) * m * r * r
 			Izz = Iyy
@@ -354,7 +354,7 @@ func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass
 
 	// InertiaTensorBody fields M11, M22, M33 correspond to Ixx, Iyy, Izz about body X, Y, Z axes.
 	inertiaBodyCalculated := types.Matrix3x3{M11: Ixx, M22: Iyy, M33: Izz} // Direct struct initialization
-	invInertiaBodyCalculated := inertiaBodyCalculated.Inverse() // Inverse() is a method on Matrix3x3, returns *Matrix3x3
+	invInertiaBodyCalculated := inertiaBodyCalculated.Inverse()            // Inverse() is a method on Matrix3x3, returns *Matrix3x3
 
 	if invInertiaBodyCalculated == nil { // Inverse() returns nil on error
 		s.logger.Error("Failed to calculate inverse of dynamically calculated body inertia tensor, using identity.", "ixx", Ixx, "iyy", Iyy, "izz", Izz)
@@ -376,7 +376,7 @@ func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass
 		Nosecone:                 getComponent[components.Nosecone](s.rocket, "nosecone"),
 		Finset:                   getComponent[components.TrapezoidFinset](s.rocket, "finset"),
 		Parachute:                getComponent[components.Parachute](s.rocket, "parachute"),
-		InertiaTensorBody:        inertiaBodyCalculated,    // Use dynamically calculated value (Matrix3x3)
+		InertiaTensorBody:        inertiaBodyCalculated,     // Use dynamically calculated value (Matrix3x3)
 		InverseInertiaTensorBody: *invInertiaBodyCalculated, // Use its inverse (*Matrix3x3)
 	}
 }
@@ -401,7 +401,7 @@ func (s *Simulation) updateSystems() error {
 
 	// --- Update Rocket's Mass Property ---
 	currentMassKg := s.rocket.GetCurrentMassKg() // Includes motor mass potentially from *previous* step
-	s.rocket.Mass.Value = currentMassKg         // Update the main mass value for this step
+	s.rocket.Mass.Value = currentMassKg          // Update the main mass value for this step
 	s.logger.Debug("Updated rocket mass from GetCurrentMassKg", "massKg", currentMassKg)
 
 	// Tentatively build state - used by plugins and motor update
@@ -432,7 +432,7 @@ func (s *Simulation) updateSystems() error {
 	}
 
 	// Get final mass state AFTER motor update and inertia recalc for physics systems
-	finalMass := s.getSafeMass(motor, s.rocket.Mass) // Use the mass updated at the start of this func
+	finalMass := s.getSafeMass(motor, s.rocket.Mass)    // Use the mass updated at the start of this func
 	finalState := s.buildPhysicsState(motor, finalMass) // Build final state with updated mass & inertia
 
 	// 4. Update Core Physics Systems (using finalState snapshot)
@@ -491,15 +491,15 @@ func (s *Simulation) updateSystems() error {
 
 		// Start with gravity and thrust forces
 		netForceThisStage := gravityForce.Add(thrustForceWorld)
-		
+
 		// Now add drag force based on current evaluation velocity
 		// This properly adapts the drag for each RK4 evaluation point
 		if s.rocket.Parachute != nil && s.rocket.Parachute.IsDeployed() {
 			// Get velocity magnitude
-			velocityMag := math.Sqrt(currentEvalVel.X*currentEvalVel.X + 
-				currentEvalVel.Y*currentEvalVel.Y + 
+			velocityMag := math.Sqrt(currentEvalVel.X*currentEvalVel.X +
+				currentEvalVel.Y*currentEvalVel.Y +
 				currentEvalVel.Z*currentEvalVel.Z)
-			
+
 			if velocityMag > 0.01 { // Only apply drag if moving
 				// Calculate drag force magnitude
 				area := s.rocket.Parachute.Area
@@ -507,22 +507,22 @@ func (s *Simulation) updateSystems() error {
 				if dragCoeff <= 0 {
 					dragCoeff = 0.8 // Standard fallback
 				}
-				
+
 				// Get atmospheric density at current altitude
 				altitude := currentEvalPos.Y
-				density := 1.225 * math.Exp(-altitude / 7000.0) // Simple exponential approximation
-				
+				density := 1.225 * math.Exp(-altitude/7000.0) // Simple exponential approximation
+
 				// Calculate drag force (magnitude = 0.5 * density * velocity^2 * Cd * area)
 				dragMagnitude := 0.5 * density * velocityMag * velocityMag * dragCoeff * area
-				
+
 				// Apply a balanced parachute effect - aim for typical 5-10 m/s descent rate
 				dragMagnitude *= 2.5
-				
+
 				// Create a unit vector in the opposite direction of velocity
 				dragDirX := -currentEvalVel.X / velocityMag
 				dragDirY := -currentEvalVel.Y / velocityMag
 				dragDirZ := -currentEvalVel.Z / velocityMag
-				
+
 				// Add drag force to net force
 				dragForce := types.Vector3{
 					X: dragDirX * dragMagnitude,

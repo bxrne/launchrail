@@ -278,7 +278,6 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 		momentBodyFrame := a.CalculateAerodynamicMoment(*entity)
 		var momentWorldFrame types.Vector3
 
-
 		// Rotate Moment to World Frame if orientation is valid
 		if entity.Orientation != nil && entity.Orientation.Quat != (types.Quaternion{}) {
 			momentWorldFrame = *entity.Orientation.Quat.RotateVector(&momentBodyFrame)

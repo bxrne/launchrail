@@ -25,8 +25,8 @@ type RocketEntity struct {
 	*ecs.BasicEntity
 	*states.PhysicsState
 	*types.Mass // This will store the initial total mass for reference
-	components map[string]interface{}
-	mu         sync.RWMutex
+	components  map[string]interface{}
+	mu          sync.RWMutex
 }
 
 // GetCurrentMassKg calculates the current total mass of the rocket by summing
@@ -45,7 +45,7 @@ func (r *RocketEntity) GetCurrentMassKg() float64 {
 			// This path might be hit by Bodytube, Nosecone etc., if not yet updated to InertialComponent fully.
 			// It assumes their GetMass() returns their current (fixed) mass.
 			currentMass += compWithMass.GetMass()
-		} 
+		}
 	}
 	if currentMass <= 1e-9 {
 		// This case should ideally not happen if initialized correctly

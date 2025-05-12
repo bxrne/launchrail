@@ -85,7 +85,7 @@ func (s *RulesSystem) handleParachute(entity *states.PhysicsState, apogeeNewlyDe
 	if entity.Parachute == nil || entity.Parachute.Deployed {
 		return types.None
 	}
-	
+
 	switch entity.Parachute.Trigger {
 	case components.ParachuteTriggerApogee:
 		return s.handleApogeeParachute(entity, apogeeNewlyDetected)
@@ -98,23 +98,23 @@ func (s *RulesSystem) handleParachute(entity *states.PhysicsState, apogeeNewlyDe
 // handleApogeeParachute handles parachute deployment at apogee
 func (s *RulesSystem) handleApogeeParachute(entity *states.PhysicsState, apogeeNewlyDetected bool) types.Event {
 	deployAtApogee := apogeeNewlyDetected && (entity.Position.Vec.Y >= entity.Parachute.DeployAltitude || entity.Parachute.DeployAltitude <= 0)
-	
+
 	if deployAtApogee {
 		s.logger.Info("Deploying parachute at apogee", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "deployAltitudeSetting", entity.Parachute.DeployAltitude)
 		entity.Parachute.Deploy()
 		return types.ParachuteDeploy
 	}
-	
-	deployPostApogeeAltitude := s.hasApogee && entity.Velocity.Vec.Y < 0 && 
-							 entity.Position.Vec.Y <= entity.Parachute.DeployAltitude && 
-							 entity.Parachute.DeployAltitude > 0
-	
+
+	deployPostApogeeAltitude := s.hasApogee && entity.Velocity.Vec.Y < 0 &&
+		entity.Position.Vec.Y <= entity.Parachute.DeployAltitude &&
+		entity.Parachute.DeployAltitude > 0
+
 	if deployPostApogeeAltitude {
 		s.logger.Info("Deploying parachute post-apogee at specified altitude", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "deployAltitudeSetting", entity.Parachute.DeployAltitude)
 		entity.Parachute.Deploy()
 		return types.ParachuteDeploy
 	}
-	
+
 	return types.None
 }
 
@@ -124,7 +124,7 @@ func (s *RulesSystem) checkLanding(entity *states.PhysicsState) (bool, float64) 
 	if s.config != nil && s.config.Simulation.GroundTolerance > 0 {
 		groundTolerance = s.config.Simulation.GroundTolerance
 	}
-	
+
 	return s.hasApogee && !s.hasLanded && entity.Position.Vec.Y <= groundTolerance, groundTolerance
 }
 
@@ -203,7 +203,7 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 
 		s.logger.Info("APOGEE DETECTED", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "velocityY", entity.Velocity.Vec.Y)
 		s.hasApogee = true // Set that apogee has been detected
-		return true       // Apogee newly detected this step
+		return true        // Apogee newly detected this step
 	}
 
 	s.logger.Info("DetectApogee REJECT: vertical velocity outside window and not negative", "velocityY", entity.Velocity.Vec.Y, "targetWindow", velocityWindow)
