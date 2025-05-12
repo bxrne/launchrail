@@ -269,7 +269,7 @@ func (s *Simulation) Run() error {
 func (s *Simulation) shouldStopSimulation() bool {
 	// Check for NaN/Inf in primary rocket state after updateSystems and clamping as a final safeguard
 	if math.IsNaN(s.rocket.Position.Vec.Y) || math.IsInf(s.rocket.Position.Vec.Y, 0) {
-		s.logger.Error("CRITICAL: Rocket Y position is NaN or Inf after update and clamping. Stopping simulation.", "posY", s.rocket.Position.Vec.Y)
+		s.logger.Error("Rocket Y position is NaN or Inf after update and clamping. Stopping simulation.", "posY", s.rocket.Position.Vec.Y)
 		return true
 	}
 
@@ -581,11 +581,11 @@ func (s *Simulation) updateSystems() error {
 	prevY := s.rocket.Position.Vec.Y
 	prevVY := s.rocket.Velocity.Vec.Y
 	if math.IsNaN(finalPos.Y) || math.IsInf(finalPos.Y, 0) {
-		s.logger.Error("CRITICAL: Calculated finalPos.Y is NaN or Inf. Using previous Y position.", "finalPosY_error", finalPos.Y, "prevY", prevY)
+		s.logger.Error("Calculated finalPos.Y is NaN or Inf. Using previous Y position.", "finalPosY_error", finalPos.Y, "prevY", prevY)
 		finalPos.Y = prevY // Use previous valid Y to prevent state corruption
 	}
 	if math.IsNaN(finalVel.Y) || math.IsInf(finalVel.Y, 0) {
-		s.logger.Error("CRITICAL: Calculated finalVel.Y is NaN or Inf. Resetting Y velocity to previous.", "finalVelY_error", finalVel.Y, "prevVY", prevVY)
+		s.logger.Error("Calculated finalVel.Y is NaN or Inf. Resetting Y velocity to previous.", "finalVelY_error", finalVel.Y, "prevVY", prevVY)
 		// If prevVY is also suspect (e.g. if NaN propagated from previous step), consider resetting to 0.
 		// For now, using prevVY to attempt to maintain some continuity if possible.
 		finalVel.Y = prevVY

@@ -315,7 +315,7 @@ func (a *AerodynamicSystem) GetSpeedOfSound(altitude float64) float64 {
 // calculateDragCoeff calculates the drag coefficient based on Mach number
 func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity *states.PhysicsState) float64 {
 	// More accurate drag coefficient calculation
-	baseCd := 0.75 // Adjusted subsonic base drag for better realism (was 0.5)
+	baseCd := 0.35 // Typical subsonic drag coefficient for rockets
 
 	// Add wave drag in transonic region
 	// Prandtl-Glauert compressibility correction is applied for Mach < 1.0

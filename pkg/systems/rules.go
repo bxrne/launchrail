@@ -197,7 +197,7 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 		s.hasLiftoff && !s.hasApogee {
 		// Additional check: Motor should not be burning
 		if entity.Motor.FSM.Current() == components.StateBurning {
-			s.logger.Info("DetectApogee REJECT: motor still burning", "motorState", string(entity.Motor.FSM.Current()))
+			s.logger.Info("DetectApogee: motor still burning", "motorState", string(entity.Motor.FSM.Current()))
 			return false
 		}
 
@@ -206,6 +206,6 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 		return true        // Apogee newly detected this step
 	}
 
-	s.logger.Info("DetectApogee REJECT: vertical velocity outside window and not negative", "velocityY", entity.Velocity.Vec.Y, "targetWindow", velocityWindow)
+	s.logger.Info("DetectApogee: vertical velocity outside window and not negative", "velocityY", entity.Velocity.Vec.Y, "targetWindow", velocityWindow)
 	return false // Apogee not newly detected this step
 }
