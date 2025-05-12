@@ -15,21 +15,30 @@ import (
 )
 
 var (
-	globalLogger logf.Logger
-	once         sync.Once
-	logFile      *os.File
-	defaultOpts = logf.Opts{
+	globalLogger    logf.Logger
+	once            sync.Once
+	logFile         *os.File
+	defaultOpts     = logf.Opts{
 		EnableCaller:    true,
 		TimestampFormat: "15:04:05",
 		EnableColor:     false,
 		Level:           logf.InfoLevel,
 	}
+	// UserCurrentFunc is a variable that holds the function to get the current user.
+	// It's exported for testing purposes to allow mocking.
+	UserCurrentFunc = user.Current
 )
+
+// GetDefaultOpts returns a copy of the default logger options.
+// This is useful for tests that need to modify options for a specific logger instance.
+func GetDefaultOpts() logf.Opts {
+	return defaultOpts
+}
 
 // InitFileLogger sets up the global logger with file output.
 // It ensures the log directory exists and creates a timestamped log file.
 func InitFileLogger(configuredLevel string, appName string) (*logf.Logger, error) {
-	usr, err := user.Current()
+	usr, err := UserCurrentFunc() // Use the exported function variable
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user: %w", err)
 	}
@@ -58,7 +67,7 @@ func InitFileLogger(configuredLevel string, appName string) (*logf.Logger, error
 // The 'level' and 'filePath' parameters are only effective on the first call that initializes the logger.
 func GetLogger(level string, filePath ...string) *logf.Logger {
 	once.Do(func() {
-		currentOpts := defaultOpts
+		currentOpts := GetDefaultOpts()
 		var logLevel logf.Level
 		switch level {
 		case "debug":
@@ -72,7 +81,7 @@ func GetLogger(level string, filePath ...string) *logf.Logger {
 		case "fatal":
 			logLevel = logf.FatalLevel
 		default:
-			logLevel = defaultOpts.Level // Use default if level string is unrecognized
+			logLevel = currentOpts.Level // Use default if level string is unrecognized
 		}
 		currentOpts.Level = logLevel
 
