@@ -75,12 +75,33 @@ func (s *RulesSystem) ProcessRules(entity *states.PhysicsState) types.Event {
 		return types.Liftoff
 	}
 
-	// Check for apogee
-	// Only check for apogee *after* liftoff
-	if s.hasLiftoff && !s.hasApogee && s.DetectApogee(entity) {
-		s.hasApogee = true
-		// The Info log for apogee is now within DetectApogee itself
-		return types.Apogee
+	// Check for Apogee
+	// Note: DetectApogee now sets s.hasApogee and returns if it was *newly* detected.
+	apogeeNewlyDetected := s.DetectApogee(entity)
+	if apogeeNewlyDetected {
+		// Deployment logic is now handled below, considering parachute settings
+	}
+
+	// Parachute Deployment Logic
+	if entity.Parachute != nil && !entity.Parachute.Deployed {
+		switch entity.Parachute.Trigger {
+		case components.ParachuteTriggerApogee:
+			deployAtApogee := apogeeNewlyDetected && (entity.Position.Vec.Y >= entity.Parachute.DeployAltitude || entity.Parachute.DeployAltitude <= 0)
+			deployPostApogeeAltitude := s.hasApogee && entity.Velocity.Vec.Y < 0 && entity.Position.Vec.Y <= entity.Parachute.DeployAltitude && entity.Parachute.DeployAltitude > 0
+
+			if deployAtApogee {
+				s.logger.Info("Deploying parachute at apogee", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "deployAltitudeSetting", entity.Parachute.DeployAltitude)
+				entity.Parachute.Deploy()
+				return types.ParachuteDeploy // Can be Apogee and ParachuteDeploy
+			} else if deployPostApogeeAltitude {
+				s.logger.Info("Deploying parachute post-apogee at specified altitude", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "deployAltitudeSetting", entity.Parachute.DeployAltitude)
+				entity.Parachute.Deploy()
+				return types.ParachuteDeploy
+			}
+		// TODO: Add cases for other trigger types like Altitude, Delay, etc.
+		default:
+			s.logger.Warn("Unknown parachute trigger type or no trigger logic implemented", "trigger", entity.Parachute.Trigger)
+		}
 	}
 
 	// Check for landing after apogee using ground tolerance
@@ -116,41 +137,32 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 	}
 
 	// Log initial state when function is called
-	s.logger.Info("DetectApogee attempt", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "velocityY", entity.Velocity.Vec.Y, "motorState", string(entity.Motor.FSM.Current()), "parachuteDeployed", entity.Parachute.Deployed)
+	s.logger.Debug("DetectApogee called",
+		"entityID", entity.Entity.ID(),
+		"altitude", entity.Position.Vec.Y,
+		"velocityY", entity.Velocity.Vec.Y,
+		"motorState", string(entity.Motor.FSM.Current()),
+		"hasLiftoff", s.hasLiftoff,
+		"hasApogee", s.hasApogee,
+	)
 
-	// Check parachute status - ensure it's not already deployed
-	if entity.Parachute.Deployed {
-		s.logger.Info("DetectApogee REJECT: parachute already deployed", "parachuteDeployed", entity.Parachute.Deployed)
-		return false
-	}
-	s.logger.Debug("DetectApogee PASS: parachute OK (not deployed)")
-
-	// Must be above a minimum safe deployment altitude
-	minDeploymentAltitude := 10.0 // Example minimum altitude
-	if entity.Position.Vec.Y <= minDeploymentAltitude {
-		s.logger.Info("DetectApogee REJECT: not sufficiently above ground for deployment", "altitude", entity.Position.Vec.Y, "minAltitude", minDeploymentAltitude)
-		return false
-	}
-	s.logger.Debug("DetectApogee PASS: IS ABOVE MINIMUM DEPLOYMENT ALTITUDE")
-
-	// Vertical velocity check - at apogee velocity is near zero or becoming negative
-	// Detect apogee in two ways:
-	// 1. When velocity is close to zero (standard apogee)
-	// 2. OR when velocity has become negative (we might have missed the exact zero-crossing)
-	if math.Abs(entity.Velocity.Vec.Y) <= velocityWindow || entity.Velocity.Vec.Y < 0 {
-		// Motor should be done burning, but accept any non-burning state
-		// This makes apogee detection more robust by allowing StateCoast or other states
+	// Conditions for apogee detection:
+	// 1. Vertical velocity is near zero or negative.
+	// 2. Liftoff has occurred.
+	// 3. Apogee has not already been detected.
+	if (math.Abs(entity.Velocity.Vec.Y) < velocityWindow || entity.Velocity.Vec.Y < 0) &&
+		s.hasLiftoff && !s.hasApogee {
+		// Additional check: Motor should not be burning
 		if entity.Motor.FSM.Current() == components.StateBurning {
 			s.logger.Info("DetectApogee REJECT: motor still burning", "motorState", string(entity.Motor.FSM.Current()))
 			return false
 		}
 
-		// Deploy parachute if conditions met
-		s.logger.Info("APOGEE DETECTED: Deploying parachute!", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "velocityY", entity.Velocity.Vec.Y)
-		entity.Parachute.Deploy()
-		return true
+		s.logger.Info("APOGEE DETECTED", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "velocityY", entity.Velocity.Vec.Y)
+		s.hasApogee = true // Set that apogee has been detected
+		return true       // Apogee newly detected this step
 	}
 
 	s.logger.Info("DetectApogee REJECT: vertical velocity outside window and not negative", "velocityY", entity.Velocity.Vec.Y, "targetWindow", velocityWindow)
-	return false
+	return false // Apogee not newly detected this step
 }

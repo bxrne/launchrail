@@ -205,13 +205,19 @@ func (bt *Bodytube) calculateAndSetProperties() {
 	}
 }
 
-// GetInertiaTensor returns the inertia tensor of the body tube.
+// GetPosition returns the position of the body tube's reference point.
+// This typically corresponds to one end of the bodytube in the rocket's coordinate system.
+func (bt *Bodytube) GetPosition() types.Vector3 {
+	return bt.Position
+}
+
+// GetInertiaTensorLocal returns the inertia tensor of the body tube.
 // This is about its own CM and aligned with its principal axes (assumed to be rocket body axes).
-func (bt *Bodytube) GetInertiaTensor() types.Matrix3x3 {
+func (bt *Bodytube) GetInertiaTensorLocal() types.Matrix3x3 {
 	return bt.InertiaTensor
 }
 
-// GetCenterOfMass returns the Center of Mass of the body tube relative to its own Position reference point.
-func (bt *Bodytube) GetCenterOfMass() types.Vector3 {
+// GetCenterOfMassLocal returns the Center of Mass of the body tube relative to its own Position reference point.
+func (bt *Bodytube) GetCenterOfMassLocal() types.Vector3 {
 	return bt.CenterOfMass
 }

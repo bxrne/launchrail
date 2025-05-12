@@ -4,4 +4,3 @@ tmp/
 vendor/
 __debug_bin*
 *.log
-*.xml

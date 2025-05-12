@@ -100,7 +100,7 @@ func (m *Manager) validateSimConfigInternal() error {
 
 // loadSimDataInternal loads necessary external data like motor thrust curves and OpenRocket files.
 func (m *Manager) loadSimDataInternal() (*thrustcurves.MotorData, *openrocket.OpenrocketDocument, error) {
-	motorData, err := thrustcurves.Load(m.cfg.Engine.Options.MotorDesignation, http_client.NewHTTPClient())
+	motorData, err := thrustcurves.Load(m.cfg.Engine.Options.MotorDesignation, http_client.NewHTTPClient(), m.log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load motor data for '%s': %w", m.cfg.Engine.Options.MotorDesignation, err)
 	}

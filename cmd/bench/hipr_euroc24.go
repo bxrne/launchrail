@@ -2,17 +2,17 @@ package main
 
 import (
 	"fmt"
-	"math" // Added for velocity magnitude calculation
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/bxrne/launchrail/internal/config"
-	"github.com/bxrne/launchrail/internal/http_client" // Added import
+	"github.com/bxrne/launchrail/internal/http_client" 
 	"github.com/bxrne/launchrail/internal/simulation"
-	"github.com/bxrne/launchrail/internal/storage" // Added import
+	"github.com/bxrne/launchrail/internal/storage" 
 	"github.com/bxrne/launchrail/pkg/thrustcurves"
-	logf "github.com/zerodha/logf"
+	logf "github.com/zerodha/logf" 
 )
 
 // HiprEuroc24Benchmark implements the Benchmark interface for the specific dataset.
@@ -23,7 +23,7 @@ type HiprEuroc24Benchmark struct {
 }
 
 // NewHiprEuroc24Benchmark creates a new instance.
-func NewHiprEuroc24Benchmark() *HiprEuroc24Benchmark { // Removed config param
+func NewHiprEuroc24Benchmark() *HiprEuroc24Benchmark { 
 	return &HiprEuroc24Benchmark{
 		name: "hipr-euroc24",
 		// config removed
@@ -57,8 +57,9 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 	logger.Debug("Using design file", "path", designFilePath)
 
 	// Fetch thrust curve data
-	httpClient := http_client.NewHTTPClient() // Create default HTTP client
-	motorData, err := thrustcurves.Load(entry.MotorDesignation, httpClient)
+	httpClient := http_client.NewHTTPClient() 
+	loggerForThrustcurves := logf.New(logf.Opts{Level: logf.FatalLevel}) 
+	motorData, err := thrustcurves.Load(entry.MotorDesignation, httpClient, loggerForThrustcurves)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load thrust curve data for designation '%s': %w", entry.MotorDesignation, err)
 	}
@@ -76,7 +77,7 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 		// For now, fail fast as config is likely essential.
 		return nil, fmt.Errorf("failed to get config for simulation manager: %w", err)
 	}
-	simManager := simulation.NewManager(cfg, *logger) // Dereference logger
+	simManager := simulation.NewManager(cfg, *logger) 
 
 	// --- Initialize Simulation Manager with Storage ---
 	logger.Debug("Initializing simulation manager storage", "run_dir", runDir)
@@ -125,12 +126,12 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 	logger.Debug("Using ground truth data directory", "path", gtDataDir)
 
 	flightInfoPath := filepath.Join(gtDataDir, "fl001 - flight_info_processed.csv")
-	flightInfoGroundTruth, err := LoadFlightInfo(flightInfoPath) // Using function from datastore.go
+	flightInfoGroundTruth, err := LoadFlightInfo(flightInfoPath) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to load ground truth flight info from '%s': %w", flightInfoPath, err)
 	}
 	eventInfoPath := filepath.Join(gtDataDir, "fl001 - event_info_processed.csv")
-	eventInfoGroundTruth, err := LoadEventInfo(eventInfoPath) // Using function from datastore.go
+	eventInfoGroundTruth, err := LoadEventInfo(eventInfoPath) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to load ground truth event info from '%s': %w", eventInfoPath, err)
 	}
@@ -139,13 +140,13 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 
 	// --- 4. Load Simulation Results ---
 	logger.Info("Loading simulation results")
-	simDynamicsPath := filepath.Join(runDir, "dynamics.csv")     // Load dynamics.csv
-	simDynamicsData, err := LoadSimDynamicsData(simDynamicsPath) // Use LoadSimDynamicsData
+	simDynamicsPath := filepath.Join(runDir, "dynamics.csv")     
+	simDynamicsData, err := LoadSimDynamicsData(simDynamicsPath) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to load simulation dynamics data from '%s': %w", simDynamicsPath, err)
 	}
-	simEventInfoPath := filepath.Join(runDir, "events.csv") // Load events.csv
-	simEventInfo, err := LoadSimEventData(simEventInfoPath) // Use LoadSimEventData
+	simEventInfoPath := filepath.Join(runDir, "events.csv") 
+	simEventInfo, err := LoadSimEventData(simEventInfoPath) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to load simulation event info from '%s': %w", simEventInfoPath, err)
 	}
@@ -154,11 +155,11 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 	// --- 5. Compare Results ---
 	logger.Info("Comparing ground truth and simulation results...")
 	var results []BenchmarkResult
-	const tolerance = 0.05 // 5% tolerance
+	const tolerance = 0.05 
 
 	// --- Compare Apogee ---
 	gtApogee, gtApogeeTime := findGroundTruthApogee(flightInfoGroundTruth)
-	simApogee, simApogeeTime := findSimApogee(simDynamicsData) // Pass correct data type
+	simApogee, simApogeeTime := findSimApogee(simDynamicsData) 
 	logger.Debug("Apogee Comparison", "ground_truth", gtApogee, "sim", simApogee)
 	results = append(results, compareFloat("Apogee", "Maximum altitude reached (m)", gtApogee, simApogee, tolerance))
 	logger.Debug("Apogee Time Comparison", "ground_truth", gtApogeeTime, "sim", simApogeeTime)
@@ -166,7 +167,7 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 
 	// --- Compare Max Velocity ---
 	gtMaxVel, gtMaxVelTime := findGroundTruthMaxVelocity(flightInfoGroundTruth)
-	simMaxVel, simMaxVelTime := findSimMaxVelocity(simDynamicsData) // Pass correct data type
+	simMaxVel, simMaxVelTime := findSimMaxVelocity(simDynamicsData) 
 	logger.Debug("Max Velocity Comparison", "ground_truth", gtMaxVel, "sim", simMaxVel)
 	results = append(results, compareFloat("Max Velocity", "Maximum velocity reached (m/s)", gtMaxVel, simMaxVel, tolerance))
 	logger.Debug("Max Velocity Time Comparison", "ground_truth", gtMaxVelTime, "sim", simMaxVelTime)
@@ -183,7 +184,7 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 	}
 
 	for gtEvent, simEvent := range eventMappings {
-		gtEventTime := findGroundTruthEventTime(eventInfoGroundTruth, gtEvent, logger) // Pass logger
+		gtEventTime := findGroundTruthEventTime(eventInfoGroundTruth, gtEvent, logger) 
 		if gtEventTime < 0 {
 			logger.Warn("Target ground truth event not found in data", "event_name", gtEvent)
 			metricName := fmt.Sprintf("%s Time", gtEvent)
@@ -192,7 +193,7 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 				Description:   fmt.Sprintf("Compare %s time", gtEvent),
 				Expected:      math.NaN(),
 				Actual:        findSimEventTime(simEventInfo, simEvent, logger),
-				Tolerance:     0.05, // Revert to hardcoded 5% tolerance
+				Tolerance:     0.05, 
 				ToleranceType: "relative",
 				Passed:        false,
 			})
@@ -209,7 +210,7 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 				Description:   fmt.Sprintf("Compare %s time", gtEvent),
 				Expected:      gtEventTime,
 				Actual:        math.NaN(),
-				Tolerance:     0.05, // Revert to hardcoded 5% tolerance
+				Tolerance:     0.05, 
 				ToleranceType: "relative",
 				Passed:        false,
 			})
@@ -228,15 +229,15 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 // --- Helper methods for SIMULATION data --- //
 
 // findSimApogee finds the maximum altitude from simulation dynamics data.
-func findSimApogee(simData []SimDynamicsData) (float64, float64) { // Changed type
+func findSimApogee(simData []SimDynamicsData) (float64, float64) { 
 	if len(simData) == 0 {
 		return 0, 0
 	}
-	maxAltitude := simData[0].PositionZ // Use PositionZ for altitude
+	maxAltitude := simData[0].PositionZ 
 	timestamp := simData[0].Timestamp
 	for _, p := range simData {
-		if p.PositionZ > maxAltitude { // Use PositionZ
-			maxAltitude = p.PositionZ // Use PositionZ
+		if p.PositionZ > maxAltitude { 
+			maxAltitude = p.PositionZ 
 			timestamp = p.Timestamp
 		}
 	}
@@ -244,14 +245,14 @@ func findSimApogee(simData []SimDynamicsData) (float64, float64) { // Changed ty
 }
 
 // findSimMaxVelocity finds the maximum velocity magnitude from simulation dynamics data.
-func findSimMaxVelocity(simData []SimDynamicsData) (float64, float64) { // Changed type
+func findSimMaxVelocity(simData []SimDynamicsData) (float64, float64) { 
 	if len(simData) == 0 {
 		return 0, 0
 	}
 	maxVelocityMag := 0.0
 	timestamp := 0.0
 	if len(simData) > 0 {
-		timestamp = simData[0].Timestamp // Initial timestamp
+		timestamp = simData[0].Timestamp 
 	}
 
 	for _, p := range simData {
@@ -267,7 +268,7 @@ func findSimMaxVelocity(simData []SimDynamicsData) (float64, float64) { // Chang
 
 // findSimEventTime finds the timestamp for a specific event from simulation event info.
 // Note: Matches event name string case-insensitively.
-func findSimEventTime(simEvents []SimEventInfo, targetEventName string, logger *logf.Logger) float64 { // Pass logger
+func findSimEventTime(simEvents []SimEventInfo, targetEventName string, logger *logf.Logger) float64 { 
 	for _, e := range simEvents {
 		// Case-insensitive comparison
 		if strings.EqualFold(e.EventName, targetEventName) {
@@ -277,7 +278,7 @@ func findSimEventTime(simEvents []SimEventInfo, targetEventName string, logger *
 	}
 
 	logger.Warn("Target sim event not found", "targetEvent", targetEventName)
-	return -1 // Not found
+	return -1 
 }
 
 // --- Helper methods for GROUND TRUTH data --- //
@@ -311,18 +312,18 @@ func findGroundTruthMaxVelocity(gtData []FlightInfo) (float64, float64) {
 			timestamp = p.Timestamp
 		}
 	}
-	return maxVelocity, timestamp // Corrected return value
+	return maxVelocity, timestamp 
 }
 
 // findGroundTruthEventTime finds the timestamp for a specific event from ground truth event info.
-func findGroundTruthEventTime(gtEvents []EventInfo, eventName string, logger *logf.Logger) float64 { // Add logger param
+func findGroundTruthEventTime(gtEvents []EventInfo, eventName string, logger *logf.Logger) float64 { 
 	for _, e := range gtEvents {
 		// Need case-insensitive comparison or ensure ground truth event names match sim names exactly
 		logger.Debug("Comparing GT event", "expected", eventName, "actual_in_csv", e.Event, "equal_fold", strings.EqualFold(e.Event, eventName))
-		if strings.EqualFold(e.Event, eventName) { // Make comparison case-insensitive
+		if strings.EqualFold(e.Event, eventName) { 
 			return e.Timestamp
 		}
 	}
 	logger.Warn("Target ground truth event not found", "targetEvent", eventName)
-	return -1 // Indicate not found
+	return -1 
 }

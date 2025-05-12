@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -250,7 +249,7 @@ func (rm *RecordManager) DeleteRecord(hash string) error {
 	// Check if the record directory exists first
 	if _, err := os.Stat(recordPath); err != nil {
 		if os.IsNotExist(err) {
-			return errors.New("record not found") // Use the defined sentinel error
+			return ErrRecordNotFound // Use the defined sentinel error
 		}
 		return fmt.Errorf("failed to check record existence: %w", err)
 	}

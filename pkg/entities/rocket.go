@@ -24,9 +24,41 @@ type InertialComponent interface {
 type RocketEntity struct {
 	*ecs.BasicEntity
 	*states.PhysicsState
-	*types.Mass
+	*types.Mass // This will store the initial total mass for reference
 	components map[string]interface{}
 	mu         sync.RWMutex
+}
+
+// GetCurrentMassKg calculates the current total mass of the rocket by summing
+// the masses of its components. It pays special attention to components
+// that implement InertialComponent (like the motor) to get their current mass.
+func (r *RocketEntity) GetCurrentMassKg() float64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	currentMass := 0.0
+	for _, compGeneric := range r.components {
+		if inertialComp, ok := compGeneric.(InertialComponent); ok {
+			currentMass += inertialComp.GetMass() // Gets dynamic mass from motor, fixed from others if they implement it
+		} else if compWithMass, ok := compGeneric.(interface{ GetMass() float64 }); ok {
+			// Fallback for components that have GetMass but aren't (yet) full InertialComponents
+			// This path might be hit by Bodytube, Nosecone etc., if not yet updated to InertialComponent fully.
+			// It assumes their GetMass() returns their current (fixed) mass.
+			currentMass += compWithMass.GetMass()
+		} else {
+			// Potentially log a warning here if a component has no way to get its mass
+			// fmt.Printf("Warning: Component of type %T does not have a GetMass() method\n", compGeneric)
+		}
+	}
+	if currentMass <= 1e-9 {
+		// This case should ideally not happen if initialized correctly
+		// Fallback to initial mass if something went wrong with component sum
+		if r.Mass != nil {
+			return r.Mass.Value
+		}
+		return 0 // Or handle error
+	}
+	return currentMass
 }
 
 // Helper function to initialize and update motor from ORK data
