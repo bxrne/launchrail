@@ -37,7 +37,7 @@ type PhysicsSystem struct {
 func (s *PhysicsSystem) Remove(basic ecs.BasicEntity) {
 	var deleteIndex int
 	for i, entity := range s.entities {
-		if entity.Entity.ID() == basic.ID() {
+		if entity.BasicEntity.ID() == basic.ID() {
 			deleteIndex = i
 			break
 		}
@@ -61,8 +61,18 @@ func NewPhysicsSystem(world *ecs.World, cfg *config.Engine, logger logf.Logger, 
 	}
 }
 
-// Update applies forces to entities
-func (s *PhysicsSystem) Update(dt float64) error {
+// Update implements ecs.System interface
+func (s *PhysicsSystem) Update(dt float32) {
+	_ = s.update(float64(dt))
+}
+
+// UpdateWithError implements System interface
+func (s *PhysicsSystem) UpdateWithError(dt float64) error {
+	return s.update(dt)
+}
+
+// update is the internal update method
+func (s *PhysicsSystem) update(dt float64) error {
 	if dt <= 0 || math.IsNaN(dt) {
 		return fmt.Errorf("invalid timestep: %v", dt)
 	}
@@ -95,7 +105,7 @@ func (s *PhysicsSystem) Update(dt float64) error {
 					gravityForce := types.Vector3{Y: -s.gravity * entity.Mass.Value}
 					entity.AccumulatedForce = entity.AccumulatedForce.Add(gravityForce)
 				} else {
-					s.logger.Warn("Skipping gravity calculation due to invalid mass", "entity_id", entity.Entity.ID())
+					s.logger.Warn("Skipping gravity calculation due to invalid mass", "entity_id", entity.BasicEntity.ID())
 				}
 
 				// NOTE: Thrust force is now handled in simulation.go's RK4 integrator
@@ -132,9 +142,9 @@ func (s *PhysicsSystem) Update(dt float64) error {
 }
 
 func (s *PhysicsSystem) validateEntity(entity *states.PhysicsState) error {
-	entityID := uint64(0) // Default ID if entity or entity.Entity is nil
-	if entity != nil && entity.Entity != nil {
-		entityID = entity.Entity.ID()
+	entityID := uint64(0) // Default ID if entity is nil
+	if entity != nil {
+		entityID = entity.BasicEntity.ID()
 	}
 	if entity == nil {
 		return fmt.Errorf("nil entity")

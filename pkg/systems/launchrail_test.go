@@ -62,7 +62,7 @@ func TestUpdateNoThrust(t *testing.T) {
 	}
 
 	system.Add(entity)
-	err := system.Update(0.01)
+	err := system.UpdateWithError(0.01)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 0.0, entity.Position.Vec.X)

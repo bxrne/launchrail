@@ -9,6 +9,7 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/plugin"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/pkg/atmosphere"
 	"github.com/bxrne/launchrail/pkg/components"
 	"github.com/bxrne/launchrail/pkg/entities"
 	openrocket "github.com/bxrne/launchrail/pkg/openrocket"
@@ -66,7 +67,7 @@ func NewSimulation(cfg *config.Config, log logf.Logger, stores *storage.Stores) 
 
 	// Initialize systems with optimized worker counts
 	sim.physicsSystem = systems.NewPhysicsSystem(world, &cfg.Engine, sim.logger, 4)
-	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, 4, &cfg.Engine, sim.logger)
+	sim.aerodynamicSystem = systems.NewAerodynamicSystem(world, atmosphere.NewISAModel(&cfg.Engine.Options.Launchsite.Atmosphere.ISAConfiguration), sim.logger)
 	rules := systems.NewRulesSystem(world, &cfg.Engine, sim.logger)
 
 	sim.rulesSystem = rules
@@ -129,7 +130,7 @@ func (s *Simulation) LoadRocket(orkData *openrocket.OpenrocketDocument, motorDat
 
 	// Create a single PhysicsEntity to reuse for all systems
 	sysEntity := &states.PhysicsState{
-		Entity:              s.rocket.BasicEntity,
+		BasicEntity:         *s.rocket.BasicEntity,
 		Position:            s.rocket.Position,
 		Velocity:            s.rocket.Velocity,
 		Acceleration:        s.rocket.Acceleration,
@@ -362,7 +363,7 @@ func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass
 
 	return &states.PhysicsState{
 		Time:                     s.currentTime,
-		Entity:                   s.rocket.BasicEntity,
+		BasicEntity:              *s.rocket.BasicEntity,
 		Position:                 s.rocket.Position,
 		Orientation:              s.rocket.Orientation,
 		AngularVelocity:          s.rocket.AngularVelocity,
@@ -440,8 +441,8 @@ func (s *Simulation) updateSystems() error {
 		sysName := reflect.TypeOf(sys).String() // Get system name for logging
 		s.logger.Debug("Updating system", "type", sysName)
 
-		// Pass dt to the system's Update method
-		if err := sys.Update(s.config.Engine.Simulation.Step); err != nil {
+		// Pass dt to the system's UpdateWithError method
+		if err := sys.UpdateWithError(s.config.Engine.Simulation.Step); err != nil {
 			s.logger.Error("Error updating system", "type", sysName, "error", err)
 			// Potentially handle critical errors, e.g., by stopping the simulation
 			// For now, we'll let it continue to gather more data if one system fails minorly
@@ -512,7 +513,7 @@ func (s *Simulation) updateSystems() error {
 				// Temperature lapse rate in troposphere (K/m)
 				lapseRate := -0.0065
 				// Sea level values
-				T0 := 288.15 // K
+				T0 := 288.15   // K
 				P0 := 101325.0 // Pa
 				// Calculate temperature and pressure
 				T := T0 + lapseRate*altitude

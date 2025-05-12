@@ -56,8 +56,18 @@ func (s *LaunchRailSystem) Add(pe *states.PhysicsState) {
 	s.entities = append(s.entities, pe)
 }
 
-// Update applies launch rail constraints to entities
-func (s *LaunchRailSystem) Update(dt float64) error {
+// Update implements ecs.System interface
+func (s *LaunchRailSystem) Update(dt float32) {
+	_ = s.update(float64(dt))
+}
+
+// UpdateWithError implements System interface
+func (s *LaunchRailSystem) UpdateWithError(dt float64) error {
+	return s.update(dt)
+}
+
+// update is the internal update method
+func (s *LaunchRailSystem) update(dt float64) error {
 	if !s.onRail {
 		return nil
 	}

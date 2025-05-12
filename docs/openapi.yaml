@@ -151,7 +151,7 @@ paths:
                   example: 0.0065
       responses:
         202:
-          description: Simulation started successfully
+          description: Simulation completed successfully
           content:
             application/json:
               schema:
@@ -159,7 +159,7 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "Simulation started"
+                    example: "Simulation completed"
         400:
           description: Invalid request parameters
           content:
@@ -283,7 +283,7 @@ components:
       properties:
         message:
           type: string
-          example: "Simulation started"
+          example: "Simulation completed"
 
     ErrorResponse:
       type: object

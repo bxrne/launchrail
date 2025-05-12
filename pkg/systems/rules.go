@@ -54,8 +54,18 @@ func (s *RulesSystem) Add(entity *states.PhysicsState) {
 	s.entities = append(s.entities, entity)
 }
 
-// Update applies rules of flight to entities
-func (s *RulesSystem) Update(dt float64) error {
+// Update implements ecs.System interface
+func (s *RulesSystem) Update(dt float32) {
+	_ = s.update(float64(dt))
+}
+
+// UpdateWithError implements System interface
+func (s *RulesSystem) UpdateWithError(dt float64) error {
+	return s.update(dt)
+}
+
+// update is the internal update method
+func (s *RulesSystem) update(dt float64) error {
 	for _, entity := range s.entities {
 		s.ProcessRules(entity)
 	}
@@ -64,7 +74,7 @@ func (s *RulesSystem) Update(dt float64) error {
 
 // checkValidEntity verifies if entity and its components are valid
 func (s *RulesSystem) checkValidEntity(entity *states.PhysicsState) bool {
-	if entity == nil || entity.Entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Motor == nil {
+	if entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Motor == nil {
 		s.logger.Debug("ProcessRules: entity or critical component is nil")
 		return false
 	}
@@ -74,7 +84,7 @@ func (s *RulesSystem) checkValidEntity(entity *states.PhysicsState) bool {
 // checkLiftoff detects if liftoff has occurred
 func (s *RulesSystem) checkLiftoff(entity *states.PhysicsState) bool {
 	if !s.hasLiftoff && entity.Motor.FSM.Current() == components.StateBurning && entity.Position.Vec.Y > 0.1 /* Small tolerance */ {
-		s.logger.Info("Liftoff detected", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y)
+		s.logger.Info("Liftoff detected", "entityID", entity.ID(), "altitude", entity.Position.Vec.Y)
 		return true
 	}
 	return false
@@ -100,7 +110,7 @@ func (s *RulesSystem) handleApogeeParachute(entity *states.PhysicsState, apogeeN
 	deployAtApogee := apogeeNewlyDetected && (entity.Position.Vec.Y >= entity.Parachute.DeployAltitude || entity.Parachute.DeployAltitude <= 0)
 
 	if deployAtApogee {
-		s.logger.Info("Deploying parachute at apogee", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "deployAltitudeSetting", entity.Parachute.DeployAltitude)
+		s.logger.Info("Deploying parachute at apogee", "entityID", entity.ID(), "altitude", entity.Position.Vec.Y, "deployAltitudeSetting", entity.Parachute.DeployAltitude)
 		entity.Parachute.Deploy()
 		return types.ParachuteDeploy
 	}
@@ -110,7 +120,7 @@ func (s *RulesSystem) handleApogeeParachute(entity *states.PhysicsState, apogeeN
 		entity.Parachute.DeployAltitude > 0
 
 	if deployPostApogeeAltitude {
-		s.logger.Info("Deploying parachute post-apogee at specified altitude", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "deployAltitudeSetting", entity.Parachute.DeployAltitude)
+		s.logger.Info("Deploying parachute post-apogee at specified altitude", "entityID", entity.ID(), "altitude", entity.Position.Vec.Y, "deployAltitudeSetting", entity.Parachute.DeployAltitude)
 		entity.Parachute.Deploy()
 		return types.ParachuteDeploy
 	}
@@ -130,7 +140,7 @@ func (s *RulesSystem) checkLanding(entity *states.PhysicsState) (bool, float64) 
 
 // handleLanding processes landing event
 func (s *RulesSystem) handleLanding(entity *states.PhysicsState) {
-	s.logger.Info("Landing detected", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y)
+	s.logger.Info("Landing detected", "entityID", entity.ID(), "altitude", entity.Position.Vec.Y)
 	entity.Position.Vec.Y = 0 // Normalize to ground
 	entity.Velocity.Vec.Y = 0 // Stop vertical movement
 	entity.Velocity.Vec.X = 0
@@ -174,14 +184,14 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 	const velocityWindow = 1.0 // m/s window to detect velocity near zero or negative
 
 	// Ensure entity and its relevant fields are not nil before accessing them
-	if entity == nil || entity.Entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Motor == nil || entity.Parachute == nil {
+	if entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Motor == nil || entity.Parachute == nil {
 		s.logger.Error("DetectApogee: entity or critical component is nil")
 		return false
 	}
 
 	// Log initial state when function is called
 	s.logger.Debug("DetectApogee called",
-		"entityID", entity.Entity.ID(),
+		"entityID", entity.ID(),
 		"altitude", entity.Position.Vec.Y,
 		"velocityY", entity.Velocity.Vec.Y,
 		"motorState", string(entity.Motor.FSM.Current()),
@@ -201,7 +211,7 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 			return false
 		}
 
-		s.logger.Info("APOGEE DETECTED", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "velocityY", entity.Velocity.Vec.Y)
+		s.logger.Info("APOGEE DETECTED", "entityID", entity.ID(), "altitude", entity.Position.Vec.Y, "velocityY", entity.Velocity.Vec.Y)
 		s.hasApogee = true // Set that apogee has been detected
 		return true        // Apogee newly detected this step
 	}

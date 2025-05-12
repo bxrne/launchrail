@@ -85,7 +85,7 @@ func TestApogeeDetection(t *testing.T) {
 	motor.FSM.SetState(components.StateIdle)
 
 	entity := &states.PhysicsState{
-		Entity:       &mockEntityID, // Initialize the Entity field
+		BasicEntity:  mockEntityID,
 		Position:     &types.Position{Vec: types.Vector3{Y: 100}},
 		Velocity:     &types.Velocity{Vec: types.Vector3{Y: -0.01}},
 		Acceleration: &types.Acceleration{Vec: types.Vector3{}}, // Initialize Acceleration
@@ -98,14 +98,14 @@ func TestApogeeDetection(t *testing.T) {
 	// 1. Simulate Liftoff
 	entity.Position.Vec.Y = 1.0                        // Ensure above ground
 	entity.Motor.FSM.SetState(components.StateBurning) // Use SetState to force motor state
-	_ = rs.Update(0)
+	_ = rs.UpdateWithError(0)
 	assert.Equal(t, types.Liftoff, rs.GetLastEvent(), "Event should be Liftoff after first update")
 
 	// 2. Simulate Apogee condition (motor idle, negative velocity)
 	entity.Position.Vec.Y = 100.0                   // Set altitude high for apogee
 	entity.Velocity.Vec.Y = -0.01                   // Negative velocity indicating descent
 	entity.Motor.FSM.SetState(components.StateIdle) // Use SetState to force motor state
-	_ = rs.Update(0)
+	_ = rs.UpdateWithError(0)
 
 	// 3. Assert Apogee detection and parachute deployment
 	assert.Equal(t, types.Apogee, rs.GetLastEvent(), "Event should be Apogee after second update")
@@ -133,7 +133,7 @@ func TestLandingDetection(t *testing.T) {
 	motor.FSM.SetState(components.StateIdle)
 
 	entity := &states.PhysicsState{
-		Entity:       &mockEntityID, // Initialize the Entity field
+		BasicEntity:  mockEntityID,
 		Position:     &types.Position{Vec: types.Vector3{Y: 200.0}},
 		Velocity:     &types.Velocity{Vec: types.Vector3{Y: 0.0}},
 		Acceleration: &types.Acceleration{Vec: types.Vector3{}}, // Initialize Acceleration
@@ -145,21 +145,21 @@ func TestLandingDetection(t *testing.T) {
 	// 1. Simulate Liftoff
 	entity.Position.Vec.Y = 1.0                        // Ensure above ground
 	entity.Motor.FSM.SetState(components.StateBurning) // Force motor to burning state
-	_ = rs.Update(0)
+	_ = rs.UpdateWithError(0)
 	assert.Equal(t, types.Liftoff, rs.GetLastEvent(), "Event should be Liftoff")
 
 	// 2. Simulate Apogee
 	entity.Position.Vec.Y = 100.0                   // Set altitude high for apogee
 	entity.Velocity.Vec.Y = -0.01                   // Negative velocity indicating descent
 	entity.Motor.FSM.SetState(components.StateIdle) // Motor should be idle/coasting at apogee
-	_ = rs.Update(0)
+	_ = rs.UpdateWithError(0)
 	assert.Equal(t, types.Apogee, rs.GetLastEvent(), "Event should be Apogee")
 	assert.True(t, entity.Parachute.Deployed, "Parachute should be deployed at apogee")
 
 	// 3. Simulate Landing
 	entity.Position.Vec.Y = 0.05 // Below ground tolerance
 	entity.Velocity.Vec.Y = -0.1 // Moving down
-	_ = rs.Update(0)
+	_ = rs.UpdateWithError(0)
 	assert.Equal(t, types.Land, rs.GetLastEvent(), "Event should be Land")
 }
 
@@ -171,6 +171,6 @@ func TestInvalidEntityHandling(t *testing.T) {
 	entity := &states.PhysicsState{}
 
 	rs.Add(entity)
-	_ = rs.Update(0)
+	_ = rs.UpdateWithError(0)
 	assert.Equal(t, types.None, rs.GetLastEvent())
 }

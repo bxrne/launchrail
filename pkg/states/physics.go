@@ -8,8 +8,9 @@ import (
 
 // PhysicsState represents an entity with physics components
 type PhysicsState struct {
+	ecs.BasicEntity `mapstructure:"-"` // Embed BasicEntity directly
+
 	// data
-	Entity              *ecs.BasicEntity
 	Position            *types.Position
 	Velocity            *types.Velocity
 	Acceleration        *types.Acceleration

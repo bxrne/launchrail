@@ -310,15 +310,15 @@ func (f *TrapezoidFinset) calculateAndSetMass() {
 	if f.Material.Density <= 0 || planformArea <= 0 || f.Thickness <= 0 || f.FinCount <= 0 {
 		// Use default values if inputs are invalid
 		f.Material.Density = 630.0 // Default density for birch plywood (kg/m³)
-		f.Thickness = 0.003       // Default thickness (3mm)
-		f.FinCount = 4            // Default to 4 fins
-		
+		f.Thickness = 0.003        // Default thickness (3mm)
+		f.FinCount = 4             // Default to 4 fins
+
 		// If planform area is still zero after fixing the calculation,
 		// use reasonable defaults for a small rocket
 		if planformArea <= 0 {
-			f.RootChord = 0.1     // 10cm root chord
-			f.TipChord = 0.05    // 5cm tip chord
-			f.Span = 0.075       // 7.5cm span
+			f.RootChord = 0.1 // 10cm root chord
+			f.TipChord = 0.05 // 5cm tip chord
+			f.Span = 0.075    // 7.5cm span
 			planformArea = f.GetPlanformArea()
 		}
 	}

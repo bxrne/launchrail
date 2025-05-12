@@ -536,7 +536,7 @@ func (h *DataHandler) handleSimRun(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
+	c.JSON(http.StatusAccepted, gin.H{"message": "Simulation complet"})
 }
 
 // Deprecated: Use plot_transformer.TransformRowsToFloat64 instead.

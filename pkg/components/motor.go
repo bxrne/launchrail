@@ -109,27 +109,34 @@ func (m *Motor) updateBurningState(dt float64) {
 	// Interpolate thrust based on elapsed time
 	m.thrust = m.interpolateThrust(m.elapsedTime)
 
+	// Calculate mass flow rate based on current thrust and effective exhaust velocity
+	// For typical amateur solid motors, Isp is around 150-200 seconds
+	const (
+		g0  = 9.81  // Standard gravity in m/s²
+		Isp = 180.0 // Specific impulse in seconds (typical for amateur solid motors)
+	)
+
+	// Calculate effective exhaust velocity (Ve = Isp * g0)
+	ve := Isp * g0
+
+	// Calculate mass flow rate from thrust equation: F = ṁ * Ve
+	// Therefore, ṁ = F / Ve
+	propellantMassFlowRate := m.thrust / ve
+
 	// Calculate mass loss for this step
-	// Ensure burnTime is not zero to avoid division by zero
-	var propellantMassFlowRate float64
-	if m.burnTime > 1e-9 { // Use a small epsilon to check for non-zero burn time
-		propellantMassFlowRate = m.initialPropellantMass / m.burnTime
-	}
 	massLoss := propellantMassFlowRate * dt
 
+	// Update propellant mass
 	m.currentPropellantMass -= massLoss
 	if m.currentPropellantMass < 0 {
+		// If we would consume too much propellant, limit it and adjust thrust
 		m.currentPropellantMass = 0
-	}
-
-	m.Mass = m.casingMass + m.currentPropellantMass
-
-	// If propellant is depleted, ensure thrust is zero
-	if m.currentPropellantMass == 0 {
+		// Recalculate thrust for this final step
 		m.thrust = 0
-		// Optionally, trigger FSM event like 'burnout' if not handled by time
-		// if m.FSM.Current() != "coast" { m.FSM.Event(context.Background(), "burnout") }
 	}
+
+	// Update total mass
+	m.Mass = m.casingMass + m.currentPropellantMass
 }
 
 func (m *Motor) Update(dt float64) error {
@@ -162,9 +169,22 @@ func (m *Motor) Update(dt float64) error {
 }
 
 func (m *Motor) interpolateThrust(totalDt float64) float64 {
+	// Motor efficiency factors
+	const (
+		// Nozzle efficiency (typical range 0.85-0.98)
+		nozzleEff = 0.92
+		// Combustion efficiency (typical range 0.90-0.98)
+		combustionEff = 0.95
+		// Friction losses (typical range 0.97-0.99)
+		frictionEff = 0.98
+	)
+
+	// Combined efficiency
+	efficiencyFactor := nozzleEff * combustionEff * frictionEff // About 0.86
+
 	// If before burn start, use initial thrust
 	if totalDt <= m.Thrustcurve[0][0] {
-		return m.Thrustcurve[0][1] * 0.75 // Scale down initial thrust more aggressively
+		return m.Thrustcurve[0][1] * efficiencyFactor
 	}
 
 	// If past burn time, return 0
@@ -180,8 +200,8 @@ func (m *Motor) interpolateThrust(totalDt float64) float64 {
 		if totalDt >= t1 && totalDt <= t2 {
 			// Linear interpolation
 			ratio := (totalDt - t1) / (t2 - t1)
-			// Scale down thrust by 15% to account for real-world losses
-			thrust := (thrust1 + (ratio * (thrust2 - thrust1))) * 0.75
+			// Apply realistic efficiency losses
+			thrust := (thrust1 + (ratio * (thrust2 - thrust1))) * efficiencyFactor
 			m.logger.Debug("interpolateThrust", "totalDt", totalDt, "t1", t1, "t2", t2, "thrust1", thrust1, "thrust2", thrust2, "thrust", thrust)
 			return thrust
 		}
@@ -189,7 +209,7 @@ func (m *Motor) interpolateThrust(totalDt float64) float64 {
 
 	// If we're between last data point and burn time
 	// Use the last thrust value
-	thrust := m.Thrustcurve[len(m.Thrustcurve)-1][1] * 0.75 // Scale down final thrust more aggressively
+	thrust := m.Thrustcurve[len(m.Thrustcurve)-1][1] * efficiencyFactor
 	m.logger.Debug("interpolateThrust (last value)", "totalDt", totalDt, "thrust", thrust)
 	return thrust
 }

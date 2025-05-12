@@ -65,8 +65,18 @@ func (s *LogParasiteSystem) processData() {
 	}
 }
 
-// Update the LogParasiteSystem
-func (s *LogParasiteSystem) Update(dt float64) error {
+// Update implements ecs.System interface
+func (s *LogParasiteSystem) Update(dt float32) {
+	_ = s.update(float64(dt))
+}
+
+// UpdateWithError implements System interface
+func (s *LogParasiteSystem) UpdateWithError(dt float64) error {
+	return s.update(dt)
+}
+
+// update is the internal update method
+func (s *LogParasiteSystem) update(dt float64) error {
 	// No need to track time here - data comes from simulation state
 	return nil
 }

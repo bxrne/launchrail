@@ -61,8 +61,8 @@ func TestCalculateNetForce_InvalidMass(t *testing.T) {
 	basicEntity := ecs.NewBasic()
 
 	entity := &states.PhysicsState{
-		Entity:       &basicEntity, // Initialize the Entity field
-		Mass:         nil,          // Explicitly set to nil
+		BasicEntity:  basicEntity,
+		Mass:         nil, // Explicitly set to nil
 		Position:     &types.Position{},
 		Velocity:     &types.Velocity{},
 		Acceleration: &types.Acceleration{},
@@ -72,7 +72,7 @@ func TestCalculateNetForce_InvalidMass(t *testing.T) {
 
 	system.Add(entity)
 	t.Logf("[Test] Before Update: entity.Mass is nil? %v", entity.Mass == nil)
-	err := system.Update(0.01)
+	err := system.UpdateWithError(0.01)
 	assert.Error(t, err) // Assert that an error occurred
 	if err == nil {
 		t.Fatal("CalculateNetForce unexpectedly returned nil error, stopping test to prevent panic")
@@ -109,7 +109,7 @@ func TestUpdate_AngularMotion(t *testing.T) {
 
 	// Create the state with necessary fields, including Nosecone/Bodytube
 	entity := &states.PhysicsState{
-		Entity:       &e,                       // Need a basic entity ID
+		BasicEntity:  e,
 		Mass:         &types.Mass{Value: 10.0}, // Use a mass
 		Position:     &types.Position{Vec: types.Vector3{Y: 10}},
 		Velocity:     &types.Velocity{}, // Start stationary for simplicity
@@ -125,7 +125,7 @@ func TestUpdate_AngularMotion(t *testing.T) {
 	}
 
 	system.Add(entity)
-	err = system.Update(0.01)
+	err = system.UpdateWithError(0.01)
 	assert.NoError(t, err)
 
 	// Assertions:
@@ -149,7 +149,7 @@ func TestUpdate_AngularMotion(t *testing.T) {
 func TestUpdate_InvalidTimestep(t *testing.T) {
 	world := &ecs.World{}
 	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger, 1)
-	err := system.Update(0)
+	err := system.UpdateWithError(0)
 	assert.Error(t, err)
 }
 
@@ -162,7 +162,7 @@ func TestUpdate_InvalidEntity(t *testing.T) {
 	}
 
 	system.Add(entity)
-	err := system.Update(0.01)
+	err := system.UpdateWithError(0.01)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "entity missing required vectors")
 }
@@ -173,8 +173,8 @@ func TestRemoveEntity(t *testing.T) {
 	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger, 1)
 	e := ecs.NewBasic()
 	entity := &states.PhysicsState{
-		Entity: &e,
-		Mass:   &types.Mass{Value: 1.0},
+		BasicEntity: e,
+		Mass:        &types.Mass{Value: 1.0},
 	}
 
 	system.Add(entity)
@@ -186,16 +186,16 @@ func TestUpdate_MissingComponents(t *testing.T) {
 	world := &ecs.World{}
 	system := systems.NewPhysicsSystem(world, &config.Engine{}, testLogger, 1)
 	e := ecs.NewBasic()
-	entity := &states.PhysicsState{Entity: &e} // Missing Mass, Position etc.
+	entity := &states.PhysicsState{BasicEntity: e} // Missing Mass, Position etc.
 	system.Add(entity)
 
-	err := system.Update(0.01)
+	err := system.UpdateWithError(0.01)
 	// The system's validateEntity should catch this
 	assert.Error(t, err, "Update should error if required state components are missing")
 	// Test missing Nosecone/Bodytube (used by calculateReferenceArea within calculateNetForce)
 	entityWithMass := &states.PhysicsState{
-		Entity: &e,
-		Mass:   &types.Mass{Value: 1.0}, Position: &types.Position{}, Velocity: &types.Velocity{}, Acceleration: &types.Acceleration{},
+		BasicEntity: e,
+		Mass:        &types.Mass{Value: 1.0}, Position: &types.Position{}, Velocity: &types.Velocity{}, Acceleration: &types.Acceleration{},
 		// Missing Nosecone/Bodytube
 	}
 	system.Remove(e) // Remove the previous invalid entity before adding a new one
@@ -207,7 +207,7 @@ func TestUpdate_MissingComponents(t *testing.T) {
 	// NOTE: calculateReferenceArea inside physics.go *will* panic if Nosecone or Bodytube are nil.
 	// This test case reveals that calculateNetForce/calculateReferenceArea needs nil checks.
 	// For now, we expect a panic. We should fix this in physics.go later.
-	err = system.Update(0.01)
+	err = system.UpdateWithError(0.01)
 	assert.Error(t, err, "Update should error if geometry components needed for drag are missing")
 }
 
@@ -232,7 +232,7 @@ func TestUpdate_GroundCollision(t *testing.T) {
 	system := systems.NewPhysicsSystem(world, cfg, testLogger, 1)
 	e := ecs.NewBasic()
 	entity := &states.PhysicsState{
-		Entity:       &e,
+		BasicEntity:  e,
 		Mass:         &types.Mass{Value: 1.0},
 		Position:     &types.Position{Vec: types.Vector3{Y: 0.0}},  // Start at ground
 		Velocity:     &types.Velocity{Vec: types.Vector3{Y: -1.0}}, // Moving downwards
@@ -242,7 +242,7 @@ func TestUpdate_GroundCollision(t *testing.T) {
 	}
 
 	system.Add(entity)
-	err := system.Update(0.01)
+	err := system.UpdateWithError(0.01)
 	assert.NoError(t, err)
 
 	// Assertions:
