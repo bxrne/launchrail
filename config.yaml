@@ -4,7 +4,7 @@ setup:
     version: "0.0.1"
 
   logging:
-    level: "debug"
+    level: "info"
   plugins:
     paths:
       - "./plugins/windeffect.so"
@@ -41,7 +41,7 @@ engine:
           sea_level_temperature: 288.15
           sea_level_pressure: 101325.0
           ratio_specific_heats: 1.4
-          temperature_lapse_rate: 0.0065
+          temperature_lapse_rate: -0.0065
 
 #-------------------------------------------------------------------------------
 # Benchmarks Configuration

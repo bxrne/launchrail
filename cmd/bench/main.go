@@ -92,7 +92,8 @@ func main() {
 	}
 
 	// Initialize logger using the new centralized function
-	benchLogger, err = logger.InitFileLogger(cfg.Setup.Logging.Level, "bench")
+	// Override config level to ensure Debug/Warn messages are shown for benchmark analysis
+	benchLogger, err = logger.InitFileLogger("debug", "bench") // Use "debug" string
 	if err != nil {
 		log.Fatalf("CRITICAL: Failed to initialize file logger: %v", err) // Use standard log
 	}

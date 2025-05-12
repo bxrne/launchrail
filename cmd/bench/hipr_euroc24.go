@@ -161,17 +161,55 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 	gtApogee, gtApogeeTime := findGroundTruthApogee(flightInfoGroundTruth)
 	simApogee, simApogeeTime := findSimApogee(simDynamicsData) 
 	logger.Debug("Apogee Comparison", "ground_truth", gtApogee, "sim", simApogee)
-	results = append(results, compareFloat("Apogee", "Maximum altitude reached (m)", gtApogee, simApogee, tolerance))
+	benchmarkResultApogee := compareFloat("Apogee", "Maximum altitude reached (m)", gtApogee, simApogee, tolerance)
+	results = append(results, benchmarkResultApogee)
+	if !benchmarkResultApogee.Passed {
+		logger.Warn("Comparison Failed: Apogee", "expected", gtApogee, "actual", simApogee, "tolerance", tolerance)
+	}
+
 	logger.Debug("Apogee Time Comparison", "ground_truth", gtApogeeTime, "sim", simApogeeTime)
-	results = append(results, compareFloat("Apogee Time", "Time of maximum altitude (s)", gtApogeeTime, simApogeeTime, tolerance))
+	benchmarkResultApogeeTime := compareFloat("Apogee Time", "Time of maximum altitude (s)", gtApogeeTime, simApogeeTime, tolerance)
+	results = append(results, benchmarkResultApogeeTime)
+	if !benchmarkResultApogeeTime.Passed {
+		logger.Warn("Comparison Failed: Apogee Time", "expected", gtApogeeTime, "actual", simApogeeTime, "tolerance", tolerance)
+	}
 
 	// --- Compare Max Velocity ---
 	gtMaxVel, gtMaxVelTime := findGroundTruthMaxVelocity(flightInfoGroundTruth)
 	simMaxVel, simMaxVelTime := findSimMaxVelocity(simDynamicsData) 
 	logger.Debug("Max Velocity Comparison", "ground_truth", gtMaxVel, "sim", simMaxVel)
-	results = append(results, compareFloat("Max Velocity", "Maximum velocity reached (m/s)", gtMaxVel, simMaxVel, tolerance))
+	benchmarkResultMaxVel := compareFloat("Max Velocity", "Maximum velocity reached (m/s)", gtMaxVel, simMaxVel, tolerance)
+	results = append(results, benchmarkResultMaxVel)
+	if !benchmarkResultMaxVel.Passed {
+		logger.Warn("Comparison Failed: Max Velocity", "expected", gtMaxVel, "actual", simMaxVel, "tolerance", tolerance)
+	}
+
 	logger.Debug("Max Velocity Time Comparison", "ground_truth", gtMaxVelTime, "sim", simMaxVelTime)
-	results = append(results, compareFloat("Max Velocity Time", "Time of maximum velocity (s)", gtMaxVelTime, simMaxVelTime, tolerance))
+	benchmarkResultMaxVelTime := compareFloat("Max Velocity Time", "Time of maximum velocity (s)", gtMaxVelTime, simMaxVelTime, tolerance)
+	results = append(results, benchmarkResultMaxVelTime)
+	if !benchmarkResultMaxVelTime.Passed {
+		logger.Warn("Comparison Failed: Max Velocity Time", "expected", gtMaxVelTime, "actual", simMaxVelTime, "tolerance", tolerance)
+	}
+
+	// --- Compare Impact Velocity ---
+	gtImpactVel, _ := findGroundTruthImpactVelocity(flightInfoGroundTruth) // Assuming time is not compared here
+	simImpactVel, _ := findSimImpactVelocity(simDynamicsData)              // Assuming time is not compared here
+	logger.Debug("Impact Velocity Comparison", "ground_truth", gtImpactVel, "sim", simImpactVel)
+	benchmarkResultImpactVel := compareFloat("Impact Velocity", "Velocity at impact (m/s)", gtImpactVel, simImpactVel, tolerance)
+	results = append(results, benchmarkResultImpactVel)
+	if !benchmarkResultImpactVel.Passed {
+		logger.Warn("Comparison Failed: Impact Velocity", "expected", gtImpactVel, "actual", simImpactVel, "tolerance", tolerance)
+	}
+
+	// --- Compare Flight Duration ---
+	gtDuration, _ := findGroundTruthFlightDuration(flightInfoGroundTruth) // Assuming event time is the duration?
+	simDuration, _ := findSimFlightDuration(simDynamicsData)            // Assuming last time step is duration?
+	logger.Debug("Flight Duration Comparison", "ground_truth", gtDuration, "sim", simDuration)
+	benchmarkResultDuration := compareFloat("Flight Duration", "Total flight time (s)", gtDuration, simDuration, tolerance)
+	results = append(results, benchmarkResultDuration)
+	if !benchmarkResultDuration.Passed {
+		logger.Warn("Comparison Failed: Flight Duration", "expected", gtDuration, "actual", simDuration, "tolerance", tolerance)
+	}
 
 	// --- Compare Event Times ---
 	eventMappings := map[string]string{
@@ -219,7 +257,11 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 
 		// Compare times
 		logger.Debug("Event Time Comparison", "event", gtEvent, "ground_truth", gtEventTime, "sim", simEventTime)
-		results = append(results, compareFloat(fmt.Sprintf("%s Time", gtEvent), fmt.Sprintf("Time of %s event (s)", strings.ToLower(gtEvent)), gtEventTime, simEventTime, tolerance))
+		benchmarkResultEventTime := compareFloat(fmt.Sprintf("%s Time", gtEvent), fmt.Sprintf("Time of %s event (s)", strings.ToLower(gtEvent)), gtEventTime, simEventTime, tolerance)
+		results = append(results, benchmarkResultEventTime)
+		if !benchmarkResultEventTime.Passed {
+			logger.Warn("Comparison Failed: Event Time", "event", gtEvent, "expected", gtEventTime, "actual", simEventTime, "tolerance", tolerance)
+		}
 	}
 
 	logger.Info("Comparison finished")
@@ -326,4 +368,42 @@ func findGroundTruthEventTime(gtEvents []EventInfo, eventName string, logger *lo
 	}
 	logger.Warn("Target ground truth event not found", "targetEvent", eventName)
 	return -1 
+}
+
+// findGroundTruthImpactVelocity finds the impact velocity from ground truth flight info.
+func findGroundTruthImpactVelocity(gtData []FlightInfo) (float64, float64) {
+	if len(gtData) == 0 {
+		return 0, 0
+	}
+	impactVelocity := gtData[len(gtData)-1].Velocity
+	timestamp := gtData[len(gtData)-1].Timestamp
+	return impactVelocity, timestamp
+}
+
+// findGroundTruthFlightDuration finds the flight duration from ground truth flight info.
+func findGroundTruthFlightDuration(gtData []FlightInfo) (float64, float64) {
+	if len(gtData) == 0 {
+		return 0, 0
+	}
+	flightDuration := gtData[len(gtData)-1].Timestamp - gtData[0].Timestamp
+	return flightDuration, 0
+}
+
+// findSimImpactVelocity finds the impact velocity from simulation dynamics data.
+func findSimImpactVelocity(simData []SimDynamicsData) (float64, float64) {
+	if len(simData) == 0 {
+		return 0, 0
+	}
+	impactVelocity := math.Sqrt(simData[len(simData)-1].VelocityX*simData[len(simData)-1].VelocityX + simData[len(simData)-1].VelocityY*simData[len(simData)-1].VelocityY + simData[len(simData)-1].VelocityZ*simData[len(simData)-1].VelocityZ)
+	timestamp := simData[len(simData)-1].Timestamp
+	return impactVelocity, timestamp
+}
+
+// findSimFlightDuration finds the flight duration from simulation dynamics data.
+func findSimFlightDuration(simData []SimDynamicsData) (float64, float64) {
+	if len(simData) == 0 {
+		return 0, 0
+	}
+	flightDuration := simData[len(simData)-1].Timestamp - simData[0].Timestamp
+	return flightDuration, 0
 }

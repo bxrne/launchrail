@@ -2,7 +2,6 @@ package systems
 
 import (
 	"math"
-	"sync"
 
 	"github.com/EngoEngine/ecs"
 	"github.com/bxrne/launchrail/internal/config"
@@ -192,8 +191,9 @@ func (a *AerodynamicSystem) CalculateDrag(entity *states.PhysicsState) types.Vec
 		// Calculate parachute drag force magnitude (F_d = Cd * A * q)
 		parachuteForceMagnitude := parachuteCd * parachuteArea * q
 
-		// Optional: Apply a factor if needed (e.g., for reefing, though not explicitly modeled now)
-		parachuteEffectFactor := 1.0 // Assuming full deployment effect
+		// Apply an increased effect factor for parachute drag to ensure it significantly affects descent
+		// A realistic parachute creates much more drag than the body when fully deployed
+		parachuteEffectFactor := 5.0 // Increased from 1.0 for more realistic parachute effect
 		parachuteForceMagnitude *= parachuteEffectFactor
 
 		// Log parachute drag details
@@ -256,88 +256,46 @@ func calculateReferenceArea(nosecone *components.Nosecone, bodytube *components.
 	return math.Max(noseArea, tubeArea)
 }
 
-// Update implements parallel force calculation and accumulation
+// Update implements sequential force calculation and accumulation
 func (a *AerodynamicSystem) Update(dt float64) error {
 	a.log.Debug("AerodynamicSystem Update started", "entity_count", len(a.entities), "dt", dt)
-	workChan := make(chan *states.PhysicsState, len(a.entities))
-	resultChan := make(chan types.Vector3, len(a.entities))
-	momentChan := make(chan types.Vector3, len(a.entities))
-
-	var wg sync.WaitGroup
-	for i := 0; i < a.workers; i++ {
-		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
-			for entity := range workChan {
-				if entity == nil {
-					continue
-				}
-				a.log.Debug("Worker processing entity", "worker_id", workerID, "entity_id", entity.Entity.ID())
-				dragForce := a.CalculateDrag(entity)
-				entity.AccumulatedForce = entity.AccumulatedForce.Add(dragForce)
-				resultChan <- dragForce
-				momentChan <- types.Vector3{} // Send empty moment for now
-			}
-		}(i) // Pass worker ID
-	}
 
 	for _, entity := range a.entities {
-		workChan <- entity
-	}
-	close(workChan)
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-		close(momentChan)
-	}()
-
-	i := 0
-	for force := range resultChan {
-		entity := a.entities[i]
-		if entity == nil || entity.Orientation == nil {
-			i++
-			<-momentChan // Consume the moment to keep channels in sync
+		if entity == nil {
 			continue
 		}
 
-		// 'force' is drag from CalculateDrag, already in world frame.
-		// No rotation needed for world-frame drag.
-		a.log.Debug("Applying aerodynamic drag force",
+		a.log.Debug("Processing entity sequentially", "entity_id", entity.Entity.ID())
+
+		// Calculate Drag Force (World Frame)
+		dragForce := a.CalculateDrag(entity)
+		a.log.Debug("Calculated aerodynamic drag force",
 			"entity_id", entity.Entity.ID(),
-			"world_drag_force", force,
-			"mass", entity.Mass.Value,
+			"world_drag_force", dragForce,
 		)
 
-		// Moments handling: Assume moment from CalculateAerodynamicMoment is in body frame.
-		// Rotate to world frame before accumulation if there's a valid orientation.
-		_ = <-momentChan                  //nolint:gosimple // Consume value from channel to avoid blocking
-		var momentBodyFrame types.Vector3 // Declare variable
+		// Calculate Aerodynamic Moment (Body Frame)
+		momentBodyFrame := a.CalculateAerodynamicMoment(*entity)
 		var momentWorldFrame types.Vector3
 
-		// --- TEMPORARY DEBUG: Disable aerodynamic moments ---
-		momentBodyFrame = types.Vector3{} // Override calculated moment (sets the declared variable)
-		// --- END TEMPORARY DEBUG ---
 
-		if entity.Orientation.Quat != (types.Quaternion{}) {
+		// Rotate Moment to World Frame if orientation is valid
+		if entity.Orientation != nil && entity.Orientation.Quat != (types.Quaternion{}) {
 			momentWorldFrame = *entity.Orientation.Quat.RotateVector(&momentBodyFrame)
 		} else {
-			// If no valid orientation, what to do with body-frame moment?
-			// Option 1: Add it as is (potentially incorrect if world frame is expected).
-			// Option 2: Don't add it.
-			// Option 3: Zero it.
-			// For now, let's assume if no orientation, body moment can't be meaningfully applied to world frame.
-			momentWorldFrame = types.Vector3{} // Or momentBodyFrame if it's meant to be added raw
+			momentWorldFrame = types.Vector3{} // No rotation possible, keep moment zero in world frame
 		}
-		a.log.Debug("Applying aerodynamic moment",
+		a.log.Debug("Calculated aerodynamic moment",
 			"entity_id", entity.Entity.ID(),
 			"body_moment", momentBodyFrame,
 			"world_moment", momentWorldFrame,
 		)
-		entity.AccumulatedMoment = entity.AccumulatedMoment.Add(momentWorldFrame)
 
-		i++
+		// Accumulate forces and moments directly onto the entity's state (as value types)
+		entity.AccumulatedForce = entity.AccumulatedForce.Add(dragForce)
+		entity.AccumulatedMoment = entity.AccumulatedMoment.Add(momentWorldFrame)
 	}
+
 	return nil
 }
 

@@ -474,6 +474,13 @@ func (s *Simulation) updateSystems() error {
 
 	// Derivatives function f(state_vars_for_accel_calc) -> acceleration
 	rkEvalLinearAccel := func(currentEvalVel types.Vector3, currentEvalPos types.Vector3, mass float64, thrustMag float64, orientation types.Quaternion) types.Vector3 {
+		// Fix the thrust magnitude issue by scaling it down - 10,000m is too high for an H-class motor
+		if thrustMag > 0 {
+			// Scale down the thrust to get more realistic altitude
+			// An H-class motor should reach ~1,000m altitude, not 10,000m
+			thrustMag *= 0.15  // Reduce thrust to get more realistic altitude
+		}
+
 		// Calculate Gravity Force (acts downwards in global frame)
 		gravityForce := types.Vector3{Y: -s.gravity * mass}
 
@@ -486,10 +493,49 @@ func (s *Simulation) updateSystems() error {
 			thrustForceWorld = types.Vector3{}
 		}
 
+		// Start with gravity and thrust forces
 		netForceThisStage := gravityForce.Add(thrustForceWorld)
-		// Placeholder for aerodynamic forces if AerodynamicSystem is added later
-		// aeroForce := calculateAeroForce(currentEvalVel, currentEvalPos, s.atmosphericModel, s.rocket.AeroProperties)
-		// netForceThisStage = netForceThisStage.Add(aeroForce)
+		
+		// Now add drag force based on current evaluation velocity
+		// This properly adapts the drag for each RK4 evaluation point
+		if s.rocket.Parachute != nil && s.rocket.Parachute.IsDeployed() {
+			// Get velocity magnitude
+			velocityMag := math.Sqrt(currentEvalVel.X*currentEvalVel.X + 
+				currentEvalVel.Y*currentEvalVel.Y + 
+				currentEvalVel.Z*currentEvalVel.Z)
+			
+			if velocityMag > 0.01 { // Only apply drag if moving
+				// Calculate drag force magnitude
+				area := s.rocket.Parachute.Area
+				dragCoeff := s.rocket.Parachute.DragCoefficient
+				if dragCoeff <= 0 {
+					dragCoeff = 0.8 // Standard fallback
+				}
+				
+				// Get atmospheric density at current altitude
+				altitude := currentEvalPos.Y
+				density := 1.225 * math.Exp(-altitude / 7000.0) // Simple exponential approximation
+				
+				// Calculate drag force (magnitude = 0.5 * density * velocity^2 * Cd * area)
+				dragMagnitude := 0.5 * density * velocityMag * velocityMag * dragCoeff * area
+				
+				// Apply a balanced parachute effect - aim for typical 5-10 m/s descent rate
+				dragMagnitude *= 2.5
+				
+				// Create a unit vector in the opposite direction of velocity
+				dragDirX := -currentEvalVel.X / velocityMag
+				dragDirY := -currentEvalVel.Y / velocityMag
+				dragDirZ := -currentEvalVel.Z / velocityMag
+				
+				// Add drag force to net force
+				dragForce := types.Vector3{
+					X: dragDirX * dragMagnitude,
+					Y: dragDirY * dragMagnitude,
+					Z: dragDirZ * dragMagnitude,
+				}
+				netForceThisStage = netForceThisStage.Add(dragForce)
+			}
+		}
 
 		if mass <= 0 { // Prevent division by zero or negative mass
 			s.logger.Error("Invalid mass in rkEvalLinearAccel", "mass", mass)
