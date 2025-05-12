@@ -474,12 +474,8 @@ func (s *Simulation) updateSystems() error {
 
 	// Derivatives function f(state_vars_for_accel_calc) -> acceleration
 	rkEvalLinearAccel := func(currentEvalVel types.Vector3, currentEvalPos types.Vector3, mass float64, thrustMag float64, orientation types.Quaternion) types.Vector3 {
-		// Fix the thrust magnitude issue by scaling it down - 10,000m is too high for an H-class motor
-		if thrustMag > 0 {
-			// Scale down the thrust to get more realistic altitude
-			// An H-class motor should reach ~1,000m altitude, not 10,000m
-			thrustMag *= 0.15  // Reduce thrust to get more realistic altitude
-		}
+		// Use the actual thrust magnitude from the motor
+		// No scaling is needed - let the physics model work with real values
 
 		// Calculate Gravity Force (acts downwards in global frame)
 		gravityForce := types.Vector3{Y: -s.gravity * mass}
