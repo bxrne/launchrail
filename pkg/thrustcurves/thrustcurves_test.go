@@ -19,11 +19,11 @@ func TestLoadMotor_ValidResponse(t *testing.T) {
 
 	mockSearchResponse := `{"results":[{"motorId":"motor123"}]}`
 	mockHTTP.On("Post", "https://www.thrustcurve.org/api/v1/search.json", "application/json", mock.Anything).
-		Return(&http.Response{Body: io.NopCloser(bytes.NewBufferString(mockSearchResponse))}, nil)
+		Return(&http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewBufferString(mockSearchResponse))}, nil)
 
 	mockDownloadResponse := `{"results":[{"samples":[{"time":0.1,"thrust":10.0},{"time":0.2,"thrust":20.0}]}]}`
 	mockHTTP.On("Post", "https://www.thrustcurve.org/api/v1/download.json", "application/json", mock.Anything).
-		Return(&http.Response{Body: io.NopCloser(bytes.NewBufferString(mockDownloadResponse))}, nil)
+		Return(&http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewBufferString(mockDownloadResponse))}, nil)
 
 	logger := logf.New(logf.Opts{Level: logf.FatalLevel})
 	motorData, err := thrustcurves.Load("269H110-14A", mockHTTP, logger)

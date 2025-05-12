@@ -78,9 +78,6 @@ func (s *RulesSystem) ProcessRules(entity *states.PhysicsState) types.Event {
 	// Check for Apogee
 	// Note: DetectApogee now sets s.hasApogee and returns if it was *newly* detected.
 	apogeeNewlyDetected := s.DetectApogee(entity)
-	if apogeeNewlyDetected {
-		// Deployment logic is now handled below, considering parachute settings
-	}
 
 	// Parachute Deployment Logic
 	if entity.Parachute != nil && !entity.Parachute.Deployed {

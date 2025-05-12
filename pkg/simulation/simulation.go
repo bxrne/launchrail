@@ -324,48 +324,41 @@ func (s *Simulation) getSafeMass(motor *components.Motor, mass *types.Mass) *typ
 func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass) *states.PhysicsState {
 	// Simplified inertia tensor calculation (diagonal body frame)
 	// TODO: Replace with more accurate inertia calculation, possibly from OpenRocket data
+	// that considers all components and their relative positions for parallel axis theorem.
 	var Ixx, Iyy, Izz float64
 	bodytube := getComponent[components.Bodytube](s.rocket, "bodytube")
 
 	if bodytube != nil && mass != nil && mass.Value > 0 && bodytube.Radius > 0 {
 		r := bodytube.Radius
 		l := bodytube.Length
-		m := mass.Value
+		m := mass.Value // Current total mass of the rocket
 
-		// Roll inertia (longitudinal axis, assuming X)
+		// Assuming X is the longitudinal/roll axis of the rocket.
+		// Roll inertia about X for a cylinder: Ixx_cyl = 0.5 * m * r^2
 		Ixx = 0.5 * m * r * r
-		// Pitch/Yaw inertia (transverse axes, assuming Y and Z are similar for a cylinder)
-		// Using the simplified inertia from aerodynamics.go for cylinder rod perpendicular to axis
-		// I = (1/12) * m * (3*r^2 + L^2) for pitch/yaw about CG
-		// This CalculateInertia might need to be adapted or made more accessible
-		// For now, let's call a static version if available, or use the formula.
-		// This calculation is a placeholder as `systems.CalculateInertia` expects a full PhysicsState.
+
+		// Pitch/Yaw inertia (transverse axes Y and Z)
+		// For a cylinder rod perpendicular to axis: I_transverse = (1/12) * m * (3*r^2 + L^2)
 		if l > 0 {
-			Iyy = (1.0 / 12.0) * m * (3*r*r + l*l)
-			Izz = Iyy // Assume symmetry for pitch and yaw inertia
-		} else { // Fallback if length is zero (e.g. sphere)
+			Iyy = (1.0 / 12.0) * m * (3*r*r + l*l) // Pitch inertia about Y
+			Izz = Iyy                                 // Yaw inertia about Z (assuming symmetry)
+		} else { // Fallback if length is zero (e.g. sphere or point mass approx)
 			Iyy = (2.0 / 5.0) * m * r * r
 			Izz = Iyy
 		}
 	} else {
-		// Fallback to unit inertia if components are missing
+		// Fallback to unit inertia if components are missing or mass is invalid
 		Ixx, Iyy, Izz = 1.0, 1.0, 1.0
-		s.logger.Warn("Using fallback unit inertia tensor due to missing rocket components or mass.")
+		s.logger.Warn("Using fallback unit inertia tensor due to missing rocket components or invalid mass/dimensions.")
 	}
 
-	inertiaBody := types.NewMatrix3x3([]float64{
-		Ixx, 0, 0,
-		0, Iyy, 0,
-		0, 0, Izz,
-	})
-	invInertiaBody := types.NewMatrix3x3([]float64{
-		1.0 / Ixx, 0, 0,
-		0, 1.0 / Iyy, 0,
-		0, 0, 1.0 / Izz,
-	})
-	if Ixx == 0 || Iyy == 0 || Izz == 0 { // Avoid division by zero if any inertia is zero
-		s.logger.Error("Zero component in body inertia tensor, using identity for inverse.", "ixx", Ixx, "iyy", Iyy, "izz", Izz)
-		invInertiaBody = types.IdentityMatrix()
+	// InertiaTensorBody fields M11, M22, M33 correspond to Ixx, Iyy, Izz about body X, Y, Z axes.
+	inertiaBodyCalculated := types.Matrix3x3{M11: Ixx, M22: Iyy, M33: Izz} // Direct struct initialization
+	invInertiaBodyCalculated := inertiaBodyCalculated.Inverse() // Inverse() is a method on Matrix3x3, returns *Matrix3x3
+
+	if invInertiaBodyCalculated == nil { // Inverse() returns nil on error
+		s.logger.Error("Failed to calculate inverse of dynamically calculated body inertia tensor, using identity.", "ixx", Ixx, "iyy", Iyy, "izz", Izz)
+		invInertiaBodyCalculated = types.IdentityMatrix() // IdentityMatrix returns *Matrix3x3
 	}
 
 	return &states.PhysicsState{
@@ -379,12 +372,12 @@ func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass
 		Acceleration:             s.rocket.Acceleration,
 		Mass:                     mass,
 		Motor:                    motor,
-		Bodytube:                 bodytube, // Use already fetched bodytube
+		Bodytube:                 getComponent[components.Bodytube](s.rocket, "bodytube"),
 		Nosecone:                 getComponent[components.Nosecone](s.rocket, "nosecone"),
 		Finset:                   getComponent[components.TrapezoidFinset](s.rocket, "finset"),
 		Parachute:                getComponent[components.Parachute](s.rocket, "parachute"),
-		InertiaTensorBody:        *inertiaBody,
-		InverseInertiaTensorBody: *invInertiaBody,
+		InertiaTensorBody:        inertiaBodyCalculated,    // Use dynamically calculated value (Matrix3x3)
+		InverseInertiaTensorBody: *invInertiaBodyCalculated, // Use its inverse (*Matrix3x3)
 	}
 }
 
@@ -405,29 +398,44 @@ func (s *Simulation) updateSystems() error {
 		return fmt.Errorf("no rocket entity loaded")
 	}
 	motor := getComponent[components.Motor](s.rocket, "motor")
-	mass := s.getSafeMass(motor, s.rocket.Mass)
-	state := s.buildPhysicsState(motor, mass) // state is a snapshot for systems to READ from
+
+	// --- Update Rocket's Mass Property ---
+	currentMassKg := s.rocket.GetCurrentMassKg() // Includes motor mass potentially from *previous* step
+	s.rocket.Mass.Value = currentMassKg         // Update the main mass value for this step
+	s.logger.Debug("Updated rocket mass from GetCurrentMassKg", "massKg", currentMassKg)
+
+	// Tentatively build state - used by plugins and motor update
+	// Note: Inertia might be slightly stale here if motor mass changed last step
+	tempMass := s.getSafeMass(motor, s.rocket.Mass)
+	tempStateForPlugins := s.buildPhysicsState(motor, tempMass)
 
 	// 1. Reset Force/Moment Accumulators for this timestep ON THE MAIN ROCKET ENTITY
 	s.rocket.AccumulatedForce = types.Vector3{}
 	s.rocket.AccumulatedMoment = types.Vector3{}
 	s.logger.Debug("Accumulators reset on s.rocket", "s.rocket.AF", s.rocket.AccumulatedForce, "s.rocket.AM", s.rocket.AccumulatedMoment)
 
-	// 2. Run BeforeSimStep plugins
+	// 2. Run BeforeSimStep plugins (might modify rocket state indirectly)
 	s.logger.Debug("Running BeforeSimStep plugins")
 	if err := runPlugins(s.pluginManager.GetPlugins(), func(p pluginapi.SimulationPlugin) error {
-		return p.BeforeSimStep(state)
+		return p.BeforeSimStep(tempStateForPlugins)
 	}); err != nil {
 		return fmt.Errorf("plugin %s BeforeSimStep error: %w", "unknown", err)
 	}
 
-	if state.Motor != nil {
+	// 3. Update Motor (changes its internal mass for *next* step's GetCurrentMassKg)
+	if motor != nil {
 		s.logger.Debug("Updating Motor")
-		if err := state.Motor.Update(s.config.Engine.Simulation.Step); err != nil {
+		if err := motor.Update(s.config.Engine.Simulation.Step); err != nil {
 			return err
 		}
+		s.logger.Debug("Motor updated", "thrust", motor.GetThrust(), "elapsedTime", motor.GetElapsedTime())
 	}
 
+	// Get final mass state AFTER motor update and inertia recalc for physics systems
+	finalMass := s.getSafeMass(motor, s.rocket.Mass) // Use the mass updated at the start of this func
+	finalState := s.buildPhysicsState(motor, finalMass) // Build final state with updated mass & inertia
+
+	// 4. Update Core Physics Systems (using finalState snapshot)
 	s.logger.Debug("Starting system update loop")
 	for _, sys := range s.systems {
 		sysName := reflect.TypeOf(sys).String() // Get system name for logging
@@ -452,9 +460,9 @@ func (s *Simulation) updateSystems() error {
 	s.logger.Debug("s.rocket.AccumulatedForce before netForce calculation", "AF", s.rocket.AccumulatedForce)
 
 	// Capture the detected event *after* running rules system
-	state.CurrentEvent = s.rulesSystem.GetLastEvent()
+	finalState.CurrentEvent = s.rulesSystem.GetLastEvent()
 
-	// 3. Calculate Net Acceleration from Accumulated Forces ON THE MAIN ROCKET ENTITY
+	// 5. Calculate Net Acceleration from Accumulated Forces ON THE MAIN ROCKET ENTITY
 	pos0 := s.rocket.Position.Vec // Value type
 	vel0 := s.rocket.Velocity.Vec // Value type
 	currentMass := s.rocket.Mass.Value
@@ -575,18 +583,18 @@ func (s *Simulation) updateSystems() error {
 	// Populate the 'state' object that will be recorded and passed to plugins/channels.
 	// This 'state' object was passed into updateSystems.
 	// *state.AngularAcceleration was already set using netAngularAccelerationWorld.
-	state.Time = s.currentTime                 // Assuming PhysicsState has a 'Time' field
-	state.Position = s.rocket.Position         // Reflects clamped position
-	state.Velocity = s.rocket.Velocity         // Reflects clamped velocity
-	state.Acceleration = s.rocket.Acceleration // This is k1ADeriv (accel at start of step)
-	state.Mass = s.rocket.Mass                 // Assign pointer directly, assuming state.Mass is *types.Mass
-	state.Orientation = s.rocket.Orientation
-	state.AngularVelocity = s.rocket.AngularVelocity // s.rocket.AngularVelocity is types.Vector3, state.AngularVelocity should match
+	finalState.Time = s.currentTime                 // Assuming PhysicsState has a 'Time' field
+	finalState.Position = s.rocket.Position         // Reflects clamped position
+	finalState.Velocity = s.rocket.Velocity         // Reflects clamped velocity
+	finalState.Acceleration = s.rocket.Acceleration // This is k1ADeriv (accel at start of step)
+	finalState.Mass = s.rocket.Mass                 // Assign pointer directly, assuming state.Mass is *types.Mass
+	finalState.Orientation = s.rocket.Orientation
+	finalState.AngularVelocity = s.rocket.AngularVelocity // s.rocket.AngularVelocity is types.Vector3, state.AngularVelocity should match
 	// state.AngularAcceleration is already populated.
 
 	s.logger.Debug("Running AfterSimStep plugins")
 	if err := runPlugins(s.pluginManager.GetPlugins(), func(p pluginapi.SimulationPlugin) error {
-		return p.AfterSimStep(state) // Pass the fully updated and clamped state
+		return p.AfterSimStep(finalState) // Pass the fully updated and clamped state
 	}); err != nil {
 		pluginName := "unknown" // Placeholder
 		// Consider adding a way to get the actual plugin name if an error occurs
@@ -596,7 +604,7 @@ func (s *Simulation) updateSystems() error {
 
 	s.logger.Debug("Sending state to channel")
 	select {
-	case s.stateChan <- state:
+	case s.stateChan <- finalState:
 	default:
 		s.logger.Warn("state channel full, dropping frame")
 	}

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/bxrne/launchrail/internal/http_client"
@@ -79,7 +79,7 @@ func getMotorProps(designation designation.Designation, client http_client.HTTPC
 
 	log.Debug("Received motor search response", "url", url, "status_code", resp.StatusCode)
 
-	bodyBytes, errRead := ioutil.ReadAll(resp.Body)
+	bodyBytes, errRead := io.ReadAll(resp.Body)
 	if errRead != nil {
 		log.Error("Failed to read motor search response body", "error", errRead, "url", url, "status_code", resp.StatusCode)
 		return SearchResponse{}, fmt.Errorf("reading search response body: %w", errRead)
@@ -132,7 +132,7 @@ func getMotorCurve(id string, client http_client.HTTPClient, log logf.Logger) ([
 
 	log.Debug("Received motor curve download response", "url", url, "motor_id", id, "status_code", resp.StatusCode)
 
-	bodyBytes, errRead := ioutil.ReadAll(resp.Body)
+	bodyBytes, errRead := io.ReadAll(resp.Body)
 	if errRead != nil {
 		log.Error("Failed to read motor curve download response body", "error", errRead, "url", url, "motor_id", id, "status_code", resp.StatusCode)
 		return nil, fmt.Errorf("reading curve response body: %w", errRead)

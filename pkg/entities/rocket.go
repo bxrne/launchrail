@@ -45,10 +45,7 @@ func (r *RocketEntity) GetCurrentMassKg() float64 {
 			// This path might be hit by Bodytube, Nosecone etc., if not yet updated to InertialComponent fully.
 			// It assumes their GetMass() returns their current (fixed) mass.
 			currentMass += compWithMass.GetMass()
-		} else {
-			// Potentially log a warning here if a component has no way to get its mass
-			// fmt.Printf("Warning: Component of type %T does not have a GetMass() method\n", compGeneric)
-		}
+		} 
 	}
 	if currentMass <= 1e-9 {
 		// This case should ideally not happen if initialized correctly
