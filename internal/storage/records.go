@@ -261,50 +261,60 @@ func (rm *RecordManager) ListRecords() ([]*Record, error) {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 
-	// Use rm.baseDir instead of hardcoding to ~/.launchrail
+	rm.log.Debug("ListRecords called", "baseDir", rm.baseDir) // Log baseDir
+
 	entries, err := os.ReadDir(rm.baseDir)
-	if err != nil {
+	if err != nil { // Error reading base directory
+		rm.log.Error("ListRecords: Failed to read base directory", "baseDir", rm.baseDir, "error", err)
 		return nil, fmt.Errorf("failed to read directory %s: %w", rm.baseDir, err)
 	}
 
-	// Regex to match a 64-character hexadecimal string (SHA256 hash)
-	hashRegex := regexp.MustCompile(`^[0-9a-f]{64}$`)
+	// Regex to match a 16 or 64-character hexadecimal string
+	hashRegex := regexp.MustCompile(`^([0-9a-f]{16}|[0-9a-f]{64})$`)
 
 	var records []*Record
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		entryName := entry.Name()
+		rm.log.Debug("ListRecords: Processing entry", "name", entryName, "isDir", entry.IsDir())
+
+		if !entry.IsDir() { // Skip if not a directory
+			rm.log.Debug("ListRecords: Skipping non-directory entry", "name", entryName)
 			continue
 		}
 
-		// Check if the directory name matches the SHA256 hash pattern
-		if !hashRegex.MatchString(entry.Name()) {
-			rm.log.Debug("Skipping non-record directory", "name", entry.Name(), "baseDir", rm.baseDir)
-			continue // Skip directories like 'logs', 'benchmarks', etc.
+		if !hashRegex.MatchString(entryName) { // Skip if name doesn't match 16/64 hex pattern
+			rm.log.Debug("ListRecords: Skipping entry with non-matching name", "name", entryName)
+			continue
 		}
+		rm.log.Debug("ListRecords: Entry name matched hash regex", "name", entryName)
 
-		// Construct recordPath relative to rm.baseDir
-		recordPath := filepath.Join(rm.baseDir, entry.Name())
+		// Passed checks, create basic record struct
+		recordPath := filepath.Join(rm.baseDir, entryName)
+		rm.log.Debug("ListRecords: Attempting to stat record path", "path", recordPath)
 		info, err := os.Stat(recordPath)
-		if err != nil {
-			rm.log.Warn("Failed to stat record, skipping", "path", recordPath, "error", err)
-			continue // Skip invalid records
+		if err != nil { // Error stating the specific record directory
+			rm.log.Warn("ListRecords: Failed to stat record path, skipping", "path", recordPath, "error", err)
+			continue // Skip this entry
 		}
+		rm.log.Debug("ListRecords: Successfully stated record path", "path", recordPath)
 
-		creationTime := info.ModTime()
+		creationTime := info.ModTime() // Note: Using ModTime for CreationTime
 
-		// Load the record without creating a new one
 		record := &Record{
-			Hash:         entry.Name(),
-			Name:         entry.Name(), // Or potentially load from metadata if stored
+			Hash:         entryName,
+			Name:         entryName,
 			LastModified: info.ModTime(),
-			CreationTime: creationTime,
-			Motion:       nil,
-			Events:       nil,
-			Dynamics:     nil,
+			CreationTime: creationTime, // Uses ModTime
+			Path:         recordPath,   // Added Path field? Assumed based on common practice
+			Motion:       nil,          // Explicitly nil
+			Events:       nil,          // Explicitly nil
+			Dynamics:     nil,          // Explicitly nil
 		}
+		rm.log.Debug("ListRecords: Appending record", "hash", entryName)
 		records = append(records, record)
 	}
 
+	rm.log.Debug("ListRecords finished", "record_count", len(records))
 	return records, nil
 }
 
