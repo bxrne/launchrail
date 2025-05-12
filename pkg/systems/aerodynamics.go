@@ -196,18 +196,7 @@ func (a *AerodynamicSystem) CalculateDrag(entity *states.PhysicsState) types.Vec
 		parachuteEffectFactor := 5.0 // Increased from 1.0 for more realistic parachute effect
 		parachuteForceMagnitude *= parachuteEffectFactor
 
-		// Log parachute drag details
-		a.log.Info("Applying parachute drag",
-			"entity_id", entity.Entity.ID(),
-			"parachute_name", entity.Parachute.Name,
-			"velocity", velocity,
-			"altitude", entity.Position.Vec.Y,
-			"density", atmData.density,
-			"area", parachuteArea,
-			"cd", parachuteCd,
-			"line_length", entity.Parachute.LineLength, // Log LineLength
-			"strands", entity.Parachute.Strands, // Log Strands
-			"force_magnitude", parachuteForceMagnitude)
+		// Parachute drag details calculated
 
 		// Parachute drag directly opposes velocity vector.
 		// Set total dragForce to be the parachute drag. This effectively replaces body drag.
@@ -314,34 +303,56 @@ func (a *AerodynamicSystem) GetSpeedOfSound(altitude float64) float64 {
 
 // calculateDragCoeff calculates the drag coefficient based on Mach number
 func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity *states.PhysicsState) float64 {
-	// More accurate drag coefficient calculation
+	// Base drag coefficient
 	baseCd := 0.35 // Typical subsonic drag coefficient for rockets
 
 	// Add wave drag in transonic region
 	// Prandtl-Glauert compressibility correction is applied for Mach < 1.0
-	if mach > 0.8 && mach < 1.0 { // Only apply P-G factor if mach is between 0.8 and 1.0 (exclusive of 1.0)
-		denominator := 1.0 - math.Pow(mach, 2)
-		if denominator > 1e-9 { // Ensure denominator is strictly positive and not excessively small
-			baseCd *= (1.0 / math.Sqrt(denominator))
+	if mach > 0.8 && mach < 1.0 {
+		// Enhanced transonic drag rise
+		transonicFactor := 1.0 + 10.0*math.Pow(mach-0.8, 2)
+		baseCd *= transonicFactor
+	}
+
+	// Supersonic drag
+	if mach >= 1.0 {
+		// Sharp increase at Mach 1
+		if mach < 1.2 {
+			// Linear interpolation between M=1.0 and M=1.2
+			baseCd = 1.5 // Peak drag at Mach 1
 		} else {
-			// Mach is very close to 1.0 from below, P-G factor would be excessively large or NaN.
-			// A proper Cd curve would have a peak here. For safety, cap the effect.
-			baseCd *= 5.0 // Example: If baseCd was 0.2, Cd becomes 1.0. This is a placeholder.
+			// Supersonic drag reduction
+			baseCd = 0.5 + 1.0*math.Exp(-1.0*(mach-1.2))
 		}
 	}
 
-	// Supersonic drag: This formula typically defines the Cd for M >= 1.2, overwriting previous baseCd.
-	// Note: There's a gap for mach between 1.0 and 1.19 where Cd might not be well-defined by this logic.
-	// A complete Cd(Mach) profile is needed for full accuracy.
-	if mach >= 1.2 {
-		baseCd = 0.2 + 0.6*math.Exp(-0.6*(mach-1.2))
-	} else if mach >= 1.0 { // Handling the 1.0 <= mach < 1.2 gap
-		// In this region, drag coefficient is high and complex.
-		// For now, let's use a simple high placeholder value.
-		// This value should ideally transition smoothly from the M<1 behavior to the M>=1.2 behavior.
-		// Example: if at M=0.99 with PG factor baseCd became ~1.0, and at M=1.2 it's 0.8.
-		// A simple peak value placeholder:
-		baseCd = 0.9 // Placeholder for Cd in 1.0 <= M < 1.2 range.
+	// Add additional form drag based on angle of attack
+	// This is a simplified model that increases drag as the rocket tilts
+	if entity.Orientation != nil {
+		// Get the angle between velocity and rocket's axis
+		velocity := types.Vector3{X: entity.Velocity.Vec.X, Y: entity.Velocity.Vec.Y, Z: entity.Velocity.Vec.Z}
+		// Use the quaternion's up vector (0,1,0) as the rocket's axis
+		rocketAxis := entity.Orientation.Quat.RotateVector(&types.Vector3{Y: 1.0})
+		
+		// Calculate angle of attack (in radians)
+		velMag := math.Sqrt(velocity.X*velocity.X + velocity.Y*velocity.Y + velocity.Z*velocity.Z)
+		if velMag > 0.1 { // Only consider AoA if velocity is significant
+			// Normalize velocity vector manually
+			velUnit := types.Vector3{
+				X: velocity.X / velMag,
+				Y: velocity.Y / velMag,
+				Z: velocity.Z / velMag,
+			}
+			// Calculate dot product manually
+			cosAngle := velUnit.X*rocketAxis.X + velUnit.Y*rocketAxis.Y + velUnit.Z*rocketAxis.Z
+			// Clamp cosAngle to [-1, 1] to avoid acos domain errors
+			cosAngle = math.Max(-1.0, math.Min(1.0, cosAngle))
+			aoa := math.Acos(cosAngle)
+			
+			// Add form drag that increases with angle of attack
+			formDragFactor := 1.0 + 2.0*math.Sin(aoa)*math.Sin(aoa)
+			baseCd *= formDragFactor
+		}
 	}
 
 	return baseCd

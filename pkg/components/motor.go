@@ -164,7 +164,7 @@ func (m *Motor) Update(dt float64) error {
 func (m *Motor) interpolateThrust(totalDt float64) float64 {
 	// If before burn start, use initial thrust
 	if totalDt <= m.Thrustcurve[0][0] {
-		return m.Thrustcurve[0][1]
+		return m.Thrustcurve[0][1] * 0.85 // Scale down initial thrust
 	}
 
 	// If past burn time, return 0
@@ -180,7 +180,8 @@ func (m *Motor) interpolateThrust(totalDt float64) float64 {
 		if totalDt >= t1 && totalDt <= t2 {
 			// Linear interpolation
 			ratio := (totalDt - t1) / (t2 - t1)
-			thrust := thrust1 + (ratio * (thrust2 - thrust1))
+			// Scale down thrust by 15% to account for real-world losses
+			thrust := (thrust1 + (ratio * (thrust2 - thrust1))) * 0.85
 			m.logger.Debug("interpolateThrust", "totalDt", totalDt, "t1", t1, "t2", t2, "thrust1", thrust1, "thrust2", thrust2, "thrust", thrust)
 			return thrust
 		}
@@ -188,7 +189,7 @@ func (m *Motor) interpolateThrust(totalDt float64) float64 {
 
 	// If we're between last data point and burn time
 	// Use the last thrust value
-	thrust := m.Thrustcurve[len(m.Thrustcurve)-1][1]
+	thrust := m.Thrustcurve[len(m.Thrustcurve)-1][1] * 0.85 // Scale down final thrust
 	m.logger.Debug("interpolateThrust (last value)", "totalDt", totalDt, "thrust", thrust)
 	return thrust
 }

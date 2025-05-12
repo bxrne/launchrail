@@ -167,7 +167,6 @@ func (s *Simulation) assertAndLogPhysicsSanity(state *entities.RocketEntity) err
 		return nil
 	}
 	zeroRocketStateIfNoMotor(s, state)
-	s.logger.Warn("Pre-assert acceleration", "ax", state.Acceleration.Vec.X, "ay", state.Acceleration.Vec.Y, "az", state.Acceleration.Vec.Z)
 	logAndAssertNaNOrInf(s, "Altitude", state.Position.Vec.Y)
 	logAndAssertNaNOrInf(s, "Velocity", state.Velocity.Vec.Y)
 	logAndAssertNaNOrInf(s, "Acceleration", state.Acceleration.Vec.Y)
@@ -224,7 +223,7 @@ func logPeriodicSimState(s *Simulation, state *entities.RocketEntity, hasMotor b
 		return
 	}
 	if hasMotor {
-		s.logger.Info("Sim state", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value, "thrust", state.Motor.GetThrust())
+		s.logger.Debug("Sim state", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value, "thrust", state.Motor.GetThrust())
 	} else {
 		s.logger.Warn("Sim state: Motor is nil", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value)
 	}
