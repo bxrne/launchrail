@@ -247,35 +247,14 @@ func (s *Simulation) Run() error {
 		if err := s.updateSystems(); err != nil {
 			return err
 		}
-		state := s.rocket
+		state := s.rocket // This variable is used by assertAndLogPhysicsSanity
 		if err := s.assertAndLogPhysicsSanity(state); err != nil {
 			return err
 		}
 
-		// Check for NaN/Inf in primary rocket state after updateSystems and clamping as a final safeguard
-		if math.IsNaN(s.rocket.Position.Vec.Y) || math.IsInf(s.rocket.Position.Vec.Y, 0) {
-			s.logger.Error("CRITICAL: Rocket Y position is NaN or Inf after update and clamping. Stopping simulation.", "posY", s.rocket.Position.Vec.Y)
-			break // Exit loop
-		}
-
-		// Ground collision check (using clamped s.rocket.Position.Vec.Y)
-		// Ensure currentTime > 0 to allow simulation to start if rocket is initially on the ground (e.g., Y <= tolerance)
-		if s.rocket.Position.Vec.Y <= s.config.Engine.Simulation.GroundTolerance && s.currentTime > s.config.Engine.Simulation.Step { // Compare with Timestep to ensure at least one step has run
-			s.logger.Info("Ground impact detected: Rocket altitude at or below ground tolerance. Stopping simulation.",
-				"altitude", s.rocket.Position.Vec.Y, "tolerance", s.config.Engine.Simulation.GroundTolerance, "vy", s.rocket.Velocity.Vec.Y)
-			break // Exit loop
-		}
-
-		// Rules system land event check
-		if s.rulesSystem.GetLastEvent() == types.Land && s.currentTime > s.config.Engine.Simulation.Step { // Avoid stopping at t=0 if initial state is Land
-			s.logger.Info("RulesSystem reported Land event. Stopping simulation.", "lastEvent", s.rulesSystem.GetLastEvent())
-			break // Exit loop
-		}
-
-		// Max simulation time check
-		if s.currentTime >= s.config.Engine.Simulation.MaxTime {
-			s.logger.Info("Reached maximum simulation time. Stopping simulation.", "maxTime", s.config.Engine.Simulation.MaxTime)
-			break // Exit loop
+		// Check simulation exit conditions
+		if s.shouldStopSimulation() {
+			break
 		}
 
 		s.currentTime += s.config.Engine.Simulation.Step
@@ -283,6 +262,40 @@ func (s *Simulation) Run() error {
 
 	close(s.doneChan)
 	return nil
+}
+
+// shouldStopSimulation checks all conditions that would require the simulation to stop.
+// It consolidates the various exit conditions from the main simulation loop.
+func (s *Simulation) shouldStopSimulation() bool {
+	// Check for NaN/Inf in primary rocket state after updateSystems and clamping as a final safeguard
+	if math.IsNaN(s.rocket.Position.Vec.Y) || math.IsInf(s.rocket.Position.Vec.Y, 0) {
+		s.logger.Error("CRITICAL: Rocket Y position is NaN or Inf after update and clamping. Stopping simulation.", "posY", s.rocket.Position.Vec.Y)
+		return true
+	}
+
+	// Ground collision check (using clamped s.rocket.Position.Vec.Y)
+	// Ensure currentTime > 0 to allow simulation to start if rocket is initially on the ground (e.g., Y <= tolerance)
+	// Compare with Timestep to ensure at least one step has run
+	if s.rocket.Position.Vec.Y <= s.config.Engine.Simulation.GroundTolerance && s.currentTime > s.config.Engine.Simulation.Step {
+		s.logger.Info("Ground impact detected: Rocket altitude at or below ground tolerance. Stopping simulation.",
+			"altitude", s.rocket.Position.Vec.Y, "tolerance", s.config.Engine.Simulation.GroundTolerance, "vy", s.rocket.Velocity.Vec.Y)
+		return true
+	}
+
+	// Rules system land event check
+	// Avoid stopping at t=0 if initial state is Land
+	if s.rulesSystem.GetLastEvent() == types.Land && s.currentTime > s.config.Engine.Simulation.Step {
+		s.logger.Info("RulesSystem reported Land event. Stopping simulation.", "lastEvent", s.rulesSystem.GetLastEvent())
+		return true
+	}
+
+	// Max simulation time check
+	if s.currentTime >= s.config.Engine.Simulation.MaxTime {
+		s.logger.Info("Reached maximum simulation time. Stopping simulation.", "maxTime", s.config.Engine.Simulation.MaxTime)
+		return true
+	}
+
+	return false
 }
 
 // getComponent safely retrieves and type-asserts a component from the rocket.
