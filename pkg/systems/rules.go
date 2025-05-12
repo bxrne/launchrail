@@ -62,61 +62,107 @@ func (s *RulesSystem) Update(dt float64) error {
 	return nil
 }
 
-func (s *RulesSystem) ProcessRules(entity *states.PhysicsState) types.Event {
+// checkValidEntity verifies if entity and its components are valid
+func (s *RulesSystem) checkValidEntity(entity *states.PhysicsState) bool {
 	if entity == nil || entity.Entity == nil || entity.Position == nil || entity.Velocity == nil || entity.Motor == nil {
 		s.logger.Debug("ProcessRules: entity or critical component is nil")
+		return false
+	}
+	return true
+}
+
+// checkLiftoff detects if liftoff has occurred
+func (s *RulesSystem) checkLiftoff(entity *states.PhysicsState) bool {
+	if !s.hasLiftoff && entity.Motor.FSM.Current() == components.StateBurning && entity.Position.Vec.Y > 0.1 /* Small tolerance */ {
+		s.logger.Info("Liftoff detected", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y)
+		return true
+	}
+	return false
+}
+
+// handleParachute manages parachute deployment logic
+func (s *RulesSystem) handleParachute(entity *states.PhysicsState, apogeeNewlyDetected bool) types.Event {
+	if entity.Parachute == nil || entity.Parachute.Deployed {
+		return types.None
+	}
+	
+	switch entity.Parachute.Trigger {
+	case components.ParachuteTriggerApogee:
+		return s.handleApogeeParachute(entity, apogeeNewlyDetected)
+	default:
+		s.logger.Warn("Unknown parachute trigger type or no trigger logic implemented", "trigger", entity.Parachute.Trigger)
+		return types.None
+	}
+}
+
+// handleApogeeParachute handles parachute deployment at apogee
+func (s *RulesSystem) handleApogeeParachute(entity *states.PhysicsState, apogeeNewlyDetected bool) types.Event {
+	deployAtApogee := apogeeNewlyDetected && (entity.Position.Vec.Y >= entity.Parachute.DeployAltitude || entity.Parachute.DeployAltitude <= 0)
+	
+	if deployAtApogee {
+		s.logger.Info("Deploying parachute at apogee", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "deployAltitudeSetting", entity.Parachute.DeployAltitude)
+		entity.Parachute.Deploy()
+		return types.ParachuteDeploy
+	}
+	
+	deployPostApogeeAltitude := s.hasApogee && entity.Velocity.Vec.Y < 0 && 
+							 entity.Position.Vec.Y <= entity.Parachute.DeployAltitude && 
+							 entity.Parachute.DeployAltitude > 0
+	
+	if deployPostApogeeAltitude {
+		s.logger.Info("Deploying parachute post-apogee at specified altitude", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "deployAltitudeSetting", entity.Parachute.DeployAltitude)
+		entity.Parachute.Deploy()
+		return types.ParachuteDeploy
+	}
+	
+	return types.None
+}
+
+// checkLanding detects if landing has occurred
+func (s *RulesSystem) checkLanding(entity *states.PhysicsState) (bool, float64) {
+	groundTolerance := 0.1 // Default tolerance
+	if s.config != nil && s.config.Simulation.GroundTolerance > 0 {
+		groundTolerance = s.config.Simulation.GroundTolerance
+	}
+	
+	return s.hasApogee && !s.hasLanded && entity.Position.Vec.Y <= groundTolerance, groundTolerance
+}
+
+// handleLanding processes landing event
+func (s *RulesSystem) handleLanding(entity *states.PhysicsState) {
+	s.logger.Info("Landing detected", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y)
+	entity.Position.Vec.Y = 0 // Normalize to ground
+	entity.Velocity.Vec.Y = 0 // Stop vertical movement
+	entity.Velocity.Vec.X = 0
+	entity.Velocity.Vec.Z = 0
+	entity.Acceleration.Vec.Y = 0 // Stop vertical acceleration
+	s.hasLanded = true
+}
+
+func (s *RulesSystem) ProcessRules(entity *states.PhysicsState) types.Event {
+	if !s.checkValidEntity(entity) {
 		return types.None
 	}
 
-	// Check for Liftoff (Motor burning and off the ground/rail?)
-	if !s.hasLiftoff && entity.Motor.FSM.Current() == components.StateBurning && entity.Position.Vec.Y > 0.1 /* Small tolerance */ {
-		s.logger.Info("Liftoff detected", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y)
+	// Check for Liftoff
+	if s.checkLiftoff(entity) {
 		s.hasLiftoff = true
 		return types.Liftoff
 	}
 
 	// Check for Apogee
-	// Note: DetectApogee now sets s.hasApogee and returns if it was *newly* detected.
 	apogeeNewlyDetected := s.DetectApogee(entity)
 
 	// Parachute Deployment Logic
-	if entity.Parachute != nil && !entity.Parachute.Deployed {
-		switch entity.Parachute.Trigger {
-		case components.ParachuteTriggerApogee:
-			deployAtApogee := apogeeNewlyDetected && (entity.Position.Vec.Y >= entity.Parachute.DeployAltitude || entity.Parachute.DeployAltitude <= 0)
-			deployPostApogeeAltitude := s.hasApogee && entity.Velocity.Vec.Y < 0 && entity.Position.Vec.Y <= entity.Parachute.DeployAltitude && entity.Parachute.DeployAltitude > 0
-
-			if deployAtApogee {
-				s.logger.Info("Deploying parachute at apogee", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "deployAltitudeSetting", entity.Parachute.DeployAltitude)
-				entity.Parachute.Deploy()
-				return types.ParachuteDeploy // Can be Apogee and ParachuteDeploy
-			} else if deployPostApogeeAltitude {
-				s.logger.Info("Deploying parachute post-apogee at specified altitude", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "deployAltitudeSetting", entity.Parachute.DeployAltitude)
-				entity.Parachute.Deploy()
-				return types.ParachuteDeploy
-			}
-		// TODO: Add cases for other trigger types like Altitude, Delay, etc.
-		default:
-			s.logger.Warn("Unknown parachute trigger type or no trigger logic implemented", "trigger", entity.Parachute.Trigger)
-		}
+	parachuteEvent := s.handleParachute(entity, apogeeNewlyDetected)
+	if parachuteEvent != types.None {
+		return parachuteEvent
 	}
 
-	// Check for landing after apogee using ground tolerance
-	groundTolerance := 0.1                                          // Default, consider making this configurable if not already via s.config
-	if s.config != nil && s.config.Simulation.GroundTolerance > 0 { // Check if config and value exist
-		groundTolerance = s.config.Simulation.GroundTolerance
-	}
-
-	// Only check for landing *after* apogee
-	if s.hasApogee && !s.hasLanded && entity.Position.Vec.Y <= groundTolerance {
-		s.logger.Info("Landing detected", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y)
-		entity.Position.Vec.Y = 0 // Normalize to ground
-		entity.Velocity.Vec.Y = 0 // Stop vertical movement
-		// Consider zeroing other velocity components if it's a full stop
-		entity.Velocity.Vec.X = 0
-		entity.Velocity.Vec.Z = 0
-		entity.Acceleration.Vec.Y = 0 // Stop vertical acceleration
-		s.hasLanded = true
+	// Check for landing after apogee
+	landed, _ := s.checkLanding(entity)
+	if landed {
+		s.handleLanding(entity)
 		return types.Land
 	}
 
