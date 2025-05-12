@@ -13,15 +13,6 @@ import (
 	"github.com/zerodha/logf"
 )
 
-// Use object pools for vectors and matrices
-var (
-	vectorPool = sync.Pool{
-		New: func() interface{} {
-			return &types.Vector3{}
-		},
-	}
-)
-
 // PhysicsSystem calculates forces on entities
 type PhysicsSystem struct {
 	world           *ecs.World

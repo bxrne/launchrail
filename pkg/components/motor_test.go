@@ -67,16 +67,19 @@ func TestMotorUpdate(t *testing.T) {
 	err := motor.Update(0.5)
 	assert.NoError(t, err)
 
-	// After 0.5s, thrust should still be 10.0N and mass should be 7.5kg
+	// After 0.5s (25% of burn time), mass should be reduced by 25% of propellant mass
 	assert.Equal(t, 10.0, motor.GetThrust())
-	assert.Equal(t, 7.5, motor.GetMass())
+	expectedMass := 10.0 - (10.0 * 0.5/2.0) // Initial - (PropellantMass * TimeElapsed/BurnTime)
+	assert.Equal(t, expectedMass, motor.GetMass())
+	t.Logf("State after first update: %s", motor.GetState())
 
 	// Update to burnout
 	err = motor.Update(1.5)
 	assert.NoError(t, err)
 
+	t.Logf("State after second update: %s", motor.GetState())
 	assert.Equal(t, 0.0, motor.GetThrust())
-	assert.Equal(t, 7.5, motor.GetMass())
+	assert.Equal(t, 0.0, motor.GetMass()) // All propellant consumed
 }
 
 // TEST: GIVEN a Motor WHEN Update is called THEN the Motor is updated

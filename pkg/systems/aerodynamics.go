@@ -10,15 +10,6 @@ import (
 	"github.com/zerodha/logf"
 )
 
-// atmosphericData stores atmospheric data at a given altitude
-type atmosphericData struct {
-	density     float64
-	pressure    float64
-	temperature float64
-	soundSpeed  float64
-	viscosity   float64 // Dynamic viscosity in kg/(m·s)
-}
-
 // AerodynamicSystem calculates aerodynamic forces on entities
 type AerodynamicSystem struct {
 	world    *ecs.World

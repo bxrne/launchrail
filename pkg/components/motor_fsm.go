@@ -74,14 +74,13 @@ func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime flo
 	ctx := context.Background()
 	currentState := fsm.FSM.Current()
 
-	if elapsedTime < burnTime && mass > 0 {
-		if currentState == StateIdle || currentState == StateIgnited {
-			return fsm.handleBurningTransition(ctx, currentState)
-		}
-		return nil
+	// If we're not burning and we're within burn time and have mass, start burning
+	if (currentState == StateIdle || currentState == StateIgnited) && elapsedTime < burnTime && mass > 0 {
+		return fsm.handleBurningTransition(ctx, currentState)
 	}
 
-	if currentState == StateBurning {
+	// If we're burning and either reached burn time or ran out of mass, transition to coasting
+	if currentState == StateBurning && (elapsedTime >= burnTime || mass <= 0) {
 		return fsm.triggerEvent(ctx, "burnout")
 	}
 	return nil
