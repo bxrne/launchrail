@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -402,10 +403,35 @@ func TestDownloadReport(t *testing.T) {
 	defer dummyRecord.Close()
 	actualHash := dummyRecord.Hash
 
-	// Create a dummy engine_config.json in the record's directory for LoadSimulationData
-	recordDir := filepath.Join(tempStorageDir, actualHash)
-	err = os.MkdirAll(recordDir, 0755) // Ensure the specific record directory exists
-	require.NoError(t, err, "Failed to create record directory for engine_config.json")
+	// Write sample data to the record's CSV files
+	motionCSVPath := filepath.Join(dummyRecord.Path, "MOTION.csv")
+	eventsCSVPath := filepath.Join(dummyRecord.Path, "EVENTS.csv")
+
+	// Sample motion data (matches expected apogee/max_velocity)
+	// Headers: time,altitude,velocity,acceleration,thrust
+	motionData := []string{
+		"time,altitude,velocity,acceleration,thrust", // Headers should already be there, but good to be explicit
+		"0,0,0,0,100",
+		"1,10,10,10,100",
+		"2,25,5,0,0", // Max velocity around here
+		"3,30,0,-10,0", // Apogee
+		"4,20,-10,-10,0",
+	}
+	err = os.WriteFile(motionCSVPath, []byte(strings.Join(motionData, "\n")), 0644)
+	require.NoError(t, err, "Failed to write sample motion data")
+
+	// Sample event data
+	// Headers: time,event_name,motor_status,parachute_status
+	eventData := []string{
+		"time,event_name,motor_status,parachute_status", // Headers
+		"0,Liftoff,BURNOUT,NONE", // Changed from LAUNCH to Liftoff
+		"3,Apogee,BURNOUT,DEPLOYED", // Changed from APOGEE to Apogee
+	}
+	err = os.WriteFile(eventsCSVPath, []byte(strings.Join(eventData, "\n")), 0644)
+	require.NoError(t, err, "Failed to write sample event data")
+
+	// Create a dummy engine_config.json as it's expected by LoadSimulationData
+	engineConfigPath := filepath.Join(dummyRecord.Path, "engine_config.json")
 	dummyEngineConfig := config.Engine{
 		Options: config.Options{
 			OpenRocketFile:   "./testdata/l1.ork",
@@ -414,7 +440,7 @@ func TestDownloadReport(t *testing.T) {
 	}
 	dummyEngineConfigBytes, err := json.Marshal(dummyEngineConfig)
 	require.NoError(t, err, "Failed to marshal dummy engine config")
-	err = os.WriteFile(filepath.Join(recordDir, "engine_config.json"), dummyEngineConfigBytes, 0644)
+	err = os.WriteFile(engineConfigPath, dummyEngineConfigBytes, 0644)
 	require.NoError(t, err, "Failed to write dummy engine_config.json")
 
 	// Close the record to flush data and release file handles before the handler tries to read them
