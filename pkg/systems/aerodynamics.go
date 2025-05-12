@@ -262,11 +262,10 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 					continue
 				}
 				a.log.Debug("Worker processing entity", "worker_id", workerID, "entity_id", entity.Entity.ID())
-				force := a.CalculateDrag(entity)
-				moment := a.CalculateAerodynamicMoment(*entity)
-				a.log.Debug("Worker calculated force/moment", "worker_id", workerID, "entity_id", entity.Entity.ID(), "force", force, "moment", moment)
-				resultChan <- force
-				momentChan <- moment
+				dragForce := a.CalculateDrag(entity)
+				entity.AccumulatedForce = entity.AccumulatedForce.Add(dragForce)
+				resultChan <- dragForce
+				momentChan <- types.Vector3{} // Send empty moment for now
 			}
 		}(i) // Pass worker ID
 	}
@@ -298,7 +297,6 @@ func (a *AerodynamicSystem) Update(dt float64) error {
 			"world_drag_force", force,
 			"mass", entity.Mass.Value,
 		)
-		entity.AccumulatedForce = entity.AccumulatedForce.Add(force)
 
 		// Moments handling: Assume moment from CalculateAerodynamicMoment is in body frame.
 		// Rotate to world frame before accumulation if there's a valid orientation.

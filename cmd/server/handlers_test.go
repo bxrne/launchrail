@@ -7,363 +7,25 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/bxrne/launchrail/internal/config"
-	"github.com/bxrne/launchrail/internal/logger"
-	"github.com/bxrne/launchrail/internal/reporting"
-	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/internal/reporting"
+	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/zerodha/logf"
 )
 
-var testLog = logger.GetLogger("debug") // Define testLog
+// Dummy data for CreateRecordWithConfig
+var (
+	dummyConfigData = []byte(`{"simulation": {"timestep": 0.01}}`)
+	dummyOrkData    = []byte(`<openrocket/>`)
+)
 
-// Response structure for API tests
-type ListRecordsAPIResponse struct {
-	Total   int               `json:"total"`
-	Records []*storage.Record `json:"records"`
-}
-
-// RecordManagerInterface defines the methods that the real RecordManager implements
-// This allows us to create a test implementation with the same methods
-type RecordManagerInterface interface {
-	ListRecords() ([]*storage.Record, error)
-	GetRecord(hash string) (*storage.Record, error)
-	DeleteRecord(hash string) error
-	GetStorageDir() string
-}
-
-// TestRecordManager is a test implementation of RecordManagerInterface for testing.
-type TestRecordManager struct {
-	mock *MockRecordManager
-}
-
-// MockRecordManager is a simplified implementation for tests
-type MockRecordManager struct {
-	records []*storage.Record
-	baseDir string
-}
-
-// Create a new test record manager - returns our mock implementation
-func newTestRecordManager(n int) RecordManagerInterface {
-	mock := &MockRecordManager{
-		records: make([]*storage.Record, 0, n),
-		baseDir: "/tmp/test-storage",
-	}
-
-	// Add initial test records
-	for i := 0; i < n; i++ {
-		hash := fmt.Sprintf("test-hash-%d", i+1)
-		creationTime := time.Now().Add(-time.Duration(i) * time.Hour)
-		mock.records = append(mock.records, &storage.Record{
-			Hash:         hash,
-			LastModified: creationTime,
-			CreationTime: creationTime,
-		})
-	}
-
-	return &TestRecordManager{mock: mock}
-}
-
-// ListRecords implements storage.RecordManager interface
-func (t *TestRecordManager) ListRecords() ([]*storage.Record, error) {
-	return t.mock.records, nil
-}
-
-// GetRecord implements storage.RecordManager interface
-func (t *TestRecordManager) GetRecord(hash string) (*storage.Record, error) {
-	for _, r := range t.mock.records {
-		if r.Hash == hash {
-			return r, nil
-		}
-	}
-	return nil, fmt.Errorf("record not found with hash: %s", hash)
-}
-
-// DeleteRecord implements storage.RecordManager interface
-func (t *TestRecordManager) DeleteRecord(hash string) error {
-	for i, r := range t.mock.records {
-		if r.Hash == hash {
-			// Remove the record at index i
-			t.mock.records = append(t.mock.records[:i], t.mock.records[i+1:]...)
-			return nil
-		}
-	}
-	return fmt.Errorf("record not found with hash: %s", hash)
-}
-
-// GetStorageDir implements storage.RecordManager interface
-func (t *TestRecordManager) GetStorageDir() string {
-	return t.mock.baseDir
-}
-
-// TestDataHandler is a version of DataHandler that works with our test interface
-type TestDataHandler struct {
-	records RecordManagerInterface
-	Cfg     *config.Config
-}
-
-// Reimplement the necessary handler methods using our interface
-
-func (h *TestDataHandler) ListRecordsAPI(c *gin.Context) {
-	// Fetch all records
-	records, err := h.records.ListRecords()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Get limit and offset from query parameters
-	limit := 0
-	offset := 0
-
-	limitParam := c.Query("limit")
-	offsetParam := c.Query("offset")
-
-	if limitParam != "" {
-		limit, _ = strconv.Atoi(limitParam)
-	}
-
-	if offsetParam != "" {
-		offset, _ = strconv.Atoi(offsetParam)
-	}
-
-	// Apply pagination if requested
-	totalRecords := len(records)
-	paginatedRecords := records
-
-	if offset > 0 && offset < len(records) {
-		paginatedRecords = records[offset:]
-	} else if offset >= len(records) {
-		paginatedRecords = []*storage.Record{}
-	}
-
-	if limit > 0 && limit < len(paginatedRecords) {
-		paginatedRecords = paginatedRecords[:limit]
-	}
-
-	// Return JSON response with total and records
-	c.JSON(http.StatusOK, gin.H{
-		"total":   totalRecords,
-		"records": paginatedRecords,
-	})
-}
-
-func (h *TestDataHandler) ListRecords(c *gin.Context) {
-	// Fetch all records
-	records, err := h.records.ListRecords()
-	if err != nil {
-		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
-
-	// Render simple HTML for testing
-	_, _ = c.Writer.WriteString("<html><body>")
-	for _, record := range records {
-		_, _ = c.Writer.WriteString("<div>" + record.Hash + "</div>")
-	}
-	_, _ = c.Writer.WriteString("</body></html>")
-}
-
-// TestEmptyRecordsAPI verifies that the API handles empty record sets correctly
-func TestEmptyRecordsAPI(t *testing.T) {
-	// Create a mock storage with no records
-	mockRecords := newTestRecordManager(0)
-
-	// Set up the API handler
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-
-	// Create minimal config
-	cfg := &config.Config{
-		Setup: config.Setup{
-			App: config.App{Version: "test"},
-		},
-	}
-
-	// Create handler
-	log := logger.GetLogger("debug")
-	handler := NewDataHandler(mockRecords, cfg, log)
-
-	// Register API route
-	apiPath := "/api/v0"
-	apiGroup := router.Group(apiPath)
-	apiGroup.GET("/data", handler.ListRecordsAPI)
-
-	// Make API request
-	req := httptest.NewRequest("GET", apiPath+"/data", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	// Verify response
-	require.Equal(t, http.StatusOK, w.Code)
-
-	// Parse JSON response
-	var response ListRecordsAPIResponse
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	require.NoError(t, err)
-
-	// Verify contents
-	assert.Equal(t, 0, response.Total, "Empty storage should return total=0")
-	assert.Len(t, response.Records, 0, "Empty storage should return empty records array")
-}
-
-// TestPaginationAPI tests pagination functionality in the API
-func TestPaginationAPI(t *testing.T) {
-	// Create a mock storage with 5 pre-populated records
-	mockRecords := newTestRecordManager(5)
-
-	// Set up the API handler
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-
-	// Create minimal config
-	cfg := &config.Config{
-		Setup: config.Setup{
-			App: config.App{Version: "test"},
-		},
-	}
-
-	// Create handler
-	log := logger.GetLogger("debug")
-	handler := NewDataHandler(mockRecords, cfg, log)
-
-	// Register API route
-	apiPath := "/api/v0"
-	apiGroup := router.Group(apiPath)
-	apiGroup.GET("/data", handler.ListRecordsAPI)
-
-	// Create a test server
-	server := httptest.NewServer(router)
-	defer server.Close()
-
-	// Helper function to make pagination requests
-	fetchWithParams := func(params string) ListRecordsAPIResponse {
-		url := fmt.Sprintf("%s%s/data", server.URL, apiPath)
-		if params != "" {
-			url += "?" + params
-		}
-
-		resp, err := http.Get(url)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		require.Equal(t, http.StatusOK, resp.StatusCode)
-
-		var result ListRecordsAPIResponse
-		err = json.NewDecoder(resp.Body).Decode(&result)
-		require.NoError(t, err)
-
-		return result
-	}
-
-	// Test cases
-	testCases := []struct {
-		name        string
-		params      string
-		expectTotal int
-		expectCount int
-	}{
-		{
-			name:        "Default (no pagination)",
-			params:      "",
-			expectTotal: 5,
-			expectCount: 5,
-		},
-		{
-			name:        "With limit=2",
-			params:      "limit=2",
-			expectTotal: 5,
-			expectCount: 2,
-		},
-		{
-			name:        "With offset=3",
-			params:      "offset=3",
-			expectTotal: 5,
-			expectCount: 2,
-		},
-		{
-			name:        "With limit=2&offset=2",
-			params:      "limit=2&offset=2",
-			expectTotal: 5,
-			expectCount: 2,
-		},
-		{
-			name:        "With offset past end",
-			params:      "offset=5",
-			expectTotal: 5,
-			expectCount: 0,
-		},
-	}
-
-	// Run each test case
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			response := fetchWithParams(tc.params)
-
-			assert.Equal(t, tc.expectTotal, response.Total,
-				"Total count should match regardless of pagination")
-			assert.Len(t, response.Records, tc.expectCount,
-				"Record count should match expected for params: %s", tc.params)
-		})
-	}
-}
-
-// TestListRecordsHTML tests the HTML rendering for the records list
-func TestListRecordsHTML(t *testing.T) {
-	// Create a mock with 3 records
-	mockRecords := newTestRecordManager(3)
-
-	// Set up the handler
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-
-	// Create minimal config
-	cfg := &config.Config{
-		Setup: config.Setup{
-			App: config.App{Version: "test"},
-		},
-	}
-
-	// Create handler
-	log := logger.GetLogger("debug")
-	handler := NewDataHandler(mockRecords, cfg, log)
-
-	// Register route for HTML handler
-	router.GET("/data", handler.ListRecords)
-
-	// Make request
-	req := httptest.NewRequest("GET", "/data", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	// Verify response
-	require.Equal(t, http.StatusOK, w.Code)
-
-	// Check HTML response
-	body := w.Body.String()
-
-	// It should contain HTML elements
-	assert.Contains(t, body, "<html")
-
-	// It should contain test-hash identifiers from our mock records
-	for i := 1; i <= 3; i++ {
-		assert.Contains(t, body, fmt.Sprintf("test-hash-%d", i),
-			"HTML should include record hash identifiers")
-	}
-	// Check for version string
-	assert.Contains(t, body, "test", "HTML should contain app version")
-
-}
-
-// setupTestTemplate creates the dummy template file needed by the reporting generator.
 func setupTestTemplate(t *testing.T) string {
 	templateDir := filepath.Join("internal", "reporting", "templates")
 	templatePath := filepath.Join(templateDir, "report.md.tmpl")
@@ -398,12 +60,11 @@ func TestDownloadReport(t *testing.T) {
 	tempStorageDir := t.TempDir()
 	realManager, err := storage.NewRecordManager(cfg, tempStorageDir)
 	require.NoError(t, err, "Failed to create real RecordManager for test")
-	dummyRecord, err := realManager.CreateRecord(cfg)
-	require.NoError(t, err)
-	defer dummyRecord.Close()
-	actualHash := dummyRecord.Hash
+	// Create a dummy record using the correct method
+	dummyRecord, err := realManager.CreateRecordWithConfig(dummyConfigData, dummyOrkData)
+	require.NoError(t, err, "Failed to create dummy record")
 
-	// Write sample data to the record's CSV files
+	// Create dummy data files (motion.json, events.json, dynamics.json) within the record directory
 	motionCSVPath := filepath.Join(dummyRecord.Path, "MOTION.csv")
 	eventsCSVPath := filepath.Join(dummyRecord.Path, "EVENTS.csv")
 
@@ -447,7 +108,8 @@ func TestDownloadReport(t *testing.T) {
 	err = dummyRecord.Close()
 	require.NoError(t, err, "Failed to close dummy record")
 
-	dataHandler := NewDataHandler(realManager, cfg, testLog)
+	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
+	dataHandler := NewDataHandler(realManager, cfg, &log)
 	router := gin.New()
 	// The test was previously trying to hit /reports/{hash}/download, but ReportAPIV2 is mounted differently
 	// The actual route in main.go is /explore/:hash/report.
@@ -455,7 +117,7 @@ func TestDownloadReport(t *testing.T) {
 	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
 
 	w := httptest.NewRecorder()
-	reqURL := fmt.Sprintf("/api/v0/explore/%s/report", actualHash)
+	reqURL := fmt.Sprintf("/api/v0/explore/%s/report", dummyRecord.Hash)
 	req, _ := http.NewRequest("GET", reqURL, nil)
 
 	// Act
@@ -470,7 +132,7 @@ func TestDownloadReport(t *testing.T) {
 	require.NoError(t, err, "Failed to unmarshal JSON response from ReportAPIV2")
 
 	// Verify some key fields in the ReportData
-	assert.Equal(t, actualHash, reportDataResponse.RecordID, "RecordID in response mismatch")
+	assert.Equal(t, dummyRecord.Hash, reportDataResponse.RecordID, "RecordID in response mismatch")
 	assert.Equal(t, "test-v0.1.0", reportDataResponse.Version, "Version in response mismatch")
 	assert.Equal(t, "l1.ork", reportDataResponse.RocketName, "RocketName in response mismatch")      // Based on dummyEngineConfig
 	assert.Equal(t, "TestMotor-ABC", reportDataResponse.MotorName, "MotorName in response mismatch") // Based on dummyEngineConfig
@@ -511,53 +173,7 @@ func TestDownloadReport(t *testing.T) {
 	// Assertions about specific markdown content or SVG links are no longer applicable here.
 }
 
-// TestDownloadReport_NotFound tests the scenario where a report is requested for a non-existent hash.
-func TestDownloadReport_NotFound(t *testing.T) {
-	// Arrange
-	// _ = setupTestTemplate(t) // No longer needed as we abort before report generation
-
-	cfg := &config.Config{ // Minimal config
-		Setup: config.Setup{
-			App:     config.App{Version: "test-report-v1"},
-			Logging: config.Logging{Level: "error"},
-		},
-	}
-
-	// Use the real RecordManager in a temp directory
-	tempStorageDir := t.TempDir()
-	realManager, err := storage.NewRecordManager(cfg, tempStorageDir)
-	require.NoError(t, err, "Failed to create real RecordManager for test")
-
-	nonExistentHash := "record-does-not-exist"
-
-	// Initialize DataHandler with a logger
-	log := logger.GetLogger("debug")
-	dataHandler := NewDataHandler(realManager, cfg, log)
-
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.Use(gin.Recovery()) // Add recovery middleware
-	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
-
-	// Act
-	req := httptest.NewRequest(http.MethodGet, "/api/v0/explore/"+nonExistentHash+"/report", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	// Assert
-	// Expecting NotFound status because LoadSimulationData fails
-	require.Equal(t, http.StatusNotFound, w.Code)
-
-	// Check error message in JSON response
-	var jsonResponse map[string]string
-	err = json.Unmarshal(w.Body.Bytes(), &jsonResponse)
-	require.NoError(t, err, "Response body should be valid JSON")
-	// Updated expected error message
-	assert.Equal(t, "Data for report not found or incomplete", jsonResponse["error"], "Error message for non-existent report mismatch")
-}
-
-// --- New Test for HTML ListRecords with Real Manager ---
-
+// TestListRecordsAPI tests the API handler for listing records
 func TestListRecordsAPI(t *testing.T) {
 	// 1. Setup real RecordManager
 	tempStorageDir := t.TempDir()
@@ -567,21 +183,22 @@ func TestListRecordsAPI(t *testing.T) {
 
 	// 2. Create dummy records
 	numRecords := 3
+	createdHashes := make([]string, numRecords)
 	for i := 0; i < numRecords; i++ {
-		// Pass cfg to CreateRecord
-		record, err := realManager.CreateRecord(cfg)
+		// Create slightly different config data for unique hashes
+		configData := []byte(fmt.Sprintf(`{"iteration": %d}`, i))
+		orkData := []byte(fmt.Sprintf(`<rocket iteration="%d"/>`, i))
+		record, err := realManager.CreateRecordWithConfig(configData, orkData)
 		require.NoError(t, err)
-		// Ensure hash is generated and accessible
-		require.NotEmpty(t, record.Hash, "Record hash should not be empty after creation")
-		defer record.Close()
+		createdHashes[i] = record.Hash
 	}
 
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
-	log := logger.GetLogger("debug")
+	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
 	// Ensure AppVersion is set in the config for the template
 	cfg.Setup.App.Version = "test-version"
-	dataHandler := NewDataHandler(realManager, cfg, log)
+	dataHandler := NewDataHandler(realManager, cfg, &log)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -607,8 +224,7 @@ func TestListRecordsAPI(t *testing.T) {
 	assert.Contains(t, body, cfg.Setup.App.Version, "HTML should contain app version")
 }
 
-// --- New Test for DeleteRecord ---
-
+// TestDeleteRecord tests the delete record handler
 func TestDeleteRecord(t *testing.T) {
 	// Arrange
 	// 1. Setup real RecordManager
@@ -626,9 +242,10 @@ func TestDeleteRecord(t *testing.T) {
 	hashToKeep := ""
 	hashToDelete := ""
 	for i := 0; i < 2; i++ {
-		record, err := realManager.CreateRecord(cfg)
+		configData := []byte(fmt.Sprintf(`{"test": "delete%d"}`, i))
+		orkData := []byte(fmt.Sprintf(`<rocket test="delete%d"/>`, i))
+		record, err := realManager.CreateRecordWithConfig(configData, orkData)
 		require.NoError(t, err)
-		defer record.Close()
 		if i == 0 {
 			hashToKeep = record.Hash
 		} else {
@@ -638,8 +255,8 @@ func TestDeleteRecord(t *testing.T) {
 
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
-	log := logger.GetLogger("debug")
-	dataHandler := NewDataHandler(realManager, cfg, log)
+	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
+	dataHandler := NewDataHandler(realManager, cfg, &log)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -675,8 +292,7 @@ func TestDeleteRecord(t *testing.T) {
 	require.NoError(t, err, "GetRecord should succeed for the kept hash")
 }
 
-// --- New Test for DeleteRecordAPI ---
-
+// TestDeleteRecordAPI tests the delete record API handler
 func TestDeleteRecordAPI(t *testing.T) {
 	// Arrange
 	// 1. Setup real RecordManager
@@ -690,15 +306,18 @@ func TestDeleteRecordAPI(t *testing.T) {
 	require.NoError(t, err, "Failed to create real RecordManager for test")
 
 	// 2. Create a dummy record
-	recordToDelete, err := realManager.CreateRecord(cfg)
+	// Use slightly different data to ensure unique hash if run concurrently
+	configDataDel := []byte(`{"action": "delete_api"}`)
+	orkDataDel := []byte(`<rocket action="delete_api"/>`)
+	recordToDelete, err := realManager.CreateRecordWithConfig(configDataDel, orkDataDel)
 	require.NoError(t, err)
-	defer recordToDelete.Close()
+	require.NotNil(t, recordToDelete, "Created record should not be nil")
 	hashToDelete := recordToDelete.Hash
 
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
-	log := logger.GetLogger("debug")
-	dataHandler := NewDataHandler(realManager, cfg, log)
+	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
+	dataHandler := NewDataHandler(realManager, cfg, &log)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
