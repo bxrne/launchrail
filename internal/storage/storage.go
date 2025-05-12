@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/zerodha/logf"
 )
@@ -47,6 +48,7 @@ type Storage struct {
 	file      *os.File
 	log       *logf.Logger
 	closed    bool
+	appCfg    *config.Config
 }
 
 // Stores is a collection of storage services
@@ -57,7 +59,12 @@ type Stores struct {
 }
 
 // NewStorage creates a new storage service for a specific store type within a given record directory.
-func NewStorage(recordDir string, store SimStorageType) (*Storage, error) {
+func NewStorage(recordDir string, store SimStorageType, appCfg *config.Config) (*Storage, error) {
+	if appCfg == nil {
+		return nil, fmt.Errorf("application configuration (appCfg) cannot be nil for NewStorage")
+	}
+	log := logger.GetLogger(appCfg.Setup.Logging.Level) // Use appCfg for logger
+
 	// Ensure the record directory path is absolute
 	absRecordDir, err := filepath.Abs(recordDir)
 	if err != nil {
@@ -86,6 +93,8 @@ func NewStorage(recordDir string, store SimStorageType) (*Storage, error) {
 		file:      file,
 		writer:    csv.NewWriter(file),
 		closed:    false,
+		appCfg:    appCfg,
+		log:       log,
 	}, nil
 }
 
@@ -94,8 +103,6 @@ func NewStorage(recordDir string, store SimStorageType) (*Storage, error) {
 func (s *Storage) Init() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	s.log = logger.GetLogger("debug") // Ensure logger is always initialized
 
 	// Check file size to determine if it's new or empty
 	fileInfo, err := s.file.Stat()

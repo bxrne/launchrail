@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/zerodha/logf"
 )
@@ -29,10 +30,10 @@ type Record struct {
 }
 
 // NewRecord creates a new simulation record with associated storage services
-func NewRecord(baseDir string, hash string) (*Record, error) {
+func NewRecord(baseDir string, hash string, appCfg *config.Config) (*Record, error) {
 	recordDir := baseDir // Use the baseDir directly as it already includes the hash
 
-	motionStore, err := NewStorage(recordDir, MOTION) // Use recordDir
+	motionStore, err := NewStorage(recordDir, MOTION, appCfg) // Use recordDir and appCfg
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +42,7 @@ func NewRecord(baseDir string, hash string) (*Record, error) {
 		return nil, fmt.Errorf("failed to initialize motion storage: %w", err)
 	}
 
-	eventsStore, err := NewStorage(recordDir, EVENTS) // Use recordDir
+	eventsStore, err := NewStorage(recordDir, EVENTS, appCfg) // Use recordDir and appCfg
 	if err != nil {
 		motionStore.Close()
 		return nil, err
@@ -52,7 +53,7 @@ func NewRecord(baseDir string, hash string) (*Record, error) {
 		return nil, fmt.Errorf("failed to initialize events storage: %w", err)
 	}
 
-	dynamicsStore, err := NewStorage(recordDir, DYNAMICS) // Use recordDir
+	dynamicsStore, err := NewStorage(recordDir, DYNAMICS, appCfg) // Use recordDir and appCfg
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close()
@@ -99,6 +100,7 @@ type RecordManager struct {
 	baseDir string
 	mu      sync.RWMutex
 	log     *logf.Logger
+	appCfg  *config.Config // Added to store application-level config
 }
 
 // GetStorageDir returns the base directory for the record manager.
@@ -106,7 +108,13 @@ func (rm *RecordManager) GetStorageDir() string {
 	return rm.baseDir
 }
 
-func NewRecordManager(baseDir string) (*RecordManager, error) {
+func NewRecordManager(cfg *config.Config, baseDir string) (*RecordManager, error) {
+	// Ensure cfg is not nil to prevent panic when accessing cfg.Setup.Logging.Level
+	if cfg == nil {
+		return nil, fmt.Errorf("application configuration (cfg) cannot be nil")
+	}
+	log := logger.GetLogger(cfg.Setup.Logging.Level) // Use cfg for this initial logger
+
 	if !filepath.IsAbs(baseDir) {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
@@ -119,20 +127,17 @@ func NewRecordManager(baseDir string) (*RecordManager, error) {
 		return nil, err
 	}
 
-	log := logger.GetLogger("info") // Or a more appropriate level
-
 	return &RecordManager{
 		baseDir: baseDir,
-		log:     log,
+		log:     log,    // This log instance uses the appCfg level
+		appCfg:  cfg,    // Store appCfg
 	}, nil
 }
 
 // CreateRecord creates a new record with a unique hash based on the current time
-// DEPRECATED: Use CreateRecordWithConfig for deterministic hashing based on simulation parameters
-func (rm *RecordManager) CreateRecord() (*Record, error) {
+func (rm *RecordManager) CreateRecord(cfg *config.Config) (*Record, error) {
 	pc, file, line, _ := runtime.Caller(1)
-	log := logger.GetLogger("")
-	log.Warn("DEPRECATED: CreateRecord called without config data. This may cause duplicate records.", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
+	rm.log.Info("CreateRecord called (Note: uses time-based hash)", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 	
@@ -157,14 +162,13 @@ func (rm *RecordManager) CreateRecord() (*Record, error) {
 	}
 
 	// Create record with its storage services
-	return NewRecord(recordDir, hash)
+	return NewRecord(recordDir, hash, cfg)
 }
 
 // CreateRecordWithConfig creates a new record with a hash derived from configuration and OpenRocket data
 func (rm *RecordManager) CreateRecordWithConfig(configData []byte, orkData []byte) (*Record, error) {
 	pc, file, line, _ := runtime.Caller(1)
-	log := logger.GetLogger("")
-	log.Info("CreateRecordWithConfig called", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
+	rm.log.Info("CreateRecordWithConfig called", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 	
@@ -193,7 +197,7 @@ func (rm *RecordManager) CreateRecordWithConfig(configData []byte, orkData []byt
 		return nil, fmt.Errorf("failed to create hash directory %s: %w", hashDir, err)
 	}
 
-	record, err := NewRecord(hashDir, hash)
+	record, err := NewRecord(hashDir, hash, rm.appCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -235,11 +239,10 @@ func (rm *RecordManager) DeleteRecord(hash string) error {
 	recordPath := filepath.Join(rm.baseDir, hash)
 
 	// Check if the record directory exists first
-	if _, err := os.Stat(recordPath); os.IsNotExist(err) {
-		// Directory does not exist, return specific error
-		return ErrRecordNotFound // Use the defined sentinel error
-	} else if err != nil {
-		// Some other error occurred during stat (e.g., permissions)
+	if _, err := os.Stat(recordPath); err != nil {
+		if os.IsNotExist(err) {
+			return ErrRecordNotFound // Use the defined sentinel error
+		}
 		return fmt.Errorf("failed to check record existence: %w", err)
 	}
 
@@ -325,7 +328,7 @@ func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 	}
 
 	// Initialize storage services for the record
-	motionStore, err := NewStorage(recordPath, MOTION) // Use recordPath
+	motionStore, err := NewStorage(recordPath, MOTION, rm.appCfg) // Pass rm.appCfg
 	if err != nil {
 		return nil, fmt.Errorf("failed to create motion storage for %s: %w", hash, err) // More context for error
 	}
@@ -334,7 +337,7 @@ func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 		return nil, fmt.Errorf("failed to initialize motion storage for %s: %w", hash, err)
 	}
 
-	eventsStore, err := NewStorage(recordPath, EVENTS) // Use recordPath
+	eventsStore, err := NewStorage(recordPath, EVENTS, rm.appCfg) // Pass rm.appCfg
 	if err != nil {
 		motionStore.Close() // Clean up previously successful store
 		return nil, fmt.Errorf("failed to create events storage for %s: %w", hash, err)
@@ -345,7 +348,7 @@ func (rm *RecordManager) GetRecord(hash string) (*Record, error) {
 		return nil, fmt.Errorf("failed to initialize events storage for %s: %w", hash, err)
 	}
 
-	dynamicsStore, err := NewStorage(recordPath, DYNAMICS) // Use recordPath
+	dynamicsStore, err := NewStorage(recordPath, DYNAMICS, rm.appCfg) // Pass rm.appCfg
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close() // Clean up previously successful stores
@@ -395,7 +398,7 @@ func (rm *RecordManager) loadRecord(hash string) (*Record, error) {
 		return nil, fmt.Errorf("path %s is not a directory", recordPath)
 	}
 	creationTime := info.ModTime()
-	motionStore, err := NewStorage(recordPath, MOTION)
+	motionStore, err := NewStorage(recordPath, MOTION, rm.appCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init motion storage for %s: %w", hash, err)
 	}
@@ -403,7 +406,7 @@ func (rm *RecordManager) loadRecord(hash string) (*Record, error) {
 		motionStore.Close()
 		return nil, fmt.Errorf("failed to initialize motionStore for %s: %w", hash, err)
 	}
-	eventsStore, err := NewStorage(recordPath, EVENTS)
+	eventsStore, err := NewStorage(recordPath, EVENTS, rm.appCfg)
 	if err != nil {
 		motionStore.Close()
 		return nil, fmt.Errorf("failed to init events storage for %s: %w", hash, err)
@@ -413,7 +416,7 @@ func (rm *RecordManager) loadRecord(hash string) (*Record, error) {
 		eventsStore.Close()
 		return nil, fmt.Errorf("failed to initialize eventsStore for %s: %w", hash, err)
 	}
-	dynamicsStore, err := NewStorage(recordPath, DYNAMICS)
+	dynamicsStore, err := NewStorage(recordPath, DYNAMICS, rm.appCfg)
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close()

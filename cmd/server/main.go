@@ -303,7 +303,7 @@ func main() {
 	homedir := usr.HomeDir
 	recordOutputBase := filepath.Join(homedir, ".launchrail")
 
-	recordManager, err := storage.NewRecordManager(recordOutputBase) // Pass the specific records path
+	recordManager, err := storage.NewRecordManager(cfg, recordOutputBase) // Pass the specific records path
 	if err != nil {
 		lg.Error("Failed to initialize record manager", "error", err)
 		os.Exit(1)

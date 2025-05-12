@@ -199,13 +199,13 @@ func TestManager_Initialize(t *testing.T) {
 			log := logf.New(logf.Opts{})
 
 			recordDir := t.TempDir()
-			motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
+			motionStore, err := storage.NewStorage(recordDir, storage.MOTION, cfg)
 			require.NoError(t, err)
 			// defer motionStore.Close() // Manager is responsible for closing
-			eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
+			eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS, cfg)
 			require.NoError(t, err)
 			// defer eventsStore.Close() // Manager is responsible for closing
-			dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
+			dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS, cfg)
 			require.NoError(t, err)
 			// defer dynamicsStore.Close() // Manager is responsible for closing
 			stores := &storage.Stores{
@@ -264,13 +264,13 @@ func TestManager_Run(t *testing.T) {
 					},
 				}
 				recordDir := t.TempDir()
-				motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
+				motionStore, err := storage.NewStorage(recordDir, storage.MOTION, cfg)
 				require.NoError(t, err)
 				// defer motionStore.Close() // Manager is responsible for closing
-				eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
+				eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS, cfg)
 				require.NoError(t, err)
 				// defer eventsStore.Close() // Manager is responsible for closing
-				dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
+				dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS, cfg)
 				require.NoError(t, err)
 				// defer dynamicsStore.Close() // Manager is responsible for closing
 				stores := &storage.Stores{
@@ -325,11 +325,11 @@ func TestManager_Close(t *testing.T) {
 	}
 
 	recordDir := t.TempDir()
-	motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
+	motionStore, err := storage.NewStorage(recordDir, storage.MOTION, cfg)
 	require.NoError(t, err)
-	eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
+	eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS, cfg)
 	require.NoError(t, err)
-	dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
+	dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS, cfg)
 	require.NoError(t, err)
 	stores := &storage.Stores{
 		Motion:   motionStore,
@@ -371,11 +371,11 @@ func TestManager_GetStatus(t *testing.T) {
 	}
 
 	recordDir := t.TempDir()
-	motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
+	motionStore, err := storage.NewStorage(recordDir, storage.MOTION, cfg)
 	require.NoError(t, err)
-	eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
+	eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS, cfg)
 	require.NoError(t, err)
-	dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
+	dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS, cfg)
 	require.NoError(t, err)
 	stores := &storage.Stores{
 		Motion:   motionStore,

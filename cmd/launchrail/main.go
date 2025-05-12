@@ -39,7 +39,7 @@ func main() {
 	simManager := simulation.NewManager(cfg, *log) // Dereference pointer to pass interface value
 
 	// Create storage for the run using the run-specific directory
-	motionStore, err := storage.NewStorage(hash, storage.MOTION)
+	motionStore, err := storage.NewStorage(hash, storage.MOTION, cfg)
 	if err != nil {
 		log.Fatal("Failed to create motion storage", "error", err)
 	}
@@ -47,7 +47,7 @@ func main() {
 		motionStore.Close()
 		log.Fatal("Failed to initialize motion storage headers", "error", err)
 	}
-	eventsStore, err := storage.NewStorage(hash, storage.EVENTS)
+	eventsStore, err := storage.NewStorage(hash, storage.EVENTS, cfg)
 	if err != nil {
 		motionStore.Close() // Clean up previously opened store
 		log.Fatal("Failed to create events storage", "error", err)
@@ -57,7 +57,7 @@ func main() {
 		eventsStore.Close()
 		log.Fatal("Failed to initialize events storage headers", "error", err)
 	}
-	dynamicsStore, err := storage.NewStorage(hash, storage.DYNAMICS)
+	dynamicsStore, err := storage.NewStorage(hash, storage.DYNAMICS, cfg)
 	if err != nil {
 		motionStore.Close()
 		eventsStore.Close()

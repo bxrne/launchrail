@@ -16,17 +16,17 @@ import (
 	"github.com/zerodha/logf"
 )
 
-func setupTestStorage(t *testing.T) (*storage.Stores, func()) {
+func setupTestStorage(t *testing.T, cfg *config.Config) (*storage.Stores, func()) {
 	testDir := t.TempDir()
 	recordDir := filepath.Join(testDir, "launchrail-test")
 
-	motionStore, err := storage.NewStorage(recordDir, storage.MOTION)
+	motionStore, err := storage.NewStorage(recordDir, storage.MOTION, cfg)
 	require.NoError(t, err)
 
-	eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS)
+	eventsStore, err := storage.NewStorage(recordDir, storage.EVENTS, cfg)
 	require.NoError(t, err)
 
-	dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS)
+	dynamicsStore, err := storage.NewStorage(recordDir, storage.DYNAMICS, cfg)
 	require.NoError(t, err)
 
 	stores := &storage.Stores{
@@ -57,7 +57,7 @@ func TestNewSimulation(t *testing.T) {
 	}
 	log := logf.New(logf.Opts{})
 
-	stores, cleanup := setupTestStorage(t)
+	stores, cleanup := setupTestStorage(t, cfg)
 	defer cleanup()
 
 	sim, err := simulation.NewSimulation(cfg, log, stores)
@@ -77,7 +77,7 @@ func TestLoadRocket(t *testing.T) {
 	}
 	log := logf.New(logf.Opts{})
 
-	stores, cleanup := setupTestStorage(t)
+	stores, cleanup := setupTestStorage(t, cfg)
 	defer cleanup()
 
 	sim, err := simulation.NewSimulation(cfg, log, stores)
@@ -104,10 +104,11 @@ func TestLoadRocket(t *testing.T) {
 
 func TestLoadRocket_MotorError(t *testing.T) {
 	log := logf.New(logf.Opts{Writer: io.Discard})
-	stores, cleanup := setupTestStorage(t)
+	cfg := &config.Config{Setup: config.Setup{Logging: config.Logging{Level: "error"}}} // Minimal config for storage
+	stores, cleanup := setupTestStorage(t, cfg)
 	defer cleanup()
-	cfg := &config.Config{}
-	sim, _ := simulation.NewSimulation(cfg, log, stores)
+	simCfg := &config.Config{} // Config for the simulation itself (can be different)
+	sim, _ := simulation.NewSimulation(simCfg, log, stores)
 
 	// Load valid ORK data
 	orkData, err := openrocket.Load("../../testdata/openrocket/l1.ork", "23.09")
@@ -135,7 +136,7 @@ func TestRun(t *testing.T) {
 	}
 	log := logf.New(logf.Opts{})
 
-	stores, cleanup := setupTestStorage(t)
+	stores, cleanup := setupTestStorage(t, cfg)
 	defer cleanup()
 
 	sim, err := simulation.NewSimulation(cfg, log, stores)
@@ -165,7 +166,10 @@ func TestRun(t *testing.T) {
 
 func TestRun_InvalidStep(t *testing.T) {
 	log := logf.New(logf.Opts{Writer: io.Discard})
-	stores, cleanup := setupTestStorage(t)
+	// Use one of the configs for storage setup, doesn't matter which for this test's purpose
+	// as storage setup is minimal.
+	cfgForStorage := &config.Config{Setup: config.Setup{Logging: config.Logging{Level: "error"}}}
+	stores, cleanup := setupTestStorage(t, cfgForStorage)
 	defer cleanup()
 
 	// Test step too small
@@ -189,8 +193,6 @@ func TestRun_InvalidStep(t *testing.T) {
 
 func TestRun_StopConditions(t *testing.T) {
 	log := logf.New(logf.Opts{Writer: io.Discard})
-	stores, cleanup := setupTestStorage(t)
-	defer cleanup()
 
 	// Minimal config for a short run
 	cfg := &config.Config{
@@ -209,6 +211,8 @@ func TestRun_StopConditions(t *testing.T) {
 			},
 		},
 	}
+	stores, cleanup := setupTestStorage(t, cfg)
+	defer cleanup()
 	sim, err := simulation.NewSimulation(cfg, log, stores)
 	require.NoError(t, err)
 
@@ -237,8 +241,6 @@ func TestRun_StopConditions(t *testing.T) {
 
 func TestRun_AssertNonPositiveMass(t *testing.T) {
 	log := logf.New(logf.Opts{Writer: io.Discard})
-	stores, cleanup := setupTestStorage(t)
-	defer cleanup()
 	cfg := &config.Config{
 		Engine: config.Engine{
 			Simulation: config.Simulation{
@@ -254,6 +256,8 @@ func TestRun_AssertNonPositiveMass(t *testing.T) {
 			},
 		},
 	}
+	stores, cleanup := setupTestStorage(t, cfg)
+	defer cleanup()
 	sim, err := simulation.NewSimulation(cfg, log, stores)
 	require.NoError(t, err)
 

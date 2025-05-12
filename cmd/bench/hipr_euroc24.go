@@ -80,15 +80,15 @@ func (b *HiprEuroc24Benchmark) Run(entry config.BenchmarkEntry, logger *logf.Log
 
 	// --- Initialize Simulation Manager with Storage ---
 	logger.Debug("Initializing simulation manager storage", "run_dir", runDir)
-	motionStore, err := storage.NewStorage(runDir, storage.MOTION)
+	motionStore, err := storage.NewStorage(runDir, storage.MOTION, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create motion storage in %s: %w", runDir, err)
 	}
-	eventsStore, err := storage.NewStorage(runDir, storage.EVENTS)
+	eventsStore, err := storage.NewStorage(runDir, storage.EVENTS, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create events storage in %s: %w", runDir, err)
 	}
-	dynamicsStore, err := storage.NewStorage(runDir, storage.DYNAMICS)
+	dynamicsStore, err := storage.NewStorage(runDir, storage.DYNAMICS, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dynamics storage in %s: %w", runDir, err)
 	}
