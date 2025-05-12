@@ -301,12 +301,17 @@ func main() {
 		lg.Fatal("Failed to get current user for RecordManager path", "error", err)
 	}
 	homedir := usr.HomeDir
-	recordOutputBase := filepath.Join(homedir, ".launchrail")
+	// Ensure the .launchrail directory exists before creating the records subdir
+	launchrailDir := filepath.Join(homedir, ".launchrail")
+	if err := os.MkdirAll(launchrailDir, 0755); err != nil {
+		lg.Fatal("Failed to create .launchrail directory", "path", launchrailDir, "error", err)
+	}
+	recordOutputBase := filepath.Join(launchrailDir, "records")
 
-	recordManager, err := storage.NewRecordManager(cfg, recordOutputBase) // Pass the specific records path
+	// Pass the logger correctly (lg, not &lg)
+	recordManager, err := storage.NewRecordManager(cfg, recordOutputBase, lg)
 	if err != nil {
-		lg.Error("Failed to initialize record manager", "error", err)
-		os.Exit(1)
+		lg.Fatal("Failed to initialize record manager", "error", err)
 	}
 
 	// Set up data handler with the initialized logger and configuration

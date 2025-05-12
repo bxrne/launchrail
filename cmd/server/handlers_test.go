@@ -58,7 +58,8 @@ func TestDownloadReport(t *testing.T) {
 		},
 	}
 	tempStorageDir := t.TempDir()
-	realManager, err := storage.NewRecordManager(cfg, tempStorageDir)
+	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
+	realManager, err := storage.NewRecordManager(cfg, tempStorageDir, &log)
 	require.NoError(t, err, "Failed to create real RecordManager for test")
 	// Create a dummy record using the correct method
 	dummyRecord, err := realManager.CreateRecordWithConfig(dummyConfigData, dummyOrkData)
@@ -108,7 +109,6 @@ func TestDownloadReport(t *testing.T) {
 	err = dummyRecord.Close()
 	require.NoError(t, err, "Failed to close dummy record")
 
-	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
 	dataHandler := NewDataHandler(realManager, cfg, &log)
 	router := gin.New()
 	// The test was previously trying to hit /reports/{hash}/download, but ReportAPIV2 is mounted differently
@@ -178,7 +178,8 @@ func TestListRecordsAPI(t *testing.T) {
 	// 1. Setup real RecordManager
 	tempStorageDir := t.TempDir()
 	cfg := &config.Config{Setup: config.Setup{Logging: config.Logging{Level: "error"}}} // Minimal config for storage
-	realManager, err := storage.NewRecordManager(cfg, tempStorageDir)
+	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
+	realManager, err := storage.NewRecordManager(cfg, tempStorageDir, &log)
 	require.NoError(t, err, "Failed to create real RecordManager for test")
 
 	// 2. Create dummy records
@@ -195,9 +196,6 @@ func TestListRecordsAPI(t *testing.T) {
 
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
-	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
-	// Ensure AppVersion is set in the config for the template
-	cfg.Setup.App.Version = "test-version"
 	dataHandler := NewDataHandler(realManager, cfg, &log)
 
 	gin.SetMode(gin.TestMode)
@@ -235,7 +233,8 @@ func TestDeleteRecord(t *testing.T) {
 		},
 	}
 	tempStorageDir := t.TempDir()
-	realManager, err := storage.NewRecordManager(cfg, tempStorageDir)
+	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
+	realManager, err := storage.NewRecordManager(cfg, tempStorageDir, &log)
 	require.NoError(t, err, "Failed to create real RecordManager for test")
 
 	// 2. Create dummy records
@@ -255,7 +254,6 @@ func TestDeleteRecord(t *testing.T) {
 
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
-	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
 	dataHandler := NewDataHandler(realManager, cfg, &log)
 
 	gin.SetMode(gin.TestMode)
@@ -302,7 +300,8 @@ func TestDeleteRecordAPI(t *testing.T) {
 		},
 	}
 	tempStorageDir := t.TempDir()
-	realManager, err := storage.NewRecordManager(cfg, tempStorageDir)
+	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
+	realManager, err := storage.NewRecordManager(cfg, tempStorageDir, &log)
 	require.NoError(t, err, "Failed to create real RecordManager for test")
 
 	// 2. Create a dummy record
@@ -316,7 +315,6 @@ func TestDeleteRecordAPI(t *testing.T) {
 
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
-	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
 	dataHandler := NewDataHandler(realManager, cfg, &log)
 
 	gin.SetMode(gin.TestMode)

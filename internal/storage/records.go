@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/bxrne/launchrail/internal/config"
-	"github.com/bxrne/launchrail/internal/logger"
+	"github.com/bxrne/launchrail/pkg/diff"
+	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/zerodha/logf"
 )
 
@@ -101,6 +102,8 @@ type RecordManager struct {
 	mu      sync.RWMutex
 	log     *logf.Logger
 	appCfg  *config.Config // Added to store application-level config
+	records map[string]*Record
+	stopCh  chan struct{}
 }
 
 // GetStorageDir returns the base directory for the record manager.
@@ -108,30 +111,42 @@ func (rm *RecordManager) GetStorageDir() string {
 	return rm.baseDir
 }
 
-func NewRecordManager(cfg *config.Config, baseDir string) (*RecordManager, error) {
+// NewRecordManager creates a new RecordManager.
+// It requires the application config, the base directory for records, and a logger.
+func NewRecordManager(cfg *config.Config, baseDir string, log *logf.Logger) (*RecordManager, error) {
 	// Ensure cfg is not nil to prevent panic when accessing cfg.Setup.Logging.Level
 	if cfg == nil {
 		return nil, fmt.Errorf("application configuration (cfg) cannot be nil")
 	}
-	log := logger.GetLogger(cfg.Setup.Logging.Level) // Use cfg for this initial logger
+	if log == nil {
+		return nil, fmt.Errorf("logger cannot be nil")
+	}
 
+	// Validate and potentially make baseDir absolute
 	if !filepath.IsAbs(baseDir) {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get user home directory: %w", err)
 		}
 		baseDir = filepath.Join(homeDir, baseDir)
 	}
 
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
+	// Ensure base directory exists
+	err := os.MkdirAll(baseDir, 0755)
+	if err != nil {
 		return nil, err
 	}
 
-	return &RecordManager{
+	// Create RecordManager instance
+	rm := &RecordManager{
 		baseDir: baseDir,
-		log:     log, // This log instance uses the appCfg level
-		appCfg:  cfg, // Store appCfg
-	}, nil
+		appCfg:  cfg,
+		log:     log,
+		records: make(map[string]*Record),
+		stopCh:  make(chan struct{}),
+	}
+
+	return rm, nil
 }
 
 // CreateRecord creates a new record with a unique hash based on the current time
@@ -141,16 +156,17 @@ func (rm *RecordManager) CreateRecord(cfg *config.Config) (*Record, error) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
-	// Use a fixed prefix with the current day (without time) to make simulations run on the same day
-	// have the same hash, avoiding duplicate result sets
-	currentDate := time.Now().Format("2006-01-02")
-	hashInput := fmt.Sprintf("simulation-%s-%d", currentDate, time.Now().UnixNano()) // Add nanoseconds for uniqueness
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(hashInput)))
+	ork, err := openrocket.Load(cfg.Engine.Options.OpenRocketFile, cfg.Engine.External.OpenRocketVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	hash := diff.CombinedHash(cfg.Bytes(), ork.Bytes())
 
 	// Use rm.baseDir as the root for record directories.
 	// rm.baseDir should already be an absolute path, created by NewRecordManager.
 	// MkdirAll is still good practice in case baseDir was removed externally or for subdirs.
-	err := os.MkdirAll(rm.baseDir, 0755) // Ensure baseDir itself exists
+	err = os.MkdirAll(rm.baseDir, 0755) // Ensure baseDir itself exists
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensure base directory exists %s: %w", rm.baseDir, err)
 	}
@@ -168,19 +184,12 @@ func (rm *RecordManager) CreateRecord(cfg *config.Config) (*Record, error) {
 // CreateRecordWithConfig creates a new record with a hash derived from configuration and OpenRocket data
 func (rm *RecordManager) CreateRecordWithConfig(configData []byte, orkData []byte) (*Record, error) {
 	pc, file, line, _ := runtime.Caller(1)
-	rm.log.Info("CreateRecordWithConfig called", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
+	rm.log.Info("CreateRecordWithConfig called", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name()) // Uses rm.log which depends on logf
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
-	// Hash the configuration and OpenRocket data
-	combinedData := append(configData, orkData...)
-	// Add a prefix to ensure consistency in hash generation
-	combinedData = append([]byte("launchrail-config-"), combinedData...)
-	hashInput := sha256.Sum256(combinedData)
-	hash := fmt.Sprintf("%x", hashInput)
-
-	// Truncate to a reasonable length (first 16 characters)
-	hash = hash[:16]
+	// Use diff.CombinedHash to generate the hash from config and ORK data
+	hash := diff.CombinedHash(configData, orkData)
 
 	// Use rm.baseDir as the root for record directories.
 	// rm.baseDir should already be an absolute path, created by NewRecordManager.
@@ -241,7 +250,7 @@ func (rm *RecordManager) DeleteRecord(hash string) error {
 	// Check if the record directory exists first
 	if _, err := os.Stat(recordPath); err != nil {
 		if os.IsNotExist(err) {
-			return ErrRecordNotFound // Use the defined sentinel error
+			return errors.New("record not found") // Use the defined sentinel error
 		}
 		return fmt.Errorf("failed to check record existence: %w", err)
 	}
