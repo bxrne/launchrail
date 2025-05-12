@@ -23,8 +23,8 @@ import (
 )
 
 var (
-	// TODO: Populate from viper config
-	// simulationDirName string = ".launchrail/simulations" // Removed unused variable
+// TODO: Populate from viper config
+// simulationDirName string = ".launchrail/simulations" // Removed unused variable
 )
 
 // HandlerRecordManager defines the subset of storage.RecordManager methods used by DataHandler.

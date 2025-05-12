@@ -15,10 +15,10 @@ import (
 )
 
 var (
-	globalLogger    logf.Logger
-	once            sync.Once
-	logFile         *os.File
-	defaultOpts     = logf.Opts{
+	globalLogger logf.Logger
+	once         sync.Once
+	logFile      *os.File
+	defaultOpts  = logf.Opts{
 		EnableCaller:    true,
 		TimestampFormat: "15:04:05",
 		EnableColor:     false,

@@ -56,4 +56,6 @@ func (p *WindEffectPlugin) Cleanup() error {
 }
 
 // main is required for Go plugins.
-func main() {}
+func main() {
+	// included to silence sonarcloud
+}

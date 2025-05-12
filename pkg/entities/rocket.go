@@ -15,8 +15,8 @@ import (
 // InertialComponent defines an interface for components that contribute to mass and inertia.
 type InertialComponent interface {
 	GetMass() float64
-	GetPosition() types.Vector3 // Position of the component's reference point in rocket global axes
-	GetCenterOfMassLocal() types.Vector3 // Position of the component's CM relative to its reference point, in component local axes
+	GetPosition() types.Vector3             // Position of the component's reference point in rocket global axes
+	GetCenterOfMassLocal() types.Vector3    // Position of the component's CM relative to its reference point, in component local axes
 	GetInertiaTensorLocal() types.Matrix3x3 // Inertia tensor of component about its own CM, in component local axes
 }
 
@@ -173,15 +173,15 @@ func processInertialComponent(compGeneric interface{}, overallRocketCG types.Vec
 
 // PhysicsStateConfig holds parameters for creating a PhysicsState.
 type PhysicsStateConfig struct {
-	OverallRocketCG             types.Vector3
-	TotalInertiaTensorBody      types.Matrix3x3
+	OverallRocketCG               types.Vector3
+	TotalInertiaTensorBody        types.Matrix3x3
 	InverseTotalInertiaTensorBody types.Matrix3x3
-	InitialMass               float64
-	Motor                     *components.Motor
-	Bodytube                  *components.Bodytube
-	Nosecone                  *components.Nosecone
-	Finset                    *components.TrapezoidFinset
-	Parachute                 *components.Parachute
+	InitialMass                   float64
+	Motor                         *components.Motor
+	Bodytube                      *components.Bodytube
+	Nosecone                      *components.Nosecone
+	Finset                        *components.TrapezoidFinset
+	Parachute                     *components.Parachute
 }
 
 // createPhysicsState creates and initializes the PhysicsState for the rocket.
@@ -203,15 +203,15 @@ func createPhysicsState(basic ecs.BasicEntity, cfg *PhysicsStateConfig) *states.
 			BasicEntity: basic,
 			Quat:        *types.IdentityQuaternion(),
 		},
-		AngularAcceleration: &types.Vector3{},
-		AngularVelocity:     &types.Vector3{},
+		AngularAcceleration:      &types.Vector3{},
+		AngularVelocity:          &types.Vector3{},
 		InertiaTensorBody:        cfg.TotalInertiaTensorBody,
 		InverseInertiaTensorBody: cfg.InverseTotalInertiaTensorBody,
 		// Assign components directly for physics system access
-		Motor:    cfg.Motor,
-		Bodytube: cfg.Bodytube,
-		Nosecone: cfg.Nosecone,
-		Finset:   cfg.Finset,
+		Motor:     cfg.Motor,
+		Bodytube:  cfg.Bodytube,
+		Nosecone:  cfg.Nosecone,
+		Finset:    cfg.Finset,
 		Parachute: cfg.Parachute,
 	}
 	return ps
@@ -290,25 +290,25 @@ func NewRocketEntity(world *ecs.World, orkData *openrocket.OpenrocketDocument, m
 
 	overallRocketCG, totalInertiaTensorBody, inverseTotalInertiaTensorBody := calculateCGAndInertia(initialMass, createdComponents, log)
 
-	// --- 3. Create Basic Entity and Physics State --- 
+	// --- 3. Create Basic Entity and Physics State ---
 	basic := ecs.NewBasic()
 
 	physicsStateCfg := &PhysicsStateConfig{
-		OverallRocketCG:             overallRocketCG,
-		TotalInertiaTensorBody:      totalInertiaTensorBody,
+		OverallRocketCG:               overallRocketCG,
+		TotalInertiaTensorBody:        totalInertiaTensorBody,
 		InverseTotalInertiaTensorBody: inverseTotalInertiaTensorBody,
-		InitialMass:               initialMass,
-		Motor:                     motor,
-		Bodytube:                  bodytube,
-		Nosecone:                  nosecone,
-		Finset:                    finset,
-		Parachute:                 parachute,
+		InitialMass:                   initialMass,
+		Motor:                         motor,
+		Bodytube:                      bodytube,
+		Nosecone:                      nosecone,
+		Finset:                        finset,
+		Parachute:                     parachute,
 	}
 	physicsState := createPhysicsState(basic, physicsStateCfg)
 
 	// --- 4. Construct RocketEntity ---
 	r := &RocketEntity{
-		BasicEntity: &basic,
+		BasicEntity:  &basic,
 		PhysicsState: physicsState,
 		Mass: &types.Mass{
 			BasicEntity: basic,

@@ -67,7 +67,7 @@ func TestWindEffectPlugin_BeforeSimStep(t *testing.T) {
 	}
 
 	// Test with Time that gives non-zero force
-	state.Time = math.Pi / 2 // math.Sin(Pi/2) is 1
+	state.Time = math.Pi / 2     // math.Sin(Pi/2) is 1
 	state.AccumulatedForce.X = 0 // Reset accumulated force for new test case
 	err = p.BeforeSimStep(state)
 	if err != nil {

@@ -99,7 +99,7 @@ func TestAerodynamicSystem_CalculateDrag(t *testing.T) {
 	// Create test entity
 	basicID := ecs.NewBasic()
 	entity := &states.PhysicsState{
-		Entity:   &basicID, // Initialize Entity field
+		Entity:   &basicID,                                    // Initialize Entity field
 		Position: &types.Position{Vec: types.Vector3{Y: 0}},   // Sea level
 		Velocity: &types.Velocity{Vec: types.Vector3{Y: 100}}, // 100 m/s upward
 		Nosecone: &components.Nosecone{Radius: 0.1},

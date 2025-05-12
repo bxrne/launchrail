@@ -188,7 +188,7 @@ func TestNewParachuteFromORK(t *testing.T) {
 			},
 		},
 		{
-			name: "Nil ORK Data",
+			name:            "Nil ORK Data",
 			orkData:         nil,
 			wantErr:         true,
 			wantErrContains: "OpenRocket data is nil",

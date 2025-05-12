@@ -195,7 +195,7 @@ func (a *AerodynamicSystem) CalculateDrag(entity *states.PhysicsState) types.Vec
 			"area", parachuteArea,
 			"cd", parachuteCd,
 			"line_length", entity.Parachute.LineLength, // Log LineLength
-			"strands", entity.Parachute.Strands,         // Log Strands
+			"strands", entity.Parachute.Strands, // Log Strands
 			"force_magnitude", parachuteForceMagnitude)
 
 		// Parachute drag directly opposes velocity vector.

@@ -8,8 +8,8 @@ import (
 	"github.com/bxrne/launchrail/pkg/states"
 	"github.com/bxrne/launchrail/pkg/systems"
 	"github.com/bxrne/launchrail/pkg/types"
-	"github.com/zerodha/logf"
 	"github.com/stretchr/testify/assert"
+	"github.com/zerodha/logf"
 )
 
 // TEST: GIVEN a new launch rail WHEN initialized THEN parameters are set correctly

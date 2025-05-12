@@ -39,7 +39,7 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager, log *logf.
 		oldLog.Error("Failed to serialize config for record hashing", "Error", err)
 		return fmt.Errorf("failed to serialize config for deterministic hashing: %w", err)
 	}
-	
+
 	// Read OpenRocket data as bytes
 	orkData := []byte{}
 	if cfg.Engine.Options.OpenRocketFile != "" {
@@ -50,7 +50,7 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager, log *logf.
 			orkData = []byte{}
 		}
 	}
-	
+
 	// Create a record with deterministic hash based on config and OpenRocket data
 	record, err := recordManager.CreateRecordWithConfig(configJSON, orkData)
 	if err != nil {

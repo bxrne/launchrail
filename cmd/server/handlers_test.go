@@ -389,7 +389,7 @@ func TestDownloadReport(t *testing.T) {
 	// Arrange
 	// 1. Setup real RecordManager and create a dummy record
 	_ = setupTestTemplate(t) // Ensure template exists, though its path isn't directly used in cfg for this handler
-	cfg := &config.Config{ // Minimal config
+	cfg := &config.Config{   // Minimal config
 		Setup: config.Setup{
 			App:     config.App{Version: "test-v0.1.0"},
 			Logging: config.Logging{Level: "error"},
@@ -413,7 +413,7 @@ func TestDownloadReport(t *testing.T) {
 		"time,altitude,velocity,acceleration,thrust", // Headers should already be there, but good to be explicit
 		"0,0,0,0,100",
 		"1,10,10,10,100",
-		"2,25,5,0,0", // Max velocity around here
+		"2,25,5,0,0",   // Max velocity around here
 		"3,30,0,-10,0", // Apogee
 		"4,20,-10,-10,0",
 	}
@@ -424,8 +424,8 @@ func TestDownloadReport(t *testing.T) {
 	// Headers: time,event_name,motor_status,parachute_status
 	eventData := []string{
 		"time,event_name,motor_status,parachute_status", // Headers
-		"0,Liftoff,BURNOUT,NONE", // Changed from LAUNCH to Liftoff
-		"3,Apogee,BURNOUT,DEPLOYED", // Changed from APOGEE to Apogee
+		"0,Liftoff,BURNOUT,NONE",                        // Changed from LAUNCH to Liftoff
+		"3,Apogee,BURNOUT,DEPLOYED",                     // Changed from APOGEE to Apogee
 	}
 	err = os.WriteFile(eventsCSVPath, []byte(strings.Join(eventData, "\n")), 0644)
 	require.NoError(t, err, "Failed to write sample event data")

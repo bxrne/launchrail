@@ -102,7 +102,7 @@ func containsANSICodes(s string) bool {
 // TEST: GIVEN GetLogger is called with an unrecognized level THEN the logger level defaults to info
 func TestGetLogger_UnrecognizedLevelDefaultsToInfo(t *testing.T) {
 	logger.Reset()
-	cfg.Setup.Logging.Level = "verywronglevel" // An unrecognized level
+	cfg.Setup.Logging.Level = "verywronglevel"               // An unrecognized level
 	logInstance := logger.GetLogger(cfg.Setup.Logging.Level) // Pass the level string
 	if logInstance == nil {
 		t.Fatal("Expected logger to be non-nil for unrecognized level")
@@ -118,7 +118,7 @@ func TestGetLogger_FileOpenError(t *testing.T) {
 
 	var buf bytes.Buffer
 	originalStdLogOutput := log.Writer() // log.Writer() returns current output
-	log.SetOutput(&buf)                 // Intercepts output from standard `log` package
+	log.SetOutput(&buf)                  // Intercepts output from standard `log` package
 	defer func() {
 		log.SetOutput(originalStdLogOutput)
 	}()

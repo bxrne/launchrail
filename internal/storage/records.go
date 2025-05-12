@@ -129,8 +129,8 @@ func NewRecordManager(cfg *config.Config, baseDir string) (*RecordManager, error
 
 	return &RecordManager{
 		baseDir: baseDir,
-		log:     log,    // This log instance uses the appCfg level
-		appCfg:  cfg,    // Store appCfg
+		log:     log, // This log instance uses the appCfg level
+		appCfg:  cfg, // Store appCfg
 	}, nil
 }
 
@@ -140,8 +140,8 @@ func (rm *RecordManager) CreateRecord(cfg *config.Config) (*Record, error) {
 	rm.log.Info("CreateRecord called (Note: uses time-based hash)", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	
-	// Use a fixed prefix with the current day (without time) to make simulations run on the same day 
+
+	// Use a fixed prefix with the current day (without time) to make simulations run on the same day
 	// have the same hash, avoiding duplicate result sets
 	currentDate := time.Now().Format("2006-01-02")
 	hashInput := fmt.Sprintf("simulation-%s-%d", currentDate, time.Now().UnixNano()) // Add nanoseconds for uniqueness
@@ -171,14 +171,14 @@ func (rm *RecordManager) CreateRecordWithConfig(configData []byte, orkData []byt
 	rm.log.Info("CreateRecordWithConfig called", "file", file, "line", line, "caller", runtime.FuncForPC(pc).Name())
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	
+
 	// Hash the configuration and OpenRocket data
 	combinedData := append(configData, orkData...)
 	// Add a prefix to ensure consistency in hash generation
 	combinedData = append([]byte("launchrail-config-"), combinedData...)
 	hashInput := sha256.Sum256(combinedData)
 	hash := fmt.Sprintf("%x", hashInput)
-	
+
 	// Truncate to a reasonable length (first 16 characters)
 	hash = hash[:16]
 

@@ -84,7 +84,7 @@ func (s *RulesSystem) ProcessRules(entity *states.PhysicsState) types.Event {
 	}
 
 	// Check for landing after apogee using ground tolerance
-	groundTolerance := 0.1 // Default, consider making this configurable if not already via s.config
+	groundTolerance := 0.1                                          // Default, consider making this configurable if not already via s.config
 	if s.config != nil && s.config.Simulation.GroundTolerance > 0 { // Check if config and value exist
 		groundTolerance = s.config.Simulation.GroundTolerance
 	}
@@ -127,7 +127,7 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 
 	// Must be above a minimum safe deployment altitude
 	minDeploymentAltitude := 10.0 // Example minimum altitude
-	if entity.Position.Vec.Y <= minDeploymentAltitude { 
+	if entity.Position.Vec.Y <= minDeploymentAltitude {
 		s.logger.Info("DetectApogee REJECT: not sufficiently above ground for deployment", "altitude", entity.Position.Vec.Y, "minAltitude", minDeploymentAltitude)
 		return false
 	}
@@ -144,7 +144,7 @@ func (s *RulesSystem) DetectApogee(entity *states.PhysicsState) bool {
 			s.logger.Info("DetectApogee REJECT: motor still burning", "motorState", string(entity.Motor.FSM.Current()))
 			return false
 		}
-		
+
 		// Deploy parachute if conditions met
 		s.logger.Info("APOGEE DETECTED: Deploying parachute!", "entityID", entity.Entity.ID(), "altitude", entity.Position.Vec.Y, "velocityY", entity.Velocity.Vec.Y)
 		entity.Parachute.Deploy()
