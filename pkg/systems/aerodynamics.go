@@ -301,28 +301,34 @@ func (a *AerodynamicSystem) GetSpeedOfSound(altitude float64) float64 {
 	return float64(math.Sqrt(float64(1.4 * 287.05 * temperature)))
 }
 
-// calculateDragCoeff calculates the drag coefficient based on Mach number
+// calculateDragCoeff calculates the drag coefficient based on Mach number and angle of attack
 func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity *states.PhysicsState) float64 {
-	// Base drag coefficient
-	baseCd := 0.35 // Typical subsonic drag coefficient for rockets
+	// Base pressure drag coefficient (typical for model rockets)
+	baseCd := 0.3
 
-	// Add wave drag in transonic region
-	// Prandtl-Glauert compressibility correction is applied for Mach < 1.0
-	if mach > 0.8 && mach < 1.0 {
-		// Enhanced transonic drag rise
-		transonicFactor := 1.0 + 10.0*math.Pow(mach-0.8, 2)
-		baseCd *= transonicFactor
+	// Add compressibility effects starting from Mach 0.3
+	if mach > 0.3 {
+		// Prandtl-Glauert compressibility correction
+		compressibilityFactor := 1.0 / math.Sqrt(1.0-math.Min(0.95, mach*mach))
+		baseCd *= compressibilityFactor
+
+		// Enhanced transonic effects (M = 0.8 to 1.0)
+		if mach > 0.8 && mach < 1.0 {
+			// Wave drag rise
+			transonicFactor := 1.0 + 5.0*math.Pow(mach-0.8, 2)
+			baseCd *= transonicFactor
+		}
 	}
 
-	// Supersonic drag
+	// Supersonic drag (M >= 1.0)
 	if mach >= 1.0 {
 		// Sharp increase at Mach 1
 		if mach < 1.2 {
 			// Linear interpolation between M=1.0 and M=1.2
-			baseCd = 1.5 // Peak drag at Mach 1
+			baseCd = 1.2 // More realistic peak drag at Mach 1
 		} else {
-			// Supersonic drag reduction
-			baseCd = 0.5 + 1.0*math.Exp(-1.0*(mach-1.2))
+			// Supersonic drag reduction following 1/M^2 trend
+			baseCd = 0.5 + 0.7/math.Pow(mach, 2)
 		}
 	}
 
@@ -349,9 +355,17 @@ func (a *AerodynamicSystem) calculateDragCoeff(mach float64, entity *states.Phys
 			cosAngle = math.Max(-1.0, math.Min(1.0, cosAngle))
 			aoa := math.Acos(cosAngle)
 			
-			// Add form drag that increases with angle of attack
-			formDragFactor := 1.0 + 2.0*math.Sin(aoa)*math.Sin(aoa)
-			baseCd *= formDragFactor
+			// Add form drag and induced drag from angle of attack
+			// Form drag increases with sin^2(AoA)
+			formDragFactor := 1.0 + 1.5*math.Sin(aoa)*math.Sin(aoa)
+			
+			// Induced drag from lift generation, proportional to (CL*alpha)^2
+			// Using small angle approximation for lift coefficient
+			liftCoeff := 2.0 * math.Sin(aoa) // Approximate CL = 2π*alpha
+			inducedDragFactor := 1.0 + 0.1*liftCoeff*liftCoeff
+			
+			// Combined drag factors
+			baseCd *= formDragFactor * inducedDragFactor
 		}
 	}
 

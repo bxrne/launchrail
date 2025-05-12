@@ -507,9 +507,18 @@ func (s *Simulation) updateSystems() error {
 					dragCoeff = 0.8 // Standard fallback
 				}
 
-				// Get atmospheric density at current altitude
+				// Get atmospheric density at current altitude using ISA model for troposphere
 				altitude := currentEvalPos.Y
-				density := 1.225 * math.Exp(-altitude/7000.0) // Simple exponential approximation
+				// Temperature lapse rate in troposphere (K/m)
+				lapseRate := -0.0065
+				// Sea level values
+				T0 := 288.15 // K
+				P0 := 101325.0 // Pa
+				// Calculate temperature and pressure
+				T := T0 + lapseRate*altitude
+				P := P0 * math.Pow(T/T0, -9.81/(lapseRate*287.05))
+				// Calculate density using ideal gas law
+				density := P / (287.05 * T) // More accurate density model
 
 				// Calculate drag force (magnitude = 0.5 * density * velocity^2 * Cd * area)
 				dragMagnitude := 0.5 * density * velocityMag * velocityMag * dragCoeff * area
