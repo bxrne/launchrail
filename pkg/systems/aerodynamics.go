@@ -164,6 +164,17 @@ func (a *AerodynamicSystem) CalculateDrag(entity *states.PhysicsState) types.Vec
 	velVec := types.Vector3{X: entity.Velocity.Vec.X, Y: entity.Velocity.Vec.Y, Z: entity.Velocity.Vec.Z}
 	velUnitVec := velVec.Normalize()
 
+	// --- DIAGNOSTIC LOG ---
+	if entity.Parachute != nil {
+		a.log.Debug("Checking parachute status before drag calculation",
+			"entity_id", entity.Entity.ID(),
+			"is_deployed", entity.Parachute.IsDeployed(),
+			"parachute_area", entity.Parachute.Area,
+			"parachute_cd", entity.Parachute.DragCoefficient,
+		)
+	}
+	// --- END DIAGNOSTIC LOG ---
+
 	// Check if parachute is deployed
 	if entity.Parachute != nil && entity.Parachute.IsDeployed() {
 		// Parachute is deployed, calculate its specific drag
