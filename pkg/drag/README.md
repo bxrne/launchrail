@@ -1,27 +1,13 @@
-# pkg/drag
+# drag
 
-This package provides functionality for calculating the drag force on a rocket.
+Aerodynamic drag modeling system that calculates drag forces on rockets during flight.
 
-## Responsibility
-
-*   Calculate the drag force on a rocket.
-*   Account for different drag coefficients based on the rocket's shape and velocity.
-*   Consider the effects of air density and viscosity.
-
-## Scope
-
-*   Support different drag models, such as the Newtonian drag model and the semi-empirical drag model.
-*   Provide options for customizing the drag calculation process.
-
-## Gotchas
-
-*   Accuracy of the drag coefficient data.
-*   Complexity of the drag models.
-
-## Test Suite Overview
-
-The test suite includes unit tests for the core functionality of the package, including:
-
-*   Calculating the drag force on a rocket.
-*   Accounting for different drag coefficients.
-*   Considering the effects of air density and viscosity.
+## Notes
+- Implements different drag coefficient calculation methods
+- Accounts for varying Mach numbers and Reynolds numbers
+- Supports component-based drag calculation for complex geometries
+- Handles both subsonic and supersonic flight regimes
+- Provides accurate drag prediction based on atmospheric conditions
+- Calculates area-based drag for different rocket components
+- Considers surface roughness effects on boundary layer behavior
+- Enables pressure and skin friction drag component analysis

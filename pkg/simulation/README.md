@@ -1,26 +1,13 @@
-# pkg/simulation
+# simulation
 
-This package provides functionality for simulating rocket flights.
+Core simulation framework that orchestrates the physics-based rocket flight simulation process.
 
-## Responsibility
-
-*   Simulate rocket flights.
-*   Provide accurate and realistic flight simulations.
-
-## Scope
-
-*   Support different rocket designs and flight conditions.
-*   Account for various factors, such as drag, gravity, and wind.
-
-## Gotchas
-
-*   Complexity of the flight simulation models.
-*   Accuracy of the simulation results.
-
-## Test Suite Overview
-
-The test suite includes unit tests for the core functionality of the package, including:
-
-*   Simulating rocket flights.
-*   Validating the simulation results.
-*   Testing different rocket designs and flight conditions.
+## Notes
+- Implements numerical integration methods (RK4) for flight dynamics
+- Orchestrates system updates in the appropriate sequence
+- Manages simulation time step and advancement
+- Detects and handles flight events (launch, burnout, apogee)
+- Provides interfaces for system integration and data collection
+- Implements different simulation modes (standard, real-time)
+- Ensures consistent physics calculations across simulation systems
+- Handles simulation initialization and termination conditions
