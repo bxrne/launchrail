@@ -17,6 +17,16 @@ import (
 	"gonum.org/v1/plot/vg"
 )
 
+// Constants for plot labels and error messages
+const (
+	// Axis labels
+	LabelTimeSeconds = "Time (s)"
+
+	// Error messages
+	ErrCreateLinePlot = "failed to create new line plot: %w"
+	ErrSavePlot       = "failed to save plot: %w"
+)
+
 // TemplateRenderer handles report template processing and rendering
 type TemplateRenderer struct {
 	log            *logf.Logger
@@ -344,7 +354,7 @@ func (tr *TemplateRenderer) GeneratePlots(data *ReportData) error {
 }
 
 // extractPlotData is a helper function to extract X and Y data series from motionData
-func (tr *TemplateRenderer) extractPlotData(motionData []*plotSimRecord, xKey, yKey string) (plotter.XYs, error) {
+func (tr *TemplateRenderer) extractPlotData(motionData []*PlotSimRecord, xKey, yKey string) (plotter.XYs, error) {
 	pts := make(plotter.XYs, 0, len(motionData))
 
 	if len(motionData) == 0 {
@@ -363,7 +373,7 @@ func (tr *TemplateRenderer) extractPlotData(motionData []*plotSimRecord, xKey, y
 		for k := range *record {
 			keysInRecord = append(keysInRecord, k)
 		}
-		tr.log.Debug("Keys in current plotSimRecord", "index", i, "keys", keysInRecord, "expectedX", xKey, "expectedY", yKey)
+		tr.log.Debug("Keys in current PlotSimRecord", "index", i, "keys", keysInRecord, "expectedX", xKey, "expectedY", yKey)
 
 		xValRaw, xOk := (*record)[xKey]
 		yValRaw, yOk := (*record)[yKey]
@@ -374,8 +384,8 @@ func (tr *TemplateRenderer) extractPlotData(motionData []*plotSimRecord, xKey, y
 			continue
 		}
 
-		xVal, xAssertOk := xValRaw.(float64)
-		yVal, yAssertOk := yValRaw.(float64)
+		xVal, xAssertOk := getFloat64(xValRaw)
+		yVal, yAssertOk := getFloat64(yValRaw)
 
 		if !xAssertOk || !yAssertOk {
 			tr.log.Warn("Data type assertion failed for plot data", "xKey", xKey, "yKey", yKey, "recordIndex", i, "xType", fmt.Sprintf("%T", xValRaw), "yType", fmt.Sprintf("%T", yValRaw))
@@ -405,12 +415,12 @@ func (tr *TemplateRenderer) generateAltitudeVsTimePlot(data *ReportData, outputP
 	p := plot.New()
 
 	p.Title.Text = "Altitude vs. Time"
-	p.X.Label.Text = "Time (s)"
+	p.X.Label.Text = LabelTimeSeconds
 	p.Y.Label.Text = "Altitude (m)"
 
 	line, err := plotter.NewLine(pts)
 	if err != nil {
-		return fmt.Errorf("failed to create new line plot: %w", err)
+		return fmt.Errorf(ErrCreateLinePlot, err)
 	}
 	line.Color = color.RGBA{B: 255, A: 255} // Blue line
 
@@ -419,7 +429,7 @@ func (tr *TemplateRenderer) generateAltitudeVsTimePlot(data *ReportData, outputP
 
 	// Save the plot to a SVG file.
 	if err := p.Save(6*vg.Inch, 4*vg.Inch, outputPath); err != nil {
-		return fmt.Errorf("failed to save plot: %w", err)
+		return fmt.Errorf(ErrSavePlot, err)
 	}
 	tr.log.Info("Successfully generated altitude vs time plot", "path", outputPath)
 	return nil
@@ -434,12 +444,12 @@ func (tr *TemplateRenderer) generateVelocityVsTimePlot(data *ReportData, outputP
 	p := plot.New()
 
 	p.Title.Text = "Velocity vs. Time"
-	p.X.Label.Text = "Time (s)"
+	p.X.Label.Text = LabelTimeSeconds
 	p.Y.Label.Text = "Velocity (m/s)"
 
 	line, err := plotter.NewLine(pts)
 	if err != nil {
-		return fmt.Errorf("failed to create new line plot: %w", err)
+		return fmt.Errorf(ErrCreateLinePlot, err)
 	}
 	line.Color = color.RGBA{R: 255, A: 255} // Red line
 
@@ -447,7 +457,7 @@ func (tr *TemplateRenderer) generateVelocityVsTimePlot(data *ReportData, outputP
 	p.Add(plotter.NewGrid())
 
 	if err := p.Save(6*vg.Inch, 4*vg.Inch, outputPath); err != nil {
-		return fmt.Errorf("failed to save plot: %w", err)
+		return fmt.Errorf(ErrSavePlot, err)
 	}
 	tr.log.Info("Successfully generated velocity vs time plot", "path", outputPath)
 	return nil
@@ -462,12 +472,12 @@ func (tr *TemplateRenderer) generateAccelerationVsTimePlot(data *ReportData, out
 	p := plot.New()
 
 	p.Title.Text = "Acceleration vs. Time"
-	p.X.Label.Text = "Time (s)"
+	p.X.Label.Text = LabelTimeSeconds
 	p.Y.Label.Text = "Acceleration (m/s²)"
 
 	line, err := plotter.NewLine(pts)
 	if err != nil {
-		return fmt.Errorf("failed to create new line plot: %w", err)
+		return fmt.Errorf(ErrCreateLinePlot, err)
 	}
 	line.Color = color.RGBA{G: 200, A: 255} // Green line
 
@@ -475,7 +485,7 @@ func (tr *TemplateRenderer) generateAccelerationVsTimePlot(data *ReportData, out
 	p.Add(plotter.NewGrid())
 
 	if err := p.Save(6*vg.Inch, 4*vg.Inch, outputPath); err != nil {
-		return fmt.Errorf("failed to save plot: %w", err)
+		return fmt.Errorf(ErrSavePlot, err)
 	}
 	tr.log.Info("Successfully generated acceleration vs time plot", "path", outputPath)
 	return nil
@@ -499,12 +509,12 @@ func (tr *TemplateRenderer) GenerateThrustVsTimePlot(data *ReportData, outputPat
 	p := plot.New()
 
 	p.Title.Text = "Thrust vs. Time"
-	p.X.Label.Text = "Time (s)"
+	p.X.Label.Text = LabelTimeSeconds
 	p.Y.Label.Text = "Thrust (N)"
 
 	line, err := plotter.NewLine(pts)
 	if err != nil {
-		return fmt.Errorf("failed to create new line plot: %w", err)
+		return fmt.Errorf(ErrCreateLinePlot, err)
 	}
 	line.Color = color.RGBA{R: 128, G: 0, B: 128, A: 255} // Purple line
 
@@ -512,7 +522,7 @@ func (tr *TemplateRenderer) GenerateThrustVsTimePlot(data *ReportData, outputPat
 	p.Add(plotter.NewGrid())
 
 	if err := p.Save(6*vg.Inch, 4*vg.Inch, outputPath); err != nil {
-		return fmt.Errorf("failed to save plot: %w", err)
+		return fmt.Errorf(ErrSavePlot, err)
 	}
 	tr.log.Info("Successfully generated thrust vs time plot", "path", outputPath)
 	return nil
@@ -527,4 +537,9 @@ type RecoverySystem struct {
 	Type        string  // Type of recovery system (parachute, streamer, etc)
 	Deployment  float64 // Time of deployment in seconds
 	DescentRate float64 // Descent rate in m/s
+}
+
+func getFloat64(value interface{}) (float64, bool) {
+	val, ok := value.(float64)
+	return val, ok
 }

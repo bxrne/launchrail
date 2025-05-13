@@ -198,18 +198,18 @@ func TestGetConfig_NoConfigFile(t *testing.T) {
 	// Save current directory to restore later
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	
+
 	// Create a clean directory with no config file
 	tempDir := t.TempDir()
 	err = os.Chdir(tempDir)
 	require.NoError(t, err)
-	
+
 	// Cleanup: change back to original directory afterward
 	defer func() {
 		err = os.Chdir(originalWd)
 		require.NoError(t, err)
 	}()
-	
+
 	// Attempt to get config, should fail with specific error
 	_, err = config.GetConfig()
 	require.Error(t, err)
@@ -221,24 +221,24 @@ func TestGetConfig_MalformedConfig(t *testing.T) {
 	// Save current directory to restore later
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	
+
 	// Create a temporary directory with a malformed config
 	tempDir := t.TempDir()
 	malformedContent := "this is not valid yaml"
 	configPath := filepath.Join(tempDir, "config.yaml")
 	err = os.WriteFile(configPath, []byte(malformedContent), 0644)
 	require.NoError(t, err)
-	
+
 	// Change to that directory
 	err = os.Chdir(tempDir)
 	require.NoError(t, err)
-	
+
 	// Cleanup: change back to original directory afterward
 	defer func() {
 		err = os.Chdir(originalWd)
 		require.NoError(t, err)
 	}()
-	
+
 	// Attempt to get config, should fail during parsing
 	_, err = config.GetConfig()
 	require.Error(t, err)
@@ -249,7 +249,7 @@ func TestGetConfig_InvalidConfig(t *testing.T) {
 	// Save current directory to restore later
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	
+
 	// Create a temporary directory with an invalid config
 	tempDir := t.TempDir()
 	invalidContent := `
@@ -265,17 +265,17 @@ setup:
 	configPath := filepath.Join(tempDir, "config.yaml")
 	err = os.WriteFile(configPath, []byte(invalidContent), 0644)
 	require.NoError(t, err)
-	
+
 	// Change to that directory
 	err = os.Chdir(tempDir)
 	require.NoError(t, err)
-	
+
 	// Cleanup: change back to original directory afterward
 	defer func() {
 		err = os.Chdir(originalWd)
 		require.NoError(t, err)
 	}()
-	
+
 	// Attempt to get config, should fail during validation
 	_, err = config.GetConfig()
 	require.Error(t, err)
@@ -287,7 +287,7 @@ func TestGetConfig_UnmarshalFailure(t *testing.T) {
 	// Save current directory to restore later
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	
+
 	// Create a temporary directory with an invalid YAML structure but valid syntax
 	tempDir := t.TempDir()
 	invalidContent := `
@@ -296,17 +296,17 @@ setup: true
 	configPath := filepath.Join(tempDir, "config.yaml")
 	err = os.WriteFile(configPath, []byte(invalidContent), 0644)
 	require.NoError(t, err)
-	
+
 	// Change to that directory
 	err = os.Chdir(tempDir)
 	require.NoError(t, err)
-	
+
 	// Cleanup: change back to original directory afterward
 	defer func() {
 		err = os.Chdir(originalWd)
 		require.NoError(t, err)
 	}()
-	
+
 	// Attempt to get config, should fail during unmarshal
 	_, err = config.GetConfig()
 	require.Error(t, err)
@@ -317,19 +317,19 @@ setup: true
 func TestGetConfig_FallbackToCurrentDir(t *testing.T) {
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	
+
 	tempDir := t.TempDir()
-	
+
 	// Create a fully valid config file with all required directories and files
 	pluginsDir := filepath.Join(tempDir, "plugins")
 	require.NoError(t, os.MkdirAll(pluginsDir, 0755))
-	
+
 	dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
 	require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
-	
+
 	// Special test case that forces the code to go through the ConfigFileUsed()=="" branch
 	// This is done by using a mock Viper in the test
-	
+
 	// Move into the temp directory
 	err = os.Chdir(tempDir)
 	require.NoError(t, err)
@@ -337,7 +337,7 @@ func TestGetConfig_FallbackToCurrentDir(t *testing.T) {
 		err = os.Chdir(originalWd)
 		require.NoError(t, err)
 	}()
-	
+
 	// Create minimal valid config file
 	validContent := fmt.Sprintf(`
 setup:
@@ -382,11 +382,11 @@ engine:
     max_time: 10.0
     ground_tolerance: 0.1
 `, strings.ReplaceAll(pluginsDir, "\\", "/"), strings.ReplaceAll(tempDir, "\\", "/"), strings.ReplaceAll(dummyOrkPath, "\\", "/"))
-	
+
 	configPath := filepath.Join(tempDir, "config.yaml")
 	err = os.WriteFile(configPath, []byte(validContent), 0644)
 	require.NoError(t, err)
-	
+
 	// Test GetConfig will now load the config file from the current directory
 	cfg, err := config.GetConfig()
 	require.NoError(t, err)
@@ -398,17 +398,17 @@ engine:
 func TestGetConfig_EmptyConfigFilePath(t *testing.T) {
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	
+
 	tempDir := t.TempDir()
-	
+
 	// Create a fully valid config file
 	pluginsDir := filepath.Join(tempDir, "plugins")
 	require.NoError(t, os.MkdirAll(pluginsDir, 0755))
-	
+
 	// Create dummy ork file
 	dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
 	require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
-	
+
 	// Create proper config with plugins path
 	validContent := fmt.Sprintf(`
 setup:
@@ -453,21 +453,21 @@ engine:
     max_time: 10.0
     ground_tolerance: 0.1
 `, strings.ReplaceAll(pluginsDir, "\\", "/"), strings.ReplaceAll(tempDir, "\\", "/"), strings.ReplaceAll(dummyOrkPath, "\\", "/"))
-	
+
 	configPath := filepath.Join(tempDir, "config.yaml")
 	err = os.WriteFile(configPath, []byte(validContent), 0644)
 	require.NoError(t, err)
-	
+
 	// Move to the directory so the config is found
 	err = os.Chdir(tempDir)
 	require.NoError(t, err)
-	
+
 	// Cleanup: restore original working directory
 	defer func() {
 		err = os.Chdir(originalWd)
 		require.NoError(t, err)
 	}()
-	
+
 	// Test the GetConfig function
 	cfg, err := config.GetConfig()
 	require.NoError(t, err)
@@ -593,8 +593,8 @@ func TestConfig_Validate_ValidBenchmark(t *testing.T) {
 // TestConfig_Validate_ServerOptions - Test validation of server configuration fields
 func TestConfig_Validate_ServerOptions(t *testing.T) {
 	tests := []struct {
-		name       string
-		mutateFunc func(*config.Config)
+		name        string
+		mutateFunc  func(*config.Config)
 		expectedErr string
 	}{
 		{
@@ -645,20 +645,20 @@ func TestConfig_Validate_ServerOptions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a temp dir for this test case
 			tempDir := t.TempDir()
-			
+
 			// Create a valid plugins directory
 			pluginsDir := filepath.Join(tempDir, "plugins")
 			require.NoError(t, os.MkdirAll(pluginsDir, 0755))
-			
+
 			// Create base config using the temp dir
 			cfg := createValidConfig(tempDir)
-			
+
 			// Set up valid plugin path
 			cfg.Setup.Plugins.Paths = []string{pluginsDir}
-			
+
 			// Apply the mutation to make the config invalid for the specific test
 			tc.mutateFunc(&cfg)
-			
+
 			// The validate function will use the current directory for relative paths
 			// We'll pass the temp dir as the config file directory for validation
 			err := cfg.Validate(tempDir)
@@ -671,8 +671,8 @@ func TestConfig_Validate_ServerOptions(t *testing.T) {
 // TestConfig_Validate_SimulationOptions - Test validation of simulation configuration fields
 func TestConfig_Validate_SimulationOptions(t *testing.T) {
 	tests := []struct {
-		name       string
-		mutateFunc func(*config.Config)
+		name        string
+		mutateFunc  func(*config.Config)
 		expectedErr string
 	}{
 		{
@@ -716,25 +716,25 @@ func TestConfig_Validate_SimulationOptions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a temp dir for this test case
 			tempDir := t.TempDir()
-			
+
 			// Create a valid plugins directory
 			pluginsDir := filepath.Join(tempDir, "plugins")
 			require.NoError(t, os.MkdirAll(pluginsDir, 0755))
-			
+
 			// Create dummy.ork file for validation
 			dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
 			require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
-			
+
 			// Create base config using the temp dir
 			cfg := createValidConfig(tempDir)
-			
+
 			// Set up valid plugin path and OpenRocket file
 			cfg.Setup.Plugins.Paths = []string{pluginsDir}
 			cfg.Engine.Options.OpenRocketFile = dummyOrkPath
-			
+
 			// Apply the mutation to make the config invalid for the specific test
 			tc.mutateFunc(&cfg)
-			
+
 			// The validate function will use the current directory for relative paths
 			// We'll pass the temp dir as the config file directory for validation
 			err := cfg.Validate(tempDir)
@@ -747,8 +747,8 @@ func TestConfig_Validate_SimulationOptions(t *testing.T) {
 // TestConfig_Validate_ISAConfiguration - Test validation of atmosphere/ISA configuration fields
 func TestConfig_Validate_ISAConfiguration(t *testing.T) {
 	tests := []struct {
-		name       string
-		mutateFunc func(*config.Config)
+		name        string
+		mutateFunc  func(*config.Config)
 		expectedErr string
 	}{
 		{
@@ -806,25 +806,25 @@ func TestConfig_Validate_ISAConfiguration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a temp dir for this test case
 			tempDir := t.TempDir()
-			
+
 			// Create a valid plugins directory
 			pluginsDir := filepath.Join(tempDir, "plugins")
 			require.NoError(t, os.MkdirAll(pluginsDir, 0755))
-			
+
 			// Create dummy.ork file for validation
 			dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
 			require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
-			
+
 			// Create base config using the temp dir
 			cfg := createValidConfig(tempDir)
-			
+
 			// Set up valid plugin path and OpenRocket file
 			cfg.Setup.Plugins.Paths = []string{pluginsDir}
 			cfg.Engine.Options.OpenRocketFile = dummyOrkPath
-			
+
 			// Apply the mutation to make the config invalid for the specific test
 			tc.mutateFunc(&cfg)
-			
+
 			// The validate function will use the current directory for relative paths
 			// We'll pass the temp dir as the config file directory for validation
 			err := cfg.Validate(tempDir)
@@ -840,40 +840,40 @@ func TestConfig_Validate_PluginPaths(t *testing.T) {
 	t.Run("Empty plugin paths", func(t *testing.T) {
 		// Create a temp dir for this test case
 		tempDir := t.TempDir()
-		
+
 		// Create dummy.ork file for validation
 		dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
 		require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
-		
+
 		// Create base config using the temp dir
 		cfg := createValidConfig(tempDir)
 		cfg.Engine.Options.OpenRocketFile = dummyOrkPath
-		
+
 		// Set empty plugin paths to trigger validation error
 		cfg.Setup.Plugins.Paths = []string{}
-		
+
 		err := cfg.Validate(tempDir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "plugins.paths must contain at least one valid path")
 	})
-	
+
 	// Test non-existent plugin path
 	t.Run("Non-existent plugin path", func(t *testing.T) {
 		// Create a temp dir for this test case
 		tempDir := t.TempDir()
-		
+
 		// Create dummy.ork file for validation
 		dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
 		require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
-		
+
 		// Create base config using the temp dir
 		cfg := createValidConfig(tempDir)
 		cfg.Engine.Options.OpenRocketFile = dummyOrkPath
-		
+
 		// Use absolute path to a non-existent directory
 		nonExistentPath := filepath.Join(tempDir, "non_existent_plugin_dir")
 		cfg.Setup.Plugins.Paths = []string{nonExistentPath}
-		
+
 		err := cfg.Validate(tempDir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "plugins.paths[0] path does not exist")
@@ -886,46 +886,46 @@ func TestConfig_Validate_OpenRocketFile(t *testing.T) {
 	t.Run("Non-existent OpenRocket file", func(t *testing.T) {
 		// Create a temp dir for this test case
 		tempDir := t.TempDir()
-		
+
 		// Create a valid plugins directory
 		pluginsDir := filepath.Join(tempDir, "plugins")
 		require.NoError(t, os.MkdirAll(pluginsDir, 0755))
-		
+
 		// Create base config using the temp dir
 		cfg := createValidConfig(tempDir)
-		
+
 		// Set up valid plugin path but non-existent OpenRocket file
 		cfg.Setup.Plugins.Paths = []string{pluginsDir}
 		cfg.Server.StaticDir = tempDir
 		cfg.Engine.Options.OpenRocketFile = filepath.Join(tempDir, "non_existent_file.ork")
-		
+
 		// The validate function will use the current directory for relative paths
 		err := cfg.Validate(tempDir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "options.openrocket_file path does not exist")
 	})
-	
+
 	// Test relative path resolution for OpenRocket file
 	t.Run("Relative OpenRocket file path", func(t *testing.T) {
 		// Create a temp dir for this test case
 		tempDir := t.TempDir()
-		
+
 		// Create a valid plugins directory
 		pluginsDir := filepath.Join(tempDir, "plugins")
 		require.NoError(t, os.MkdirAll(pluginsDir, 0755))
-		
+
 		// Create a dummy ork file in the temp dir
 		dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
 		require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
-		
+
 		// Create base config using the temp dir
 		cfg := createValidConfig(tempDir)
-		
+
 		// Set up valid plugin path and relative OpenRocket file path
 		cfg.Setup.Plugins.Paths = []string{pluginsDir}
 		cfg.Server.StaticDir = tempDir
 		cfg.Engine.Options.OpenRocketFile = "dummy.ork" // Relative path
-		
+
 		// The validate function will use the current directory for relative paths
 		err := cfg.Validate(tempDir)
 		assert.NoError(t, err)
@@ -940,23 +940,23 @@ func TestConfig_Validate_PluginPaths_FileErrors(t *testing.T) {
 	t.Run("Plugin path points to a file", func(t *testing.T) {
 		// Create a temp dir for this test case
 		tempDir := t.TempDir()
-		
+
 		// Create a dummy plugin file (not a directory)
 		pluginFilePath := filepath.Join(tempDir, "plugin.so")
 		require.NoError(t, os.WriteFile(pluginFilePath, []byte("dummy plugin"), 0644))
-		
+
 		// Create dummy.ork file for validation
 		dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
 		require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
-		
+
 		// Create base config using the temp dir
 		cfg := createValidConfig(tempDir)
-		
+
 		// Set plugin path to a file rather than a directory
 		cfg.Setup.Plugins.Paths = []string{pluginFilePath}
 		cfg.Server.StaticDir = tempDir
 		cfg.Engine.Options.OpenRocketFile = dummyOrkPath
-		
+
 		// Validation should still pass since we're just checking if the path exists, not if it's a directory
 		err := cfg.Validate(tempDir)
 		assert.NoError(t, err)
@@ -966,8 +966,8 @@ func TestConfig_Validate_PluginPaths_FileErrors(t *testing.T) {
 // Test basic required fields of the config
 func TestConfig_Validate_RequiredFields(t *testing.T) {
 	tests := []struct {
-		name       string
-		mutateFunc func(*config.Config)
+		name        string
+		mutateFunc  func(*config.Config)
 		expectedErr string
 	}{
 		{
@@ -1018,25 +1018,25 @@ func TestConfig_Validate_RequiredFields(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a temp dir for this test case
 			tempDir := t.TempDir()
-			
+
 			// Create a valid plugins directory
 			pluginsDir := filepath.Join(tempDir, "plugins")
 			require.NoError(t, os.MkdirAll(pluginsDir, 0755))
-			
+
 			// Create dummy.ork file for validation
 			dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
 			require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
-			
+
 			// Create base config using the temp dir
 			cfg := createValidConfig(tempDir)
-			
+
 			// Set up valid plugin path and OpenRocket file
 			cfg.Setup.Plugins.Paths = []string{pluginsDir}
 			cfg.Engine.Options.OpenRocketFile = dummyOrkPath
-			
+
 			// Apply the mutation to make the config invalid for the specific test
 			tc.mutateFunc(&cfg)
-			
+
 			// The validate function will use the current directory for relative paths
 			// We'll pass the temp dir as the config file directory for validation
 			err := cfg.Validate(tempDir)
@@ -1049,8 +1049,8 @@ func TestConfig_Validate_RequiredFields(t *testing.T) {
 // Test launchrail configuration validation
 func TestConfig_Validate_LaunchrailOptions(t *testing.T) {
 	tests := []struct {
-		name       string
-		mutateFunc func(*config.Config)
+		name        string
+		mutateFunc  func(*config.Config)
 		expectedErr string
 	}{
 		{
@@ -1100,25 +1100,25 @@ func TestConfig_Validate_LaunchrailOptions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a temp dir for this test case
 			tempDir := t.TempDir()
-			
+
 			// Create a valid plugins directory
 			pluginsDir := filepath.Join(tempDir, "plugins")
 			require.NoError(t, os.MkdirAll(pluginsDir, 0755))
-			
+
 			// Create dummy.ork file for validation
 			dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
 			require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
-			
+
 			// Create base config using the temp dir
 			cfg := createValidConfig(tempDir)
-			
+
 			// Set up valid plugin path and OpenRocket file
 			cfg.Setup.Plugins.Paths = []string{pluginsDir}
 			cfg.Engine.Options.OpenRocketFile = dummyOrkPath
-			
+
 			// Apply the mutation to make the config invalid for the specific test
 			tc.mutateFunc(&cfg)
-			
+
 			// The validate function will use the current directory for relative paths
 			// We'll pass the temp dir as the config file directory for validation
 			err := cfg.Validate(tempDir)
@@ -1131,8 +1131,8 @@ func TestConfig_Validate_LaunchrailOptions(t *testing.T) {
 // Test launchsite configuration validation
 func TestConfig_Validate_LaunchsiteOptions(t *testing.T) {
 	tests := []struct {
-		name       string
-		mutateFunc func(*config.Config)
+		name        string
+		mutateFunc  func(*config.Config)
 		expectedErr string
 	}{
 		{
@@ -1165,25 +1165,25 @@ func TestConfig_Validate_LaunchsiteOptions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a temp dir for this test case
 			tempDir := t.TempDir()
-			
+
 			// Create a valid plugins directory
 			pluginsDir := filepath.Join(tempDir, "plugins")
 			require.NoError(t, os.MkdirAll(pluginsDir, 0755))
-			
+
 			// Create dummy.ork file for validation
 			dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
 			require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
-			
+
 			// Create base config using the temp dir
 			cfg := createValidConfig(tempDir)
-			
+
 			// Set up valid plugin path and OpenRocket file
 			cfg.Setup.Plugins.Paths = []string{pluginsDir}
 			cfg.Engine.Options.OpenRocketFile = dummyOrkPath
-			
+
 			// Apply the mutation to make the config invalid for the specific test
 			tc.mutateFunc(&cfg)
-			
+
 			// The validate function will use the current directory for relative paths
 			// We'll pass the temp dir as the config file directory for validation
 			err := cfg.Validate(tempDir)
