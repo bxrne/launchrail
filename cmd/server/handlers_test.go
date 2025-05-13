@@ -27,7 +27,7 @@ var (
 )
 
 func setupTestTemplate(t *testing.T) string {
-	templateDir := filepath.Join("internal", "reporting", "templates")
+	templateDir := filepath.Join("templates", "reports")
 	templatePath := filepath.Join(templateDir, "report.md.tmpl")
 
 	// Ensure parent directory exists
