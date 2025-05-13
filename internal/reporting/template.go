@@ -358,6 +358,13 @@ func (tr *TemplateRenderer) extractPlotData(motionData []*plotSimRecord, xKey, y
 			continue
 		}
 
+		// Log all keys in the current record for debugging
+		keysInRecord := make([]string, 0, len(*record))
+		for k := range *record {
+			keysInRecord = append(keysInRecord, k)
+		}
+		tr.log.Debug("Keys in current plotSimRecord", "index", i, "keys", keysInRecord, "expectedX", xKey, "expectedY", yKey)
+
 		xValRaw, xOk := (*record)[xKey]
 		yValRaw, yOk := (*record)[yKey]
 
