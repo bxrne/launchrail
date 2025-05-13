@@ -268,7 +268,7 @@ func (tr *TemplateRenderer) ensureMandatoryFields(data *ReportData) {
 	// Add placeholder fields if they're missing but expected by the template
 	for _, plotKey := range []string{"altitude_vs_time", "velocity_vs_time", "acceleration_vs_time"} {
 		if _, exists := data.Plots[plotKey]; !exists {
-			data.Plots[plotKey] = filepath.ToSlash(filepath.Join("assets", plotKey+".svg"))
+			data.Plots[plotKey] = plotKey + ".svg" // Store just the filename
 		}
 	}
 

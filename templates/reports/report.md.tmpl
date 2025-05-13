@@ -46,7 +46,7 @@ Generated: {{.GenerationDate}}
 {{if .Plots}}
 {{range $key, $path := .Plots}}
 ### {{$key}}
-![{{$key}}]({{$path}})
+{{ embedSVG $path $key }}
 {{end}}
 {{else}}
 *No telemetry plots available for this simulation.*
