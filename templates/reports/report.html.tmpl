@@ -4,107 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simulation Report: {{.RecordID}}</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f8f9fa;
-            color: #212529;
-            line-height: 1.6;
-        }
-        .container {
-            width: 80%;
-            margin: 20px auto;
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        header h1 {
-            color: #007bff;
-            border-bottom: 2px solid #007bff;
-            padding-bottom: 10px;
-        }
-        header p {
-            font-size: 0.9em;
-            color: #6c757d;
-        }
-        nav#toc {
-            background-color: #e9ecef;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-        nav#toc h2 {
-            margin-top: 0;
-            color: #495057;
-        }
-        nav#toc ul {
-            list-style: none;
-            padding: 0;
-        }
-        nav#toc ul li a {
-            text-decoration: none;
-            color: #007bff;
-        }
-        nav#toc ul li a:hover {
-            text-decoration: underline;
-        }
-        section {
-            margin-bottom: 30px;
-        }
-        section h2 {
-            color: #007bff;
-            border-bottom: 1px solid #dee2e6;
-            padding-bottom: 5px;
-            margin-top: 0;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-        th, td {
-            padding: 8px 12px;
-            border: 1px solid #dee2e6;
-            text-align: left;
-        }
-        th {
-            background-color: #e9ecef;
-            font-weight: bold;
-        }
-        .plot-container {
-            text-align: center;
-            margin-bottom: 20px;
-            padding: 10px;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            background-color: #f8f9fa;
-        }
-        .plot-container h3 {
-            margin-top: 0;
-            color: #495057;
-        }
-        .plot-container svg {
-            max-width: 100%;
-            height: auto;
-            display: block;
-            margin: 0 auto;
-        }
-        .no-data {
-            font-style: italic;
-            color: #6c757d;
-        }
-        footer {
-            text-align: center;
-            padding: 20px;
-            font-size: 0.9em;
-            color: #6c757d;
-            border-top: 1px solid #dee2e6;
-            margin-top: 30px;
-        }
-    </style>
+    <link rel="stylesheet" type="text/css" href="/static/css/main.css">
 </head>
 <body>
     <div class="container">
@@ -217,7 +117,6 @@
             {{if .Weather}}
                 <table>
                     <tbody>
-                        <tr><td>Launch Site</td><td>{{.Weather.LaunchSiteName | default "N/A"}}</td></tr>
                         {{with .Weather.Latitude}}<tr><td>Latitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
                         {{with .Weather.Longitude}}<tr><td>Longitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
                         {{with .Weather.ElevationAMSL}}<tr><td>Elevation (AMSL)</td><td>{{printf "%.1f" .}} m</td></tr>{{end}}

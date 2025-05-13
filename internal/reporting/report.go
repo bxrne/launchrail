@@ -152,7 +152,6 @@ type ForcesAndMomentsData struct {
 
 // WeatherData holds atmospheric conditions data
 type WeatherData struct {
-	LaunchSiteName        string  // Added
 	Latitude              float64 // Added
 	Longitude             float64 // Added
 	ElevationAMSL         float64 // Added
@@ -208,7 +207,6 @@ type motionPoint struct {
 
 // 	// Set default values for Weather
 // 	rData.Weather = WeatherData{
-// 		LaunchSiteName:        appCfg.Setup.App.Name, // Added
 // 		Latitude:              appCfg.Engine.Options.Launchsite.Latitude, // Added
 // 		Longitude:             appCfg.Engine.Options.Launchsite.Longitude, // Added
 // 		ElevationAMSL:         appCfg.Engine.Options.Launchsite.Altitude, // Added
@@ -1299,7 +1297,6 @@ func GenerateReportData(simData *storage.SimulationData, recordID string, rm Han
 	}
 
 	// Populate WeatherData with LaunchSite information from appCfg
-	rData.Weather.LaunchSiteName = appCfg.Setup.App.Name
 	rData.Weather.Latitude = appCfg.Engine.Options.Launchsite.Latitude
 	rData.Weather.Longitude = appCfg.Engine.Options.Launchsite.Longitude
 	rData.Weather.ElevationAMSL = appCfg.Engine.Options.Launchsite.Altitude
