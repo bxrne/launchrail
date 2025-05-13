@@ -1,3 +1,60 @@
+## v0.8.0 (2025-05-13)
+
+### Feat
+
+- implement efficiency factors in motor thrust calculations and add CSV output
+- add CSV output files and fix motor mass calculation formatting
+- improve aerodynamic modeling with realistic ISA atmosphere and enhanced drag calculations
+- enhance aerodynamic model with angle of attack and transonic drag calculations
+- implement multi-layer ISA model and improve parachute drag effects
+- add parachute status debug logging in aerodynamics calculation
+- implement rocket simulation with event tracking and data output
+- add burnout and parachute events, rename component methods for clarity
+- enhance record listing with 16/64 hex support and improved logging
+- add config parameter to storage initialization for consistent logging
+- add nanosecond precision to simulation hash and improve record deletion logging
+- update OpenRocket XML parsing to support full document structure
+- add parachute drag calculation and improve apogee detection logic
+- implement rocket center of mass and inertia tensor calculation
+- refactor motor FSM to handle coasting state and XML schema updates
+- implement inertia tensor calculation for trapezoidal finset component
+- add center of mass calculation for trapezoid finset component
+- implement gravity and thrust forces in RK4 integration with improved mass tracking
+- add timestamps to log filenames for better organization
+- standardize log file paths to ~/.launchrail/logs directory across all commands
+- **server, logger, entities, simulation**: implement file logging with ANSI color stripping and Gin middleware
+- **rocket, simulation, matrix**: enhance mass calculation logging in rocket entity, refactor matrix creation to accept slice input, and improve matrix-related tests for robustness
+- **tests, simulation**: add new tests for rocket entity creation, simulation run conditions, and matrix operations; introduce SonarLint configuration for improved code quality
+
+### Fix
+
+- remove thrust scaling factor to use actual motor values in physics simulation
+- format code and remove trailing whitespace across multiple files
+- **logger**: improved coverage
+
+### Refactor
+
+- improve physics system code organization and add comprehensive tests
+- simplify motor mass calculation and remove efficiency factors
+- embed BasicEntity in PhysicsState and standardize System interface
+- adjust drag coefficient and simplify logging messages for clarity
+- move thrust force calculation to RK4 integrator to avoid double-counting
+- restructure ISA model with layer-based atmospheric calculations and improved error handling
+- split rules system into smaller, focused methods for better maintainability
+- update RecordManager to use logger dependency and deterministic hashing
+- remove system directory filtering and update test suite to use CreateRecordWithConfig
+- extract simulation exit conditions into dedicated shouldStopSimulation method
+- improve rocket physics initialization and component handling
+- improve parachute component OpenRocket parsing and test coverage
+- improve error handling and code organization in rocket entity creation
+- update wind effect plugin to use force-based calculations and improve logging
+- replace mass parameter with density in bodytube component
+- add ground collision handling and rocket initialization on launch rail
+- **tests, matrix**: remove redundant matrix and vector equality assertion functions to simplify test code
+- **aerodynamics, physics**: disable aerodynamic moments for debugging and remove ground collision handling from PhysicsSystem
+- **simulation, physics**: implement inertia tensor calculations and enhance RK4 integration for angular motion updates
+- **simulation, physics, aerodynamics**: enhance inertia tensor calculations, integrate RK4 for state updates, and streamline force accumulation
+
 ## v0.7.3 (2025-05-07)
 
 ### Fix

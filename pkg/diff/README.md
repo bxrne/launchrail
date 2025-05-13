@@ -1,26 +1,13 @@
-# pkg/diff
+# diff
 
-This package provides functionality for calculating the difference between two sets of data.
+Utility package for calculating and comparing differences between simulation values and configurations.
 
-## Responsibility
-
-*   Calculate the difference between two sets of data.
-*   Provide a clear and concise representation of the differences.
-
-## Scope
-
-*   Support different data types for comparison.
-*   Provide options for customizing the comparison process.
-
-## Gotchas
-
-*   Handling of edge cases, such as empty sets or sets with different sizes.
-*   Performance considerations when comparing large sets of data.
-
-## Test Suite Overview
-
-The test suite includes unit tests for the core functionality of the package, including:
-
-*   Calculating the difference between two sets of data.
-*   Handling edge cases.
-*   Customizing the comparison process.
+## Notes
+- Provides hash calculation functions for deterministic file identification
+- Implements comparison methods for simulation results analysis
+- Supports diff generation between multiple simulation runs
+- Facilitates reproducibility through consistent hashing algorithms
+- Offers utilities for comparing numerical values with tolerances
+- Enables tracking of configuration changes between simulation runs
+- Includes methods for structured data comparison and visualization
+- Assists in validation and verification of simulation results

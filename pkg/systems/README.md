@@ -1,26 +1,13 @@
-# pkg/systems
+# systems
 
-This package defines the different systems that make up a rocket.
+Collection of physics-based systems that implement specialized simulation behaviors using the entity-component architecture.
 
-## Responsibility
-
-*   Define the different systems that make up a rocket.
-*   Provide a clear and concise representation of the rocket's systems.
-
-## Scope
-
-*   Include all necessary information about the rocket's systems.
-*   Support different types of systems, such as propulsion, guidance, and control.
-
-## Gotchas
-
-*   Ensuring that the rocket's systems are accurately represented.
-*   Handling interactions between different systems.
-
-## Test Suite Overview
-
-The test suite includes unit tests for the core functionality of the package, including:
-
-*   Defining the different systems that make up a rocket.
-*   Ensuring that the rocket's systems are accurately represented.
-*   Handling interactions between different systems.
+## Notes
+- Implements different physical systems for rocket simulation (physics, aerodynamics, launch rail)
+- Follows entity-component system (ECS) principles for modular design
+- Handles forces calculation and motion updates for simulation entities
+- Defines constraints and rules for entity interactions
+- Manages simulation state transitions during flight phases
+- Includes parallel processing capabilities for performance optimization
+- Provides clean interfaces for integration with the core simulation loop
+- Implements specialized mathematics for aerospace applications

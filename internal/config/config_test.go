@@ -26,6 +26,9 @@ setup:
     paths: ["./plugins"]
 server:
   port: 8000
+  read_timeout_seconds: 15
+  write_timeout_seconds: 15
+  idle_timeout_seconds: 60
 engine:
   external:
     openrocket_version: "23.0"
@@ -110,7 +113,10 @@ func createValidConfig() config.Config {
 			},
 		},
 		Server: config.Server{
-			Port: 8080,
+			Port:         8080,
+			ReadTimeout:  15,
+			WriteTimeout: 15,
+			IdleTimeout:  60,
 		},
 		Engine: config.Engine{
 			External: config.External{
@@ -331,6 +337,9 @@ setup:
     paths: [%q]
 server:
   port: 9999
+  read_timeout_seconds: 15
+  write_timeout_seconds: 15
+  idle_timeout_seconds: 60
 engine:
   external:
     openrocket_version: "23.0"

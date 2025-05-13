@@ -9,9 +9,10 @@ import (
 
 // MotorState represents the states of the motor
 const (
-	StateIdle    = "idle"
-	StateBurning = "burning"
-	StateIgnited = "IGNITED"
+	StateIdle     = "idle"
+	StateBurning  = "burning"
+	StateIgnited  = "IGNITED"
+	StateCoasting = "coast"
 )
 
 // MotorFSM represents the finite state machine for the motor
@@ -28,8 +29,9 @@ func NewMotorFSM(motor *Motor, log logf.Logger) *MotorFSM {
 			string(StateIdle), // Set initial state to "idle"
 			fsm.Events{
 				{Name: "ignite", Src: []string{string(StateIdle)}, Dst: string(StateIgnited)},
-				{Name: "burnout", Src: []string{string(StateBurning)}, Dst: string(StateIdle)},
+				{Name: "burnout", Src: []string{string(StateBurning)}, Dst: string(StateCoasting)},
 				{Name: "start_burning", Src: []string{string(StateIgnited)}, Dst: string(StateBurning)},
+				{Name: "reset", Src: []string{string(StateCoasting), string(StateBurning), string(StateIgnited)}, Dst: string(StateIdle)},
 			},
 			fsm.Callbacks{},
 		),
@@ -72,11 +74,13 @@ func (fsm *MotorFSM) UpdateState(mass float64, elapsedTime float64, burnTime flo
 	ctx := context.Background()
 	currentState := fsm.FSM.Current()
 
-	if elapsedTime < burnTime && mass > 0 {
+	// If we're not burning and we're within burn time and have mass, start burning
+	if (currentState == StateIdle || currentState == StateIgnited) && elapsedTime < burnTime && mass > 0 {
 		return fsm.handleBurningTransition(ctx, currentState)
 	}
 
-	if currentState == StateBurning {
+	// If we're burning and either reached burn time or ran out of mass, transition to coasting
+	if currentState == StateBurning && (elapsedTime >= burnTime || mass <= 0) {
 		return fsm.triggerEvent(ctx, "burnout")
 	}
 	return nil

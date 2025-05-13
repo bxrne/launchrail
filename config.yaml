@@ -8,14 +8,16 @@ setup:
   plugins:
     paths:
       - "./plugins/windeffect.so"
-      - "./plugins/blackscholes.so"
+      # - "./plugins/blackscholes.so"
 
 server:
   port: 8080
+  read_timeout_seconds: 10
+  write_timeout_seconds: 10
 
 engine:
   simulation:
-    step: 0.001
+    step: 0.01
     max_time: 300.0
     ground_tolerance: 0.01
   external:
@@ -39,7 +41,7 @@ engine:
           sea_level_temperature: 288.15
           sea_level_pressure: 101325.0
           ratio_specific_heats: 1.4
-          temperature_lapse_rate: 0.0065
+          temperature_lapse_rate: -0.0065
 
 #-------------------------------------------------------------------------------
 # Benchmarks Configuration

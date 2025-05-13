@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,9 +29,10 @@ func setupTest(t *testing.T) (string, string, func()) {
 func TestNewStorageMotion(t *testing.T) {
 	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
+	cfg := &config.Config{Setup: config.Setup{Logging: config.Logging{Level: "error"}}}
 
 	recordDir := filepath.Join(baseDir, "test_record")
-	s, err := storage.NewStorage(recordDir, storage.MOTION)
+	s, err := storage.NewStorage(recordDir, storage.MOTION, cfg)
 	require.NoError(t, err)
 
 	// Close the storage before cleanup
@@ -49,9 +51,10 @@ func TestNewStorageMotion(t *testing.T) {
 func TestNewStorageEvents(t *testing.T) {
 	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
+	cfg := &config.Config{Setup: config.Setup{Logging: config.Logging{Level: "error"}}}
 
 	recordDir := filepath.Join(baseDir, "test_record")
-	s, err := storage.NewStorage(recordDir, storage.EVENTS)
+	s, err := storage.NewStorage(recordDir, storage.EVENTS, cfg)
 	require.NoError(t, err)
 
 	// Close the storage before cleanup
@@ -70,9 +73,10 @@ func TestNewStorageEvents(t *testing.T) {
 func TestInit(t *testing.T) {
 	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
+	cfg := &config.Config{Setup: config.Setup{Logging: config.Logging{Level: "error"}}}
 
 	recordDir := filepath.Join(baseDir, "test_init")
-	s, err := storage.NewStorage(recordDir, storage.MOTION)
+	s, err := storage.NewStorage(recordDir, storage.MOTION, cfg)
 	require.NoError(t, err)
 
 	err = s.Init()
@@ -102,9 +106,10 @@ func TestInit(t *testing.T) {
 func TestWrite(t *testing.T) {
 	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
+	cfg := &config.Config{Setup: config.Setup{Logging: config.Logging{Level: "error"}}}
 
 	recordDir := filepath.Join(baseDir, "test_write")
-	s, err := storage.NewStorage(recordDir, storage.MOTION)
+	s, err := storage.NewStorage(recordDir, storage.MOTION, cfg)
 	require.NoError(t, err)
 
 	err = s.Init()
@@ -140,9 +145,10 @@ func TestWrite(t *testing.T) {
 func TestWriteInvalidData(t *testing.T) {
 	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
+	cfg := &config.Config{Setup: config.Setup{Logging: config.Logging{Level: "error"}}}
 
 	recordDir := filepath.Join(baseDir, "test_invalid_data")
-	s, err := storage.NewStorage(recordDir, storage.MOTION)
+	s, err := storage.NewStorage(recordDir, storage.MOTION, cfg)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, s.Close())
@@ -161,9 +167,10 @@ func TestWriteInvalidData(t *testing.T) {
 func TestReadAll(t *testing.T) {
 	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
+	cfg := &config.Config{Setup: config.Setup{Logging: config.Logging{Level: "error"}}}
 
 	recordDir := filepath.Join(baseDir, "test_read_all")
-	s, err := storage.NewStorage(recordDir, storage.MOTION)
+	s, err := storage.NewStorage(recordDir, storage.MOTION, cfg)
 	require.NoError(t, err)
 	require.NoError(t, s.Init())
 
@@ -171,7 +178,7 @@ func TestReadAll(t *testing.T) {
 	require.NoError(t, s.Write(data))
 	require.NoError(t, s.Close())
 
-	s2, err := storage.NewStorage(recordDir, storage.MOTION)
+	s2, err := storage.NewStorage(recordDir, storage.MOTION, cfg)
 	require.NoError(t, err)
 	defer s2.Close()
 
@@ -184,9 +191,10 @@ func TestReadAll(t *testing.T) {
 func TestReadHeadersAndData(t *testing.T) {
 	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
+	cfg := &config.Config{Setup: config.Setup{Logging: config.Logging{Level: "error"}}}
 
 	recordDir := filepath.Join(baseDir, "test_read_headers_and_data")
-	s, err := storage.NewStorage(recordDir, storage.EVENTS)
+	s, err := storage.NewStorage(recordDir, storage.EVENTS, cfg)
 	require.NoError(t, err)
 	require.NoError(t, s.Init())
 
@@ -194,7 +202,7 @@ func TestReadHeadersAndData(t *testing.T) {
 	require.NoError(t, s.Write(data))
 	require.NoError(t, s.Close())
 
-	s2, err := storage.NewStorage(recordDir, storage.EVENTS)
+	s2, err := storage.NewStorage(recordDir, storage.EVENTS, cfg)
 	require.NoError(t, err)
 	defer s2.Close()
 
@@ -208,9 +216,10 @@ func TestReadHeadersAndData(t *testing.T) {
 func TestGetFilePath(t *testing.T) {
 	baseDir, _, cleanup := setupTest(t)
 	defer cleanup()
+	cfg := &config.Config{Setup: config.Setup{Logging: config.Logging{Level: "error"}}}
 
 	recordDir := filepath.Join(baseDir, "test_get_file_path")
-	s, err := storage.NewStorage(recordDir, storage.DYNAMICS)
+	s, err := storage.NewStorage(recordDir, storage.DYNAMICS, cfg)
 	require.NoError(t, err)
 	assert.Contains(t, s.GetFilePath(), "DYNAMICS.csv")
 	require.NoError(t, s.Close())

@@ -10,6 +10,8 @@ const (
 	Liftoff
 	Apogee
 	Land
+	ParachuteDeploy
+	Burnout
 )
 
 // String returns a string representation of the event.
@@ -23,6 +25,10 @@ func (e Event) String() string {
 		return "APOGEE"
 	case Land:
 		return "LAND"
+	case ParachuteDeploy:
+		return "PARACHUTE_DEPLOY"
+	case Burnout:
+		return "BURNOUT"
 	default:
 		return fmt.Sprintf("UNKNOWN_EVENT(%d)", e)
 	}

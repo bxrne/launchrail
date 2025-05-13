@@ -29,11 +29,11 @@ func TestMotorFSM_StateTransitions(t *testing.T) {
 		wantState   string
 	}{
 		{"Idle to Burning", 10.0, 1.0, 5.0, components.StateIdle, components.StateBurning},
-		{"Burning to Idle (Time Exceeded)", 10.0, 6.0, 5.0, components.StateBurning, components.StateIdle},
-		{"Burning to Idle (No Mass)", 0.0, 3.0, 5.0, components.StateBurning, components.StateIdle},
+		{"Burning to Coasting (Time Exceeded)", 10.0, 6.0, 5.0, components.StateBurning, components.StateCoasting},
+		{"Burning to Coasting (No Mass)", 0.0, 3.0, 5.0, components.StateBurning, components.StateCoasting},
 		{"Stay in Idle", 0.0, 0.0, 5.0, components.StateIdle, components.StateIdle},
 		{"Stay in Burning", 10.0, 3.0, 5.0, components.StateBurning, components.StateBurning},
-		{"Edge Case - Exact Burn Time", 10.0, 5.0, 5.0, components.StateBurning, components.StateIdle},
+		{"Edge Case - Exact Burn Time", 10.0, 5.0, 5.0, components.StateBurning, components.StateCoasting},
 		{"Edge Case - Zero Mass at Start", 0.0, 0.0, 5.0, components.StateIdle, components.StateIdle},
 	}
 
@@ -73,7 +73,7 @@ func TestMotorFSM_ConcurrentUpdates(t *testing.T) {
 
 	// State should be valid
 	state := fsm.GetState()
-	assert.Contains(t, []string{components.StateIdle, components.StateBurning}, state)
+	assert.Contains(t, []string{components.StateIdle, components.StateBurning, components.StateCoasting}, state)
 }
 
 // TEST: GIVEN a new MotorFSM WHEN NegativeValues is called THEN the state is valid
@@ -122,11 +122,11 @@ func TestMotorFSM_RapidStateChanges(t *testing.T) {
 		if i%2 == 0 {
 			_ = fsm.UpdateState(10.0, 1.0, 5.0) // Should transition to burning
 		} else {
-			_ = fsm.UpdateState(0.0, 6.0, 5.0) // Should transition to idle
+			_ = fsm.UpdateState(0.0, 6.0, 5.0) // Should transition to coast
 		}
 	}
 
 	// Final state should be valid
 	state := fsm.GetState()
-	assert.Contains(t, []string{components.StateIdle, components.StateBurning}, state)
+	assert.Contains(t, []string{components.StateIdle, components.StateBurning, components.StateCoasting}, state)
 }
