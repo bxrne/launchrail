@@ -744,7 +744,7 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 	// Determine format from query parameter or Accept header
 	format := c.DefaultQuery("format", "")
 	acceptHeader := c.GetHeader("Accept")
-	
+
 	// If format not specified in query, try to infer from Accept header
 	if format == "" {
 		if strings.Contains(acceptHeader, "application/json") {
@@ -807,7 +807,7 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 				}
 			}
 		}
-		
+
 		// Set the content type and return the JSON data
 		c.JSON(http.StatusOK, reportData)
 		return
