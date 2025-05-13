@@ -387,13 +387,27 @@ type motorPoint struct {
 
 // findMotorDataIndices finds the indices for time and thrust columns in the motor headers
 func findMotorDataIndices(motorHeaders []string, log *logf.Logger) (timeIdx, thrustIdx int) {
+	log.Debug("calculateMotorSummary: processing with headers", "headers", motorHeaders)
+
 	timeIdx, thrustIdx = -1, -1
 	for i, header := range motorHeaders {
-		if header == "Time (s)" { // TODO: Make these configurable or more robust
+		switch strings.ToLower(strings.TrimSpace(header)) {
+		case "time (s)":
 			timeIdx = i
-		} else if header == "Thrust (N)" {
+		case "time":
+			if timeIdx == -1 {
+				timeIdx = i
+			}
+		case "thrust (n)":
 			thrustIdx = i
+		case "thrust":
+			if thrustIdx == -1 {
+				thrustIdx = i
+			}
 		}
+	}
+	if timeIdx == -1 || thrustIdx == -1 {
+		log.Warn("calculateMotorSummary: Required columns not found.", "searched_time", "'Time (s)' or 'Time'", "searched_thrust", "'Thrust (N)' or 'Thrust'", "received_headers", motorHeaders, "time_col_found", timeIdx != -1, "thrust_col_found", thrustIdx != -1)
 	}
 	return timeIdx, thrustIdx
 }
@@ -476,7 +490,7 @@ func calculateMotorSummary(motorData []*PlotSimRecord, motorHeaders []string, lo
 	// Find required data column indices
 	timeIdx, thrustIdx := findMotorDataIndices(motorHeaders, log)
 	if timeIdx == -1 || thrustIdx == -1 {
-		log.Warn("Required columns 'Time (s)' or 'Thrust (N)' not found in motor headers. Cannot calculate motor summary.", "headers", motorHeaders)
+		log.Warn("Required columns 'Time (s)'/'Time' or 'Thrust (N)'/'Thrust' not found in motor headers. Cannot calculate motor summary.", "headers", motorHeaders)
 		return summary
 	}
 
@@ -539,27 +553,6 @@ func findLandingSpeed(points []motionPoint, eventsData [][]string, touchdownIdx 
 	return 0
 }
 
-// findRailExitVelocity determines velocity at rail exit
-func findRailExitVelocity(points []motionPoint, eventsData [][]string, railExitIdx int) float64 {
-	if railExitIdx < 0 || len(eventsData) <= railExitIdx || len(eventsData[railExitIdx]) == 0 {
-		return 0
-	}
-
-	exitTime, err := strconv.ParseFloat(eventsData[railExitIdx][0], 64)
-	if err != nil {
-		return 0
-	}
-
-	// Find velocity closest to the rail exit time
-	for i := 0; i < len(points); i++ {
-		if points[i].Time >= exitTime && points[i].VelTot >= 0 {
-			return points[i].VelTot
-		}
-	}
-
-	return 0
-}
-
 // calculateStabilityMetrics computes aerodynamic stability metrics
 func calculateStabilityMetrics(railExitVelocity, launchRailLength float64) (machNumber, stabilityMetric float64) {
 	if launchRailLength <= 0 || railExitVelocity <= 0 {
@@ -574,134 +567,340 @@ func calculateStabilityMetrics(railExitVelocity, launchRailLength float64) (mach
 
 // CalculateMotionMetrics computes summary motion statistics from telemetry and event data.
 func CalculateMotionMetrics(motionData []*PlotSimRecord, motionHeaders []string, eventsData [][]string, launchRailLength float64, log *logf.Logger) *MotionMetrics {
+	log.Debug("CalculateMotionMetrics: processing with motion headers", "motion_headers", motionHeaders)
+
 	metrics := &MotionMetrics{}
+
+	if eventsData == nil {
+		log.Warn("CalculateMotionMetrics: eventsData is nil. Event-dependent metrics will not be calculated or will use fallbacks if available.")
+		// metrics.Error could be set here, or allow individual calculations to note missing data.
+	}
 
 	// 1. Find data column indices from motionHeaders
 	timeIdx, altitudeIdx, velocityIdx, accelIdx := FindMotionDataIndices(motionHeaders)
-	if timeIdx == -1 { // Time is essential
-		log.Error("Essential 'Time' column not found in motion data headers. Cannot calculate motion metrics.")
-		metrics.Error = "Essential 'Time' column not found in motion data headers."
-		return metrics
+	if timeIdx == -1 { // Time is essential and index must be valid
+		log.Error("Essential 'Time' or 'Time (s)' column not found in motion data headers. Motion-point-based metrics will not be calculated.", "received_headers", motionHeaders)
+		// Do not return early; allow event-based metrics to be calculated.
+		// motionPoints will be empty if timeIdx is -1, and subsequent logic handles this.
 	}
 
-	// 2. Find event row indices from eventsData
-	launchIdx, railExitIdx, burnoutIdx, apogeeEventIdx, touchdownIdx := FindFlightEvents(eventsData, log)
-
-	// 3. Extract motion points from raw motionData
+	// 2. Extract motion points from motionData
 	motionPoints := ExtractMotionPoints(motionData, motionHeaders, timeIdx, altitudeIdx, velocityIdx, accelIdx, log)
-	if len(motionPoints) == 0 {
-		log.Warn("No motion points extracted. Cannot calculate most motion metrics.")
-		// Continue, as some event-based metrics might still be possible if eventsData is valid
+	if len(motionPoints) == 0 && timeIdx != -1 { // Log this only if timeIdx was found but still no points (e.g. empty motionData)
+		log.Warn("No motion points extracted from motionData. Point-based metrics may be inaccurate or unavailable.")
+	} else if len(motionPoints) == 0 && timeIdx == -1 {
+		// Already logged the error about missing time header
 	}
 
-	// 4. Find peak values from motion points
-	maxAltitude, maxSpeed, maxAcceleration, apogeeDataTime := FindPeakValues(motionPoints)
-	metrics.MaxAltitudeAGL = maxAltitude
-	metrics.MaxSpeed = maxSpeed
-	metrics.MaxAcceleration = maxAcceleration
-	metrics.TimeAtApogee = apogeeDataTime // This is apogee time based on sensor data peak altitude
-
-	// --- Event-based time calculations ---
-	// For parsing event times, we assume the time string is in the second column (index 1) of the event row.
-	// This aligns with how FindFlightEvents identifies rows, and how subsequent sections use these indices.
-	const eventTimeCol = 1 // Define for clarity, assuming time is in the second column of event rows
-
-	var launchTime, apogeeEventTimeFloat float64
-
-	if launchIdx != -1 && launchIdx < len(eventsData) && len(eventsData[launchIdx]) > eventTimeCol {
-		launchTimeStr := eventsData[launchIdx][eventTimeCol]
-		lt, err := strconv.ParseFloat(launchTimeStr, 64)
-		if err == nil {
-			launchTime = lt
-		} else {
-			log.Warn("Failed to parse launch event time", "value", launchTimeStr, "error", err)
-		}
-	}
-
-	// 5. Calculate flight time from events
-	metrics.FlightTime = CalculateFlightTime(eventsData, launchIdx, touchdownIdx)
-
-	// Calculate TimeToApogee, prioritizing event data
-	if apogeeEventIdx != -1 && apogeeEventIdx < len(eventsData) && len(eventsData[apogeeEventIdx]) > eventTimeCol {
-		apogeeTimeStr := eventsData[apogeeEventIdx][eventTimeCol]
-		at, err := strconv.ParseFloat(apogeeTimeStr, 64)
-		if err == nil {
-			apogeeEventTimeFloat = at
-			if launchTime > 0 && apogeeEventTimeFloat >= launchTime {
-				metrics.TimeToApogee = apogeeEventTimeFloat - launchTime
-			} else if launchTime == 0 { // If launch time couldn't be parsed, use absolute apogee event time
-				metrics.TimeToApogee = apogeeEventTimeFloat
-			}
-		} else {
-			log.Warn("Failed to parse apogee event time", "value", apogeeTimeStr, "error", err)
-		}
-	}
-	// Fallback for TimeToApogee if event-based calculation wasn't possible or complete
-	if metrics.TimeToApogee == 0 && metrics.TimeAtApogee > 0 { // TimeAtApogee is from sensor peak
-		if launchTime > 0 && metrics.TimeAtApogee >= launchTime {
-			metrics.TimeToApogee = metrics.TimeAtApogee - launchTime
-		} else if launchTime == 0 { // If no launch event time, sensor apogee time is relative to data start (effectively t=0)
-			metrics.TimeToApogee = metrics.TimeAtApogee
-		}
-	}
-
-	// Calculate Rail Exit Velocity
-	// Find the motion point closest to rail exit time, if rail exit event exists
-	if railExitIdx != -1 && railExitIdx < len(eventsData) && len(eventsData[railExitIdx]) > eventTimeCol {
-		railExitTimeStr := eventsData[railExitIdx][eventTimeCol]
-		rt, err := strconv.ParseFloat(railExitTimeStr, 64)
-		if err == nil {
-			closestPoint := FindClosestMotionPoint(motionPoints, rt)
-			if closestPoint != nil {
-				metrics.RailExitVelocity = closestPoint.VelTot
-			}
-		} else {
-			log.Warn("Failed to parse rail exit time from events data", "value", railExitTimeStr, "error", err)
-		}
-	} else if launchRailLength > 0 && len(motionPoints) > 0 { // Fallback: use launch rail length if no rail exit event
-		// Iterate through points to find when altitude first exceeds launchRailLength
-		for _, p := range motionPoints {
-			if p.AltAGL >= launchRailLength {
-				metrics.RailExitVelocity = p.VelTot
-				break
-			}
-		}
-	}
-
-	// 7. Burnout Altitude and Time
-	if burnoutIdx != -1 && burnoutIdx < len(eventsData) && len(eventsData[burnoutIdx]) > eventTimeCol {
-		burnoutTimeStr := eventsData[burnoutIdx][eventTimeCol]
-		burnoutTime, err := strconv.ParseFloat(burnoutTimeStr, 64)
-		if err == nil {
-			metrics.BurnoutTime = burnoutTime
-			closestPointAtBurnout := FindClosestMotionPoint(motionPoints, burnoutTime)
-			if closestPointAtBurnout != nil {
-				metrics.BurnoutAltitude = closestPointAtBurnout.AltAGL
-			}
-		} else {
-			log.Warn("Failed to parse burnout time from events data", "value", burnoutTimeStr, "error", err)
-		}
-	}
-
-	// Calculate CoastToApogeeTime
-	if metrics.TimeToApogee > 0 && metrics.BurnoutTime > 0 && metrics.TimeToApogee > metrics.BurnoutTime {
-		metrics.CoastToApogeeTime = metrics.TimeToApogee - metrics.BurnoutTime
+	// Event-based metrics calculation (should proceed even if motionPoints is empty)
+	var launchIdx, apogeeIdx, burnoutIdx, touchdownIdx, railExitIdx = -1, -1, -1, -1, -1
+	if eventsData != nil {
+		launchIdx = findEventIndex(eventsData, "Launch")
+		burnoutIdx = findEventIndex(eventsData, "Motor Burnout") // Changed from "Burnout"
+		apogeeIdx = findEventIndex(eventsData, "Apogee")
+		touchdownIdx = findEventIndex(eventsData, "Touchdown")
+		railExitIdx = findEventIndex(eventsData, "Rail Exit")
+		log.Debug("Event indices found", "launch", launchIdx, "burnout", burnoutIdx, "apogee", apogeeIdx, "touchdown", touchdownIdx, "railExit", railExitIdx)
 	} else {
-		log.Warn("Could not reliably calculate CoastToApogeeTime", "time_to_apogee", metrics.TimeToApogee, "burnout_time", metrics.BurnoutTime)
+		log.Info("CalculateMotionMetrics: Skipping event index searches as eventsData is nil.")
 	}
 
-	// Calculate DescentTime
+	// Calculate metrics
+
+	// 2. Flight Time (event-based)
+	if eventsData != nil && launchIdx != -1 && touchdownIdx != -1 {
+		metrics.FlightTime = CalculateFlightTime(eventsData, launchIdx, touchdownIdx)
+		if metrics.FlightTime < 0 { // Check for error return from CalculateFlightTime
+			log.Warn("Failed to calculate valid flight time from events.")
+			metrics.FlightTime = 0 // Reset or handle as per desired error representation
+		}
+	} else {
+		log.Warn("Cannot calculate FlightTime: events data missing, or Launch/Touchdown events not found.")
+	}
+
+	// 3. Time to Apogee (event-based)
+	if eventsData != nil && launchIdx != -1 && apogeeIdx != -1 {
+		apogeeEventTimeStr := eventsData[apogeeIdx][1] // Assuming time is column 1
+		launchEventTimeStr := eventsData[launchIdx][1]
+		apogeeEventTimeFloat, errApogee := strconv.ParseFloat(apogeeEventTimeStr, 64)
+		launchEventTimeFloat, errLaunch := strconv.ParseFloat(launchEventTimeStr, 64)
+
+		if errApogee == nil && errLaunch == nil {
+			metrics.TimeToApogee = apogeeEventTimeFloat - launchEventTimeFloat
+			metrics.TimeAtApogee = apogeeEventTimeFloat // Corrected: Use TimeAtApogee
+		} else {
+			log.Warn("Could not parse apogee or launch event times to calculate TimeToApogee.", "errApogee", errApogee, "errLaunch", errLaunch)
+		}
+	} else if len(motionPoints) > 0 {
+		// Fallback for TimeToApogee if event-based calculation failed or was not possible
+		currentMaxAlt := -1.0
+		var apogeeTimeFromMotion float64 = -1
+		for _, p := range motionPoints {
+			if p.AltAGL > currentMaxAlt {
+				currentMaxAlt = p.AltAGL
+				apogeeTimeFromMotion = p.Time // Capture time of max altitude
+			}
+		}
+		if currentMaxAlt != -1.0 {
+			launchTimeFromMotion := 0.0
+			if len(motionPoints) > 0 {
+				launchTimeFromMotion = motionPoints[0].Time
+				log.Warn("Using first motion point time as approximate launch time for TimeToApogee calculation from motion data.")
+			}
+			metrics.TimeToApogee = apogeeTimeFromMotion - launchTimeFromMotion
+			metrics.TimeAtApogee = apogeeTimeFromMotion
+		} else {
+			log.Warn("Could not determine apogee altitude from motion points.")
+		}
+	} else {
+		log.Warn("Cannot calculate TimeToApogee: events data missing, or Launch/Apogee events not found.")
+	}
+
+	// 4. Burnout Time (Time from launch to motor burnout, event-based)
+	if eventsData != nil && launchIdx != -1 && burnoutIdx != -1 {
+		burnoutEventTimeStr := eventsData[burnoutIdx][1] // Assuming time is column 1
+		launchEventTimeStr := eventsData[launchIdx][1]
+		burnoutEventTimeFloat, errBurnout := strconv.ParseFloat(burnoutEventTimeStr, 64)
+		launchEventTimeFloat, errLaunch := strconv.ParseFloat(launchEventTimeStr, 64)
+		if errBurnout == nil && errLaunch == nil {
+			metrics.BurnoutTime = burnoutEventTimeFloat - launchEventTimeFloat
+		} else {
+			log.Warn("Could not parse burnout or launch event times to calculate BurnoutTime.", "errBurnout", errBurnout, "errLaunch", errLaunch)
+		}
+	} else {
+		log.Warn("Cannot calculate BurnoutTime: events data missing, or Launch/Burnout events not found.")
+	}
+
+	log.Debug("Metrics before DescentTime calc", "FlightTime", metrics.FlightTime, "TimeToApogee", metrics.TimeToApogee)
+	// 7. Descent Time (Time from apogee to landing/touchdown)
+	// Requires FlightTime and TimeToApogee
 	if metrics.FlightTime > 0 && metrics.TimeToApogee > 0 && metrics.FlightTime > metrics.TimeToApogee {
 		metrics.DescentTime = metrics.FlightTime - metrics.TimeToApogee
 	} else {
-		log.Warn("Could not reliably calculate DescentTime", "flight_time", metrics.FlightTime, "time_to_apogee", metrics.TimeToApogee)
+		log.Warn("Cannot calculate DescentTime: FlightTime or TimeToApogee is missing or invalid.")
 	}
 
-	// TODO: Implement calculateAverageDescentSpeed
-	// TODO: Implement findLandingLocation (if GPS data becomes available)
-	// TODO: Consider thrust-to-weight, max-Q calculations if relevant data (mass, Cd, air density) is available.
+	log.Debug("Metrics before CoastToApogeeTime calc", "BurnoutTime", metrics.BurnoutTime, "TimeToApogee", metrics.TimeToApogee)
+	// 8. Coast to Apogee Time (Time from burnout to apogee)
+	// Requires BurnoutTime (preferably event-based) and TimeToApogee (preferably event-based or motion-based)
+	if metrics.BurnoutTime > 0 && metrics.TimeToApogee > 0 && metrics.TimeToApogee > metrics.BurnoutTime {
+		metrics.CoastToApogeeTime = metrics.TimeToApogee - metrics.BurnoutTime
+	} else if metrics.BurnoutTime > 0 && metrics.TimeToApogee > 0 {
+		log.Warn("Calculated TimeToApogee is not greater than BurnoutTime, CoastToApogeeTime may be invalid.", "timeToApogee", metrics.TimeToApogee, "burnoutTime", metrics.BurnoutTime)
+	} else {
+		log.Warn("Cannot calculate CoastToApogeeTime: BurnoutTime or TimeToApogee is missing or invalid.")
+	}
 
-	log.Info("Motion metrics calculated", "metrics", fmt.Sprintf("%+v", metrics))
+	// 9. Burnout Altitude (Altitude at motor burnout)
+	// Requires BurnoutTime (preferably event-based) and motion data
+	if metrics.BurnoutTime > 0 {
+		burnoutTimeFromLaunch := metrics.BurnoutTime // This is duration from launch
+		actualBurnoutTimestamp := 0.0
+		if eventsData != nil && launchIdx != -1 { // Get actual launch timestamp if possible
+			launchEventTimeStr := eventsData[launchIdx][1]
+			lt, err := strconv.ParseFloat(launchEventTimeStr, 64)
+			if err == nil {
+				actualBurnoutTimestamp = lt + burnoutTimeFromLaunch
+			}
+		} else if len(motionPoints) > 0 {
+			// Fallback: assume first motion point time is launch time
+			actualBurnoutTimestamp = motionPoints[0].Time + burnoutTimeFromLaunch
+			log.Warn("Using first motion point time as approximate launch time for BurnoutAltitude calculation.")
+		}
+
+		if actualBurnoutTimestamp > 0 {
+			closestPointToBurnout := FindClosestMotionPoint(motionPoints, actualBurnoutTimestamp)
+			if closestPointToBurnout != nil {
+				metrics.BurnoutAltitude = closestPointToBurnout.AltAGL
+			} else {
+				log.Warn("Could not find a motion point close to burnout time to determine BurnoutAltitude.")
+			}
+		} else {
+			log.Warn("Cannot determine actual burnout timestamp for BurnoutAltitude calculation.")
+		}
+	} else {
+		log.Warn("Cannot calculate BurnoutAltitude: BurnoutTime is missing or invalid.")
+	}
+
+	// 10. Landing Velocity/Speed (from motion data, at touchdown)
+	// Requires touchdown event for time, then find closest motion point.
+	if eventsData != nil && touchdownIdx != -1 {
+		touchdownTimeStr := eventsData[touchdownIdx][1]
+		touchdownTime, err := strconv.ParseFloat(touchdownTimeStr, 64)
+		if err == nil {
+			closestPointToTouchdown := FindClosestMotionPoint(motionPoints, touchdownTime)
+			if closestPointToTouchdown != nil {
+				metrics.LandingSpeed = closestPointToTouchdown.VelTot
+			} else {
+				log.Warn("Could not find a motion point close to touchdown time to determine LandingSpeed.")
+			}
+		} else {
+			log.Warn("Could not parse touchdown event time to determine LandingSpeed.", "error", err)
+		}
+	} else if len(motionPoints) > 0 { // Fallback if event data is nil or touchdown event not found
+		lastPoint := motionPoints[len(motionPoints)-1]
+		if lastPoint.AltAGL <= 1.0 { // Consider 'near ground' if altitude is <= 1.0m
+			metrics.LandingSpeed = lastPoint.VelTot
+			log.Info("Calculated LandingSpeed using last motion point near ground level.", "velocity", metrics.LandingSpeed, "altAGL", lastPoint.AltAGL)
+		} else {
+			log.Warn("Cannot calculate LandingSpeed from motion data: Touchdown event not found/eventsData nil, and last motion point not near ground.", "lastPointAlt", lastPoint.AltAGL)
+		}
+	} else {
+		log.Warn("Cannot calculate LandingSpeed: Touchdown event not found or eventsData is nil, and no motion points available.")
+	}
+
+	// If motionPoints are available, use them for point-based metrics which can be more precise
+	// or serve as fallbacks.
+	if len(motionPoints) > 0 {
+		// 5. Apogee Altitude (from motion data if available, more precise)
+		currentMaxAlt := -1.0
+		var apogeeTimeFromMotion float64 = -1
+		for _, p := range motionPoints {
+			if p.AltAGL > currentMaxAlt {
+				currentMaxAlt = p.AltAGL
+				apogeeTimeFromMotion = p.Time // Capture time of max altitude
+			}
+		}
+		if currentMaxAlt != -1.0 {
+			metrics.MaxAltitudeAGL = currentMaxAlt            // Corrected: Use MaxAltitudeAGL
+			if metrics.TimeToApogee == 0 && launchIdx != -1 { // If event-based TimeToApogee wasn't set, use motion data
+				launchTimeFromMotion := 0.0
+				if eventsData != nil && launchIdx != -1 { // get launch time from events if possible
+					launchEventTimeStr := eventsData[launchIdx][1]
+					lt, err := strconv.ParseFloat(launchEventTimeStr, 64)
+					if err == nil {
+						launchTimeFromMotion = lt
+					}
+				} else if len(motionPoints) > 0 {
+					// Fallback: assume first motion point is close to launch if no event data for launch time
+					// This is a rough approximation
+					launchTimeFromMotion = motionPoints[0].Time
+					log.Warn("Using first motion point time as approximate launch time for TimeToApogee calculation from motion data.")
+				}
+				metrics.TimeToApogee = apogeeTimeFromMotion - launchTimeFromMotion
+			}
+			if metrics.TimeAtApogee == 0 { // If event-based TimeAtApogee wasn't set
+				metrics.TimeAtApogee = apogeeTimeFromMotion
+			}
+		} else {
+			log.Warn("Could not determine apogee altitude from motion points.")
+		}
+
+		// 6. Max Speed & Max Acceleration (from motion data)
+		currentMaxSpeed := -1.0
+		currentMaxAccel := -1.0
+		for _, p := range motionPoints {
+			if p.VelTot > currentMaxSpeed {
+				currentMaxSpeed = p.VelTot
+			}
+			if p.AccTot > currentMaxAccel {
+				currentMaxAccel = p.AccTot
+			}
+		}
+		if currentMaxSpeed != -1.0 {
+			metrics.MaxSpeed = currentMaxSpeed
+		}
+		if currentMaxAccel != -1.0 {
+			metrics.MaxAcceleration = currentMaxAccel
+		}
+
+		// 7. Rail Exit Velocity
+		if eventsData != nil && railExitIdx != -1 {
+			railExitTimeStr := eventsData[railExitIdx][1]
+			railExitTime, err := strconv.ParseFloat(railExitTimeStr, 64)
+			if err == nil {
+				closestPoint := FindClosestMotionPoint(motionPoints, railExitTime)
+				if closestPoint != nil {
+					metrics.RailExitVelocity = closestPoint.VelTot
+				}
+			} else {
+				log.Warn("Could not parse rail exit event time.", "error", err)
+			}
+		} else if launchRailLength > 0 { // Fallback using launchRailLength if Rail Exit event is not available
+			for _, p := range motionPoints {
+				if p.AltAGL >= launchRailLength { // Assuming AltAGL is altitude above ground
+					metrics.RailExitVelocity = p.VelTot
+					log.Debug("Calculated rail exit velocity based on launch rail length", "velocity", metrics.RailExitVelocity, "altitude_agl", p.AltAGL, "rail_length", launchRailLength)
+					break
+				}
+			}
+			if metrics.RailExitVelocity == 0 {
+				log.Warn("Could not determine rail exit velocity using launch rail length. Rocket might not have cleared the rail or data is insufficient.")
+			}
+		}
+
+		// 8. Coast to Apogee Time (Time from burnout to apogee)
+		// Requires BurnoutTime (preferably event-based) and TimeToApogee (preferably event-based or motion-based)
+		if metrics.BurnoutTime > 0 && metrics.TimeToApogee > 0 && metrics.TimeToApogee > metrics.BurnoutTime {
+			metrics.CoastToApogeeTime = metrics.TimeToApogee - metrics.BurnoutTime
+		} else if metrics.BurnoutTime > 0 && metrics.TimeToApogee > 0 {
+			log.Warn("Calculated TimeToApogee is not greater than BurnoutTime, CoastToApogeeTime may be invalid.", "timeToApogee", metrics.TimeToApogee, "burnoutTime", metrics.BurnoutTime)
+		} else {
+			log.Warn("Cannot calculate CoastToApogeeTime: BurnoutTime or TimeToApogee is missing or invalid.")
+		}
+
+		// 9. Burnout Altitude (Altitude at motor burnout)
+		// Requires BurnoutTime (preferably event-based) and motion data
+		if metrics.BurnoutTime > 0 {
+			burnoutTimeFromLaunch := metrics.BurnoutTime // This is duration from launch
+			actualBurnoutTimestamp := 0.0
+			if eventsData != nil && launchIdx != -1 { // Get actual launch timestamp if possible
+				launchEventTimeStr := eventsData[launchIdx][1]
+				lt, err := strconv.ParseFloat(launchEventTimeStr, 64)
+				if err == nil {
+					actualBurnoutTimestamp = lt + burnoutTimeFromLaunch
+				}
+			} else if len(motionPoints) > 0 {
+				// Fallback: assume first motion point time is launch time
+				actualBurnoutTimestamp = motionPoints[0].Time + burnoutTimeFromLaunch
+				log.Warn("Using first motion point time as approximate launch time for BurnoutAltitude calculation.")
+			}
+
+			if actualBurnoutTimestamp > 0 {
+				closestPointToBurnout := FindClosestMotionPoint(motionPoints, actualBurnoutTimestamp)
+				if closestPointToBurnout != nil {
+					metrics.BurnoutAltitude = closestPointToBurnout.AltAGL
+				} else {
+					log.Warn("Could not find a motion point close to burnout time to determine BurnoutAltitude.")
+				}
+			} else {
+				log.Warn("Cannot determine actual burnout timestamp for BurnoutAltitude calculation.")
+			}
+		} else {
+			log.Warn("Cannot calculate BurnoutAltitude: BurnoutTime is missing or invalid.")
+		}
+
+		// 10. Landing Velocity/Speed (from motion data, at touchdown)
+		// Requires touchdown event for time, then find closest motion point.
+		if eventsData != nil && touchdownIdx != -1 {
+			touchdownTimeStr := eventsData[touchdownIdx][1]
+			touchdownTime, err := strconv.ParseFloat(touchdownTimeStr, 64)
+			if err == nil {
+				closestPointToTouchdown := FindClosestMotionPoint(motionPoints, touchdownTime)
+				if closestPointToTouchdown != nil {
+					metrics.LandingSpeed = closestPointToTouchdown.VelTot
+				} else {
+					log.Warn("Could not find a motion point close to touchdown time to determine LandingSpeed.")
+				}
+			} else {
+				log.Warn("Could not parse touchdown event time to determine LandingSpeed.", "error", err)
+			}
+		} else if len(motionPoints) > 0 { // Fallback if event data is nil or touchdown event not found
+			lastPoint := motionPoints[len(motionPoints)-1]
+			if lastPoint.AltAGL <= 1.0 { // Consider 'near ground' if altitude is <= 1.0m
+				metrics.LandingSpeed = lastPoint.VelTot
+				log.Info("Calculated LandingSpeed using last motion point near ground level.", "velocity", metrics.LandingSpeed, "altAGL", lastPoint.AltAGL)
+			} else {
+				log.Warn("Cannot calculate LandingSpeed from motion data: Touchdown event not found/eventsData nil, and last motion point not near ground.", "lastPointAlt", lastPoint.AltAGL)
+			}
+		} else {
+			log.Warn("Cannot calculate LandingSpeed: Touchdown event not found or eventsData is nil, and no motion points available.")
+		}
+	} else {
+		log.Warn("Motion points are not available. Point-based metrics (ApogeeAltitude, MaxSpeed, MaxAcceleration, RailExitVelocity (motion-based), CoastToApogeeTime, BurnoutAltitude, LandingSpeed) cannot be calculated.")
+	}
+
+	log.Debug("Calculated motion metrics", "metrics", fmt.Sprintf("%+v", metrics))
 	return metrics
 }
 
@@ -710,8 +909,12 @@ func FindMotionDataIndices(motionHeaders []string) (timeIdx, altitudeIdx, veloci
 	timeIdx, altitudeIdx, velocityIdx, accelIdx = -1, -1, -1, -1 // Initialize to -1 (not found)
 	for i, header := range motionHeaders {
 		switch strings.ToLower(strings.TrimSpace(header)) {
-		case "time (s)":
+		case "time":
 			timeIdx = i
+		case "time (s)":
+			if timeIdx == -1 {
+				timeIdx = i
+			}
 		case "altitude agl (m)":
 			altitudeIdx = i
 		case "total velocity (m/s)":
@@ -1062,7 +1265,15 @@ func LoadSimulationData(recordID string, rm HandlerRecordManager, reportSpecific
 		Weather:          WeatherData{},
 		Stages:           []StageData{},
 		RecoverySystems:  []RecoverySystemData{},
-		AllEvents:        []EventSummary{},
+		MotionData:       []*PlotSimRecord{},
+		MotionHeaders:    []string{},
+		EventsData:       [][]string{},
+		ReportTitle:      "",
+		GenerationDate:   "",
+		MotorData:        []*PlotSimRecord{},
+		MotorHeaders:     []string{},
+		Extensions:       map[string]interface{}{},
+		Assets:           map[string]string{},
 	}
 
 	// Load simulation configuration directly from app config
@@ -1071,11 +1282,6 @@ func LoadSimulationData(recordID string, rm HandlerRecordManager, reportSpecific
 	// Derive RocketName from OpenRocketFile path in app config
 	if appCfg.Engine.Options.OpenRocketFile != "" {
 		rData.RocketName = filepath.Base(appCfg.Engine.Options.OpenRocketFile)
-	}
-
-	// Get MotorName from the app config
-	if appCfg.Engine.Options.MotorDesignation != "" {
-		rData.MotorName = appCfg.Engine.Options.MotorDesignation
 	}
 
 	// Set a default value for LiftoffMassKg if available
@@ -1186,6 +1392,30 @@ func LoadSimulationData(recordID string, rm HandlerRecordManager, reportSpecific
 		}
 	}
 
+	// After loading and parsing data, calculate summaries
+	if rData.MotionData != nil && rData.EventsData != nil {
+		log.Info("Calculating motion metrics...")
+		rData.MotionMetrics = CalculateMotionMetrics(rData.MotionData, rData.MotionHeaders, rData.EventsData, appCfg.Engine.Options.Launchrail.Length, rData.Log)
+		if rData.MotionMetrics.Error != "" {
+			log.Warn("Error calculating motion metrics", "error", rData.MotionMetrics.Error)
+		}
+	} else {
+		log.Warn("Motion data or events data is nil, skipping motion metrics calculation.")
+		if rData.MotionMetrics.Error == "" { // Avoid overwriting specific errors from CalculateMotionMetrics
+			rData.MotionMetrics.Error = "Motion data or events data not available for calculation."
+		}
+	}
+
+	if rData.MotionData != nil { // Assuming motor data is part of general motion data for now
+		log.Info("Calculating motor summary...")
+		// TODO: Verify that calculateMotorSummary correctly uses MotionData for thrust, or if a separate motor data file/source is needed.
+		rData.MotorSummary = calculateMotorSummary(rData.MotionData, rData.MotionHeaders, rData.Log)
+		// Note: MotorSummaryData does not have an 'Error' field currently. Add one if needed.
+	} else {
+		log.Warn("Motion data is nil, skipping motor summary calculation.")
+		// Populate with an explicit error or default message if MotorSummaryData had an Error field
+	}
+
 	assetsDir := filepath.Join(reportSpecificDir, "assets")
 	if err := os.MkdirAll(assetsDir, os.ModePerm); err != nil {
 		log.Error("Failed to create assets directory", "path", assetsDir, "error", err)
@@ -1230,4 +1460,18 @@ func LoadSimulationData(recordID string, rm HandlerRecordManager, reportSpecific
 
 	log.Info("Simulation data loading and basic processing complete", "RecordID", recordID)
 	return rData, nil
+}
+
+// findEventIndex searches for an event by name in the eventsData and returns its index.
+// Assumes event name is in the first column (index 0) of each event row.
+func findEventIndex(eventsData [][]string, eventName string) int {
+	if eventsData == nil {
+		return -1
+	}
+	for i, event := range eventsData {
+		if len(event) > 0 && strings.EqualFold(strings.TrimSpace(event[0]), eventName) {
+			return i
+		}
+	}
+	return -1 // Event not found
 }
