@@ -115,7 +115,7 @@ func (a *AerodynamicSystem) CalculateDrag(entity *states.PhysicsState) types.Vec
 	}
 
 	// Calculate drag coefficient (simplified for now)
-	cd := 0.5 // Typical value for a rocket
+	cd := 0.75 // Higher value for small rockets due to relatively larger surface area and subsonic speeds
 
 	// Calculate drag force magnitude
 	dragMagnitude := 0.5 * atmData.Density * velocity * velocity * refArea * cd

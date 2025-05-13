@@ -2,6 +2,7 @@ package systems_test
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -153,7 +154,17 @@ func TestStorageParasiteSystem_Motion(t *testing.T) {
 
 	records := mock.getRecords()
 	require.Len(t, records, 1, "Expected 1 record")
-	expectedRecord := []string{"1.234567", "100.100000", "10.200000", "1.300000", "100.000000"} // Thrust should be first data point (100)
+
+	// Calculate expected thrust with efficiency factors
+	efficiencyFactor := 0.85 * 0.90 * 0.97 // nozzle * combustion * friction
+	expectedThrust := 100.0 * efficiencyFactor
+	expectedRecord := []string{
+		"1.234567",
+		"100.100000",
+		"10.200000",
+		"1.300000",
+		fmt.Sprintf("%.6f", expectedThrust),
+	}
 	assert.Equal(t, expectedRecord, records[0])
 }
 

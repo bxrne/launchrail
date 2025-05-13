@@ -494,6 +494,42 @@ func (s *Simulation) updateSystems() error {
 
 		// Now add drag force based on current evaluation velocity
 		// This properly adapts the drag for each RK4 evaluation point
+		// Get atmospheric data at current altitude
+		atmData := atmosphere.NewISAModel(&s.config.Engine.Options.Launchsite.Atmosphere.ISAConfiguration).GetAtmosphere(currentEvalPos.Y)
+
+		// Calculate velocity magnitude
+		velocity := math.Sqrt(currentEvalVel.X*currentEvalVel.X + currentEvalVel.Y*currentEvalVel.Y + currentEvalVel.Z*currentEvalVel.Z)
+
+		if velocity > 1e-10 {
+			// Calculate reference area
+			refArea := 0.0
+			if s.rocket.Bodytube != nil {
+				refArea = math.Pi * s.rocket.Bodytube.Radius * s.rocket.Bodytube.Radius
+			}
+
+			// Calculate drag coefficient (simplified)
+			cd := 0.75 // Higher value for small rockets due to relatively larger surface area and subsonic speeds
+
+			// Calculate drag force magnitude
+			dragMagnitude := 0.5 * atmData.Density * velocity * velocity * refArea * cd
+
+			// Calculate drag force direction (opposite to velocity)
+			dragDir := types.Vector3{
+				X: -currentEvalVel.X / velocity,
+				Y: -currentEvalVel.Y / velocity,
+				Z: -currentEvalVel.Z / velocity,
+			}
+
+			// Calculate final drag force
+			dragForce := types.Vector3{
+				X: dragDir.X * dragMagnitude,
+				Y: dragDir.Y * dragMagnitude,
+				Z: dragDir.Z * dragMagnitude,
+			}
+
+			// Add drag force to net force
+			netForceThisStage = netForceThisStage.Add(dragForce)
+		}
 		if s.rocket.Parachute != nil && s.rocket.Parachute.IsDeployed() {
 			// Get velocity magnitude
 			velocityMag := math.Sqrt(currentEvalVel.X*currentEvalVel.X +

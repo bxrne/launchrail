@@ -22,8 +22,8 @@ func createTestMotor() (*components.Motor, *thrustcurves.MotorData) {
 
 	motorData := &thrustcurves.MotorData{
 		Thrust:    thrustData,
-		TotalMass: 10.0, // Initial mass
-		WetMass:   10.0, // Assuming all initial mass is propellant for this test
+		TotalMass: 12.0, // Initial mass (10kg propellant + 2kg casing)
+		WetMass:   10.0, // Propellant mass
 		BurnTime:  2.0,  // 2 second burn
 		AvgThrust: 10.0, // Average thrust
 	}
@@ -51,7 +51,12 @@ func TestNewMotor(t *testing.T) {
 	motor, err := components.NewMotor(ecs.BasicEntity{}, md, logger)
 	require.NoError(t, err)
 	require.NotNil(t, motor)
-	assert.Equal(t, 10.0, motor.GetThrust()) // Initial thrust should be first thrust point
+
+	// Calculate expected thrust with efficiency factors
+	efficiencyFactor := 0.85 * 0.90 * 0.97 // nozzle * combustion * friction
+	expectedThrust := 10.0 * efficiencyFactor
+
+	assert.InDelta(t, motor.GetThrust(), expectedThrust, 0.0001) // Initial thrust should be first thrust point with efficiency factors
 	assert.Equal(t, 2.0, motor.GetMass())
 }
 
@@ -59,17 +64,21 @@ func TestNewMotor(t *testing.T) {
 func TestMotorUpdate(t *testing.T) {
 	motor, _ := createTestMotor()
 
+	// Calculate expected thrust with efficiency factors
+	efficiencyFactor := 0.85 * 0.90 * 0.97 // nozzle * combustion * friction
+	expectedThrust := 10.0 * efficiencyFactor
+
 	// Test initial conditions
-	assert.Equal(t, 10.0, motor.GetThrust())
-	assert.Equal(t, 10.0, motor.GetMass())
+	assert.InDelta(t, motor.GetThrust(), expectedThrust, 0.0001)
+	assert.Equal(t, 12.0, motor.GetMass()) // 10kg propellant + 2kg casing
 
 	// Update with 0.5 second step
 	err := motor.Update(0.5)
 	assert.NoError(t, err)
 
 	// After 0.5s (25% of burn time), mass should be reduced by 25% of propellant mass
-	assert.Equal(t, 10.0, motor.GetThrust())
-	expectedMass := 10.0 - (10.0 * 0.5 / 2.0) // Initial - (PropellantMass * TimeElapsed/BurnTime)
+	assert.InDelta(t, motor.GetThrust(), expectedThrust, 0.0001)
+	expectedMass := 12.0 - (10.0 * 0.5 / 2.0) // Initial - (PropellantMass * TimeElapsed/BurnTime)
 	assert.Equal(t, expectedMass, motor.GetMass())
 	t.Logf("State after first update: %s", motor.GetState())
 
@@ -79,7 +88,7 @@ func TestMotorUpdate(t *testing.T) {
 
 	t.Logf("State after second update: %s", motor.GetState())
 	assert.Equal(t, 0.0, motor.GetThrust())
-	assert.Equal(t, 0.0, motor.GetMass()) // All propellant consumed
+	assert.Equal(t, motor.GetCasingMass(), motor.GetMass()) // Only casing mass remains
 }
 
 // TEST: GIVEN a Motor WHEN Update is called THEN the Motor is updated

@@ -30,6 +30,11 @@ type Motor struct {
 	initialPropellantMass float64
 	casingMass            float64
 	currentPropellantMass float64
+
+	// Efficiency factors
+	nozzleEff     float64 // Nozzle efficiency (typical range 0.85-0.98)
+	combustionEff float64 // Combustion efficiency (typical range 0.90-0.98)
+	frictionEff   float64 // Friction losses (typical range 0.97-0.99)
 }
 
 // NewMotor creates a new motor component from thrust curve data
@@ -77,11 +82,18 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 		initialPropellantMass: initialPropellantMass,
 		casingMass:            casingMass,
 		currentPropellantMass: initialPropellantMass,
+
+		// Set default efficiency factors
+		nozzleEff:     0.85, // 85% nozzle efficiency (lower end of typical range)
+		combustionEff: 0.90, // 90% combustion efficiency (lower end of typical range)
+		frictionEff:   0.97, // 97% friction efficiency (typical losses)
 	}
 
 	// Initialize thrust to first data point if available and burn time > 0
 	if len(m.Thrustcurve) > 0 && m.burnTime > 0 {
-		m.thrust = m.Thrustcurve[0][1]
+		// Apply efficiency factors to initial thrust
+		efficiencyFactor := m.nozzleEff * m.combustionEff * m.frictionEff
+		m.thrust = m.Thrustcurve[0][1] * efficiencyFactor
 	} else {
 		m.thrust = 0
 	}
@@ -168,9 +180,12 @@ func (m *Motor) Update(dt float64) error {
 }
 
 func (m *Motor) interpolateThrust(totalDt float64) float64 {
+	// Combined efficiency
+	efficiencyFactor := m.nozzleEff * m.combustionEff * m.frictionEff // About 0.86
+	
 	// If before burn start, use initial thrust
 	if totalDt <= m.Thrustcurve[0][0] {
-		return m.Thrustcurve[0][1]
+		return m.Thrustcurve[0][1] * efficiencyFactor
 	}
 
 	// If past burn time, return 0
@@ -186,7 +201,7 @@ func (m *Motor) interpolateThrust(totalDt float64) float64 {
 		if totalDt >= t1 && totalDt <= t2 {
 			// Linear interpolation
 			ratio := (totalDt - t1) / (t2 - t1)
-			thrust := thrust1 + (ratio * (thrust2 - thrust1))
+			thrust := (thrust1 + (ratio * (thrust2 - thrust1))) * efficiencyFactor
 			m.logger.Debug("interpolateThrust", "totalDt", totalDt, "t1", t1, "t2", t2, "thrust1", thrust1, "thrust2", thrust2, "thrust", thrust)
 			return thrust
 		}
@@ -194,7 +209,7 @@ func (m *Motor) interpolateThrust(totalDt float64) float64 {
 
 	// If we're between last data point and burn time
 	// Use the last thrust value
-	thrust := m.Thrustcurve[len(m.Thrustcurve)-1][1]
+	thrust := m.Thrustcurve[len(m.Thrustcurve)-1][1] * efficiencyFactor
 	m.logger.Debug("interpolateThrust (last value)", "totalDt", totalDt, "thrust", thrust)
 	return thrust
 }
@@ -241,6 +256,12 @@ func (m *Motor) GetMass() float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.Mass
+}
+
+func (m *Motor) GetCasingMass() float64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.casingMass
 }
 
 func (m *Motor) Type() string {
