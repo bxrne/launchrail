@@ -152,6 +152,10 @@ type ForcesAndMomentsData struct {
 
 // WeatherData holds atmospheric conditions data
 type WeatherData struct {
+	LaunchSiteName        string  // Added
+	Latitude              float64 // Added
+	Longitude             float64 // Added
+	ElevationAMSL         float64 // Added
 	WindSpeed             float64
 	WindDirection         float64
 	WindDirectionCardinal string
@@ -204,6 +208,10 @@ type motionPoint struct {
 
 // 	// Set default values for Weather
 // 	rData.Weather = WeatherData{
+// 		LaunchSiteName:        appCfg.Setup.App.Name, // Added
+// 		Latitude:              appCfg.Engine.Options.Launchsite.Latitude, // Added
+// 		Longitude:             appCfg.Engine.Options.Launchsite.Longitude, // Added
+// 		ElevationAMSL:         appCfg.Engine.Options.Launchsite.Altitude, // Added
 // 		WindSpeed:             3.0,     // Light breeze
 // 		WindDirection:         45.0,    // NE
 // 		WindDirectionCardinal: "NE",    // Cardinal direction
@@ -1289,6 +1297,18 @@ func GenerateReportData(simData *storage.SimulationData, recordID string, rm Han
 	} else {
 		rData.ReportTitle = "Simulation Report"
 	}
+
+	// Populate WeatherData with LaunchSite information from appCfg
+	rData.Weather.LaunchSiteName = appCfg.Setup.App.Name
+	rData.Weather.Latitude = appCfg.Engine.Options.Launchsite.Latitude
+	rData.Weather.Longitude = appCfg.Engine.Options.Launchsite.Longitude
+	rData.Weather.ElevationAMSL = appCfg.Engine.Options.Launchsite.Altitude
+
+	// Keep existing weather data population if any, or ensure they are initialized
+	// For now, assuming other weather fields (WindSpeed, Temp, etc.) are populated elsewhere or are fine as zero values if not set.
+	// If they were meant to be sourced from appCfg.Engine.Options.Launchsite.Atmosphere or similar, that logic would go here.
+	// Based on current WeatherData struct, fields like Temperature, Pressure, Humidity are part of it but not directly in Launchsite struct from config.
+	// These might come from simulation results or a different part of config not yet examined for weather specifics.
 
 	record, err := rm.GetRecord(recordID)
 	if err != nil {

@@ -861,21 +861,21 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 	acceptHeader := c.GetHeader("Accept")
 
 	// If format not specified in query, try to infer from Accept header
-	if format == "" {
+	// If format is specified in query, it takes precedence.
+	if format == "" { // Only infer if not explicitly set by query
 		if strings.Contains(acceptHeader, "application/json") {
 			format = "json"
 		} else if strings.Contains(acceptHeader, "text/html") {
 			format = "html"
-		} else if strings.Contains(acceptHeader, "text/markdown") {
-			format = "markdown"
 		} else {
-			// Default to html if no specific format requested
+			// Default to html if no specific format requested via query or Accept header
 			format = "html"
 		}
 	}
+	// JSON format is handled before the switch.
+	// The switch will now handle "html" or default to an error for other formats.
 
 	h.log.Info("Report requested", "recordID", recordID, "format", format)
-
 	// Get the record to find its specific directory path
 	record, err := h.records.GetRecord(recordID)
 	if err != nil {
@@ -942,7 +942,7 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 
 	// Instantiate the template renderer with the specific assetsDir for this report
 	reportTemplatesDir := filepath.Join(h.AppConfig.Server.StaticDir, "templates", "reports")
-	renderer, err := reporting.NewTemplateRenderer(h.log, reportTemplatesDir, assetsDir)
+	rendrr, err := reporting.NewTemplateRenderer(h.log, reportTemplatesDir, assetsDir)
 	if err != nil {
 		h.log.Error("Failed to create template renderer for report", "recordID", recordID, "error", err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize report renderer"})
@@ -950,46 +950,26 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 	}
 
 	// Generate actual plots using the renderer
-	if err := renderer.GeneratePlots(reportData); err != nil {
+	if err := rendrr.GeneratePlots(reportData); err != nil {
 		h.log.Error("Failed to generate plots for report", "recordID", recordID, "error", err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate report plots"})
 		return
 	}
 
-	// Render the main report template (e.g., report.md.tmpl) to markdown content
-	markdownContent, err := renderer.RenderToMarkdown(reportData, "report.md.tmpl")
-	if err != nil {
-		h.log.Error("Failed to render report to markdown", "recordID", recordID, "error", err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to render report"})
-		return
-	}
-	h.log.Info("Successfully rendered base report to markdown content", "recordID", recordID, "contentLength", len(markdownContent))
-
-	// Define the path for the markdown file within the specific report's directory
-	mdReportPath := filepath.Join(reportDir, "index.md")
-
-	// Write the rendered Markdown to index.md
-	h.log.Info("Writing Markdown report to file", "path", mdReportPath)
-	if err := os.WriteFile(mdReportPath, []byte(markdownContent), 0644); err != nil {
-		h.log.Error("Failed to write report file", "path", mdReportPath, "error", err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to save report"})
-		return
-	}
-	h.log.Info("Successfully saved Markdown report file", "path", mdReportPath)
-
-	// Specific handling for HTML and Markdown formats will be added in the next step
+	// Specific handling for HTML format
 	switch format {
-	case "markdown":
-		// Serve the generated markdown file
-		c.Header("Content-Type", "text/markdown; charset=utf-8")
-		c.File(mdReportPath)
 	case "html":
-		// Convert markdown to HTML using the new helper
-		htmlContent := reporting.ConvertMarkdownToSimpleHTML(markdownContent, recordID)
+		// Render HTML report directly
+		htmlString, htmlErr := rendrr.RenderToHTML(reportData, "report.html.tmpl")
+		if htmlErr != nil {
+			h.log.Error("Failed to render HTML report", "recordID", recordID, "error", htmlErr)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to render HTML report"})
+			return
+		}
 		// Define path for the HTML file
 		htmlPath := filepath.Join(reportDir, "index.html")
 		// Write HTML to file
-		if err := os.WriteFile(htmlPath, []byte(htmlContent), 0644); err != nil {
+		if err := os.WriteFile(htmlPath, []byte(htmlString), 0644); err != nil {
 			h.log.Error("Failed to write HTML report file", "path", htmlPath, "error", err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to save HTML report"})
 			return
@@ -998,10 +978,9 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		c.File(htmlPath)
 	default:
-		// If format is not explicitly handled or unknown, default to serving markdown
-		h.log.Warn("Unknown report format requested, defaulting to markdown", "format", format, "recordID", recordID)
-		c.Header("Content-Type", "text/markdown; charset=utf-8")
-		c.File(mdReportPath)
+		// If format is not "json" (handled earlier) and not "html", it's unsupported.
+		h.log.Warn("Unsupported report format requested", "format", format, "recordID", recordID)
+		c.AbortWithStatusJSON(http.StatusUnsupportedMediaType, gin.H{"error": fmt.Sprintf("Unsupported report format: %s. Supported formats are: json, html.", format)})
 	}
 }
 

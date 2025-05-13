@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -86,6 +87,21 @@ func NewTemplateRenderer(log *logf.Logger, templatesDir, assetsDir string) (*Tem
 		},
 		"title": func(input string) string {
 			return cases.Title(language.English).String(input)
+		},
+		"default": func(def interface{}, val interface{}) interface{} {
+			if val == nil {
+				return def
+			}
+			// If val is a string and it's empty, return def
+			if s, ok := val.(string); ok && s == "" {
+				return def
+			}
+			// If val is a pointer and it's nil, return def
+			v := reflect.ValueOf(val)
+			if v.Kind() == reflect.Ptr && v.IsNil() {
+				return def
+			}
+			return val // Otherwise, return the original value
 		},
 		// Add other general-purpose functions if needed
 	}

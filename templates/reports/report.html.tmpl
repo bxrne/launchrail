@@ -214,18 +214,18 @@
 
         <section id="launch-conditions">
             <h2>Launch Conditions</h2>
-            {{if .Extensions.LaunchSiteName}}
+            {{if .Weather}}
                 <table>
                     <tbody>
-                        <tr><td>Launch Site</td><td>{{.Extensions.LaunchSiteName}}</td></tr>
-                        {{with .Extensions.LaunchLatitude}}<tr><td>Latitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
-                        {{with .Extensions.LaunchLongitude}}<tr><td>Longitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
-                        {{with .Extensions.LaunchElevation}}<tr><td>Elevation (AMSL)</td><td>{{printf "%.1f" .}} m</td></tr>{{end}}
-                        {{with .Extensions.Temperature}}<tr><td>Temperature</td><td>{{printf "%.1f" .}} °C</td></tr>{{end}}
-                        {{with .Extensions.Pressure}}<tr><td>Pressure</td><td>{{printf "%.1f" .}} Pa</td></tr>{{end}}
-                        {{with .Extensions.Humidity}}<tr><td>Humidity</td><td>{{printf "%.1f" .}} %</td></tr>{{end}}
-                        {{with .Extensions.WindSpeed}}<tr><td>Wind Speed</td><td>{{printf "%.1f" .}} m/s</td></tr>{{end}}
-                        {{with .Extensions.WindDirection}}<tr><td>Wind Direction (from)</td><td>{{printf "%.1f" .}}°</td></tr>{{end}}
+                        <tr><td>Launch Site</td><td>{{.Weather.LaunchSiteName | default "N/A"}}</td></tr>
+                        {{with .Weather.Latitude}}<tr><td>Latitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
+                        {{with .Weather.Longitude}}<tr><td>Longitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
+                        {{with .Weather.ElevationAMSL}}<tr><td>Elevation (AMSL)</td><td>{{printf "%.1f" .}} m</td></tr>{{end}}
+                        {{with .Weather.Temperature}}<tr><td>Temperature</td><td>{{printf "%.1f" .}} °C</td></tr>{{end}}
+                        {{with .Weather.Pressure}}<tr><td>Pressure</td><td>{{printf "%.1f" .}} Pa</td></tr>{{end}}
+                        {{with .Weather.Humidity}}<tr><td>Humidity</td><td>{{printf "%.1f" .}} %</td></tr>{{end}}
+                        {{with .Weather.WindSpeed}}<tr><td>Wind Speed</td><td>{{printf "%.1f" .}} m/s</td></tr>{{end}}
+                        {{with .Weather.WindDirection}}<tr><td>Wind Direction (from)</td><td>{{printf "%.1f" .}}°</td></tr>{{end}}
                     </tbody>
                 </table>
             {{else}}
@@ -235,8 +235,8 @@
 
         <section id="rocket-configuration">
             <h2>Rocket Configuration</h2>
-            <p><strong>Rocket:</strong> {{.Rocket.Name | default "N/A"}}</p>
-            <p><strong>Motor:</strong> {{.Motor.Designation | default "N/A"}}</p>
+            <p><strong>Rocket:</strong> {{.RocketName | default "N/A"}}</p>
+            <p><strong>Motor:</strong> {{.MotorName | default "N/A"}}</p>
             {{/* Add more configuration details if available */}}
         </section>
 
