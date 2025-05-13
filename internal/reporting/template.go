@@ -62,7 +62,7 @@ func NewTemplateRenderer(log *logf.Logger, templatesDir, assetsDir string) (*Tem
 		"embedSVG": func(plotFileName string, altText string) (template.HTML, error) {
 			if plotFileName == "" {
 				log.Warn("embedSVG called with empty plotFileName")
-				return "<!-- embedSVG: plotFileName was empty -->", nil
+				return template.HTML(fmt.Sprintf("<div class='placeholder-svg' style='background:#f5f5f5;border:1px dashed #ccc;padding:20px;text-align:center;'>%s data not available</div>", altText)), nil
 			}
 			// assetsDir is the absolute path to the specific report's assets directory
 			absolutePlotPath := filepath.Join(assetsDir, plotFileName)
@@ -71,8 +71,8 @@ func NewTemplateRenderer(log *logf.Logger, templatesDir, assetsDir string) (*Tem
 			content, err := os.ReadFile(absolutePlotPath)
 			if err != nil {
 				log.Error("embedSVG failed to read file", "path", absolutePlotPath, "error", err)
-				// Return a visible error in the report instead of empty or broken image
-				return template.HTML(fmt.Sprintf("<div style='color:red; border:1px solid red; padding:10px;'>Error embedding SVG '%s': %s (path: %s)</div>", altText, err.Error(), plotFileName)), nil
+				// Create a nicer placeholder for missing chart
+				return template.HTML(fmt.Sprintf("<div class='placeholder-svg' style='background:#f5f5f5;border:1px dashed #ccc;padding:20px;text-align:center;'>%s chart unavailable</div>", altText)), nil
 			}
 			return template.HTML(content), nil
 		},
@@ -515,9 +515,28 @@ func (tr *TemplateRenderer) generateAccelerationVsTimePlot(data *ReportData, out
 // GenerateThrustVsTimePlot generates a plot for thrust vs. time, if motor data is available.
 func (tr *TemplateRenderer) GenerateThrustVsTimePlot(data *ReportData, outputPath string) error {
 	// Check if MotorData is present and has entries
-	if len(data.MotorData) == 0 {
+	if len(data.MotorData) == 0 || data.MotorSummary.MaxThrust == 0 {
 		tr.log.Warn("No motor data available for thrust vs. time plot", "outputPath", outputPath)
-		// Return a placeholder SVG or an error, depending on the desired behavior
+		// Create a placeholder SVG with basic information
+		p := plot.New()
+		p.Title.Text = "Thrust vs. Time (No Data Available)"
+		p.X.Label.Text = LabelTimeSeconds
+		p.Y.Label.Text = "Thrust (N)"
+		p.Add(plotter.NewGrid())
+
+		// Add a text annotation about missing data
+		label, err := plotter.NewLabels(plotter.XYLabels{
+			XYs:    []plotter.XY{{X: 0.5, Y: 0.5}},
+			Labels: []string{"Motor thrust data not available"},
+		})
+		if err == nil {
+			p.Add(label)
+		}
+
+		if err := p.Save(6*vg.Inch, 4*vg.Inch, outputPath); err != nil {
+			return fmt.Errorf(ErrSavePlot, err)
+		}
+		tr.log.Info("Generated placeholder thrust vs time plot", "path", outputPath)
 		return nil
 	}
 
