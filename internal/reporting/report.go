@@ -120,7 +120,10 @@ type ReportData struct {
 	Log              *logf.Logger `json:"-"` // Exclude logger from JSON
 	ReportTitle      string
 	GenerationDate   string
-	// Add other relevant data
+	// Extended fields for templates and flexible data
+	Extensions map[string]interface{} `json:"extensions,omitempty"`
+	// Collection of all assets (SVG plots, etc.)
+	Assets map[string]string `json:"assets,omitempty"`
 }
 
 // parseSimData parses raw CSV data into a slice of plotSimRecord and headers.
@@ -198,8 +201,14 @@ func parseSimData(log *logf.Logger, csvData []byte, delimiter string) ([]*plotSi
 	return records, headers, nil
 }
 
+// HandlerRecordManager defines the interface required for record management in reports.
+type HandlerRecordManager interface {
+	GetRecord(hash string) (*storage.Record, error)
+	GetStorageDir() string
+}
+
 // LoadSimulationData orchestrates loading all necessary data for a report.
-func LoadSimulationData(recordID string, rm *storage.RecordManager, reportSpecificDir string, appCfg *config.Config) (*ReportData, error) {
+func LoadSimulationData(recordID string, rm HandlerRecordManager, reportSpecificDir string, appCfg *config.Config) (*ReportData, error) {
 	log := logger.GetLogger(appCfg.Setup.Logging.Level)
 	if log == nil {
 		return nil, fmt.Errorf("failed to initialize logger: logger.GetLogger returned nil")
@@ -261,21 +270,38 @@ func LoadSimulationData(recordID string, rm *storage.RecordManager, reportSpecif
 	}
 	// It's crucial to close the record's stores when done to release file handles.
 	// Since LoadSimulationData returns ReportData which might be used later, closing here is tricky.
-	// This responsibility might need to be handled by the caller of LoadSimulationData after report generation is complete.
-	// For now, we will defer a close, but this might be too early if ReportData is used externally for a long time.
-	// Consider if the *storage.Record itself should be part of ReportData if long-lived access to stores is needed.
+	// If the record's storage fields are nil, we don't need to close anything
 	defer func() {
-		if err := record.Close(); err != nil {
-			log.Warn("Failed to close record stores after loading data", "recordID", recordID, "error", err)
+		// Safely close the record if it has valid storage fields
+		if record.Motion != nil || record.Events != nil || record.Dynamics != nil {
+			if err := record.Close(); err != nil {
+				log.Warn("Failed to close record stores after loading data", "recordID", recordID, "error", err)
+			}
+		} else {
+			log.Debug("Record has no active storage fields to close", "recordID", recordID)
 		}
 	}()
 
-	// Load motion data
-	motionFilePath := record.Motion.GetFilePath()
+	// Load motion data - safely handle potentially nil Motion field
+	motionFilePath := filepath.Join(reportSpecificDir, "motion.csv")
+	if record.Motion != nil {
+		// Use the storage object if available
+		motionFilePath = record.Motion.GetFilePath()
+	}
+
+	// Read the motion data file directly
 	motionDataCSV, err := os.ReadFile(motionFilePath)
 	if err != nil {
-		log.Warn("Could not load motion data", "filename", motionFilePath, "error", err)
-	} else {
+		// Try alternative file name case (MOTION.csv)
+		motionFilePath = filepath.Join(reportSpecificDir, "MOTION.csv")
+		motionDataCSV, err = os.ReadFile(motionFilePath)
+		if err != nil {
+			log.Warn("Could not load motion data from any standard location", "basePath", reportSpecificDir, "error", err)
+		}
+	}
+
+	// If we successfully loaded motion data, process it
+	if err == nil {
 		motionDataParsed, motionHeaders, err := parseSimData(log, motionDataCSV, ",")
 		if err != nil {
 			log.Warn("Error parsing motion data", "filename", motionFilePath, "error", err)
@@ -286,12 +312,26 @@ func LoadSimulationData(recordID string, rm *storage.RecordManager, reportSpecif
 		}
 	}
 
-	// Load events data
-	eventsFilePath := record.Events.GetFilePath()
+	// Load events data - safely handle potentially nil Events field
+	eventsFilePath := filepath.Join(reportSpecificDir, "events.csv")
+	if record.Events != nil {
+		// Use the storage object if available
+		eventsFilePath = record.Events.GetFilePath()
+	}
+
+	// Read the events data file directly
 	eventsDataCSV, err := os.ReadFile(eventsFilePath)
 	if err != nil {
-		log.Warn("Could not load events data", "filename", eventsFilePath, "error", err)
-	} else {
+		// Try alternative file name case (EVENTS.csv)
+		eventsFilePath = filepath.Join(reportSpecificDir, "EVENTS.csv")
+		eventsDataCSV, err = os.ReadFile(eventsFilePath)
+		if err != nil {
+			log.Warn("Could not load events data from any standard location", "basePath", reportSpecificDir, "error", err)
+		}
+	}
+
+	// If we successfully loaded events data, process it
+	if err == nil {
 		reader := csv.NewReader(bytes.NewReader(eventsDataCSV))
 		reader.Comma = ','
 		rawEventsData, err := reader.ReadAll()

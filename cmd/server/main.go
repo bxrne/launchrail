@@ -19,6 +19,7 @@ import (
 	"github.com/bxrne/launchrail/internal/plugin"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/internal/utils"
 	"github.com/bxrne/launchrail/templates/pages"
 	"github.com/gin-gonic/gin"
 	"github.com/zerodha/logf"
@@ -143,37 +144,37 @@ func configFromCtx(c *gin.Context, currentCfg *config.Config, log *logf.Logger) 
 	}
 
 	// Parse numeric fields
-	launchrailLength, err := parseFloat(launchrailLengthStr, "launchrail-length")
+	launchrailLength, err := utils.ParseFloat(launchrailLengthStr, "launchrail-length")
 	checkParse(err)
-	launchrailAngle, err := parseFloat(launchrailAngleStr, "launchrail-angle")
+	launchrailAngle, err := utils.ParseFloat(launchrailAngleStr, "launchrail-angle")
 	checkParse(err)
-	launchrailOrientation, err := parseFloat(launchrailOrientationStr, "launchrail-orientation")
+	launchrailOrientation, err := utils.ParseFloat(launchrailOrientationStr, "launchrail-orientation")
 	checkParse(err)
-	latitude, err := parseFloat(latitudeStr, "latitude")
+	latitude, err := utils.ParseFloat(latitudeStr, "latitude")
 	checkParse(err)
-	longitude, err := parseFloat(longitudeStr, "longitude")
+	longitude, err := utils.ParseFloat(longitudeStr, "longitude")
 	checkParse(err)
-	altitude, err := parseFloat(altitudeStr, "altitude")
+	altitude, err := utils.ParseFloat(altitudeStr, "altitude")
 	checkParse(err)
-	simulationStep, err := parseFloat(simulationStepStr, "simulation-step")
+	simulationStep, err := utils.ParseFloat(simulationStepStr, "simulation-step")
 	checkParse(err)
-	maxTime, err := parseFloat(maxTimeStr, "max-time")
+	maxTime, err := utils.ParseFloat(maxTimeStr, "max-time")
 	checkParse(err)
-	groundTolerance, err := parseFloat(groundToleranceStr, "ground-tolerance")
+	groundTolerance, err := utils.ParseFloat(groundToleranceStr, "ground-tolerance")
 	checkParse(err)
-	specificGasConstant, err := parseFloat(specificGasConstantStr, "specific-gas-constant")
+	specificGasConstant, err := utils.ParseFloat(specificGasConstantStr, "specific-gas-constant")
 	checkParse(err)
-	gravitationalAccel, err := parseFloat(gravitationalAccelStr, "gravitational-accel")
+	gravitationalAccel, err := utils.ParseFloat(gravitationalAccelStr, "gravitational-accel")
 	checkParse(err)
-	seaLevelDensity, err := parseFloat(seaLevelDensityStr, "sea-level-density")
+	seaLevelDensity, err := utils.ParseFloat(seaLevelDensityStr, "sea-level-density")
 	checkParse(err)
-	seaLevelTemperature, err := parseFloat(seaLevelTemperatureStr, "sea-level-temperature")
+	seaLevelTemperature, err := utils.ParseFloat(seaLevelTemperatureStr, "sea-level-temperature")
 	checkParse(err)
-	seaLevelPressure, err := parseFloat(seaLevelPressureStr, "sea-level-pressure")
+	seaLevelPressure, err := utils.ParseFloat(seaLevelPressureStr, "sea-level-pressure")
 	checkParse(err)
-	ratioSpecificHeats, err := parseFloat(ratioSpecificHeatsStr, "ratio-specific-heats")
+	ratioSpecificHeats, err := utils.ParseFloat(ratioSpecificHeatsStr, "ratio-specific-heats")
 	checkParse(err)
-	temperatureLapseRate, err := parseFloat(temperatureLapseRateStr, "temperature-lapse-rate")
+	temperatureLapseRate, err := utils.ParseFloat(temperatureLapseRateStr, "temperature-lapse-rate")
 	checkParse(err)
 
 	// Return the first parsing error encountered
@@ -374,7 +375,15 @@ func main() {
 	apiVersion := fmt.Sprintf("/api/v%s", majorVersion)
 	api := r.Group(apiVersion)
 	{
-		api.POST("/run", dataHandler.handleSimRun) // handleSimRun uses dataHandler.records
+		api.POST("/run", func(c *gin.Context) {
+			// Type assertion to get the RecordManager from the interface
+			recordMgr, ok := dataHandler.records.(*storage.RecordManager)
+			if !ok {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid record manager type"})
+				return
+			}
+			handleSimRunRequest(c, recordMgr, dataHandler.Cfg, dataHandler.log)
+		}) // Use our handleSimRunRequest function
 		api.GET("/data", dataHandler.ListRecordsAPI)
 		api.GET("/explore/:hash", dataHandler.GetExplorerData)
 		api.GET("/spec", func(c *gin.Context) {
@@ -443,8 +452,8 @@ func main() {
 		}
 
 		pageStr := c.Query("page")
-		page, _ := parseInt(pageStr, "page") // Ignore error, check value instead
-		if page < 1 {                        // Default to page 1 if not specified, zero, negative, or parse error
+		page, _ := utils.ParseInt(pageStr, "page") // Ignore error, check value instead
+		if page < 1 {                              // Default to page 1 if not specified, zero, negative, or parse error
 			page = 1
 		}
 
@@ -519,24 +528,24 @@ func main() {
 	}
 }
 
-// handleSimRun handles API requests to start simulations (now a method of DataHandler)
-func (h *DataHandler) handleSimRun(c *gin.Context) {
-	h.log.Info("handleSimRun invoked", "time", time.Now().Format(time.RFC3339), "remote_addr", c.ClientIP())
+// handleSimRunRequest handles API requests to start simulations as a standalone function
+func handleSimRunRequest(c *gin.Context, recordManager *storage.RecordManager, cfg *config.Config, log *logf.Logger) {
+	log.Info("Simulation run requested", "time", time.Now().Format(time.RFC3339), "remote_addr", c.ClientIP())
 
-	// Pass the handler's config (h.Cfg) to configFromCtx
-	simConfig, err := configFromCtx(c, h.Cfg, h.log)
+	// Parse the form data into a simulation config
+	simConfig, err := configFromCtx(c, cfg, log)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Use the existing record manager from the DataHandler instance (h.records)
-	if err := runSim(simConfig, h.records.(*storage.RecordManager), h.log); err != nil {
+	// Run the simulation
+	if err := runSim(simConfig, recordManager, log); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusAccepted, gin.H{"message": "Simulation complet"})
+	c.JSON(http.StatusAccepted, gin.H{"message": "Simulation complete"})
 }
 
 // Deprecated: Use plot_transformer.TransformRowsToFloat64 instead.
@@ -547,3 +556,6 @@ func convertToFloat64(data [][]string) [][]float64 {
 func calculateTotalPages(total int, perPage int) int {
 	return int(math.Ceil(float64(total) / float64(perPage)))
 }
+
+// These functions are already defined in handlers.go
+// Use the versions from there or refactor into a utility package

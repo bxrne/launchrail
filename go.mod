@@ -4,10 +4,13 @@ go 1.23.1
 
 require (
 	github.com/a-h/templ v0.3.865
+	github.com/microcosm-cc/bluemonday v1.0.27
+	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/spf13/viper v1.20.1
 )
 
 require (
+	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/bytedance/sonic v1.12.6 // indirect
 	github.com/bytedance/sonic/loader v0.2.1 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
@@ -23,6 +26,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/goccy/go-json v0.10.4 // indirect
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
+	github.com/gorilla/css v1.0.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect

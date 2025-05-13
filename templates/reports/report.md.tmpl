@@ -1,132 +1,128 @@
 # Simulation Report: {{.RecordID}}
 
 Version: {{.Version}}
+Generated: {{.GenerationDate}}
 
-## Summary
+## Executive Summary
 
-* Apogee: {{printf "%.1f" .MotionMetrics.ApogeeMeters}} meters
-* Max Velocity: {{printf "%.1f" .MotionMetrics.MaxVelocityMPS}} m/s
-* Max Acceleration: {{printf "%.1f" .MotionMetrics.MaxAccelerationMPS2}} m/s²
-* Total Flight Time: {{printf "%.1f" .MotionMetrics.TotalFlightTimeSec}} seconds
-* Landing Velocity: {{printf "%.1f" .MotionMetrics.LandingVelocityMPS}} m/s
-
-## Flight Summary
-
-| Metric              | Value    |
-| ------------------- | -------- |
-| Apogee              | {{printf "%.1f" .MotionMetrics.ApogeeMeters}} meters |
-| Max Velocity        | {{printf "%.1f" .MotionMetrics.MaxVelocityMPS}} m/s |
-| Max Acceleration    | {{printf "%.1f" .MotionMetrics.MaxAccelerationMPS2}} m/s² |
-| Total Flight Time   | {{printf "%.1f" .MotionMetrics.TotalFlightTimeSec}} seconds |
-| Landing Velocity    | {{printf "%.1f" .MotionMetrics.LandingVelocityMPS}} m/s |
-
-## Event Summaries
-
-{{if .MotorSummary.HasMotorEvents}}
-### Motor Summary
-| Event          | Time (s) |
-| -------------- | -------- |
-| Ignition       | {{printf "%.1f" .MotorSummary.IgnitionTimeSec}} |
-| Burnout        | {{printf "%.1f" .MotorSummary.BurnoutTimeSec}} |
-| Burn Duration  | {{printf "%.1f" .MotorSummary.BurnDurationSec}} |
-{{else}}
-### Motor Summary
-*No motor events recorded.*
-{{end}}
-
-{{if .ParachuteSummary.HasParachuteEvents}}
-### Parachute Summary
-| Event Name                  | Deployment Time (s) | Deployment Altitude (m) | Time Since Liftoff (s) |
-| --------------------------- | ------------------- | ----------------------- | ---------------------- |
-{{ range .ParachuteSummary.Events }}| {{ .Name }} | {{printf "%.1f" .DeploymentTimeSec}} | {{printf "%.1f" .DeploymentAltitudeMeters}} | {{printf "%.1f" .TimeToDeploySec}} |
-{{ end }}{{else}}
-### Parachute Summary
-*No parachute deployment events recorded.*
-{{end}}
-
-### Phase Summary
-| Event          | Time (s) |
-| -------------- | -------- |
-{{if .PhaseSummary.HasLiftoffEvent}}| Liftoff        | {{printf "%.1f" .PhaseSummary.LiftoffTimeSec}} |
-{{end}}{{if .MotorSummary.HasMotorEvents}}| Coast Start    | {{printf "%.1f" .PhaseSummary.CoastStartTimeSec}} |
-{{end}}{{if .PhaseSummary.HasApogeeEvent}}| Apogee         | {{printf "%.1f" .PhaseSummary.ApogeeTimeSec}} |
-{{end}}{{if .ParachuteSummary.HasParachuteEvents}}| Coast End      | {{printf "%.1f" .PhaseSummary.CoastEndTimeSec}} |
-{{end}}{{if .PhaseSummary.HasLandingEvent}}| Landing        | {{printf "%.1f" .PhaseSummary.LandingTimeSec}} |
-{{end}}{{if .MotorSummary.HasMotorEvents}}
-| Coast Duration | {{printf "%.1f" .PhaseSummary.CoastDurationSec}} |
-{{end}}
-
-## Plots & Data
-
-### Detailed Telemetry Plots (SVG)
-{{range $filename, $filepath := .Assets}}
-![{{ $filename }}]({{ $filepath }})
-{{end}}
-
-## Atmospheric Conditions
-
-| Parameter            | Value |
-| -------------------- | ----- |
-| Launch Site          | {{.LaunchSiteName}} |
-| Latitude             | {{printf "%.4f" .LaunchLatitude}}° |
-| Longitude            | {{printf "%.4f" .LaunchLongitude}}° |
-| Elevation (AMSL)     | {{printf "%.1f" .LaunchElevation}} m |
-| Temperature          | {{printf "%.1f" .Temperature}} °C |
-| Pressure             | {{printf "%.1f" .Pressure}} Pa |
-| Humidity             | {{printf "%.1f" .Humidity}} % |
-| Wind Speed           | {{printf "%.1f" .WindSpeed}} m/s |
-| Wind Direction (from)| {{printf "%.1f" .WindDirection}}° |
-
-![]({{.AtmospherePlotPath}})
+| Key Metric          | Value     |
+| ------------------- | --------- |
+| Maximum Altitude    | {{printf "%.1f" .MotionMetrics.MaxAltitude}} meters |
+| Maximum Velocity    | {{printf "%.1f" .MotionMetrics.MaxVelocity}} m/s |
+| Maximum Acceleration (Y) | {{printf "%.1f" .MotionMetrics.MaxAccelerationY}} m/s² |
+| Maximum G-Force     | {{printf "%.1f" .MotionMetrics.MaxGForce}} G |
+| Apogee Time         | {{printf "%.1f" .MotionMetrics.ApogeeTimeSec}} seconds |
+| Total Flight Time   | {{printf "%.1f" .MotionMetrics.FlightTimeSec}} seconds |
+| Landing Velocity    | {{printf "%.1f" .MotionMetrics.GroundHitVel}} m/s |
 
 ## Motor Performance
 
-![]({{.ThrustPlotPath}})
+| Metric          | Value     |
+| --------------- | --------- |
+| Burn Time       | {{printf "%.2f" .MotorSummary.BurnTime}} seconds |
+| Peak Thrust     | {{printf "%.2f" .MotorSummary.PeakThrust}} N |
+| Average Thrust  | {{printf "%.2f" .MotorSummary.AverageThrust}} N |
+| Total Impulse   | {{printf "%.2f" .MotorSummary.TotalImpulse}} Ns |
 
-## Flight Trajectory
+## Recovery Systems
 
-![]({{.TrajectoryPlotPath}})
+{{if .RecoverySystems}}
+| Type            | Deployment Time (s) | Descent Rate (m/s) |
+| --------------- | ------------------- | ------------------ |
+{{range .RecoverySystems}}| {{.Type}} | {{printf "%.2f" .Deployment}} | {{printf "%.2f" .DescentRate}} |
+{{end}}
+{{else}}
+*No recovery systems data available.*
+{{end}}
 
-## Flight Dynamics
+## Flight Phases
 
-![]({{.DynamicsPlotPath}})
+| Phase           | Time (s)  | Altitude (m) |
+| --------------- | --------- | ------------ |
+| Apogee          | {{printf "%.2f" .PhaseSummary.ApogeeTimeSec}} | {{printf "%.2f" .PhaseSummary.MaxAltitudeM}} |
+
+## Telemetry Plots
+
+### Altitude vs Time
+![Altitude vs Time]({{.Plots.altitude_vs_time}})
+
+### Velocity vs Time
+![Velocity vs Time]({{.Plots.velocity_vs_time}})
+
+### Acceleration vs Time
+![Acceleration vs Time]({{.Plots.acceleration_vs_time}})
+
+{{if .Plots.thrust_vs_time}}
+### Thrust vs Time
+![Thrust vs Time]({{.Plots.thrust_vs_time}})
+{{end}}
+
+## Launch Conditions
+
+{{if .Extensions.LaunchSiteName}}
+| Parameter            | Value |
+| -------------------- | ----- |
+| Launch Site          | {{.Extensions.LaunchSiteName}} |
+{{if .Extensions.LaunchLatitude}}| Latitude             | {{printf "%.4f" .Extensions.LaunchLatitude}}° |{{end}}
+{{if .Extensions.LaunchLongitude}}| Longitude            | {{printf "%.4f" .Extensions.LaunchLongitude}}° |{{end}}
+{{if .Extensions.LaunchElevation}}| Elevation (AMSL)     | {{printf "%.1f" .Extensions.LaunchElevation}} m |{{end}}
+{{if .Extensions.Temperature}}| Temperature          | {{printf "%.1f" .Extensions.Temperature}} °C |{{end}}
+{{if .Extensions.Pressure}}| Pressure             | {{printf "%.1f" .Extensions.Pressure}} Pa |{{end}}
+{{if .Extensions.Humidity}}| Humidity             | {{printf "%.1f" .Extensions.Humidity}} % |{{end}}
+{{if .Extensions.WindSpeed}}| Wind Speed           | {{printf "%.1f" .Extensions.WindSpeed}} m/s |{{end}}
+{{if .Extensions.WindDirection}}| Wind Direction (from)| {{printf "%.1f" .Extensions.WindDirection}}° |{{end}}
+{{else}}
+*Launch condition data not available.*
+{{end}}
+
+{{if .Extensions.AtmospherePlotPath}}
+![Atmosphere Conditions]({{.Extensions.AtmospherePlotPath}})
+{{end}}
+
+{{if .Extensions.TrajectoryPlotPath}}
+## 3D Flight Trajectory
+![Flight Trajectory]({{.Extensions.TrajectoryPlotPath}})
+{{end}}
 
 ## Additional Analysis
 
-{{if .PressureAltitudePlotPath}}
+{{if .Extensions.PressureAltitudePlotPath}}
 ### Pressure vs. Altitude
-![Pressure vs. Altitude Plot]({{.PressureAltitudePlotPath}})
-{{else}}
-*Pressure vs. Altitude plot not available.*
+![Pressure vs. Altitude Plot]({{.Extensions.PressureAltitudePlotPath}})
 {{end}}
 
-{{if .TWRPlotPath}}
+{{if .Extensions.TWRPlotPath}}
 ### Thrust-to-Weight Ratio
-![Thrust-to-Weight Ratio Plot]({{.TWRPlotPath}})
-{{else}}
-*Thrust-to-Weight Ratio plot not available.*
+![Thrust-to-Weight Ratio Plot]({{.Extensions.TWRPlotPath}})
 {{end}}
 
-{{if .GForcePlotPath}}
+{{if .Extensions.GForcePlotPath}}
 ### G-Force Profile
-![G-Force Profile Plot]({{.GForcePlotPath}})
-{{else}}
-*G-Force Profile plot not available.*
+![G-Force Profile Plot]({{.Extensions.GForcePlotPath}})
 {{end}}
 
+{{if .Extensions.GPSMapImagePath}}
 ## GPS Landing Map
-
-{{if .GPSMapImagePath}}
-![Landing Site Map]({{.GPSMapImagePath}})
+![Landing Site Map]({{.Extensions.GPSMapImagePath}})
 *Estimated landing coordinates and radius.*
-{{else}}
-*GPS Map data not available or generation failed.*
 {{end}}
 
+{{if or .Extensions.LandingLatitude .Extensions.LandingLongitude .Extensions.LandingAltitude}}
 ## Landing Information
 
-- Latitude: {{.LandingLatitude}}
-- Longitude: {{.LandingLongitude}}
-- Altitude: {{.LandingAltitude}} meters
-- Velocity: {{.LandingVelocityMPS}} m/s
-- Time: {{.LandingTime}} seconds
+{{if .Extensions.LandingLatitude}}- Latitude: {{.Extensions.LandingLatitude}}{{end}}
+{{if .Extensions.LandingLongitude}}- Longitude: {{.Extensions.LandingLongitude}}{{end}}
+{{if .Extensions.LandingAltitude}}- Altitude: {{.Extensions.LandingAltitude}} meters{{end}}
+{{if .Extensions.LandingVelocityMPS}}- Velocity: {{.Extensions.LandingVelocityMPS}} m/s{{end}}
+{{if .Extensions.LandingTime}}- Time: {{.Extensions.LandingTime}} seconds{{end}}
+{{end}}
+
+## Rocket Configuration
+
+{{if .RocketName}}- Rocket: {{.RocketName}}{{end}}
+{{if .MotorName}}- Motor: {{.MotorName}}{{end}}
+{{if .LiftoffMassKg}}- Liftoff Mass: {{printf "%.3f" .LiftoffMassKg}} kg{{end}}
+
+## Raw Data
+
+Access the full simulation data via API at: `/api/v0/explore/{{.RecordID}}/report?format=json`
