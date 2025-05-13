@@ -1376,7 +1376,7 @@ func GenerateReportData(simData *storage.SimulationData, recordID string, rm Han
 		"moments_vs_time", "roll_rate",
 	}
 	for _, key := range plotKeys {
-		plotPath := fmt.Sprintf("assets/%s.svg", key)
+		plotPath := fmt.Sprintf("%s.svg", key)
 		rData.Plots[key] = plotPath
 		rData.Assets[key] = plotPath
 	}

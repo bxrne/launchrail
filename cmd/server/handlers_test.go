@@ -449,9 +449,9 @@ func TestDownloadReport(t *testing.T) {
 	eventsCSVPath := filepath.Join(dummyRecord.Path, "EVENTS.csv")
 
 	// Sample motion data (matches expected apogee/max_velocity)
-	// Headers: time,altitude,velocity,acceleration,thrust
+	// Headers: time,altitude agl (m),total velocity (m/s),total acceleration (m/s^2),thrust
 	motionData := []string{
-		"time,altitude,velocity,acceleration,thrust", // Headers should already be there, but good to be explicit
+		"time,altitude agl (m),total velocity (m/s),total acceleration (m/s^2),thrust", // Updated Headers
 		"0,0,0,0,100",
 		"1,10,10,10,100",
 		"2,25,5,0,0",   // Max velocity around here
@@ -465,8 +465,9 @@ func TestDownloadReport(t *testing.T) {
 	// Headers: time,event_name,motor_status,parachute_status
 	eventData := []string{
 		"time,event_name,motor_status,parachute_status", // Headers
-		"0,Liftoff,BURNOUT,NONE",                        // Changed from LAUNCH to Liftoff
-		"3,Apogee,BURNOUT,DEPLOYED",                     // Changed from APOGEE to Apogee
+		"0,Launch,BURNOUT,NONE",                         // Changed "Liftoff" to "Launch"
+		"3,Apogee,BURNOUT,DEPLOYED",
+		"6,Touchdown,BURNOUT,DEPLOYED", // Added Touchdown event
 	}
 	err = os.WriteFile(eventsCSVPath, []byte(strings.Join(eventData, "\n")), 0644)
 	require.NoError(t, err, "Failed to write sample event data")
@@ -543,9 +544,9 @@ func TestDownloadReport(t *testing.T) {
 	// Check if EventsData is populated
 	assert.NotEmpty(t, reportDataResponse.EventsData, "EventsData should not be empty")
 	if len(reportDataResponse.EventsData) > 1 { // header + data rows
-		// Example: check the first data event (Liftoff)
+		// Example: check the first data event (Launch)
 		// Assuming EventsData includes headers. If not, adjust index.
-		assert.Contains(t, reportDataResponse.EventsData[1], "Liftoff", "First event should be Liftoff")
+		assert.Contains(t, reportDataResponse.EventsData[1], "Launch", "First event should be Launch")
 	}
 
 	// Check if plot data (placeholders for now, as it's SVG strings) exists
