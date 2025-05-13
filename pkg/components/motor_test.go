@@ -69,7 +69,7 @@ func TestMotorUpdate(t *testing.T) {
 
 	// After 0.5s (25% of burn time), mass should be reduced by 25% of propellant mass
 	assert.Equal(t, 10.0, motor.GetThrust())
-	expectedMass := 10.0 - (10.0 * 0.5/2.0) // Initial - (PropellantMass * TimeElapsed/BurnTime)
+	expectedMass := 10.0 - (10.0 * 0.5 / 2.0) // Initial - (PropellantMass * TimeElapsed/BurnTime)
 	assert.Equal(t, expectedMass, motor.GetMass())
 	t.Logf("State after first update: %s", motor.GetState())
 

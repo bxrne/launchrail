@@ -113,7 +113,7 @@ func (m *Motor) updateBurningState(dt float64) {
 	// For constant thrust, mass decreases linearly with time
 	// Mass(t) = InitialMass - (InitialMass - FinalMass) * (t/BurnTime)
 	// where FinalMass = CasingMass
-	
+
 	// If we're going to exceed burn time in this step, consume all propellant
 	if m.elapsedTime >= m.burnTime {
 		m.currentPropellantMass = 0
@@ -121,15 +121,15 @@ func (m *Motor) updateBurningState(dt float64) {
 		m.thrust = 0
 		return
 	}
-	
+
 	// Calculate what the mass should be at this point in time
 	targetMass := (m.initialPropellantMass + m.casingMass) - (m.initialPropellantMass * (m.elapsedTime / m.burnTime))
-	
+
 	// If this update will take us past burn time, set mass to casing mass
-	if m.elapsedTime + dt >= m.burnTime {
+	if m.elapsedTime+dt >= m.burnTime {
 		targetMass = m.casingMass
 	}
-	
+
 	// Update current propellant mass and total mass
 	m.currentPropellantMass = targetMass - m.casingMass
 	m.Mass = targetMass
