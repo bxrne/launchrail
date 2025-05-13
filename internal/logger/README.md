@@ -1,18 +1,13 @@
-## internal/logger
+# logger
 
-### Responsibility
-- Provides a centralized logging facility for the application.
-- Uses `zerodha/logf` for structured logging.
-- Configures logging level and output format.
+Centralized logging system that provides structured logging capabilities throughout the application.
 
-### Scope
-- Logger initialization and configuration.
-- Logging functions for different levels (e.g., Info, Debug, Error).
-
-### Test Suite Overview
-- Tests should cover logging output and level configuration.
-
-### Decisions & Potential Gotchas
-- Uses `zerodha/logf` for structured logging.
-- Logging level is configurable via the configuration file.
-- Output format can be customized.
+## Notes
+- Uses zerodha/logf for structured logging
+- Configures logging level based on application settings
+- Supports various output formats and destinations
+- Provides consistent logging interface across the application
+- Includes helper functions for different log levels (info, debug, error)
+- Enables file-based logging with rotation capabilities
+- Facilitates context-aware logging with additional metadata
+- Supports both development and production logging configurations

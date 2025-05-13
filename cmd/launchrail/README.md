@@ -1,20 +1,14 @@
-# launchrail (CLI Entry Point)
+# launchrail
 
-This package provides the primary command-line interface for Launchrail.
+Primary command-line interface for Launchrail that serves as the entry point for running simulations.
 
-Responsibility:
-- Parse flags and environment configuration.
-- Initialize dependencies: storage, simulation manager, logger.
-- Wire together components to run simulations.
-
-Contract:
-- Exposes `main()` which reads `--config` and `--benchdata` flags.
-- Entrypoint for CI benchmarks via `cmd/bench` suite.
-
-Test Suite Overview:
-- No direct tests; behavior validated indirectly via `cmd/bench` benchmarks and `handlers_test.go`.
-
-Decisions & Gotchas:
-- Relies on external `config.yaml` for engine parameters.
-- Errors during initialization abort the process with non-zero exit.
-- Benchmarks in `cmd/bench` call this CLI under the hood; keep flags backward-compatible.
+## Notes
+- Loads configuration from files through the config package
+- Initializes dependencies: storage, simulation manager, logger
+- Wires together components to run simulations
+- Creates run-specific directories using a hash of configuration and OpenRocket file
+- Sets up multiple storage components (motion, events, dynamics)
+- Doesn't use CLI flags - configuration is read from config files
+- Errors during initialization abort the process with non-zero exit
+- Creates structured file storage for simulation results
+- Outputs SHA256 hash on successful simulation completion

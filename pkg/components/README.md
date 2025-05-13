@@ -1,16 +1,13 @@
-## pkg/components
+# components
 
-### Responsibility
-- Defines the components of a rocket.
-- Provides functions for creating and managing rocket components.
+Physical rocket components library that provides models for various rocket parts with accurate physics properties.
 
-### Scope
-- Component definitions (e.g., body tube, nose cone, fins, motor, parachute).
-- Component creation and management functions.
-
-### Test Suite Overview
-- Tests should cover component creation and management.
-
-### Decisions & Potential Gotchas
-- Component definitions should be well-defined and documented.
-- Component management logic should be robust.
+## Notes
+- Implements component models for nosecones, bodytube, motors, parachutes
+- Calculates mass, inertia, and center of gravity properties
+- Provides geometric representation of physical rocket parts
+- Supports different nose cone profiles (ogive, conical, etc.)
+- Models motor thrust curves and propellant consumption over time
+- Implements parachute deployment and drag characteristics
+- Follows entity-component system (ECS) architecture for modularity
+- Includes precise physical properties required for accurate simulation
