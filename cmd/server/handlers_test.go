@@ -213,7 +213,7 @@ func TestReportAPIV2(t *testing.T) {
 			acceptHeader: "application/json",
 			expectedCode: http.StatusOK,
 			expectedType: "application/json",
-			contentCheck: []string{"RecordID", "Version"}, // The JSON object should contain these keys (case-sensitive)
+			contentCheck: []string{"record_id", "version"}, // The JSON object has snake_case field names due to struct tags
 			skip:         false,
 		},
 		{
