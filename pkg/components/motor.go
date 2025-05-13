@@ -182,7 +182,7 @@ func (m *Motor) Update(dt float64) error {
 func (m *Motor) interpolateThrust(totalDt float64) float64 {
 	// Combined efficiency
 	efficiencyFactor := m.nozzleEff * m.combustionEff * m.frictionEff // About 0.86
-	
+
 	// If before burn start, use initial thrust
 	if totalDt <= m.Thrustcurve[0][0] {
 		return m.Thrustcurve[0][1] * efficiencyFactor

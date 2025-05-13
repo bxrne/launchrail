@@ -97,7 +97,7 @@ func (s *PhysicsSystem) processEntities(dt float64) error {
 // startWorkerPool initializes worker goroutines to process physics updates
 func (s *PhysicsSystem) startWorkerPool(workChan <-chan *states.PhysicsState, results chan<- Result) {
 	var wg sync.WaitGroup
-	
+
 	// Start worker goroutines
 	for i := 0; i < s.workers; i++ {
 		wg.Add(1)

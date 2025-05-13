@@ -84,3 +84,23 @@ func TestSchemaTabPositionString(t *testing.T) {
 		t.Errorf("Expected %s, got %s", expected, tp.String())
 	}
 }
+
+// TEST: GIVEN a Fillet struct WHEN calling the String method THEN return a string representation of the Fillet struct
+func TestSchemaFilletString(t *testing.T) {
+	fillet := &openrocket.Fillet{
+		Name:   "testFillet",
+		ID:     "fillet1",
+		Length: 0.05,
+		Radius: 0.025,
+		Material: openrocket.Material{
+			Name:    "CardboardMaterial",
+			Type:    "BULK",
+			Density: 600.0,
+		},
+	}
+
+	expected := "Fillet{Name='testFillet', ID='fillet1', Length=0.050, Radius=0.025, Material='CardboardMaterial'}"
+	if fillet.String() != expected {
+		t.Errorf("Expected %s, got %s", expected, fillet.String())
+	}
+}

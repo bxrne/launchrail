@@ -115,7 +115,7 @@ func (s *LaunchRailSystem) updateEntityOnRail(entity *states.PhysicsState, dt fl
 	} else {
 		// Apply forces and update motion
 		applyForcesAndUpdateMotion(entity, netForceAlongRail, angleRad, dt)
-		
+
 		// Check if entity has reached the end of the rail
 		if hasReachedEndOfRail(entity, s.rail.Length) {
 			s.onRail = false
