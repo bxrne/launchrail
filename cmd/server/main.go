@@ -317,9 +317,10 @@ func main() {
 
 	// Set up data handler with the initialized logger and configuration
 	dataHandler := &DataHandler{
-		Cfg:     cfg,
-		log:     lg,
-		records: recordManager,
+		Cfg:       cfg,
+		log:       lg,
+		records:   recordManager,
+		AppConfig: cfg, // Initialize AppConfig field
 	}
 
 	// Initialize Gin router

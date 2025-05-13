@@ -322,7 +322,7 @@ func TestReportAPIV2_Errors(t *testing.T) {
 	testTemplatePath := filepath.Join(templatesDir, "report.md.tmpl")
 	if _, err := os.Stat(testTemplatePath); os.IsNotExist(err) {
 		// Create a simple test template if it doesn't exist
-		testTemplate := "# Test Report: {{.RecordID}}\n\nVersion: {{.Version}}\n\n## Summary\n\n* Apogee: {{if .MotionMetrics}}{{printf \"%.1f\" .MotionMetrics.MaxAltitude}}{{else}}0.0{{end}} meters\n"
+		testTemplate := "# Test Report: {{.RecordID}}\n\nVersion: {{.Version}}\n\n## Summary\n\n* Apogee: {{if .MotionMetrics}}{{printf \"%.1f\" .MotionMetrics.MaxAltitudeAGL}} meters{{else}}0.0{{end}}\n"
 		if err := os.WriteFile(testTemplatePath, []byte(testTemplate), 0644); err != nil {
 			t.Fatalf("Failed to create test template file: %v", err)
 		}
@@ -511,8 +511,8 @@ func TestDownloadReport(t *testing.T) {
 	// Let's verify if MotionMetrics is not nil first.
 	assert.NotNil(t, reportDataResponse.MotionMetrics, "MotionMetrics should be populated")
 	if reportDataResponse.MotionMetrics != nil {
-		assert.InDelta(t, 30.0, reportDataResponse.MotionMetrics.MaxAltitude, 0.001, "Apogee mismatch")
-		assert.InDelta(t, 10.0, reportDataResponse.MotionMetrics.MaxVelocity, 0.001, "MaxVelocity mismatch")
+		assert.InDelta(t, 30.0, reportDataResponse.MotionMetrics.MaxAltitudeAGL, 0.001, "Apogee mismatch")
+		assert.InDelta(t, 10.0, reportDataResponse.MotionMetrics.MaxSpeed, 0.001, "MaxVelocity mismatch")
 	}
 
 	// Check if EventsData is populated

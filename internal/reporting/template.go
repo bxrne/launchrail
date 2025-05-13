@@ -44,19 +44,56 @@ func NewTemplateRenderer(log *logf.Logger, templatesDir, assetsDir string) (*Tem
 		}
 	}
 
-	// Parse all templates in the directory
+	// Define custom template functions
+	funcMap := template.FuncMap{
+		"embedSVG": func(plotFileName string, altText string) (template.HTML, error) {
+			if plotFileName == "" {
+				log.Warn("embedSVG called with empty plotFileName")
+				return "<!-- embedSVG: plotFileName was empty -->", nil
+			}
+			// assetsDir is the absolute path to the specific report's assets directory
+			absolutePlotPath := filepath.Join(assetsDir, plotFileName)
+			log.Debug("embedSVG trying to read", "path", absolutePlotPath, "inputName", plotFileName, "reportAssetsDir", assetsDir)
+
+			content, err := os.ReadFile(absolutePlotPath)
+			if err != nil {
+				log.Error("embedSVG failed to read file", "path", absolutePlotPath, "error", err)
+				// Return a visible error in the report instead of empty or broken image
+				return template.HTML(fmt.Sprintf("<div style='color:red; border:1px solid red; padding:10px;'>Error embedding SVG '%s': %s (path: %s)</div>", altText, err.Error(), plotFileName)), nil
+			}
+			return template.HTML(content), nil
+		},
+		"formatFloat": func(value float64, precision int) string {
+			return fmt.Sprintf(fmt.Sprintf("%%.%df", precision), value)
+		},
+		"safeHTML": func(s string) template.HTML {
+			return template.HTML(s)
+		},
+		// Add other general-purpose functions if needed
+	}
+
+	// Parse all templates in the directory, with the custom functions
 	templatePattern := filepath.Join(templatesDir, "*.tmpl")
 	log.Debug("Loading templates", "pattern", templatePattern)
-	tmpl, err := template.ParseGlob(templatePattern)
+	tmpl, err := template.New("").Funcs(funcMap).ParseGlob(templatePattern) // Apply Funcs before ParseGlob
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse templates: %w", err)
+		return nil, fmt.Errorf("failed to parse templates with funcs: %w", err)
+	}
+
+	// Ensure the main report template is specifically looked up if needed after parsing
+	// For instance, if reportTemplate is always a specific file like "report.md.tmpl"
+	mainReportTemplate := tmpl.Lookup("report.md.tmpl")
+	if mainReportTemplate == nil {
+		log.Warn("Main report template 'report.md.tmpl' not found after parsing glob, some specific rendering might fail if it relies on this specific name.")
+		// Depending on strictness, this could be an error:
+		// return nil, fmt.Errorf("main report template 'report.md.tmpl' not found")
 	}
 
 	renderer := &TemplateRenderer{
 		log:            log,
 		templates:      tmpl,
 		assetsDir:      assetsDir,
-		reportTemplate: tmpl, // For backward compatibility
+		reportTemplate: mainReportTemplate, // Use the looked-up template, or tmpl if generic usage is fine
 	}
 
 	return renderer, nil
@@ -120,25 +157,22 @@ func (tr *TemplateRenderer) RenderToMarkdown(data *ReportData, templateName stri
 		return "", fmt.Errorf("template not found: %s", templateName)
 	}
 
-	// Create asset paths for templates
 	// If assetsDir is provided, use it to generate paths to assets
 	if tr.assetsDir != "" && data.Plots != nil {
 		// Process plot paths to make them accessible
-		for key, relPath := range data.Plots {
-			// Create an absolute path for the asset (tr.assetsDir already points to the assets directory)
-			// Do NOT add another "assets" to the path!
-			absPath := filepath.Join(tr.assetsDir, relPath)
+		for key, relPath := range data.Plots { // relPath is actually just the filename, e.g., "altitude_vs_time.svg"
+			// Construct the absolute path for verification.
+			absolutePlotPath := filepath.Join(tr.assetsDir, relPath)
 
 			// Log the path construction for debugging
-			tr.log.Debug("Constructed asset path", "key", key, "assetsDir", tr.assetsDir, "relPath", relPath, "fullPath", absPath)
+			tr.log.Debug("Verifying plot asset path", "key", key, "renderer.assetsDir", tr.assetsDir, "plotFileName", relPath, "CheckingFullPath", absolutePlotPath)
 
-			// Verify the file exists
-			if _, err := os.Stat(absPath); err == nil {
-				// Update the path in the Plots map - use relative path for template
-				data.Plots[key] = filepath.Join("assets", relPath)
-				tr.log.Debug("Updated plot path", "key", key, "path", data.Plots[key])
+			// Verify the file exists (the placeholder SVG created by the handler)
+			if _, err := os.Stat(absolutePlotPath); err != nil {
+				tr.log.Warn("Plot file not found during RenderToMarkdown verification", "key", key, "expectedPath", absolutePlotPath, "error", err)
+				// Do NOT modify data.Plots[key] here. The embedSVG func handles path resolution.
 			} else {
-				tr.log.Warn("Plot file not found", "key", key, "path", absPath, "error", err)
+				tr.log.Debug("Plot file verified successfully", "key", key, "path", absolutePlotPath)
 			}
 		}
 	}
@@ -248,7 +282,7 @@ func (tr *TemplateRenderer) CreateReportBundle(data *ReportData, outputDir strin
 	}
 
 	// Generate the SVG plots
-	if err := tr.generatePlots(data, assetsDir); err != nil {
+	if err := tr.GeneratePlots(data); err != nil {
 		tr.log.Warn("Error generating some plots", "error", err)
 		// Continue with report generation even if some plots fail
 	}
@@ -263,39 +297,50 @@ func (tr *TemplateRenderer) CreateReportBundle(data *ReportData, outputDir strin
 	return nil
 }
 
-// generatePlots creates SVG plots for the report
-func (tr *TemplateRenderer) generatePlots(data *ReportData, outputDir string) error {
-	// Ensure we have motion data to plot
-	if len(data.MotionData) == 0 {
-		tr.log.Warn("No motion data available for plotting")
-		return nil
+// GeneratePlots generates all plots defined in the ReportData and saves them to the assets directory.
+// It iterates over the plot generation functions registered in the TemplateRenderer.
+func (tr *TemplateRenderer) GeneratePlots(data *ReportData) error {
+	tr.log.Debug("Starting plot generation", "assetsDir", tr.assetsDir)
+	if data == nil {
+		return fmt.Errorf("report data is nil, cannot generate plots")
 	}
 
-	// Generate plots using the plot_transformer package or other plotting library
-	// This is a placeholder - actual implementation would depend on your plotting library
-	plotGenerators := map[string]func(*ReportData, string) error{
-		"altitude_vs_time":     tr.generateAltitudeVsTimePlot,
-		"velocity_vs_time":     tr.generateVelocityVsTimePlot,
-		"acceleration_vs_time": tr.generateAccelerationVsTimePlot,
-	}
-
-	for plotKey, generator := range plotGenerators {
-		plotPath := filepath.Join(outputDir, plotKey+".svg")
-		if err := generator(data, plotPath); err != nil {
-			tr.log.Warn("Failed to generate plot", "plot", plotKey, "error", err)
-			// Continue with other plots even if one fails, but don't update data.Plots for this key
-		} else {
-			// Update the plot path in the data
-			// Ensure data.Plots is initialized if it's nil
-			if data.Plots == nil {
-				data.Plots = make(map[string]string)
-			}
-			data.Plots[plotKey] = filepath.ToSlash(filepath.Join("assets", plotKey+".svg"))
-			tr.log.Info("Successfully generated plot", "plot", plotKey, "path", data.Plots[plotKey])
+	// Ensure the assets directory exists
+	if _, err := os.Stat(tr.assetsDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(tr.assetsDir, os.ModePerm); err != nil {
+			return fmt.Errorf("failed to create assets directory '%s': %w", tr.assetsDir, err)
 		}
 	}
 
-	return nil
+	// Plot generation functions
+	plotFunctions := map[string]func(*ReportData, string) error{
+		"altitude_vs_time":     tr.generateAltitudeVsTimePlot,
+		"velocity_vs_time":     tr.generateVelocityVsTimePlot,
+		"acceleration_vs_time": tr.generateAccelerationVsTimePlot,
+		"thrust_vs_time":       tr.GenerateThrustVsTimePlot,
+		// Add other plot functions here, e.g., for trajectory, orientation, etc.
+	}
+
+	var firstErr error
+	for plotKey, plotFunc := range plotFunctions {
+		if plotKey == "" { // Skip if plot key is empty (e.g. not defined in ReportData.Plots)
+			tr.log.Warn("Skipping plot generation for empty plot key")
+			continue
+		}
+		plotPath := filepath.Join(tr.assetsDir, plotKey)
+		tr.log.Debug("Generating plot", "key", plotKey, "path", plotPath)
+		if err := plotFunc(data, plotPath); err != nil {
+			tr.log.Error("Failed to generate plot", "key", plotKey, "path", plotPath, "error", err)
+			if firstErr == nil {
+				firstErr = fmt.Errorf("failed to generate plot '%s': %w", plotKey, err)
+			}
+			// Decide if we should continue or return on first error. For now, try to generate all.
+		} else {
+			tr.log.Info("Successfully generated plot", "key", plotKey, "path", plotPath)
+		}
+	}
+
+	return firstErr // Return the first error encountered, or nil if all successful
 }
 
 // extractPlotData is a helper function to extract X and Y data series from motionData
@@ -426,6 +471,43 @@ func (tr *TemplateRenderer) generateAccelerationVsTimePlot(data *ReportData, out
 		return fmt.Errorf("failed to save plot: %w", err)
 	}
 	tr.log.Info("Successfully generated acceleration vs time plot", "path", outputPath)
+	return nil
+}
+
+// GenerateThrustVsTimePlot generates a plot for thrust vs. time, if motor data is available.
+func (tr *TemplateRenderer) GenerateThrustVsTimePlot(data *ReportData, outputPath string) error {
+	// Check if MotorData is present and has entries
+	if data.MotorData == nil || len(data.MotorData) == 0 {
+		tr.log.Warn("No motor data available for thrust vs. time plot", "outputPath", outputPath)
+		// Return a placeholder SVG or an error, depending on the desired behavior
+		return nil
+	}
+
+	// Extract thrust vs time data from MotorData
+	pts, err := tr.extractPlotData(data.MotorData, "time", "thrust")
+	if err != nil {
+		return fmt.Errorf("failed to extract thrust vs time data: %w", err)
+	}
+
+	p := plot.New()
+
+	p.Title.Text = "Thrust vs. Time"
+	p.X.Label.Text = "Time (s)"
+	p.Y.Label.Text = "Thrust (N)"
+
+	line, err := plotter.NewLine(pts)
+	if err != nil {
+		return fmt.Errorf("failed to create new line plot: %w", err)
+	}
+	line.Color = color.RGBA{R: 128, G: 0, B: 128, A: 255} // Purple line
+
+	p.Add(line)
+	p.Add(plotter.NewGrid())
+
+	if err := p.Save(6*vg.Inch, 4*vg.Inch, outputPath); err != nil {
+		return fmt.Errorf("failed to save plot: %w", err)
+	}
+	tr.log.Info("Successfully generated thrust vs time plot", "path", outputPath)
 	return nil
 }
 

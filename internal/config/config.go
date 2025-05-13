@@ -137,10 +137,11 @@ type Setup struct {
 
 // Server represents the server configuration.
 type Server struct {
-	Port         int `mapstructure:"port"`
-	ReadTimeout  int `mapstructure:"read_timeout_seconds"`
-	WriteTimeout int `mapstructure:"write_timeout_seconds"`
-	IdleTimeout  int `mapstructure:"idle_timeout_seconds"`
+	Port         int    `mapstructure:"port"`
+	ReadTimeout  int    `mapstructure:"read_timeout_seconds"`
+	WriteTimeout int    `mapstructure:"write_timeout_seconds"`
+	IdleTimeout  int    `mapstructure:"idle_timeout_seconds"`
+	StaticDir    string `mapstructure:"static_dir"` // Added StaticDir for serving static files/templates
 }
 
 // BenchmarkEntry defines the configuration for a single benchmark.
@@ -214,6 +215,7 @@ func (c *Config) ToMap() map[string]string {
 	marshalled["server.read_timeout_seconds"] = fmt.Sprintf("%d", c.Server.ReadTimeout)
 	marshalled["server.write_timeout_seconds"] = fmt.Sprintf("%d", c.Server.WriteTimeout)
 	marshalled["server.idle_timeout_seconds"] = fmt.Sprintf("%d", c.Server.IdleTimeout)
+	marshalled["server.static_dir"] = c.Server.StaticDir
 
 	for tag, benchmark := range c.Benchmarks {
 		marshalled["benchmarks."+tag+".name"] = benchmark.Name
@@ -354,6 +356,9 @@ func (cfg *Config) Validate(configFileDir string) error {
 	}
 	if cfg.Server.IdleTimeout < 0 {
 		return fmt.Errorf("server.idle_timeout_seconds must be non-negative")
+	}
+	if cfg.Server.StaticDir == "" {
+		return fmt.Errorf("server.static_dir is required")
 	}
 
 	// Benchmarks
