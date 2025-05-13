@@ -148,6 +148,19 @@ func (q *Quaternion) Conjugate() *Quaternion {
 	}
 }
 
+// Inverse returns the inverse of the quaternion.
+// For a unit quaternion (which orientation quaternions should be after normalization),
+// the inverse is its conjugate.
+func (q *Quaternion) Inverse() *Quaternion {
+	// Ensure the quaternion is normalized before taking conjugate as inverse.
+	// This handles non-unit quaternions gracefully by effectively making them unit first.
+	// However, for performance, if q is known to be unit, just Conjugate() could be called.
+	// For safety in general use, normalizing first is better.
+	// The Normalize method already handles zero/invalid magnitude by returning identity.
+	normalizedQ := q.Normalize()
+	return normalizedQ.Conjugate()
+}
+
 // RotateVector rotates a vector v by the quaternion q.
 // Ensures q is normalized. Returns original v if q or v is invalid, or if q normalizes to identity.
 func (q *Quaternion) RotateVector(v *Vector3) *Vector3 {

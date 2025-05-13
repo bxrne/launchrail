@@ -89,3 +89,8 @@ func (p *BlackScholesPlugin) Cleanup() error {
 	p.log.Info("Cleaning up Black-Scholes turbulence plugin")
 	return nil
 }
+
+// main is required for Go plugins.
+func main() {
+	// included to silence sonarcloud
+}

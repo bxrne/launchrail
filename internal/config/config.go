@@ -137,7 +137,10 @@ type Setup struct {
 
 // Server represents the server configuration.
 type Server struct {
-	Port int `mapstructure:"port"`
+	Port         int `mapstructure:"port"`
+	ReadTimeout  int `mapstructure:"read_timeout_seconds"`
+	WriteTimeout int `mapstructure:"write_timeout_seconds"`
+	IdleTimeout  int `mapstructure:"idle_timeout_seconds"`
 }
 
 // BenchmarkEntry defines the configuration for a single benchmark.
@@ -208,6 +211,9 @@ func (c *Config) ToMap() map[string]string {
 
 	// Server Port
 	marshalled["server.port"] = fmt.Sprintf("%d", c.Server.Port)
+	marshalled["server.read_timeout_seconds"] = fmt.Sprintf("%d", c.Server.ReadTimeout)
+	marshalled["server.write_timeout_seconds"] = fmt.Sprintf("%d", c.Server.WriteTimeout)
+	marshalled["server.idle_timeout_seconds"] = fmt.Sprintf("%d", c.Server.IdleTimeout)
 
 	for tag, benchmark := range c.Benchmarks {
 		marshalled["benchmarks."+tag+".name"] = benchmark.Name
@@ -339,6 +345,15 @@ func (cfg *Config) Validate(configFileDir string) error {
 	// Server
 	if cfg.Server.Port <= 0 || cfg.Server.Port > 65535 {
 		return fmt.Errorf("server.port must be between 1 and 65535")
+	}
+	if cfg.Server.ReadTimeout <= 0 {
+		return fmt.Errorf("server.read_timeout_seconds must be greater than zero")
+	}
+	if cfg.Server.WriteTimeout <= 0 {
+		return fmt.Errorf("server.write_timeout_seconds must be greater than zero")
+	}
+	if cfg.Server.IdleTimeout < 0 {
+		return fmt.Errorf("server.idle_timeout_seconds must be non-negative")
 	}
 
 	// Benchmarks

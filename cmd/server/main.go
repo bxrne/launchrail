@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -14,6 +16,7 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	logger "github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/plot_transformer"
+	"github.com/bxrne/launchrail/internal/plugin"
 	"github.com/bxrne/launchrail/internal/simulation"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/templates/pages"
@@ -30,13 +33,31 @@ func runSim(cfg *config.Config, recordManager *storage.RecordManager, log *logf.
 	// Create simulation manager using the old logger
 	simManager := simulation.NewManager(cfg, *oldLog)
 
-	// Create a record for this simulation run *before* initializing the manager
-	record, err := recordManager.CreateRecord()
+	// Serialize configuration for deterministic hashing using JSON marshaling
+	configJSON, err := json.Marshal(cfg)
+	if err != nil {
+		oldLog.Error("Failed to serialize config for record hashing", "Error", err)
+		return fmt.Errorf("failed to serialize config for deterministic hashing: %w", err)
+	}
+
+	// Read OpenRocket data as bytes
+	orkData := []byte{}
+	if cfg.Engine.Options.OpenRocketFile != "" {
+		orkData, err = os.ReadFile(cfg.Engine.Options.OpenRocketFile)
+		if err != nil {
+			oldLog.Error("Failed to read OpenRocket file for hashing", "path", cfg.Engine.Options.OpenRocketFile, "Error", err)
+			// Continue with empty data rather than failing
+			orkData = []byte{}
+		}
+	}
+
+	// Create a record with deterministic hash based on config and OpenRocket data
+	record, err := recordManager.CreateRecordWithConfig(configJSON, orkData)
 	if err != nil {
 		oldLog.Error("Failed to create simulation record", "Error", err)
 		return fmt.Errorf("failed to create simulation record: %w", err)
 	}
-	oldLog.Info("Simulation record created", "path", record.Path)
+	oldLog.Info("Simulation record created with deterministic hash", "path", record.Path)
 
 	// Create the Stores object from the record's initialized stores
 	stores := &storage.Stores{
@@ -251,44 +272,68 @@ func render(c *gin.Context, component templ.Component) {
 }
 
 func main() {
+	// Set Gin to release mode for production logging
+	gin.SetMode(gin.ReleaseMode)
 	// Load configuration first
 	cfg, err := config.GetConfig()
 	if err != nil {
-		fmt.Println("Failed to load configuration:", err)
+		fmt.Println("CRITICAL: Failed to load configuration:", err)
 		os.Exit(1)
 	}
 
-	// Initialize logger with the level from the loaded configuration
-	// This will be the first effective call to GetLogger in this cmd's lifecycle.
-	log := logger.GetLogger(cfg.Setup.Logging.Level)
-
-	log.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
-
-	r := gin.Default()
-	err = r.SetTrustedProxies(nil)
+	lg, err := logger.InitFileLogger(cfg.Setup.Logging.Level, "server")
 	if err != nil {
-		log.Warn("Failed to set trusted proxies", "Error", err)
-		os.Exit(1) // Exit on fatal error
+		// Use standard log for critical failures before our logger is fully up.
+		log.Fatalf("CRITICAL: Failed to initialize file logger: %v. Exiting.", err)
 	}
 
-	// Get user's home directory
-	usr, err := user.Current()
-	if err != nil {
-		log.Warn("Failed to get user's home directory", "error", err)
-		os.Exit(1) // Exit on fatal error
+	// Compile all plugins at server startup
+	lg.Info("Compiling all external plugins at server startup...")
+	if err := plugin.CompileAllPlugins("./plugins", "./plugins", *lg); err != nil {
+		lg.Fatal("Failed to compile one or more plugins during server startup", "error", err)
+		// os.Exit(1) is implicitly called by lg.Fatal
 	}
-	baseDir := filepath.Join(usr.HomeDir, ".launchrail") // Use ~/.launchrail
+	lg.Info("External plugin compilation finished successfully.")
 
 	// Initialize RecordManager
-	recordManager, err := storage.NewRecordManager(baseDir)
+	usr, err := user.Current()
 	if err != nil {
-		log.Warn("Failed to initialize record manager", "error", err)
+		lg.Fatal("Failed to get current user for RecordManager path", "error", err)
+	}
+	homedir := usr.HomeDir
+	// Ensure the .launchrail directory exists before creating the records subdir
+	launchrailDir := filepath.Join(homedir, ".launchrail")
+	if err := os.MkdirAll(launchrailDir, 0755); err != nil {
+		lg.Fatal("Failed to create .launchrail directory", "path", launchrailDir, "error", err)
+	}
+	recordOutputBase := filepath.Join(launchrailDir, "records")
+
+	// Pass the logger correctly (lg, not &lg)
+	recordManager, err := storage.NewRecordManager(cfg, recordOutputBase, lg)
+	if err != nil {
+		lg.Fatal("Failed to initialize record manager", "error", err)
+	}
+
+	// Set up data handler with the initialized logger and configuration
+	dataHandler := &DataHandler{
+		Cfg:     cfg,
+		log:     lg,
+		records: recordManager,
+	}
+
+	// Initialize Gin router
+	r := gin.New()
+	// Attach our custom LoggingMiddleware (logs to file and stdout)
+	r.Use(logger.LoggingMiddleware(lg))
+	// Optionally, add Gin's Recovery middleware for panic handling
+	r.Use(gin.Recovery())
+	err = r.SetTrustedProxies(nil)
+	if err != nil {
+		lg.Warn("Failed to set trusted proxies", "Error", err)
 		os.Exit(1) // Exit on fatal error
 	}
-	dataHandler := &DataHandler{records: recordManager, Cfg: cfg, log: log} // Pass cfg and logger here
 
-	// Serve static files (CSS, JS)
-	r.Static("/static", "./static")
+	lg.Info("Config loaded", "Name", cfg.Setup.App.Name, "Version", cfg.Setup.App.Version, "Message", "Starting server")
 
 	// Documentation & API spec routes
 	docs := r.Group("/docs")
@@ -313,6 +358,12 @@ func main() {
 			specStr := strings.ReplaceAll(string(spec), "${VERSION}", cfg.Setup.App.Version)
 			c.Data(http.StatusOK, "application/yaml", []byte(specStr))
 		})
+	}
+
+	// Serve static files
+	static := r.Group("/static")
+	{
+		static.Static("/", "./static")
 	}
 
 	// API endpoints group with version from config
@@ -452,10 +503,19 @@ func main() {
 		})
 	})
 
-	log.Info("Server started", "Port", cfg.Server.Port)
-	portStr := fmt.Sprintf(":%d", cfg.Server.Port)
-	if err := r.Run(portStr); err != nil {
-		log.Warn("Failed to start server", "error", err)
+	lg.Info("Server started", "Port", cfg.Server.Port)
+	srv := &http.Server{
+		Addr:           fmt.Sprintf(":%d", cfg.Server.Port),
+		Handler:        r, // Use the gin router 'r'
+		ReadTimeout:    time.Duration(cfg.Server.ReadTimeout) * time.Second,
+		WriteTimeout:   time.Duration(cfg.Server.WriteTimeout) * time.Second,
+		IdleTimeout:    time.Duration(cfg.Server.IdleTimeout) * time.Second,
+		MaxHeaderBytes: 1 << 20, // Example: 1 MB Max Header
+		ErrorLog:       log.New(lg.Writer, "http_server: ", log.LstdFlags),
+	}
+
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		lg.Warn("Failed to start server", "error", err)
 	}
 }
 
@@ -476,7 +536,7 @@ func (h *DataHandler) handleSimRun(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusAccepted, gin.H{"message": "Simulation started"})
+	c.JSON(http.StatusAccepted, gin.H{"message": "Simulation complet"})
 }
 
 // Deprecated: Use plot_transformer.TransformRowsToFloat64 instead.

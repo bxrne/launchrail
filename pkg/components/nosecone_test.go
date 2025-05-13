@@ -1,6 +1,7 @@
 package components_test
 
 import (
+	"encoding/xml"
 	"fmt"
 	"math"
 	"testing"
@@ -67,32 +68,36 @@ func TestNosecone_Update(t *testing.T) {
 // TEST: GIVEN a new Nosecone WHEN Remove is called THEN the component is removed
 func TestNoseconeFromORK(t *testing.T) {
 	id := ecs.NewBasic()
-	orkDoc := &openrocket.RocketDocument{
-		Subcomponents: openrocket.Subcomponents{
-			Stages: []openrocket.RocketStage{{
-				SustainerSubcomponents: openrocket.SustainerSubcomponents{
-					Nosecone: openrocket.Nosecone{
-						AftRadius:      0.5,
-						Length:         2.0,
-						Thickness:      0.1,
-						Shape:          "ogive",
-						ShapeParameter: 0.5,
-						Material: openrocket.Material{
-							Name:    "Test Material",
-							Type:    "BULK",
-							Density: 1.2,
-						},
-						Finish:            "Smooth",
-						AftShoulderRadius: 0.4,
-						AftShoulderLength: 0.3,
-						Subcomponents: openrocket.NoseSubcomponents{
-							MassComponent: openrocket.MassComponent{
-								Mass: 0.1,
+	orkDoc := &openrocket.OpenrocketDocument{
+		XMLName: xml.Name{Local: "openrocket"},
+		Rocket: openrocket.RocketDocument{
+			XMLName: xml.Name{Local: "rocket"},
+			Subcomponents: openrocket.Subcomponents{
+				Stages: []openrocket.RocketStage{{
+					SustainerSubcomponents: openrocket.SustainerSubcomponents{
+						Nosecone: openrocket.Nosecone{
+							AftRadius:      0.5,
+							Length:         2.0,
+							Thickness:      0.1,
+							Shape:          "ogive",
+							ShapeParameter: 0.5,
+							Material: openrocket.Material{
+								Name:    "Test Material",
+								Type:    "BULK",
+								Density: 1.2,
+							},
+							Finish:            "Smooth",
+							AftShoulderRadius: 0.4,
+							AftShoulderLength: 0.3,
+							Subcomponents: openrocket.NoseSubcomponents{
+								MassComponent: openrocket.MassComponent{
+									Mass: 0.1,
+								},
 							},
 						},
 					},
-				},
-			}},
+				}},
+			},
 		},
 	}
 
@@ -134,4 +139,93 @@ func TestNoseconeGetters(t *testing.T) {
 			assert.InDelta(t, tt.expected, result, 0.01)
 		})
 	}
+
+	// Test GetPosition
+	t.Run("GetPosition", func(t *testing.T) {
+		nc.Position = types.Vector3{X: 1.0, Y: 2.0, Z: 3.0}
+		pos := nc.GetPosition()
+		assert.Equal(t, types.Vector3{X: 1.0, Y: 2.0, Z: 3.0}, pos, "GetPosition should return the current position")
+	})
+}
+
+// TestNoseconeCenterOfMassAndInertia tests the GetCenterOfMassLocal and GetInertiaTensorLocal methods
+func TestNoseconeCenterOfMassAndInertia(t *testing.T) {
+	// Regular case
+	t.Run("regular nose cone", func(t *testing.T) {
+		nc := components.Nosecone{
+			Radius: 0.5,
+			Length: 2.0,
+			Mass:   1.0,
+		}
+
+		// Get center of mass
+		cm := nc.GetCenterOfMassLocal()
+		expectedCM := types.Vector3{X: 0, Y: 0, Z: 1.5} // 3/4 of length from tip
+		assert.Equal(t, expectedCM, cm, "Center of mass should be 3/4 length from tip")
+
+		// Get inertia tensor
+		itensor := nc.GetInertiaTensorLocal()
+		// Expected values based on formulas for a cone
+		expectedIxxIyy := 1.0 * ((3.0/20.0)*0.5*0.5 + (3.0/80.0)*2.0*2.0)
+		expectedIzz := (3.0 / 10.0) * 1.0 * 0.5 * 0.5
+
+		assert.InDelta(t, expectedIxxIyy, itensor.M11, 0.001, "Ixx should match expected value")
+		assert.InDelta(t, expectedIxxIyy, itensor.M22, 0.001, "Iyy should match expected value")
+		assert.InDelta(t, expectedIzz, itensor.M33, 0.001, "Izz should match expected value")
+		assert.InDelta(t, 0.0, itensor.M12, 0.001, "Off-diagonal elements should be zero")
+		assert.InDelta(t, 0.0, itensor.M13, 0.001, "Off-diagonal elements should be zero")
+		assert.InDelta(t, 0.0, itensor.M23, 0.001, "Off-diagonal elements should be zero")
+	})
+
+	// Edge case: Zero length
+	t.Run("zero length", func(t *testing.T) {
+		nc := components.Nosecone{
+			Radius: 0.5,
+			Length: 0.0, // Zero length
+			Mass:   1.0,
+		}
+
+		// Get center of mass
+		cm := nc.GetCenterOfMassLocal()
+		expectedCM := types.Vector3{X: 0, Y: 0, Z: 0} // Special handling for zero length
+		assert.Equal(t, expectedCM, cm, "Center of mass for zero length should be at origin")
+
+		// Get inertia tensor
+		itensor := nc.GetInertiaTensorLocal()
+		// For zero length or radius, should get a zero tensor
+		expectedTensor := types.Matrix3x3{} // All zeros
+
+		assert.Equal(t, expectedTensor, itensor, "Inertia tensor for zero length should be zero")
+	})
+
+	// Edge case: Zero mass
+	t.Run("zero mass", func(t *testing.T) {
+		nc := components.Nosecone{
+			Radius: 0.5,
+			Length: 2.0,
+			Mass:   0.0, // Zero mass
+		}
+
+		// For zero mass, inertia tensor should be zero
+		itensor := nc.GetInertiaTensorLocal()
+		expectedTensor := types.Matrix3x3{} // All zeros
+
+		assert.Equal(t, expectedTensor, itensor, "Inertia tensor for zero mass should be zero")
+	})
+
+	// Edge case: Zero radius
+	t.Run("zero radius", func(t *testing.T) {
+		nc := components.Nosecone{
+			Radius: 0.0, // Zero radius
+			Length: 2.0,
+			Mass:   1.0,
+		}
+
+		// Get inertia tensor
+		itensor := nc.GetInertiaTensorLocal()
+		// For zero radius, should get a zero tensor
+		expectedTensor := types.Matrix3x3{} // All zeros
+
+		assert.Equal(t, expectedTensor, itensor, "Inertia tensor for zero radius should be zero")
+	})
 }

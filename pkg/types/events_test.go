@@ -15,6 +15,8 @@ func TestEventString(t *testing.T) {
 		{types.Liftoff, "LIFTOFF"},
 		{types.Apogee, "APOGEE"},
 		{types.Land, "LAND"},
+		{types.ParachuteDeploy, "PARACHUTE_DEPLOY"},
+		{types.Burnout, "BURNOUT"},
 		{types.Event(99), "UNKNOWN_EVENT(99)"}, // Test unknown event
 	}
 
