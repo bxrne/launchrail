@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"image/color"
 	"os"
 	"path/filepath"
 	"time"
@@ -11,6 +12,9 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/russross/blackfriday/v2"
 	"github.com/zerodha/logf"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/vg"
 )
 
 // TemplateRenderer handles report template processing and rendering
@@ -121,14 +125,18 @@ func (tr *TemplateRenderer) RenderToMarkdown(data *ReportData, templateName stri
 	if tr.assetsDir != "" && data.Plots != nil {
 		// Process plot paths to make them accessible
 		for key, relPath := range data.Plots {
-			// Create an absolute path for the asset
+			// Create an absolute path for the asset (tr.assetsDir already points to the assets directory)
+			// Do NOT add another "assets" to the path!
 			absPath := filepath.Join(tr.assetsDir, relPath)
+
+			// Log the path construction for debugging
+			tr.log.Debug("Constructed asset path", "key", key, "assetsDir", tr.assetsDir, "relPath", relPath, "fullPath", absPath)
 
 			// Verify the file exists
 			if _, err := os.Stat(absPath); err == nil {
-				// Update the path in the Plots map
-				data.Plots[key] = absPath
-				tr.log.Debug("Updated plot path", "key", key, "path", absPath)
+				// Update the path in the Plots map - use relative path for template
+				data.Plots[key] = filepath.Join("assets", relPath)
+				tr.log.Debug("Updated plot path", "key", key, "path", data.Plots[key])
 			} else {
 				tr.log.Warn("Plot file not found", "key", key, "path", absPath, "error", err)
 			}
@@ -275,47 +283,150 @@ func (tr *TemplateRenderer) generatePlots(data *ReportData, outputDir string) er
 		plotPath := filepath.Join(outputDir, plotKey+".svg")
 		if err := generator(data, plotPath); err != nil {
 			tr.log.Warn("Failed to generate plot", "plot", plotKey, "error", err)
-			// Continue with other plots even if one fails
+			// Continue with other plots even if one fails, but don't update data.Plots for this key
 		} else {
 			// Update the plot path in the data
+			// Ensure data.Plots is initialized if it's nil
+			if data.Plots == nil {
+				data.Plots = make(map[string]string)
+			}
 			data.Plots[plotKey] = filepath.ToSlash(filepath.Join("assets", plotKey+".svg"))
+			tr.log.Info("Successfully generated plot", "plot", plotKey, "path", data.Plots[plotKey])
 		}
 	}
 
 	return nil
 }
 
+// extractPlotData is a helper function to extract X and Y data series from motionData
+func (tr *TemplateRenderer) extractPlotData(motionData []*plotSimRecord, xKey, yKey string) (plotter.XYs, error) {
+	pts := make(plotter.XYs, 0, len(motionData))
+
+	if len(motionData) == 0 {
+		return nil, fmt.Errorf("motionData is empty")
+	}
+
+	var foundData bool
+	for i, record := range motionData {
+		if record == nil {
+			tr.log.Debug("Skipping nil record in motionData", "index", i)
+			continue
+		}
+
+		xValRaw, xOk := (*record)[xKey]
+		yValRaw, yOk := (*record)[yKey]
+
+		if !xOk || !yOk {
+			// Log only once per key pair if missing for all records, or be more verbose if needed
+			// For now, let's assume it's fine if some records don't have all keys, but we need at least some.
+			continue
+		}
+
+		xVal, xAssertOk := xValRaw.(float64)
+		yVal, yAssertOk := yValRaw.(float64)
+
+		if !xAssertOk || !yAssertOk {
+			tr.log.Warn("Data type assertion failed for plot data", "xKey", xKey, "yKey", yKey, "recordIndex", i, "xType", fmt.Sprintf("%T", xValRaw), "yType", fmt.Sprintf("%T", yValRaw))
+			continue
+		}
+
+		pts = append(pts, plotter.XY{X: xVal, Y: yVal})
+		foundData = true
+	}
+
+	if !foundData {
+		return nil, fmt.Errorf("no valid data points found for keys X='%s', Y='%s'", xKey, yKey)
+	}
+	tr.log.Debug("Extracted plot data points", "count", len(pts), "xKey", xKey, "yKey", yKey)
+	return pts, nil
+}
+
 // These are placeholder implementations for the plot generators
 // They would be replaced with actual plotting logic using your plotting library
 
 func (tr *TemplateRenderer) generateAltitudeVsTimePlot(data *ReportData, outputPath string) error {
-	// Example placeholder implementation - would use a real plotting library
-	return tr.generatePlaceholderSVG(outputPath, "Altitude vs Time", "Time (s)", "Altitude (m)")
+	pts, err := tr.extractPlotData(data.MotionData, "time", "altitude")
+	if err != nil {
+		return fmt.Errorf("failed to extract altitude vs time data: %w", err)
+	}
+
+	p := plot.New()
+
+	p.Title.Text = "Altitude vs. Time"
+	p.X.Label.Text = "Time (s)"
+	p.Y.Label.Text = "Altitude (m)"
+
+	line, err := plotter.NewLine(pts)
+	if err != nil {
+		return fmt.Errorf("failed to create new line plot: %w", err)
+	}
+	line.Color = color.RGBA{B: 255, A: 255} // Blue line
+
+	p.Add(line)
+	p.Add(plotter.NewGrid()) // Add a grid for better readability
+
+	// Save the plot to a SVG file.
+	if err := p.Save(6*vg.Inch, 4*vg.Inch, outputPath); err != nil {
+		return fmt.Errorf("failed to save plot: %w", err)
+	}
+	tr.log.Info("Successfully generated altitude vs time plot", "path", outputPath)
+	return nil
 }
 
 func (tr *TemplateRenderer) generateVelocityVsTimePlot(data *ReportData, outputPath string) error {
-	// Example placeholder implementation - would use a real plotting library
-	return tr.generatePlaceholderSVG(outputPath, "Velocity vs Time", "Time (s)", "Velocity (m/s)")
+	pts, err := tr.extractPlotData(data.MotionData, "time", "velocity") // Assuming 'velocity' is the key
+	if err != nil {
+		return fmt.Errorf("failed to extract velocity vs time data: %w", err)
+	}
+
+	p := plot.New()
+
+	p.Title.Text = "Velocity vs. Time"
+	p.X.Label.Text = "Time (s)"
+	p.Y.Label.Text = "Velocity (m/s)"
+
+	line, err := plotter.NewLine(pts)
+	if err != nil {
+		return fmt.Errorf("failed to create new line plot: %w", err)
+	}
+	line.Color = color.RGBA{R: 255, A: 255} // Red line
+
+	p.Add(line)
+	p.Add(plotter.NewGrid())
+
+	if err := p.Save(6*vg.Inch, 4*vg.Inch, outputPath); err != nil {
+		return fmt.Errorf("failed to save plot: %w", err)
+	}
+	tr.log.Info("Successfully generated velocity vs time plot", "path", outputPath)
+	return nil
 }
 
 func (tr *TemplateRenderer) generateAccelerationVsTimePlot(data *ReportData, outputPath string) error {
-	// Example placeholder implementation - would use a real plotting library
-	return tr.generatePlaceholderSVG(outputPath, "Acceleration vs Time", "Time (s)", "Acceleration (m/s²)")
-}
+	pts, err := tr.extractPlotData(data.MotionData, "time", "acceleration") // Assuming 'acceleration' is the key
+	if err != nil {
+		return fmt.Errorf("failed to extract acceleration vs time data: %w", err)
+	}
 
-// generatePlaceholderSVG creates a simple SVG placeholder with a title and axes
-func (tr *TemplateRenderer) generatePlaceholderSVG(outputPath, title, xLabel, yLabel string) error {
-	// This would be replaced with actual plotting logic
-	// For now, just create a simple SVG placeholder
-	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
-		<rect width="800" height="600" fill="#f5f5f5" />
-		<text x="400" y="50" font-family="Arial" font-size="24" text-anchor="middle">%s</text>
-		<text x="400" y="580" font-family="Arial" font-size="18" text-anchor="middle">%s</text>
-		<text x="50" y="300" font-family="Arial" font-size="18" text-anchor="middle" transform="rotate(-90,50,300)">%s</text>
-		<text x="400" y="300" font-family="Arial" font-size="18" text-anchor="middle" fill="#999">No data available</text>
-	</svg>`, title, xLabel, yLabel)
+	p := plot.New()
 
-	return os.WriteFile(outputPath, []byte(svg), 0644)
+	p.Title.Text = "Acceleration vs. Time"
+	p.X.Label.Text = "Time (s)"
+	p.Y.Label.Text = "Acceleration (m/s²)"
+
+	line, err := plotter.NewLine(pts)
+	if err != nil {
+		return fmt.Errorf("failed to create new line plot: %w", err)
+	}
+	line.Color = color.RGBA{G: 200, A: 255} // Green line
+
+	p.Add(line)
+	p.Add(plotter.NewGrid())
+
+	if err := p.Save(6*vg.Inch, 4*vg.Inch, outputPath); err != nil {
+		return fmt.Errorf("failed to save plot: %w", err)
+	}
+	tr.log.Info("Successfully generated acceleration vs time plot", "path", outputPath)
+	return nil
 }
 
 // Note: ReportData, MotionMetrics and other report structures are defined in report.go

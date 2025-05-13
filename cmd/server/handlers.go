@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"os/user"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -735,40 +736,53 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 	}
 	// Validate that the hash is a safe single path component
 	if strings.Contains(hash, "/") || strings.Contains(hash, "\\") || strings.Contains(hash, "..") {
-		h.log.Warn("Invalid report hash provided", "hash", hash)
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid report hash"})
-		return
-	}
-	h.log.Info("Report data requested", "hash", hash)
-
-	// Use the RecordManager's configured storage directory
-	baseRecordsDir := h.records.GetStorageDir()
-	if baseRecordsDir == "" {
-		h.log.Error("Base records directory is not configured or accessible in RecordManager")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Internal server error: Records directory configuration error"})
-		return
-	}
-	reportSpecificDir := filepath.Join(baseRecordsDir, hash)
-	// Ensure the resolved path is within the base directory
-	absReportDir, err := filepath.Abs(reportSpecificDir)
-	if err != nil || !strings.HasPrefix(absReportDir, filepath.Clean(baseRecordsDir)+string(os.PathSeparator)) {
-		h.log.Warn("Resolved report directory is outside the base directory", "resolvedDir", absReportDir, "baseDir", baseRecordsDir)
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid report hash"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid report hash format"})
 		return
 	}
 
-	// We'll use the HandlerRecordManager interface directly - no need for type assertion
+	format := c.DefaultQuery("format", "html") // Default to HTML, can be 'markdown', 'pdf', 'bundle'
+	h.log.Info("Report requested", "hash", hash, "format", format)
 
-	// Create assets directory if it doesn't exist
-	assetsDir := filepath.Join(reportSpecificDir, "assets")
-	if err := os.MkdirAll(assetsDir, os.ModePerm); err != nil {
-		h.log.Error("Failed to create assets directory", "path", assetsDir, "error", err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to create assets directory"})
+	// Load the record data from storage
+	record, err := h.records.GetRecord(hash)
+	if err != nil {
+		if errors.Is(err, storage.ErrRecordNotFound) { // Check for specific storage error
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Report not found"})
+		} else {
+			h.log.Error("Failed to retrieve record from storage", "hash", hash, "error", err) // Log other errors
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to load report data"})
+		}
 		return
 	}
 
-	// Load simulation data
-	reportData, err := reporting.LoadSimulationData(hash, h.records, reportSpecificDir, h.Cfg)
+	// Base directory for report assets (where SVGs, etc., are stored for this specific report)
+	// assetsDir should point to something like ~/.launchrail/reports/HASH/assets/
+	assetsDir := filepath.Join(record.Path, "assets")
+
+	// The canonical path for report templates
+	templatesDir := "/Users/adambyrne/code/fyp/launchrail/templates/reports/"
+
+	// Validate if the canonical templates directory exists
+	if _, statErr := os.Stat(templatesDir); os.IsNotExist(statErr) {
+		h.log.Error("Canonical templates directory does not exist", "path", templatesDir, "error", statErr)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Server configuration error: templates directory not found"})
+		return
+	}
+	h.log.Info("Using canonical templates directory", "path", templatesDir)
+
+	var renderer *reporting.TemplateRenderer
+	var rendererErr error
+
+	// Initialize the template renderer
+	renderer, rendererErr = reporting.NewTemplateRenderer(h.log, templatesDir, assetsDir)
+	if rendererErr != nil {
+		h.log.Error("Failed to initialize template renderer", "error", rendererErr)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize template renderer"})
+		return
+	}
+
+	// Load simulation data for the report
+	reportData, err := reporting.LoadSimulationData(hash, h.records, record.Path, h.Cfg)
 	if err != nil {
 		h.log.Error("Failed to load simulation data for report", "hash", hash, "error", err)
 		if errors.Is(err, storage.ErrRecordNotFound) ||
@@ -784,153 +798,9 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 		return
 	}
 
-	// Check if the client specifically wants JSON (for API compatibility)
-	if c.GetHeader("Accept") == "application/json" {
-		c.JSON(http.StatusOK, reportData)
-		return
-	}
-
-	// Otherwise, render a proper report using our template renderer
-	// Enhanced debugging for template directory resolution
-	h.log.Debug("Starting template directory lookup process")
-
-	// Initialize templates and declare variables
-	var (
-		templatesDir string
-		renderer     *reporting.TemplateRenderer
-		absPath      string
-		tempErr      error // Temporary error variable for operations
-	)
-
-	// Try multiple approaches to find the templates directory
-	templateFound := false
-
-	// First approach: Check in cmd/server/testdata directory specifically (for test environment)
-	if !templateFound {
-		// Get the current working directory for absolute path construction
-		cwd, cwdErr := os.Getwd()
-		if cwdErr != nil {
-			cwd = "" // Reset if we can't get it
-		}
-
-		// Create a comprehensive list of possible template locations
-		possibleTestPaths := []string{
-			// Absolute paths - these will be most reliable
-			filepath.Join(cwd, "cmd", "server", "testdata", "templates", "reports"),
-			filepath.Join(cwd, "testdata", "templates", "reports"),
-
-			// Relative paths - for when the working directory is already at the right level
-			filepath.Join("cmd", "server", "testdata", "templates", "reports"),
-			filepath.Join("testdata", "templates", "reports"),
-			filepath.Join("templates", "reports"),
-
-			// Specific path we know exists from examining the file system
-			"/Users/adambyrne/code/fyp/launchrail/cmd/server/testdata/templates/reports",
-		}
-
-		for _, testPath := range possibleTestPaths {
-			absPath, tempErr = filepath.Abs(testPath)
-			if tempErr == nil {
-				h.log.Debug("Checking test template directory", "path", absPath)
-				if _, err := os.Stat(testPath); err == nil {
-					// We found a valid test template directory
-					templatesDir = testPath
-					h.log.Info("Found valid test templates directory", "path", absPath)
-					templateFound = true
-					break
-				}
-			}
-		}
-	}
-
-	// Second approach: Try looking for templates relative to the working directory
-	if !templateFound {
-		var cwd string
-		cwd, err = os.Getwd()
-		if err == nil {
-			h.log.Debug("Current working directory", "cwd", cwd)
-		}
-
-		// Check if templates exist directly under the working directory
-		directTemplatesDir := filepath.Join("templates", "reports")
-		if _, err := os.Stat(directTemplatesDir); err == nil {
-			h.log.Debug("Found templates directly in working directory", "path", directTemplatesDir)
-			// Use this directory for templates
-			templatesDir = directTemplatesDir
-			absPath, _ = filepath.Abs(templatesDir)
-			h.log.Info("Using templates from working directory", "path", absPath)
-			templateFound = true
-		}
-	}
-
-	// Next approach: Try ProjectDir-based path
-	// templatesDir is already declared above
-	if h.ProjectDir != "" {
-		h.log.Debug("Checking ProjectDir for templates", "ProjectDir", h.ProjectDir)
-		templatesDir = filepath.Join(h.ProjectDir, "templates", "reports")
-		absPath, _ := filepath.Abs(templatesDir)
-		h.log.Debug("Constructed templates path", "path", templatesDir, "abs_path", absPath)
-
-		// Verify that the directory exists
-		if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
-			h.log.Warn("Templates directory not found in ProjectDir, will try fallbacks", "dir", templatesDir)
-			templatesDir = "" // Clear to fall back to alternate method
-		} else {
-			h.log.Info("Using templates from ProjectDir", "dir", templatesDir)
-		}
-	} else {
-		h.log.Debug("ProjectDir is empty, skipping this lookup method")
-	}
-
-	// Fall back to executable directory if ProjectDir didn't work
-	if templatesDir == "" {
-		h.log.Debug("Using executable path fallback method")
-		execDir, err := os.Executable()
-		if err != nil {
-			h.log.Error("Failed to get executable path", "error", err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to determine templates directory"})
-			return
-		}
-		templatesDir = filepath.Join(filepath.Dir(execDir), "templates", "reports")
-		absPath, _ := filepath.Abs(templatesDir)
-		h.log.Debug("Constructed templates path from executable", "exec_dir", filepath.Dir(execDir), "templates_dir", templatesDir, "abs_path", absPath)
-
-		// Check if this directory exists
-		if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
-			h.log.Warn("Templates directory not found from executable path", "dir", templatesDir)
-
-			// Last resort: Try to find templates in the project root
-			repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(execDir))) // Go up 3 levels
-			templatesDir = filepath.Join(repoRoot, "templates", "reports")
-			h.log.Debug("Last resort template path", "dir", templatesDir)
-
-			if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
-				h.log.Error("Failed to find templates directory through all methods", "last_attempt", templatesDir)
-				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Could not locate templates directory"})
-				return
-			}
-		}
-	}
-
-	// Create the template renderer once we've found a valid templates directory
-	if templateFound && templatesDir != "" {
-		var rendererErr error
-		renderer, rendererErr = reporting.NewTemplateRenderer(h.log, templatesDir, assetsDir)
-		if rendererErr != nil {
-			h.log.Error("Failed to create template renderer", "error", rendererErr, "templatesDir", templatesDir)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize report renderer"})
-			return
-		}
-	} else {
-		// We couldn't find a valid templates directory
-		h.log.Error("Could not find any templates directory after trying all methods")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Could not locate templates directory"})
-		return
-	}
-
 	// First, check the Accept header for content negotiation
 	acceptHeader := c.GetHeader("Accept")
-	format := c.DefaultQuery("format", "html")
+	format = c.DefaultQuery("format", "html")
 
 	// If Accept header is set to application/json, markdown or html explicitly, use that
 	if strings.Contains(acceptHeader, "application/json") {
@@ -946,13 +816,99 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 		// Return raw JSON data
 		c.JSON(http.StatusOK, reportData)
 	case "markdown", "md":
-		// Render report as Markdown
-		reportContent, err := renderer.RenderReport(reportData)
+		// Render report as Markdown using the full FRR template
+		reportContent, err := renderer.RenderToMarkdown(reportData, "report.md.tmpl")
 		if err != nil {
-			h.log.Error("Failed to render report", "error", err)
+			h.log.Error("Failed to render report", "error", err, "template", "report.md.tmpl")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to render report"})
 			return
 		}
+
+		// Log successful rendering
+		h.log.Info("Successfully rendered report with template", "template", "report.md.tmpl", "contentLength", len(reportContent))
+		// Ensure proper line breaks are preserved in Markdown
+		// Check if the report content already has proper line breaks
+		if !strings.Contains(reportContent, "\n\n") {
+			// Add proper line breaks to ensure Markdown formatting is preserved
+			reportContent = strings.ReplaceAll(reportContent, "#", "\n#")
+			reportContent = strings.ReplaceAll(reportContent, "* ", "\n* ")
+			// Remove any extra line breaks that might have been introduced at the beginning
+			reportContent = strings.TrimPrefix(reportContent, "\n")
+		}
+
+		// Save the report to the user's home directory in ~/.launchrail/reports/{hash}/index.md
+		// Recreate the reportDir path to ensure it's correct
+		currentUser, userErr := user.Current()
+		if userErr != nil {
+			h.log.Error("Failed to get current user for report directory", "error", userErr)
+			// Skip report saving but still display the report
+		} else {
+			// Define paths explicitly to guarantee correctness
+			reportDir := filepath.Join(currentUser.HomeDir, ".launchrail", "reports", hash)
+			assetsDir := filepath.Join(reportDir, "assets")
+			h.log.Info("Creating report directories", "reportDir", reportDir, "assetsDir", assetsDir)
+
+			// Create fresh directory for reports
+			// Remove if exists to start fresh with proper permissions
+			if err := os.RemoveAll(reportDir); err != nil && !os.IsNotExist(err) {
+				h.log.Warn("Error removing existing report directory", "path", reportDir, "error", err)
+			}
+
+			// Create the report and assets directories
+			if err := os.MkdirAll(assetsDir, 0755); err != nil {
+				h.log.Error("Failed to create report directories", "path", assetsDir, "error", err)
+			} else {
+				// Write the report file
+				reportPath := filepath.Join(reportDir, "index.md")
+				// Ensure we safely get a sample of the content for logging
+				contentSample := ""
+				if len(reportContent) > 0 {
+					if len(reportContent) > 100 {
+						contentSample = reportContent[:100] + "..."
+					} else {
+						contentSample = reportContent
+					}
+				}
+				h.log.Info("Writing report to file", "path", reportPath, "content_length", len(reportContent), "content_sample", contentSample)
+
+				// Write file contents with explicit error handling
+				fileErr := os.WriteFile(reportPath, []byte(reportContent), 0644)
+				if fileErr != nil {
+					h.log.Error("Failed to write report file", "path", reportPath, "error", fileErr)
+				} else {
+					// Verify file was written successfully
+					if _, statErr := os.Stat(reportPath); statErr != nil {
+						h.log.Error("Report file could not be verified after writing", "path", reportPath, "error", statErr)
+					} else {
+						h.log.Info("Successfully saved and verified report file", "path", reportPath)
+
+						// Generate placeholder SVG files for all plots
+						for plotKey, plotPath := range reportData.Plots {
+							// Create a simple placeholder SVG with more visible styling
+							placeholderSVG := fmt.Sprintf(`<svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
+<rect width="800" height="400" fill="#f0f0f0"/>
+<rect width="780" height="380" x="10" y="10" fill="#e6e6e6" stroke="#999" stroke-width="2"/>
+<text x="400" y="180" font-family="Arial" font-size="36" text-anchor="middle" fill="#333" font-weight="bold">%s</text>
+<text x="400" y="240" font-family="Arial" font-size="20" text-anchor="middle" fill="#666">Placeholder Image</text>
+</svg>`, plotKey)
+
+							// Extract just the filename from the plotPath
+							plotFilename := filepath.Base(plotPath)
+							plotFullPath := filepath.Join(assetsDir, plotFilename)
+
+							// Write the SVG file
+							if writeErr := os.WriteFile(plotFullPath, []byte(placeholderSVG), 0644); writeErr != nil {
+								h.log.Error("Failed to write plot file", "path", plotFullPath, "error", writeErr)
+							} else {
+								h.log.Info("Successfully saved plot file", "path", plotFullPath)
+							}
+						}
+					}
+				}
+			}
+		}
+
+		c.Header("Content-Disposition", "inline; filename=report.md")
 		c.Header("Content-Type", "text/markdown; charset=utf-8")
 		c.String(http.StatusOK, reportContent)
 	case "download":
@@ -982,7 +938,7 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 		c.File(reportPath)
 	default: // html
 		// Render report as Markdown first
-		reportContent, err := renderer.RenderReport(reportData)
+		reportContent, err := renderer.RenderToMarkdown(reportData, "report.md.tmpl")
 		if err != nil {
 			h.log.Error("Failed to render report", "error", err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to render report"})
@@ -1054,5 +1010,3 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 		c.String(http.StatusOK, htmlContent)
 	}
 }
-
-// CreateRecordAPI handles the creation of a new simulation record.

@@ -11,18 +11,18 @@ Generated: {{.GenerationDate}}
 | Maximum Velocity    | {{printf "%.1f" .MotionMetrics.MaxVelocity}} m/s |
 | Maximum Acceleration (Y) | {{printf "%.1f" .MotionMetrics.MaxAccelerationY}} m/s² |
 | Maximum G-Force     | {{printf "%.1f" .MotionMetrics.MaxGForce}} G |
-| Apogee Time         | {{printf "%.1f" .MotionMetrics.ApogeeTimeSec}} seconds |
-| Total Flight Time   | {{printf "%.1f" .MotionMetrics.FlightTimeSec}} seconds |
-| Landing Velocity    | {{printf "%.1f" .MotionMetrics.GroundHitVel}} m/s |
+| Apogee Time         | {{ .MotionMetrics.ApogeeTime }} s |
+| Total Flight Time   | {{ .MotionMetrics.TotalFlightTime }} s |
+| Landing Velocity    | {{ .MotionMetrics.LandingSpeed }} m/s |
 
 ## Motor Performance
 
 | Metric          | Value     |
 | --------------- | --------- |
-| Burn Time       | {{printf "%.2f" .MotorSummary.BurnTime}} seconds |
-| Peak Thrust     | {{printf "%.2f" .MotorSummary.PeakThrust}} N |
-| Average Thrust  | {{printf "%.2f" .MotorSummary.AverageThrust}} N |
-| Total Impulse   | {{printf "%.2f" .MotorSummary.TotalImpulse}} Ns |
+| Burn Time       | {{printf "%.2f" .Summary.MotorSummary.BurnTime}} seconds |
+| Peak Thrust     | {{printf "%.2f" .Summary.MotorSummary.MaxThrust}} N |
+| Average Thrust  | {{printf "%.2f" .Summary.MotorSummary.AvgThrust}} N |
+| Total Impulse   | {{printf "%.2f" .Summary.MotorSummary.TotalImpulse}} Ns |
 
 ## Recovery Systems
 
@@ -43,18 +43,13 @@ Generated: {{.GenerationDate}}
 
 ## Telemetry Plots
 
-### Altitude vs Time
-![Altitude vs Time]({{.Plots.altitude_vs_time}})
-
-### Velocity vs Time
-![Velocity vs Time]({{.Plots.velocity_vs_time}})
-
-### Acceleration vs Time
-![Acceleration vs Time]({{.Plots.acceleration_vs_time}})
-
-{{if .Plots.thrust_vs_time}}
-### Thrust vs Time
-![Thrust vs Time]({{.Plots.thrust_vs_time}})
+{{if .Plots}}
+{{range $key, $path := .Plots}}
+### {{$key}}
+![{{$key}}]({{$path}})
+{{end}}
+{{else}}
+*No telemetry plots available for this simulation.*
 {{end}}
 
 ## Launch Conditions

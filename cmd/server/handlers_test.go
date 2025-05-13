@@ -358,7 +358,7 @@ func TestReportAPIV2_Errors(t *testing.T) {
 				mockStorage.On("GetRecord", "nonexistent").Return(nil, storage.ErrRecordNotFound)
 			},
 			expectedStatus:   http.StatusNotFound,
-			expectedErrorMsg: "Data for report not found",
+			expectedErrorMsg: "Report not found", // Updated message
 		},
 		{
 			name: "Generic storage error",
@@ -366,8 +366,8 @@ func TestReportAPIV2_Errors(t *testing.T) {
 			mockSetup: func() {
 				mockStorage.On("GetRecord", "errorrecord").Return(nil, errors.New("database error"))
 			},
-			expectedStatus:   http.StatusNotFound,                       // Updated to match actual behavior
-			expectedErrorMsg: "Data for report not found or incomplete", // Updated to match actual error message
+			expectedStatus:   http.StatusInternalServerError, // Updated status
+			expectedErrorMsg: "Failed to load report data",   // Updated message
 		},
 	}
 
@@ -400,10 +400,16 @@ func TestDownloadReport(t *testing.T) {
 	// Arrange
 	// 1. Setup real RecordManager and create a dummy record
 	_ = setupTestTemplate(t) // Ensure template exists, though its path isn't directly used in cfg for this handler
-	cfg := &config.Config{   // Minimal config
+	cfg := &config.Config{   // Minimal config with engine config for our test
 		Setup: config.Setup{
 			App:     config.App{Version: "test-v0.1.0"},
 			Logging: config.Logging{Level: "error"},
+		},
+		Engine: config.Engine{
+			Options: config.Options{
+				OpenRocketFile:   "./testdata/l1.ork",
+				MotorDesignation: "TestMotor-ABC",
+			},
 		},
 	}
 	tempStorageDir := t.TempDir()

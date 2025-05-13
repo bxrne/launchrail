@@ -502,6 +502,9 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+
+		lg.Info("Plot data requested for client-side rendering", "hash", hash, "source", source, "xAxis", xAxis, "yAxis", yAxis, "zAxis", zAxis)
+
 		c.JSON(http.StatusOK, gin.H{"plotData": plotData, "plotLayout": plotLayout})
 	})
 
@@ -528,7 +531,6 @@ func main() {
 	}
 }
 
-// handleSimRunRequest handles API requests to start simulations as a standalone function
 func handleSimRunRequest(c *gin.Context, recordManager *storage.RecordManager, cfg *config.Config, log *logf.Logger) {
 	log.Info("Simulation run requested", "time", time.Now().Format(time.RFC3339), "remote_addr", c.ClientIP())
 
@@ -548,7 +550,6 @@ func handleSimRunRequest(c *gin.Context, recordManager *storage.RecordManager, c
 	c.JSON(http.StatusAccepted, gin.H{"message": "Simulation complete"})
 }
 
-// Deprecated: Use plot_transformer.TransformRowsToFloat64 instead.
 func convertToFloat64(data [][]string) [][]float64 {
 	return plot_transformer.TransformRowsToFloat64(data)
 }
@@ -556,6 +557,3 @@ func convertToFloat64(data [][]string) [][]float64 {
 func calculateTotalPages(total int, perPage int) int {
 	return int(math.Ceil(float64(total) / float64(perPage)))
 }
-
-// These functions are already defined in handlers.go
-// Use the versions from there or refactor into a utility package
