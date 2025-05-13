@@ -3,6 +3,7 @@ package reporting
 import (
 	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -17,6 +18,7 @@ import (
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/zerodha/logf"
+	"golang.org/x/net/html"
 )
 
 // MotionMetrics holds summary statistics about the rocket's motion during flight.
@@ -171,130 +173,93 @@ type motionPoint struct {
 	VelV   float64
 }
 
-// populateDefaultValues sets reasonable defaults for newly added report data structures
-// when actual simulation data might not be available yet
-func populateDefaultValues(rData *ReportData, appCfg *config.Config) {
-	// Set default values for LaunchRail
-	rData.LaunchRail = LaunchRailData{
-		Length:            2.0,  // Default 2m rail
-		Angle:             5.0,  // Default 5 degree launch angle
-		DepartureVelocity: 15.0, // Typical minimum safe velocity
-		MaxForce:          50.0, // Placeholder
-		DepartureTime:     0.5,  // Placeholder
-		StabilityMargin:   1.5,  // Typical calibers for stability
-	}
+// func populateDefaultValues(rData *ReportData, appCfg *config.Config) {
+// 	// Set default values for LaunchRail
+// 	rData.LaunchRail = LaunchRailData{
+// 		Length:            2.0,  // Default 2m rail
+// 		Angle:             5.0,  // Default 5 degree launch angle
+// 		DepartureVelocity: 15.0, // Typical minimum safe velocity
+// 		MaxForce:          50.0, // Placeholder
+// 		DepartureTime:     0.5,  // Placeholder
+// 		StabilityMargin:   1.5,  // Typical calibers for stability
+// 	}
 
-	// Set default values for MotorSummary (additional fields)
-	rData.MotorSummary.SpecificImpulse = 200.0 // Typical amateur motor Isp
-	rData.MotorSummary.ThrustEfficiency = 95.0 // Percentage
-	if rData.MotorName != "" {
-		// Basic parsing of motor name to extract motor class
-		if len(rData.MotorName) >= 1 {
-			rData.MotorSummary.MotorClass = string(rData.MotorName[0])
-		}
-	}
+// 	// Set default values for MotorSummary (additional fields)
+// 	rData.MotorSummary.SpecificImpulse = 200.0 // Typical amateur motor Isp
+// 	rData.MotorSummary.ThrustEfficiency = 95.0 // Percentage
+// 	if rData.MotorName != "" {
+// 		// Basic parsing of motor name to extract motor class
+// 		if len(rData.MotorName) >= 1 {
+// 			rData.MotorSummary.MotorClass = string(rData.MotorName[0])
+// 		}
+// 	}
 
-	// Set default values for ParachuteSummary (additional fields)
-	rData.ParachuteSummary.DeploymentAltitude = rData.MotionMetrics.MaxAltitudeAGL * 0.9 // 90% of apogee
-	rData.ParachuteSummary.DeploymentVelocity = 20.0
-	rData.ParachuteSummary.DragCoefficient = 1.5      // Typical parachute drag coefficient
-	rData.ParachuteSummary.OpeningForce = 100.0       // Placeholder
-	rData.ParachuteSummary.Diameter = 0.8             // Default diameter in meters
-	rData.ParachuteSummary.ParachuteType = "Toroidal" // Default type
+// 	// Set default values for ParachuteSummary (additional fields)
+// 	rData.ParachuteSummary.DeploymentAltitude = rData.MotionMetrics.MaxAltitudeAGL * 0.9 // 90% of apogee
+// 	rData.ParachuteSummary.DeploymentVelocity = 20.0
+// 	rData.ParachuteSummary.DragCoefficient = 1.5      // Typical parachute drag coefficient
+// 	rData.ParachuteSummary.OpeningForce = 100.0       // Placeholder
+// 	rData.ParachuteSummary.Diameter = 0.8             // Default diameter in meters
+// 	rData.ParachuteSummary.ParachuteType = "Toroidal" // Default type
 
-	// Set default values for Weather
-	rData.Weather = WeatherData{
-		WindSpeed:             3.0,     // Light breeze
-		WindDirection:         45.0,    // NE
-		WindDirectionCardinal: "NE",    // Cardinal direction
-		Temperature:           20.0,    // 20°C
-		Pressure:              1013.25, // Standard pressure
-		Density:               1.225,   // Sea level air density
-		Humidity:              50.0,    // 50%
-	}
+// 	// Set default values for Weather
+// 	rData.Weather = WeatherData{
+// 		WindSpeed:             3.0,     // Light breeze
+// 		WindDirection:         45.0,    // NE
+// 		WindDirectionCardinal: "NE",    // Cardinal direction
+// 		Temperature:           20.0,    // 20°C
+// 		Pressure:              1013.25, // Standard pressure
+// 		Density:               1.225,   // Sea level air density
+// 		Humidity:              50.0,    // 50%
+// 	}
 
-	// Set default values for ForcesAndMoments
-	rData.ForcesAndMoments = ForcesAndMomentsData{
-		MaxAngleOfAttack:   5.0,    // Degrees
-		MaxNormalForce:     200.0,  // Newtons
-		MaxAxialForce:      150.0,  // Newtons
-		MaxRollRate:        10.0,   // Degrees/second
-		MaxPitchMoment:     2.0,    // Nm
-		MaxDynamicPressure: 5000.0, // Pascals
-		CenterOfPressure:   0.8,    // m from nose
-		CenterOfGravity:    0.6,    // m from nose
-		StabilityMargin:    1.5,    // Calibers
-	}
+// 	// Set default values for ForcesAndMoments
+// 	rData.ForcesAndMoments = ForcesAndMomentsData{
+// 		MaxAngleOfAttack:   5.0,    // Degrees
+// 		MaxNormalForce:     200.0,  // Newtons
+// 		MaxAxialForce:      150.0,  // Newtons
+// 		MaxRollRate:        10.0,   // Degrees/second
+// 		MaxPitchMoment:     2.0,    // Nm
+// 		MaxDynamicPressure: 5000.0, // Pascals
+// 		CenterOfPressure:   0.8,    // m from nose
+// 		CenterOfGravity:    0.6,    // m from nose
+// 		StabilityMargin:    1.5,    // Calibers
+// 	}
 
-	// Ensure MotionMetrics fields are populated for report template
-	if rData.MotionMetrics != nil {
-		// Default/example values if not set elsewhere
-		if rData.MotionMetrics.MaxAltitudeAGL == 0 {
-			rData.MotionMetrics.MaxAltitudeAGL = 500.0
-		}
-		if rData.MotionMetrics.MaxSpeed == 0 {
-			rData.MotionMetrics.MaxSpeed = 200.0
-		}
-		if rData.MotionMetrics.MaxAcceleration == 0 {
-			rData.MotionMetrics.MaxAcceleration = 100.0
-		}
-		if rData.MotionMetrics.FlightTime == 0 {
-			rData.MotionMetrics.FlightTime = 120.0
-		}
-		if rData.MotionMetrics.LandingSpeed == 0 {
-			rData.MotionMetrics.LandingSpeed = 5.0
-		}
+// 	// Ensure MotionMetrics fields are populated for report template
+// 	if rData.MotionMetrics != nil {
+// 		// Default/example values if not set elsewhere
+// 		if rData.MotionMetrics.MaxAltitudeAGL == 0 {
+// 			rData.MotionMetrics.MaxAltitudeAGL = 500.0
+// 		}
+// 		if rData.MotionMetrics.MaxSpeed == 0 {
+// 			rData.MotionMetrics.MaxSpeed = 200.0
+// 		}
+// 		if rData.MotionMetrics.MaxAcceleration == 0 {
+// 			rData.MotionMetrics.MaxAcceleration = 100.0
+// 		}
+// 		if rData.MotionMetrics.FlightTime == 0 {
+// 			rData.MotionMetrics.FlightTime = 120.0
+// 		}
+// 		if rData.MotionMetrics.LandingSpeed == 0 {
+// 			rData.MotionMetrics.LandingSpeed = 5.0
+// 		}
 
-		// Populate other motion metrics with reasonable values
-		rData.MotionMetrics.MaxAltitudeASL = rData.MotionMetrics.MaxAltitudeAGL * 1.1
-	}
+// 		// Populate other motion metrics with reasonable values
+// 		rData.MotionMetrics.MaxAltitudeASL = rData.MotionMetrics.MaxAltitudeAGL * 1.1
+// 	}
 
-	// Add some sample events if none exist
-	if len(rData.AllEvents) == 0 {
-		rData.AllEvents = []EventSummary{
-			{Time: 0.0, Name: "Launch", Altitude: 0.0, Velocity: 0.0, Details: "Rocket leaves the launch pad"},
-			{Time: 2.0, Name: "Motor Burnout", Altitude: 200.0, Velocity: 150.0, Details: "Motor has consumed all propellant"},
-			{Time: 15.0, Name: "Apogee", Altitude: rData.MotionMetrics.MaxAltitudeAGL, Velocity: 0.0, Details: "Maximum altitude reached"},
-			{Time: 15.1, Name: "Parachute Deployment", Altitude: rData.MotionMetrics.MaxAltitudeAGL - 5.0, Velocity: 5.0, Details: "Main parachute deployed"},
-			{Time: rData.MotionMetrics.FlightTime, Name: "Landing", Altitude: 0.0, Velocity: rData.MotionMetrics.LandingSpeed, Details: "Touchdown"},
-		}
-	}
-}
-
-// ReportData holds all data required to generate a report.
-type ReportData struct {
-	RecordID         string               `json:"record_id" yaml:"record_id"`
-	Version          string               `json:"version" yaml:"version"`
-	RocketName       string               `json:"rocket_name" yaml:"rocket_name"`
-	MotorName        string               `json:"motor_name" yaml:"motor_name"`
-	LiftoffMassKg    float64              `json:"liftoff_mass_kg" yaml:"liftoff_mass_kg"`
-	GeneratedTime    string               `json:"generated_time" yaml:"generated_time"`
-	ConfigSummary    *config.Config       `json:"config_summary" yaml:"config_summary"`
-	Summary          ReportSummary        `json:"summary" yaml:"summary"`
-	Plots            map[string]string    `json:"plots" yaml:"plots"`
-	MotionMetrics    *MotionMetrics       `json:"motion_metrics" yaml:"motion_metrics"`
-	MotorSummary     MotorSummaryData     `json:"motor_summary" yaml:"motor_summary"`
-	ParachuteSummary ParachuteSummaryData `json:"parachute_summary" yaml:"parachute_summary"`
-	PhaseSummary     PhaseSummaryData     `json:"phase_summary" yaml:"phase_summary"`
-	LaunchRail       LaunchRailData       `json:"launch_rail" yaml:"launch_rail"`
-	ForcesAndMoments ForcesAndMomentsData `json:"forces_and_moments" yaml:"forces_and_moments"`
-	Weather          WeatherData          `json:"weather" yaml:"weather"`
-	AllEvents        []EventSummary       `json:"all_events" yaml:"all_events"`
-	Stages           []StageData          `json:"stages" yaml:"stages"`
-	RecoverySystems  []RecoverySystemData `json:"recovery_systems" yaml:"recovery_systems"`
-	MotionData       []*PlotSimRecord     `json:"motion_data" yaml:"motion_data"`
-	MotionHeaders    []string             `json:"motion_headers" yaml:"motion_headers"`
-	EventsData       [][]string           `json:"events_data" yaml:"events_data"`
-	Log              *logf.Logger         `json:"-"` // Exclude logger from JSON
-	ReportTitle      string               `json:"report_title" yaml:"report_title"`
-	GenerationDate   string               `json:"generation_date" yaml:"generation_date"`
-	MotorData        []*PlotSimRecord     `json:"motor_data" yaml:"motor_data"`
-	MotorHeaders     []string             `json:"motor_headers" yaml:"motor_headers"`
-	// Extended fields for templates and flexible data
-	Extensions map[string]interface{} `json:"extensions,omitempty"`
-	// Collection of all assets (SVG plots, etc.)
-	Assets map[string]string `json:"assets,omitempty"`
-}
+// 	// Add some sample events if none exist
+// 	if len(rData.AllEvents) == 0 {
+// 		rData.AllEvents = []EventSummary{
+// 			{Time: 0.0, Name: "Launch", Altitude: 0.0, Velocity: 0.0, Details: "Rocket leaves the launch pad"},
+// 			{Time: 2.0, Name: "Motor Burnout", Altitude: 200.0, Velocity: 150.0, Details: "Motor has consumed all propellant"},
+// 			{Time: 15.0, Name: "Apogee", Altitude: rData.MotionMetrics.MaxAltitudeAGL, Velocity: 0.0, Details: "Maximum altitude reached"},
+// 			{Time: 15.1, Name: "Parachute Deployment", Altitude: rData.MotionMetrics.MaxAltitudeAGL - 5.0, Velocity: 5.0, Details: "Main parachute deployed"},
+// 			{Time: rData.MotionMetrics.FlightTime, Name: "Landing", Altitude: 0.0, Velocity: rData.MotionMetrics.LandingSpeed, Details: "Touchdown"},
+// 		}
+// 	}
+// }
 
 // parseSimData parses raw CSV data into a slice of PlotSimRecord and headers.
 // It attempts to convert numeric fields to float64, otherwise stores as string.
@@ -531,39 +496,37 @@ func calculateMotorSummary(motorData []*PlotSimRecord, motorHeaders []string, lo
 	return summary
 }
 
-// findLandingSpeed determines the velocity at touchdown
-func findLandingSpeed(points []motionPoint, eventsData [][]string, touchdownIdx int) float64 {
-	if touchdownIdx < 0 || len(eventsData) <= touchdownIdx || len(eventsData[touchdownIdx]) == 0 {
-		return 0
-	}
+// func findLandingSpeed(points []motionPoint, eventsData [][]string, touchdownIdx int) float64 {
+// 	if touchdownIdx < 0 || len(eventsData) <= touchdownIdx || len(eventsData[touchdownIdx]) == 0 {
+// 		return 0
+// 	}
 
-	touchdownTime, err := strconv.ParseFloat(eventsData[touchdownIdx][0], 64)
-	if err != nil {
-		return 0
-	}
+// 	touchdownTime, err := strconv.ParseFloat(eventsData[touchdownIdx][0], 64)
+// 	if err != nil {
+// 		return 0
+// 	}
 
-	// Find velocity closest to the touchdown time
-	for i := len(points) - 1; i >= 0; i-- {
-		// Look for velocity data within 0.1s of touchdown or the last valid velocity before touchdown
-		if points[i].Time <= touchdownTime && points[i].VelTot >= 0 {
-			return math.Abs(points[i].VelTot) // Speed magnitude at landing
-		}
-	}
+// 	// Find velocity closest to the touchdown time
+// 	for i := len(points) - 1; i >= 0; i-- {
+// 		// Look for velocity data within 0.1s of touchdown or the last valid velocity before touchdown
+// 		if points[i].Time <= touchdownTime && points[i].VelTot >= 0 {
+// 			return math.Abs(points[i].VelTot) // Speed magnitude at landing
+// 		}
+// 	}
 
-	return 0
-}
+// 	return 0
+// }
 
-// calculateStabilityMetrics computes aerodynamic stability metrics
-func calculateStabilityMetrics(railExitVelocity, launchRailLength float64) (machNumber, stabilityMetric float64) {
-	if launchRailLength <= 0 || railExitVelocity <= 0 {
-		return 0, 0
-	}
+// func calculateStabilityMetrics(railExitVelocity, launchRailLength float64) (machNumber, stabilityMetric float64) {
+// 	if launchRailLength <= 0 || railExitVelocity <= 0 {
+// 		return 0, 0
+// 	}
 
-	machNumber = railExitVelocity / 340.29                      // Approximate speed of sound at sea level
-	stabilityMetric = railExitVelocity * 0.3 / launchRailLength // Simplified stability calculation
+// 	machNumber = railExitVelocity / 340.29                      // Approximate speed of sound at sea level
+// 	stabilityMetric = railExitVelocity * 0.3 / launchRailLength // Simplified stability calculation
 
-	return
-}
+// 	return
+// }
 
 // CalculateMotionMetrics computes summary motion statistics from telemetry and event data.
 func CalculateMotionMetrics(motionData []*PlotSimRecord, motionHeaders []string, eventsData [][]string, launchRailLength float64, log *logf.Logger) *MotionMetrics {
@@ -588,8 +551,6 @@ func CalculateMotionMetrics(motionData []*PlotSimRecord, motionHeaders []string,
 	motionPoints := ExtractMotionPoints(motionData, motionHeaders, timeIdx, altitudeIdx, velocityIdx, accelIdx, log)
 	if len(motionPoints) == 0 && timeIdx != -1 { // Log this only if timeIdx was found but still no points (e.g. empty motionData)
 		log.Warn("No motion points extracted from motionData. Point-based metrics may be inaccurate or unavailable.")
-	} else if len(motionPoints) == 0 && timeIdx == -1 {
-		// Already logged the error about missing time header
 	}
 
 	// Event-based metrics calculation (should proceed even if motionPoints is empty)
@@ -1245,9 +1206,44 @@ func LoadSimulationData(recordID string, rm HandlerRecordManager, reportSpecific
 		return nil, fmt.Errorf("failed to initialize logger: logger.GetLogger returned nil")
 	}
 
-	log.Info("Loading simulation data for report", "recordID", recordID)
+	log.Info("Preparing to load simulation data for report", "recordID", recordID, "reportSpecificDir", reportSpecificDir)
 
-	// Set current time for the report generation
+	simDataForReport := &storage.SimulationData{
+		Motor: &storage.MotorData{},
+	}
+
+	engineConfigPath := filepath.Join(reportSpecificDir, "engine_config.json")
+	engineConfigBytes, err := os.ReadFile(engineConfigPath)
+	if err == nil {
+		var recordEngineCfg config.Engine
+		if unmarshalErr := json.Unmarshal(engineConfigBytes, &recordEngineCfg); unmarshalErr == nil {
+			log.Info("Successfully loaded engine_config.json from record directory", "path", engineConfigPath)
+			if recordEngineCfg.Options.MotorDesignation != "" {
+				simDataForReport.Motor.Name = recordEngineCfg.Options.MotorDesignation
+				log.Info("Motor name set from record's engine_config.json", "motorName", simDataForReport.Motor.Name)
+			}
+			// Basic parsing of motor name to extract motor class
+			// Removed line: simDataForReport.Motor.Class = string(recordEngineCfg.Options.MotorDesignation[0])
+		} else {
+			log.Warn("Failed to unmarshal engine_config.json from record directory", "path", engineConfigPath, "error", unmarshalErr)
+		}
+	} else {
+		log.Warn("engine_config.json not found in record directory or could not be read", "path", engineConfigPath, "error", err)
+		// Motor name will rely on fallback logic within GenerateReportData or be empty if no appCfg fallback
+	}
+
+	return GenerateReportData(simDataForReport, recordID, rm, reportSpecificDir, appCfg)
+}
+
+// GenerateReportData orchestrates loading all necessary data for a report.
+func GenerateReportData(simData *storage.SimulationData, recordID string, rm HandlerRecordManager, reportSpecificDir string, appCfg *config.Config) (*ReportData, error) {
+	log := logger.GetLogger(appCfg.Setup.Logging.Level)
+	if log == nil {
+		return nil, fmt.Errorf("failed to initialize logger: logger.GetLogger returned nil")
+	}
+
+	log.Info("Generating simulation report data", "recordID", recordID)
+
 	currentTime := time.Now().Format(time.RFC1123)
 
 	rData := &ReportData{
@@ -1268,195 +1264,122 @@ func LoadSimulationData(recordID string, rm HandlerRecordManager, reportSpecific
 		MotionData:       []*PlotSimRecord{},
 		MotionHeaders:    []string{},
 		EventsData:       [][]string{},
-		ReportTitle:      "",
-		GenerationDate:   "",
+		GenerationDate:   currentTime,
 		MotorData:        []*PlotSimRecord{},
 		MotorHeaders:     []string{},
-		Extensions:       map[string]interface{}{},
-		Assets:           map[string]string{},
+		Extensions:       make(map[string]interface{}),
+		Assets:           make(map[string]string),
 	}
 
-	// Load simulation configuration directly from app config
+	if simData != nil && simData.Motor != nil && simData.Motor.Name != "" {
+		rData.MotorName = simData.Motor.Name
+		log.Info("Motor name set from provided simData", "motorName", rData.MotorName)
+	} else if appCfg.Engine.Options.MotorDesignation != "" {
+		rData.MotorName = appCfg.Engine.Options.MotorDesignation
+		log.Warn("Motor name from simData was empty, falling back to appCfg.Engine.Options.MotorDesignation", "motorName", rData.MotorName)
+	} else {
+		log.Warn("Motor name not available from simData or appCfg.Engine.Options.MotorDesignation. MotorName will be empty.")
+	}
+
 	rData.ConfigSummary = appCfg
 
-	// Derive RocketName from OpenRocketFile path in app config
 	if appCfg.Engine.Options.OpenRocketFile != "" {
 		rData.RocketName = filepath.Base(appCfg.Engine.Options.OpenRocketFile)
+		rData.ReportTitle = fmt.Sprintf("Simulation Report for %s", rData.RocketName)
+	} else {
+		rData.ReportTitle = "Simulation Report"
 	}
 
-	// Set a default value for LiftoffMassKg if available
-	// Note: In a full implementation, you would extract this from simulation data
-
-	// Get the specific record to access its storage instances
 	record, err := rm.GetRecord(recordID)
 	if err != nil {
 		log.Error("Failed to get record for report generation", "recordID", recordID, "error", err)
 		return nil, fmt.Errorf("failed to get record %s: %w", recordID, err)
 	}
-	// It's crucial to close the record's stores when done to release file handles.
-	// Since LoadSimulationData returns ReportData which might be used later, closing here is tricky.
-	// If the record's storage fields are nil, we don't need to close anything
 	defer func() {
-		// Safely close the record if it has valid storage fields
 		if record.Motion != nil || record.Events != nil || record.Dynamics != nil {
-			if err := record.Close(); err != nil {
-				log.Warn("Failed to close record stores after loading data", "recordID", recordID, "error", err)
+			if closeErr := record.Close(); closeErr != nil {
+				log.Warn("Failed to close record stores after generating report data", "recordID", recordID, "error", closeErr)
 			}
 		} else {
 			log.Debug("Record has no active storage fields to close", "recordID", recordID)
 		}
 	}()
 
-	// Load motion data - safely handle potentially nil Motion field
 	motionFilePath := filepath.Join(reportSpecificDir, "motion.csv")
-	if record.Motion != nil {
-		// Use the storage object if available
+	if record.Motion != nil && record.Motion.GetFilePath() != "" {
 		motionFilePath = record.Motion.GetFilePath()
 	}
-
-	// Read the motion data file directly
 	motionDataCSV, err := os.ReadFile(motionFilePath)
 	if err != nil {
-		// Try alternative file name case (MOTION.csv)
-		motionFilePath = filepath.Join(reportSpecificDir, "MOTION.csv")
-		motionDataCSV, err = os.ReadFile(motionFilePath)
+		altMotionFilePath := filepath.Join(reportSpecificDir, "MOTION.csv")
+		motionDataCSV, err = os.ReadFile(altMotionFilePath)
 		if err != nil {
-			log.Warn("Could not load motion data from any standard location", "basePath", reportSpecificDir, "error", err)
+			log.Warn("Could not load motion data", "error", err)
+		} else {
+			motionFilePath = altMotionFilePath
 		}
 	}
 
-	// If we successfully loaded motion data, process it
 	if err == nil {
-		motionDataParsed, motionHeaders, err := parseSimData(log, motionDataCSV, ",")
-		if err != nil {
-			log.Warn("Error parsing motion data", "filename", motionFilePath, "error", err)
+		motionDataParsed, motionHeaders, parseErr := parseSimData(log, motionDataCSV, ",")
+		if parseErr != nil {
+			log.Warn("Error parsing motion data", "filename", motionFilePath, "error", parseErr)
 		} else {
 			rData.MotionData = motionDataParsed
 			rData.MotionHeaders = motionHeaders
-			log.Info("Successfully parsed motion data records", "count", len(rData.MotionData))
-
-			// Attempt to extract LiftoffMassKg from the first motion data record
 			if len(rData.MotionData) > 0 {
 				firstRecord := rData.MotionData[0]
-				massHeaderKey := ""
-				for _, h := range rData.MotionHeaders {
-					if strings.EqualFold(h, "Mass (kg)") {
-						massHeaderKey = h
-						break
-					}
-				}
+				massHeaderKey := getHeaderKey(rData.MotionHeaders, "Mass (kg)")
 				if massHeaderKey != "" {
 					if massVal, ok := (*firstRecord)[massHeaderKey].(float64); ok {
 						rData.LiftoffMassKg = massVal
-						log.Info("Successfully extracted LiftoffMassKg from motion data", "value", rData.LiftoffMassKg)
-					} else {
-						log.Warn("Found 'Mass (kg)' header but failed to cast value to float64 from first motion record", "value", (*firstRecord)[massHeaderKey])
 					}
-				} else {
-					log.Warn("'Mass (kg)' header not found in motion data headers. LiftoffMassKg will not be set from motion data.")
 				}
-			} else {
-				log.Warn("Motion data is empty, cannot extract LiftoffMassKg.")
 			}
 		}
 	}
 
-	// Load events data - safely handle potentially nil Events field
 	eventsFilePath := filepath.Join(reportSpecificDir, "events.csv")
-	if record.Events != nil {
-		// Use the storage object if available
+	if record.Events != nil && record.Events.GetFilePath() != "" {
 		eventsFilePath = record.Events.GetFilePath()
 	}
-
-	// Read the events data file directly
 	eventsDataCSV, err := os.ReadFile(eventsFilePath)
 	if err != nil {
-		// Try alternative file name case (EVENTS.csv)
-		eventsFilePath = filepath.Join(reportSpecificDir, "EVENTS.csv")
-		eventsDataCSV, err = os.ReadFile(eventsFilePath)
+		altEventsFilePath := filepath.Join(reportSpecificDir, "EVENTS.csv")
+		eventsDataCSV, err = os.ReadFile(altEventsFilePath)
 		if err != nil {
-			log.Warn("Could not load events data from any standard location", "basePath", reportSpecificDir, "error", err)
+			log.Warn("Could not load events data", "error", err)
+		} else {
+			eventsFilePath = altEventsFilePath
 		}
 	}
 
-	// If we successfully loaded events data, process it
 	if err == nil {
 		reader := csv.NewReader(bytes.NewReader(eventsDataCSV))
 		reader.Comma = ','
-		rawEventsData, err := reader.ReadAll()
-		if err != nil {
-			log.Warn("Error parsing events data", "filename", eventsFilePath, "error", err)
+		rawEventsData, parseErr := reader.ReadAll()
+		if parseErr != nil {
+			log.Warn("Error parsing events data", "filename", eventsFilePath, "error", parseErr)
 		} else {
 			rData.EventsData = rawEventsData
-			log.Info("Successfully loaded raw event entries", "count", len(rData.EventsData))
 		}
 	}
 
-	// After loading and parsing data, calculate summaries
-	if rData.MotionData != nil && rData.EventsData != nil {
-		log.Info("Calculating motion metrics...")
-		rData.MotionMetrics = CalculateMotionMetrics(rData.MotionData, rData.MotionHeaders, rData.EventsData, appCfg.Engine.Options.Launchrail.Length, rData.Log)
-		if rData.MotionMetrics.Error != "" {
-			log.Warn("Error calculating motion metrics", "error", rData.MotionMetrics.Error)
-		}
-	} else {
-		log.Warn("Motion data or events data is nil, skipping motion metrics calculation.")
-		if rData.MotionMetrics.Error == "" { // Avoid overwriting specific errors from CalculateMotionMetrics
-			rData.MotionMetrics.Error = "Motion data or events data not available for calculation."
-		}
+	calculatedMetrics := CalculateMotionMetrics(rData.MotionData, rData.MotionHeaders, rData.EventsData, appCfg.Engine.Options.Launchrail.Length, log)
+	rData.MotionMetrics = calculatedMetrics
+
+	rData.MotorSummary = calculateMotorSummary(rData.MotionData, rData.MotionHeaders, log)
+
+	plotKeys := []string{
+		"altitude_vs_time", "velocity_vs_time", "acceleration_vs_time", "trajectory_3d",
+		"landing_radius", "thrust_vs_time", "angle_of_attack", "forces_vs_time",
+		"moments_vs_time", "roll_rate",
 	}
-
-	if rData.MotionData != nil { // Assuming motor data is part of general motion data for now
-		log.Info("Calculating motor summary...")
-		// TODO: Verify that calculateMotorSummary correctly uses MotionData for thrust, or if a separate motor data file/source is needed.
-		rData.MotorSummary = calculateMotorSummary(rData.MotionData, rData.MotionHeaders, rData.Log)
-		// Note: MotorSummaryData does not have an 'Error' field currently. Add one if needed.
-	} else {
-		log.Warn("Motion data is nil, skipping motor summary calculation.")
-		// Populate with an explicit error or default message if MotorSummaryData had an Error field
+	for _, key := range plotKeys {
+		plotPath := fmt.Sprintf("assets/%s.svg", key)
+		rData.Plots[key] = plotPath
+		rData.Assets[key] = plotPath
 	}
-
-	assetsDir := filepath.Join(reportSpecificDir, "assets")
-	if err := os.MkdirAll(assetsDir, os.ModePerm); err != nil {
-		log.Error("Failed to create assets directory", "path", assetsDir, "error", err)
-		return nil, fmt.Errorf("failed to create assets directory '%s': %w", assetsDir, err)
-	}
-	rData.ReportTitle = fmt.Sprintf("Simulation Report for %s - %s", rData.RocketName, recordID)
-	rData.GenerationDate = time.Now().Format(time.RFC1123)
-
-	// Populate Plots map with placeholders for expected plots
-	// This satisfies test assertions for plot key existence.
-	// Actual plot generation functions (plotFunc, plotAltitude etc.) would go here.
-	requiredPlots := []string{
-		// Basic flight plots
-		"altitude_vs_time",
-		"velocity_vs_time",
-		"acceleration_vs_time",
-
-		// Additional trajectory plots
-		"trajectory_3d",
-		"landing_radius",
-
-		// Motor performance plot
-		"thrust_vs_time",
-
-		// Forces and moments plots
-		"angle_of_attack",
-		"forces_vs_time",
-		"moments_vs_time",
-		"roll_rate",
-	}
-
-	for _, plotKey := range requiredPlots {
-		// Create placeholder entries for all required plots - just the filename
-		// Avoid duplicate assets/ path by using just the filename
-		// The full path will be built by the template renderer
-		rData.Plots[plotKey] = plotKey + ".svg"
-		log.Info("Placeholder entry added for plot", "plot_key", plotKey, "path", rData.Plots[plotKey])
-	}
-
-	// Populate default values for the newly added structures
-	populateDefaultValues(rData, appCfg)
 
 	log.Info("Simulation data loading and basic processing complete", "RecordID", recordID)
 	return rData, nil
@@ -1474,4 +1397,90 @@ func findEventIndex(eventsData [][]string, eventName string) int {
 		}
 	}
 	return -1 // Event not found
+}
+
+func getHeaderKey(headers []string, keyName string) string {
+	for _, h := range headers {
+		if strings.EqualFold(h, keyName) {
+			return h
+		}
+	}
+	return "" // Return empty if not found
+}
+
+// ConvertMarkdownToSimpleHTML converts a markdown string to a very basic HTML representation.
+// This is a placeholder and should be replaced with a proper markdown parsing library for production use.
+func ConvertMarkdownToSimpleHTML(mdContent string, recordID string) string {
+	// Replace # Title with <h1>Title</h1>, ## Subtitle with <h2>Subtitle</h2> etc.
+	// This is a very naive implementation.
+	htmlOutput := "<!DOCTYPE html>\n"
+	htmlOutput += "<html>\n"
+	htmlOutput += "<head>\n"
+	htmlOutput += fmt.Sprintf("<title>Report: %s</title>\n", recordID)
+	// Basic styling could be added here if desired
+	htmlOutput += "<style>body { font-family: sans-serif; margin: 20px; } h1, h2, h3 { color: #333; } pre { background-color: #f5f5f5; padding: 10px; border: 1px solid #ddd; overflow-x: auto; }</style>\n"
+	htmlOutput += "</head>\n"
+	htmlOutput += "<body>\n"
+	htmlOutput += fmt.Sprintf("<h1>Simulation Report: %s</h1>\n", recordID)
+
+	// Simple conversion for paragraphs (split by double newline)
+	// and attempt to convert markdown headers, and code blocks.
+	lines := strings.Split(strings.ReplaceAll(mdContent, "\r\n", "\n"), "\n\n")
+	for _, paragraph := range lines {
+		if strings.HasPrefix(paragraph, "```") {
+			codeBlock := strings.TrimPrefix(paragraph, "```")
+			codeBlock = strings.TrimSuffix(codeBlock, "```")
+			codeBlock = strings.TrimSpace(codeBlock)
+			// Escape HTML characters within the code block
+			escapedCode := html.EscapeString(codeBlock)
+			htmlOutput += "<pre><code>" + escapedCode + "</code></pre>\n"
+		} else if strings.HasPrefix(paragraph, "### ") {
+			htmlOutput += "<h3>" + html.EscapeString(strings.TrimPrefix(paragraph, "### ")) + "</h3>\n"
+		} else if strings.HasPrefix(paragraph, "## ") {
+			htmlOutput += "<h2>" + html.EscapeString(strings.TrimPrefix(paragraph, "## ")) + "</h2>\n"
+		} else if strings.HasPrefix(paragraph, "# ") {
+			htmlOutput += "<h1>" + html.EscapeString(strings.TrimPrefix(paragraph, "# ")) + "</h1>\n"
+		} else if strings.TrimSpace(paragraph) != "" {
+			htmlOutput += "<p>" + html.EscapeString(paragraph) + "</p>\n"
+		}
+	}
+
+	htmlOutput += "</body>\n"
+	htmlOutput += "</html>"
+	return htmlOutput
+}
+
+// ReportData holds all data required to generate a report.
+type ReportData struct {
+	RecordID         string               `json:"record_id" yaml:"record_id"`
+	Version          string               `json:"version" yaml:"version"`
+	RocketName       string               `json:"rocket_name" yaml:"rocket_name"`
+	MotorName        string               `json:"motor_name" yaml:"motor_name"`
+	LiftoffMassKg    float64              `json:"liftoff_mass_kg" yaml:"liftoff_mass_kg"`
+	GeneratedTime    string               `json:"generated_time" yaml:"generated_time"`
+	ConfigSummary    *config.Config       `json:"config_summary" yaml:"config_summary"`
+	Summary          ReportSummary        `json:"summary" yaml:"summary"`
+	Plots            map[string]string    `json:"plots" yaml:"plots"`
+	MotionMetrics    *MotionMetrics       `json:"motion_metrics" yaml:"motion_metrics"`
+	MotorSummary     MotorSummaryData     `json:"motor_summary" yaml:"motor_summary"`
+	ParachuteSummary ParachuteSummaryData `json:"parachute_summary" yaml:"parachute_summary"`
+	PhaseSummary     PhaseSummaryData     `json:"phase_summary" yaml:"phase_summary"`
+	LaunchRail       LaunchRailData       `json:"launch_rail" yaml:"launch_rail"`
+	ForcesAndMoments ForcesAndMomentsData `json:"forces_and_moments" yaml:"forces_and_moments"`
+	Weather          WeatherData          `json:"weather" yaml:"weather"`
+	AllEvents        []EventSummary       `json:"all_events" yaml:"all_events"`
+	Stages           []StageData          `json:"stages" yaml:"stages"`
+	RecoverySystems  []RecoverySystemData `json:"recovery_systems" yaml:"recovery_systems"`
+	MotionData       []*PlotSimRecord     `json:"motion_data" yaml:"motion_data"`
+	MotionHeaders    []string             `json:"motion_headers" yaml:"motion_headers"`
+	EventsData       [][]string           `json:"events_data" yaml:"events_data"`
+	Log              *logf.Logger         `json:"-"` // Exclude logger from JSON
+	ReportTitle      string               `json:"report_title" yaml:"report_title"`
+	GenerationDate   string               `json:"generation_date" yaml:"generation_date"`
+	MotorData        []*PlotSimRecord     `json:"motor_data" yaml:"motor_data"`
+	MotorHeaders     []string             `json:"motor_headers" yaml:"motor_headers"`
+	// Extended fields for templates and flexible data
+	Extensions map[string]interface{} `json:"extensions,omitempty"`
+	// Collection of all assets (SVG plots, etc.)
+	Assets map[string]string `json:"assets,omitempty"`
 }

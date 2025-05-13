@@ -89,17 +89,66 @@ func TestReportAPIV2(t *testing.T) {
 	require.NoError(t, err, "Failed to create record directory")
 
 	// Create motion.csv with minimal test data
-	motionCSV := `time,x,altitude,z,vx,velocity,vz,ax,acceleration,az
-0.0,0,0,0,0,0,0,0,0,0
-1.0,0,100,0,0,10,0,0,0,0
-2.0,0,150,0,0,5,0,0,0,0
+	motionCSV := `time,x,altitude,z,vx,velocity,vz,ax,acceleration,az,` + // Added trailing comma for header consistency
+		`"Mass (kg)","Iyy (kg*m^2)","Ixx (kg*m^2)","Izz (kg*m^2)",` + // Added mass and inertia
+		`"Propellant Mass (kg)","Mach Number","Angle of Attack (deg)","Angle of Sideslip (deg)",` + // Added more fields
+		`"Pitch Rate (rad/s)","Yaw Rate (rad/s)","Roll Rate (rad/s)",` + // Added rates
+		`"Thrust (N)","Drag Force (N)","Lift Force (N)","Side Force (N)",` + // Added forces
+		`"Pitch Moment (Nm)","Yaw Moment (Nm)","Roll Moment (Nm)","CG Location (m)","CP Location (m)","Static Margin (cal)"
+` + // Added moments and stability
+		`0.0,0,0,0,0,0,0,0,0,0,5.0,0.1,0.1,0.1,2.0,0,0,0,0,0,0,100,0,0,0,0,0,0,1.0,1.2,2.0
+` + // Data for all fields
+		`1.0,0,100,0,0,10,0,0,0,0,4.8,0.1,0.1,0.1,1.8,0.1,0.1,0,0,0,0,80,0.5,0,0,0,0,0,1.0,1.2,2.0
+` +
+		`2.0,0,150,0,0,5,0,0,0,0,4.5,0.1,0.1,0.1,1.5,0.2,0.2,0,0,0,0,0,1.0,0,0,0,0,0,1.0,1.2,2.0
 `
 	err = os.WriteFile(filepath.Join(recordDir, "motion.csv"), []byte(motionCSV), 0644)
 	require.NoError(t, err, "Failed to create motion.csv file")
 
+	// Create engine_config.json with test motor designation
+	engineConfigJSON := `{
+		"options": {
+			"motor_designation": "TestRecordMotor-XYZ",
+			"launchrail": {
+				"length": 5.0
+			}
+		}
+	}`
+	err = os.WriteFile(filepath.Join(recordDir, "engine_config.json"), []byte(engineConfigJSON), 0644)
+	require.NoError(t, err, "Failed to create engine_config.json file")
+
+	// Create events.csv with minimal test data
+	eventsCSV := `Event,Time (s),Altitude (m AGL),Velocity (m/s),Acceleration (m/s^2),Details
+` + // Header
+		`"Launch",0.0,0,0,20,"Liftoff from pad"
+` + // Launch event
+		`"Rail Exit",0.5,5,20,18,"Cleared launch rail"
+` + // Rail exit event
+		`"Motor Burnout",2.0,200,100,0,"Motor burn complete"
+` + // Burnout event
+		`"Apogee",5.0,500,0,-9.81,"Reached peak altitude"
+` + // Apogee event
+		`"Drogue Ejection",5.1,495,-1,-9.81,"Drogue parachute deployed"
+` + // Drogue event
+		`"Main Ejection",10.0,200,-20,-9.81,"Main parachute deployed"
+` + // Main event
+		`"Touchdown",15.0,0,-5,-9.81,"Landed safely"
+` // Touchdown event
+	err = os.WriteFile(filepath.Join(recordDir, "events.csv"), []byte(eventsCSV), 0644)
+	require.NoError(t, err, "Failed to create events.csv file")
+
 	// Create a mock HandlerRecordManager
 	mockStorage := new(MockHandlerRecordManager)
 	mockStorage.storageDirPath = tempDir
+
+	// Setup mock for GetRecord to be used by HTML, Markdown, and JSON tests for 'testrecord123'
+	expectedRecord := &storage.Record{
+		Hash:         recordID,  // "testrecord123"
+		Path:         recordDir, // This is the path to the record's directory with test files
+		CreationTime: time.Now(),
+		// OrmData, CSVData, EventsData can be nil or empty for this mock if LoadSimulationData primarily relies on files from record.Path
+	}
+	mockStorage.On("GetRecord", recordID).Return(expectedRecord, nil)
 
 	// No longer create or write templates in testdata or cwd. All tests use the canonical template copied by setupTestTemplate.
 
@@ -175,28 +224,18 @@ func TestReportAPIV2(t *testing.T) {
 	// err = os.WriteFile(filepath.Join(recordDir, "MOTION.csv"), []byte(detailedMotionData), 0644)
 	// require.NoError(t, err, "Failed to create MOTION.csv")
 
-	// After examining the Record struct, it only has Motion, Events, and Dynamics fields
-	// Let's simplify and create a minimal Record with just enough for testing
-	testRecord := &storage.Record{
-		Hash: recordID,
-		Path: recordDir,
-		// We'll keep Motion as nil since we already have actual files in the record directory
-		// that the renderer can read directly without going through Storage objects
-		CreationTime: time.Now(),
-	}
-
-	// Create a sample SVG plot
+	// Create sample plot files (SVGs) in the expected assets directory for 'testrecord123'
+	// This assumes that the renderer will save plots to an 'assets' subdirectory
+	// of the record's specific path, which is recordDir for 'testrecord123'.
+	mockAssetsDir := filepath.Join(recordDir, "assets")
 	sampleSVG := `<svg width="800" height="600"><rect width="800" height="600" fill="#f0f0f0"></rect><text x="400" y="300" text-anchor="middle">Altitude vs Time</text></svg>`
 
 	// Write the sample SVG files
 	plotPaths := []string{"altitude_vs_time.svg", "velocity_vs_time.svg", "acceleration_vs_time.svg"}
 	for _, plotPath := range plotPaths {
-		err = os.WriteFile(filepath.Join(assetsDir, plotPath), []byte(sampleSVG), 0644)
+		err = os.WriteFile(filepath.Join(mockAssetsDir, plotPath), []byte(sampleSVG), 0644)
 		require.NoError(t, err, "Failed to create sample SVG file: "+plotPath)
 	}
-
-	// Mock the storage calls
-	mockStorage.On("GetRecord", recordID).Return(testRecord, nil)
 
 	// Test different output formats
 	testCases := []struct {
@@ -290,8 +329,8 @@ func TestReportAPIV2_Errors(t *testing.T) {
 		records:    mockStorage,
 		Cfg:        cfg,
 		log:        &logger,
-		ProjectDir: "",
-		AppConfig:  cfg,
+		ProjectDir: "",  // Not needed, template lookup uses staticDir
+		AppConfig:  cfg, // Initialize AppConfig with test cfg
 	}
 
 	// Setup router and register routes
@@ -322,21 +361,36 @@ func TestReportAPIV2_Errors(t *testing.T) {
 		},
 		{
 			name: "Record not found",
-			hash: "nonexistent",
+			hash: "nonexistentrecord",
 			mockSetup: func() {
-				mockStorage.On("GetRecord", "nonexistent").Return(nil, storage.ErrRecordNotFound)
+				mockStorage.On("GetRecord", "nonexistentrecord").Return(nil, storage.ErrRecordNotFound).Once()
 			},
 			expectedStatus:   http.StatusNotFound,
-			expectedErrorMsg: "Report not found", // Updated message
+			expectedErrorMsg: "{\"error\":\"Report record not found\"}", // Expect JSON error
 		},
 		{
 			name: "Generic storage error",
 			hash: "errorrecord",
 			mockSetup: func() {
-				mockStorage.On("GetRecord", "errorrecord").Return(nil, errors.New("database error"))
+				mockStorage.On("GetRecord", "errorrecord").Return(nil, errors.New("some storage error")).Once()
 			},
-			expectedStatus:   http.StatusInternalServerError, // Updated status
-			expectedErrorMsg: "Failed to load report data",   // Updated message
+			expectedStatus:   http.StatusInternalServerError,                     // Updated status
+			expectedErrorMsg: "{\"error\":\"Failed to retrieve report record\"}", // Expect JSON error & actual message
+		},
+		{
+			name: "Simulation data error",
+			hash: "simdataerrorrecord",
+			mockSetup: func() {
+				// Mock GetRecord to return a valid record. LoadSimulationData should then fail because no files exist at this path.
+				simDataErrorRecordDir := filepath.Join(tempDir, "simdataerrorrecord")
+				if err := os.MkdirAll(simDataErrorRecordDir, 0755); err != nil { // Ensure directory exists
+					t.Fatalf("Failed to create test directory %s: %v", simDataErrorRecordDir, err)
+				}
+				// Removed .Once() to allow for potential multiple calls while investigating
+				mockStorage.On("GetRecord", "simdataerrorrecord").Return(&storage.Record{Hash: "simdataerrorrecord", Path: simDataErrorRecordDir, CreationTime: time.Now()}, nil)
+			},
+			expectedStatus:   http.StatusInternalServerError,
+			expectedErrorMsg: "{\"error\":\"Failed to generate report plots\"}", // Expect JSON error for plot generation failure
 		},
 	}
 

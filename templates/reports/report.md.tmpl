@@ -11,7 +11,7 @@ Generated: {{.GenerationDate}}
 | Maximum Velocity    | {{printf "%.1f" .MotionMetrics.MaxSpeed}} m/s |
 | Maximum Acceleration | {{printf "%.1f" .MotionMetrics.MaxAcceleration}} m/s² |
 {{/* | Maximum G-Force     | {{printf "%.1f" .MotionMetrics.MaxGForce}} G | */}}
-| Apogee                | {{printf "%.1f" .MotionMetrics.ApogeeTime}} seconds since liftoff |
+| Apogee                | {{printf "%.1f" .MotionMetrics.TimeToApogee}} seconds since liftoff |
 | Flight Time           | {{printf "%.1f" .MotionMetrics.TotalFlightTime}} seconds |
 | Landing Velocity      | {{printf "%.1f" .MotionMetrics.LandingSpeed}} m/s |
 
