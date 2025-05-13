@@ -104,7 +104,7 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 		ItemsPerPage: 15,
 	}
 
-	page, err := parseInt(c.Query("page"), "page")
+	page, err := utils.ParseInt(c.Query("page"), "page")
 	if err != nil || page < 1 {
 		page = 1
 	}
@@ -264,7 +264,7 @@ func (h *DataHandler) DeleteRecordOld(c *gin.Context) {
 		ItemsPerPage: 15,
 	}
 
-	page, err := parseInt(c.Query("page"), "page")
+	page, err := utils.ParseInt(c.Query("page"), "page")
 	if err != nil || page < 1 {
 		page = 1
 	}
@@ -405,7 +405,7 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 	table := c.Query("table")
 	column := c.Query("col")
 	direction := c.Query("dir")
-	page, err := parseInt(c.Query("page"), "page")
+	page, err := utils.ParseInt(c.Query("page"), "page")
 	if err != nil || page < 1 {
 		page = 1
 	}
@@ -495,7 +495,7 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 func (h *DataHandler) GetTableRows(c *gin.Context) {
 	hash := c.Param("hash")
 	table := c.Query("table")
-	page, err := parseInt(c.Query("page"), "page")
+	page, err := utils.ParseInt(c.Query("page"), "page")
 	if err != nil || page < 1 {
 		page = 1
 	}
@@ -559,7 +559,7 @@ func (h *DataHandler) handleTableRequest(c *gin.Context, hash string, table stri
 		return
 	}
 
-	page, err := parseInt(c.Query("page"), "page")
+	page, err := utils.ParseInt(c.Query("page"), "page")
 	if err != nil || page < 1 {
 		page = 1
 	}
@@ -671,11 +671,11 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 	sortOrder := c.Query("sort")
 
 	// Parse limit and offset for pagination
-	limit, err := parseInt(c.Query("limit"), "limit")
+	limit, err := utils.ParseInt(c.Query("limit"), "limit")
 	if err != nil || limit < 0 { // Treat invalid or negative limit as no limit
 		limit = 0
 	}
-	offset, err := parseInt(c.Query("offset"), "offset")
+	offset, err := utils.ParseInt(c.Query("offset"), "offset")
 	if err != nil || offset < 0 {
 		offset = 0
 	}
@@ -717,16 +717,6 @@ func (h *DataHandler) ListRecordsAPI(c *gin.Context) {
 		"total":   totalRecords, // Add total count
 		"records": records[startIndex:endIndex],
 	})
-}
-
-// parseFloat is replaced by utils.ParseFloat
-func parseFloat(valueStr string, fieldName string) (float64, error) {
-	return utils.ParseFloat(valueStr, fieldName)
-}
-
-// parseInt is replaced by utils.ParseInt
-func parseInt(valueStr string, fieldName string) (int, error) {
-	return utils.ParseInt(valueStr, fieldName)
 }
 
 func min(a, b int) int {
@@ -938,8 +928,18 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 		return
 	}
 
-	// Get the format parameter (defaults to 'html')
+	// First, check the Accept header for content negotiation
+	acceptHeader := c.GetHeader("Accept")
 	format := c.DefaultQuery("format", "html")
+
+	// If Accept header is set to application/json, markdown or html explicitly, use that
+	if strings.Contains(acceptHeader, "application/json") {
+		format = "json"
+	} else if strings.Contains(acceptHeader, "text/markdown") {
+		format = "markdown"
+	} else if strings.Contains(acceptHeader, "text/html") {
+		format = "html"
+	}
 
 	switch format {
 	case "json":

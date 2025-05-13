@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -55,21 +56,6 @@ type MockHandlerRecordManager struct {
 	storageDirPath string
 }
 
-// mockStorage implements the needed methods of storage.Storage for testing
-type mockStorage struct {
-	getFilePathFn func() string
-}
-
-// GetFilePath returns the mocked file path
-func (ms *mockStorage) GetFilePath() string {
-	return ms.getFilePathFn()
-}
-
-// Close is a no-op for our test mock
-func (ms *mockStorage) Close() error {
-	return nil
-}
-
 func (m *MockHandlerRecordManager) ListRecords() ([]*storage.Record, error) {
 	args := m.Called()
 	if args.Get(0) == nil {
@@ -102,52 +88,76 @@ func TestReportAPIV2(t *testing.T) {
 	require.NoError(t, err, "Failed to create temp dir")
 	defer os.RemoveAll(tempDir)
 
+	// Create test record directory
+	recordID := "testrecord123"
+	recordDir := filepath.Join(tempDir, recordID)
+	err = os.MkdirAll(recordDir, 0755)
+	require.NoError(t, err, "Failed to create record directory")
+
+	// Create motion.csv with minimal test data
+	motionCSV := "t,x,y,z,vx,vy,vz,ax,ay,az\n0.0,0,0,0,0,0,0,0,0,0\n1.0,0,100,0,0,10,0,0,0,0\n2.0,0,150,0,0,5,0,0,0,0\n"
+	err = os.WriteFile(filepath.Join(recordDir, "motion.csv"), []byte(motionCSV), 0644)
+	require.NoError(t, err, "Failed to create motion.csv file")
+
 	// Create a mock HandlerRecordManager
 	mockStorage := new(MockHandlerRecordManager)
 	mockStorage.storageDirPath = tempDir
 
-	// Setup templates directory in multiple locations to ensure it's found
-	// 1. Create in the test's temp directory
-	templatesDir := filepath.Join(tempDir, "templates", "reports")
-	err = os.MkdirAll(templatesDir, 0755)
-	require.NoError(t, err, "Failed to create templates directory in temp dir")
-
-	// 2. Create in the testdata directory (which our code now specifically looks for)
+	// Setup the testdata templates directory which is checked first in handlers.go
 	testDataTemplatesDir := filepath.Join("testdata", "templates", "reports")
 	err = os.MkdirAll(testDataTemplatesDir, 0755)
 	require.NoError(t, err, "Failed to create templates directory in testdata")
 
-	// 3. Create directly in the working directory
-	directTemplatesDir := filepath.Join("templates", "reports")
-	err = os.MkdirAll(directTemplatesDir, 0755)
-	require.NoError(t, err, "Failed to create templates directory in working dir")
-
-	// Create a simple report template
+	// Create a simple report template matching our simplified template
 	templateContent := "# Simulation Report: {{.RecordID}}\n\nVersion: {{.Version}}\n\n## Summary\n\n* Max Altitude: {{printf \"%.1f\" .MotionMetrics.MaxAltitude}} meters\n* Max Velocity: {{printf \"%.1f\" .MotionMetrics.MaxVelocity}} m/s\n"
 
-	// Write the template to all possible locations
-	for _, dir := range []string{templatesDir, testDataTemplatesDir, directTemplatesDir} {
-		templateFile := filepath.Join(dir, "report.md.tmpl")
-		err = os.WriteFile(templateFile, []byte(templateContent), 0644)
-		require.NoError(t, err, fmt.Sprintf("Failed to write template file to %s", dir))
+	// Write the template only to the testdata location which is checked first
+	templateFile := filepath.Join(testDataTemplatesDir, "report.md.tmpl")
+	err = os.WriteFile(templateFile, []byte(templateContent), 0644)
+	require.NoError(t, err, "Failed to write template file")
+
+	// Copy the template to the cwd/templates/reports location for deployment tests
+	currentDirTemplatesDir := filepath.Join("templates", "reports")
+	err = os.MkdirAll(currentDirTemplatesDir, 0755)
+	if err == nil {
+		err = os.WriteFile(filepath.Join(currentDirTemplatesDir, "report.md.tmpl"), []byte(templateContent), 0644)
+		if err != nil {
+			t.Logf("Note: Failed to write template to current dir: %v (this is not critical)", err)
+		}
 	}
 
-	// Create a test config
-	cfg := &config.Config{
-		// Note: We'll handle the template path directly in the test
+	// Get the current directory to set as the project root
+	currDir, dirErr := os.Getwd()
+	if dirErr != nil {
+		t.Logf("Failed to get working directory: %v", dirErr)
+	} else {
+		t.Logf("Current working directory: %s", currDir)
 	}
 
-	// Create the handler with our mock
-	logger := logf.New(logf.Opts{Level: logf.ErrorLevel})
-	dataHandler := NewDataHandler(mockStorage, cfg, &logger)
+	// Create a test config and logger
+	cfg := &config.Config{}
+	logger := logf.New(logf.Opts{
+		Writer: os.Stdout, // Enable output for debugging
+		Level:  logf.InfoLevel,
+	})
+
+	// Create the handler with our mock and set project dir
+	dataHandler := &DataHandler{
+		records:    mockStorage,
+		Cfg:        cfg,
+		log:        &logger,
+		ProjectDir: currDir,
+	}
+	// Set the project directory explicitly to find templates
+	dataHandler.ProjectDir = currDir
 
 	// Setup Gin router
+	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
 
-	// Create record ID and mock record
-	recordID := "testrecord123"
-	recordDir := filepath.Join(tempDir, recordID)
+	// Use the record ID and directory we set up earlier
+	// recordID and recordDir are already declared at the top of the function
 	err = os.MkdirAll(recordDir, 0755)
 	require.NoError(t, err, "Failed to create record directory")
 
@@ -228,8 +238,7 @@ func TestReportAPIV2(t *testing.T) {
 			expectedCode: http.StatusOK,
 			expectedType: "text/html",
 			contentCheck: []string{"<!DOCTYPE html>", recordID}, // Should contain basic HTML tags
-			skip:         true,
-			skipReason:   "Template rendering needs fixing",
+			skip:         false,
 		},
 		{
 			name:         "Markdown format",
@@ -237,8 +246,7 @@ func TestReportAPIV2(t *testing.T) {
 			expectedCode: http.StatusOK,
 			expectedType: "text/markdown",
 			contentCheck: []string{"# Simulation Report", recordID},
-			skip:         true,
-			skipReason:   "Template rendering needs fixing",
+			skip:         false,
 		},
 	}
 
@@ -272,6 +280,38 @@ func TestReportAPIV2(t *testing.T) {
 
 // TestReportAPIV2_Errors tests error conditions in report rendering
 func TestReportAPIV2_Errors(t *testing.T) {
+	// Setup - create required directories and mock objects
+	tempDir, err := os.MkdirTemp("", "launchrail-test-errors-*")
+	require.NoError(t, err, "Failed to create temp dir")
+	defer os.RemoveAll(tempDir)
+
+	// Create mock storage
+	mockStorage := new(MockHandlerRecordManager)
+	mockStorage.storageDirPath = tempDir
+
+	// Create the handler and router for testing
+	gin.SetMode(gin.TestMode)
+	cfg := &config.Config{}
+	logger := logf.New(logf.Opts{
+		Writer: io.Discard, // Suppress log output for tests
+		Level:  logf.WarnLevel,
+	})
+
+	// Get the current directory to set as project root
+	currDir, _ := os.Getwd()
+
+	// Create the handler with our mock
+	dataHandler := &DataHandler{
+		records:    mockStorage,
+		Cfg:        cfg,
+		log:        &logger,
+		ProjectDir: currDir,
+	}
+
+	// Setup router and register routes
+	router := gin.New()
+	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
+
 	// Create a mock templates directory with a report template
 	templatesDir := filepath.Join("testdata", "templates", "reports")
 	if err := os.MkdirAll(templatesDir, 0755); err != nil {
@@ -287,25 +327,7 @@ func TestReportAPIV2_Errors(t *testing.T) {
 			t.Fatalf("Failed to create test template file: %v", err)
 		}
 	}
-	// Setup
-	tempDir, err := os.MkdirTemp("", "launchrail-tests-*")
-	require.NoError(t, err, "Failed to create temp dir")
-	defer os.RemoveAll(tempDir)
-
-	// Create a mock HandlerRecordManager
-	mockStorage := new(MockHandlerRecordManager)
-	mockStorage.storageDirPath = tempDir
-
-	// Create a test config
-	cfg := &config.Config{}
-
-	// Create the handler with our mock
-	logger := logf.New(logf.Opts{Level: logf.ErrorLevel})
-	dataHandler := NewDataHandler(mockStorage, cfg, &logger)
-
-	// Setup Gin router
-	router := gin.New()
-	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
+	// Note: We've already set up tempDir above, no need to create it again
 
 	// Test cases for error conditions
 	testCases := []struct {
@@ -436,7 +458,12 @@ func TestDownloadReport(t *testing.T) {
 	err = dummyRecord.Close()
 	require.NoError(t, err, "Failed to close dummy record")
 
-	dataHandler := NewDataHandler(realManager, cfg, &log)
+	dataHandler := &DataHandler{
+		records:    realManager,
+		Cfg:        cfg,
+		log:        &log,
+		ProjectDir: "", // Not needed for this test
+	}
 	router := gin.New()
 	// The test was previously trying to hit /reports/{hash}/download, but ReportAPIV2 is mounted differently
 	// The actual route in main.go is /explore/:hash/report.
@@ -525,7 +552,12 @@ func TestListRecordsAPI(t *testing.T) {
 
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
-	dataHandler := NewDataHandler(realManager, cfg, &log)
+	dataHandler := &DataHandler{
+		records:    realManager,
+		Cfg:        cfg,
+		log:        &log,
+		ProjectDir: "", // Not needed for this test
+	}
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -583,7 +615,12 @@ func TestDeleteRecord(t *testing.T) {
 
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
-	dataHandler := NewDataHandler(realManager, cfg, &log)
+	dataHandler := &DataHandler{
+		records:    realManager,
+		Cfg:        cfg,
+		log:        &log,
+		ProjectDir: "", // Not needed for this test
+	}
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -644,7 +681,12 @@ func TestDeleteRecordAPI(t *testing.T) {
 
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
-	dataHandler := NewDataHandler(realManager, cfg, &log)
+	dataHandler := &DataHandler{
+		records:    realManager,
+		Cfg:        cfg,
+		log:        &log,
+		ProjectDir: "", // Not needed for this test
+	}
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
