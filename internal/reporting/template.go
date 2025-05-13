@@ -7,10 +7,12 @@ import (
 	"image/color"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/microcosm-cc/bluemonday"
-	"github.com/russross/blackfriday/v2"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/zerodha/logf"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
@@ -29,10 +31,10 @@ const (
 
 // TemplateRenderer handles report template processing and rendering
 type TemplateRenderer struct {
-	log            *logf.Logger
-	templates      *template.Template
-	assetsDir      string
-	reportTemplate *template.Template
+	log       *logf.Logger
+	templates *template.Template
+	assetsDir string
+	// reportTemplate *template.Template // This specific field might be less relevant if always looking up by name
 }
 
 // NewTemplateRenderer creates a new template renderer with the specified templates directory
@@ -79,6 +81,12 @@ func NewTemplateRenderer(log *logf.Logger, templatesDir, assetsDir string) (*Tem
 		"safeHTML": func(s string) template.HTML {
 			return template.HTML(s)
 		},
+		"replace": func(input, from, to string) string {
+			return strings.ReplaceAll(input, from, to)
+		},
+		"title": func(input string) string {
+			return cases.Title(language.English).String(input)
+		},
 		// Add other general-purpose functions if needed
 	}
 
@@ -92,24 +100,25 @@ func NewTemplateRenderer(log *logf.Logger, templatesDir, assetsDir string) (*Tem
 
 	// Ensure the main report template is specifically looked up if needed after parsing
 	// For instance, if reportTemplate is always a specific file like "report.md.tmpl"
-	mainReportTemplate := tmpl.Lookup("report.md.tmpl")
-	if mainReportTemplate == nil {
-		log.Warn("Main report template 'report.md.tmpl' not found after parsing glob, some specific rendering might fail if it relies on this specific name.")
-		// Depending on strictness, this could be an error:
-		// return nil, fmt.Errorf("main report template 'report.md.tmpl' not found")
-	}
+	// mainReportTemplate := tmpl.Lookup("report.md.tmpl")
+	// if mainReportTemplate == nil {
+	// 	log.Warn("Main report template 'report.md.tmpl' not found after parsing glob, some specific rendering might fail if it relies on this specific name.")
+	// 	// Depending on strictness, this could be an error:
+	// 	// return nil, fmt.Errorf("main report template 'report.md.tmpl' not found")
+	// }
 
 	renderer := &TemplateRenderer{
-		log:            log,
-		templates:      tmpl,
-		assetsDir:      assetsDir,
-		reportTemplate: mainReportTemplate, // Use the looked-up template, or tmpl if generic usage is fine
+		log:       log,
+		templates: tmpl,
+		assetsDir: assetsDir,
+		// reportTemplate: mainReportTemplate, // Use the looked-up template, or tmpl if generic usage is fine
 	}
 
 	return renderer, nil
 }
 
-// RenderReport renders the report template with the provided data
+// RenderReport renders the markdown report template with the provided data
+// This function might need to be renamed or refactored if its primary purpose changes from MD.
 func (tr *TemplateRenderer) RenderReport(data *ReportData) (string, error) {
 	if data == nil {
 		return "", fmt.Errorf("report data cannot be nil")
@@ -126,10 +135,14 @@ func (tr *TemplateRenderer) RenderReport(data *ReportData) (string, error) {
 	// Fill missing but expected fields with defaults/placeholders
 	tr.ensureMandatoryFields(data)
 
-	// Render the template
+	// Render the markdown template
 	var buf bytes.Buffer
-	if err := tr.reportTemplate.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute template: %w", err)
+	tmpl := tr.templates.Lookup("report.md.tmpl") // Still lookup markdown for this specific func
+	if tmpl == nil {
+		return "", fmt.Errorf("markdown template 'report.md.tmpl' not found")
+	}
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute markdown template: %w", err)
 	}
 
 	return buf.String(), nil
@@ -196,39 +209,31 @@ func (tr *TemplateRenderer) RenderToMarkdown(data *ReportData, templateName stri
 	return buf.String(), nil
 }
 
-// RenderToHTML renders the report data to HTML
+// RenderToHTML renders the report data to HTML using the report.html.tmpl template
 func (tr *TemplateRenderer) RenderToHTML(data *ReportData, templateName string) (string, error) {
-	// First render to Markdown
-	md, err := tr.RenderReport(data)
-	if err != nil {
-		return "", err
+	// Prepare data (timestamps, default fields etc.)
+	if data.GenerationDate == "" {
+		data.GenerationDate = time.Now().Format(time.RFC1123)
+	}
+	tr.prepareTemplateData(data)
+	tr.ensureMandatoryFields(data)
+
+	// Lookup the specific HTML template, defaulting to "report.html.tmpl" if templateName is empty
+	htmlTemplateName := templateName
+	if htmlTemplateName == "" {
+		htmlTemplateName = "report.html.tmpl"
+	}
+	htmlTempl := tr.templates.Lookup(htmlTemplateName)
+	if htmlTempl == nil {
+		return "", fmt.Errorf("HTML template '%s' not found", htmlTemplateName)
 	}
 
-	// Create HTML rendering extensions - render with SVG support
-	exts := blackfriday.WithExtensions(blackfriday.CommonExtensions | blackfriday.HardLineBreak)
+	var buf bytes.Buffer
+	if err := htmlTempl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute HTML template '%s': %w", htmlTemplateName, err)
+	}
 
-	// Create HTML renderer with features we need
-	opts := blackfriday.WithRenderer(
-		blackfriday.NewHTMLRenderer(blackfriday.HTMLRendererParameters{
-			Flags: blackfriday.CommonHTMLFlags | blackfriday.HrefTargetBlank,
-		}),
-	)
-
-	// Convert Markdown to HTML
-	unsafe := blackfriday.Run([]byte(md), opts, exts)
-
-	// Create a sanitization policy that allows SVG elements
-	p := bluemonday.UGCPolicy()
-
-	// Allow SVG elements and attributes for our plots
-	p.AllowElements("svg", "rect", "circle", "path", "line", "polyline", "polygon", "text", "g")
-	p.AllowAttrs("width", "height", "viewBox", "xmlns", "fill", "stroke", "x", "y", "cx", "cy", "r", "d", "x1", "y1", "x2", "y2", "points").OnElements("svg", "rect", "circle", "path", "line", "polyline", "polygon")
-	p.AllowAttrs("text-anchor", "font-size", "font-family", "font-weight", "transform").OnElements("text", "g")
-
-	// Sanitize HTML
-	html := p.SanitizeBytes(unsafe)
-
-	return string(html), nil
+	return buf.String(), nil
 }
 
 // prepareTemplateData formats and prepares the data for template rendering

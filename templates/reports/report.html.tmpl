@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulation Report: {{.RecordID}}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            color: #212529;
+            line-height: 1.6;
+        }
+        .container {
+            width: 80%;
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        header h1 {
+            color: #007bff;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        header p {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        nav#toc {
+            background-color: #e9ecef;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        nav#toc h2 {
+            margin-top: 0;
+            color: #495057;
+        }
+        nav#toc ul {
+            list-style: none;
+            padding: 0;
+        }
+        nav#toc ul li a {
+            text-decoration: none;
+            color: #007bff;
+        }
+        nav#toc ul li a:hover {
+            text-decoration: underline;
+        }
+        section {
+            margin-bottom: 30px;
+        }
+        section h2 {
+            color: #007bff;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 5px;
+            margin-top: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            text-align: left;
+        }
+        th {
+            background-color: #e9ecef;
+            font-weight: bold;
+        }
+        .plot-container {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+        .plot-container h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .plot-container svg {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        .no-data {
+            font-style: italic;
+            color: #6c757d;
+        }
+        footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 0.9em;
+            color: #6c757d;
+            border-top: 1px solid #dee2e6;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Simulation Report: {{.RecordID}}</h1>
+            <p>Version: {{.Version}} | Generated: {{.GenerationDate}}</p>
+        </header>
+
+        <nav id="toc">
+            <h2>Table of Contents</h2>
+            <ul>
+                <li><a href="#executive-summary">Executive Summary</a></li>
+                <li><a href="#motor-performance">Motor Performance</a></li>
+                <li><a href="#recovery-systems">Recovery Systems</a></li>
+                <li><a href="#flight-phases">Flight Phases</a></li>
+                <li><a href="#telemetry-plots">Telemetry Plots</a></li>
+                <li><a href="#launch-conditions">Launch Conditions</a></li>
+                <li><a href="#rocket-configuration">Rocket Configuration</a></li>
+                <li><a href="#raw-data">Raw Data</a></li>
+            </ul>
+        </nav>
+
+        <section id="executive-summary">
+            <h2>Executive Summary</h2>
+            <table>
+                <thead>
+                    <tr><th>Key Metric</th><th>Value</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Maximum Altitude</td><td>{{printf "%.1f" .MotionMetrics.MaxAltitudeAGL}} meters</td></tr>
+                    <tr><td>Maximum Velocity</td><td>{{printf "%.1f" .MotionMetrics.MaxSpeed}} m/s</td></tr>
+                    <tr><td>Maximum Acceleration</td><td>{{printf "%.1f" .MotionMetrics.MaxAcceleration}} m/s²</td></tr>
+                    <tr><td>Apogee</td><td>{{printf "%.1f" .MotionMetrics.TimeToApogee}} seconds since liftoff</td></tr>
+                    <tr><td>Flight Time</td><td>{{printf "%.1f" .MotionMetrics.FlightTime}} seconds</td></tr>
+                    <tr><td>Landing Velocity</td><td>{{printf "%.1f" .MotionMetrics.LandingSpeed}} m/s</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="motor-performance">
+            <h2>Motor Performance</h2>
+            {{with .Summary.MotorSummary}}
+                <table>
+                    <thead>
+                        <tr><th>Metric</th><th>Value</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Burn Time</td><td>{{printf "%.2f" .BurnTime}} seconds</td></tr>
+                        <tr><td>Peak Thrust</td><td>{{printf "%.2f" .MaxThrust}} N</td></tr>
+                        <tr><td>Average Thrust</td><td>{{printf "%.2f" .AvgThrust}} N</td></tr>
+                        <tr><td>Total Impulse</td><td>{{printf "%.2f" .TotalImpulse}} Ns</td></tr>
+                    </tbody>
+                </table>
+            {{else}}
+                <p class="no-data">Motor performance data not available.</p>
+            {{end}}
+        </section>
+
+        <section id="recovery-systems">
+            <h2>Recovery Systems</h2>
+            {{if .RecoverySystems}}
+                <table>
+                    <thead>
+                        <tr><th>Type</th><th>Deployment Time (s)</th><th>Descent Rate (m/s)</th></tr>
+                    </thead>
+                    <tbody>
+                        {{range .RecoverySystems}}
+                        <tr>
+                            <td>{{.Type}}</td>
+                            <td>{{printf "%.2f" .Deployment}}</td>
+                            <td>{{printf "%.2f" .DescentRate}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            {{else}}
+                <p class="no-data">No recovery systems data available.</p>
+            {{end}}
+        </section>
+
+        <section id="flight-phases">
+            <h2>Flight Phases</h2>
+            <table>
+                 <thead>
+                    <tr><th>Phase</th><th>Time (s)</th><th>Altitude (m)</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Apogee</td><td>{{printf "%.2f" .PhaseSummary.ApogeeTimeSec}}</td><td>{{printf "%.2f" .PhaseSummary.MaxAltitudeM}}</td></tr>
+                    {{/* Add other phases if available in PhaseSummary */}}
+                </tbody>
+            </table>
+        </section>
+
+        <section id="telemetry-plots">
+            <h2>Telemetry Plots</h2>
+            {{if .Plots}}
+                {{range $key, $path := .Plots}}
+                    <div class="plot-container">
+                        <h3>{{$key | replace "_" " " | title}}</h3>
+                        {{ embedSVG $path $key }}
+                    </div>
+                {{end}}
+            {{else}}
+                <p class="no-data">No telemetry plots available for this simulation.</p>
+            {{end}}
+        </section>
+
+        <section id="launch-conditions">
+            <h2>Launch Conditions</h2>
+            {{if .Extensions.LaunchSiteName}}
+                <table>
+                    <tbody>
+                        <tr><td>Launch Site</td><td>{{.Extensions.LaunchSiteName}}</td></tr>
+                        {{with .Extensions.LaunchLatitude}}<tr><td>Latitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
+                        {{with .Extensions.LaunchLongitude}}<tr><td>Longitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
+                        {{with .Extensions.LaunchElevation}}<tr><td>Elevation (AMSL)</td><td>{{printf "%.1f" .}} m</td></tr>{{end}}
+                        {{with .Extensions.Temperature}}<tr><td>Temperature</td><td>{{printf "%.1f" .}} °C</td></tr>{{end}}
+                        {{with .Extensions.Pressure}}<tr><td>Pressure</td><td>{{printf "%.1f" .}} Pa</td></tr>{{end}}
+                        {{with .Extensions.Humidity}}<tr><td>Humidity</td><td>{{printf "%.1f" .}} %</td></tr>{{end}}
+                        {{with .Extensions.WindSpeed}}<tr><td>Wind Speed</td><td>{{printf "%.1f" .}} m/s</td></tr>{{end}}
+                        {{with .Extensions.WindDirection}}<tr><td>Wind Direction (from)</td><td>{{printf "%.1f" .}}°</td></tr>{{end}}
+                    </tbody>
+                </table>
+            {{else}}
+                <p class="no-data">Launch condition data not available.</p>
+            {{end}}
+        </section>
+
+        <section id="rocket-configuration">
+            <h2>Rocket Configuration</h2>
+            <p><strong>Rocket:</strong> {{.Rocket.Name | default "N/A"}}</p>
+            <p><strong>Motor:</strong> {{.Motor.Designation | default "N/A"}}</p>
+            {{/* Add more configuration details if available */}}
+        </section>
+
+        <section id="raw-data">
+            <h2>Raw Data</h2>
+            <p>Access the full simulation data via API: 
+                <a href="/api/v0/explore/{{.RecordID}}/report?format=json">/api/v0/explore/{{.RecordID}}/report?format=json</a>
+            </p>
+        </section>
+
+        <footer>
+            <p>LaunchRail Simulation Report Generator</p>
+        </footer>
+    </div>
+</body>
+</html>
