@@ -29,25 +29,19 @@ var (
 	dummyOrkData    = []byte(`<openrocket/>`)
 )
 
-func setupTestTemplate(t *testing.T) string {
-	templateDir := filepath.Join("templates", "reports")
-	templatePath := filepath.Join(templateDir, "report.md.tmpl")
-
-	// Ensure parent directory exists
-	err := os.MkdirAll(templateDir, 0755)
-	require.NoError(t, err)
-
-	// Create dummy template content
-	templateContent := "Report for {{.RecordID}} Version {{.Version}}"
-	err = os.WriteFile(templatePath, []byte(templateContent), 0644)
-	require.NoError(t, err)
-
-	// Cleanup function to remove the created structure
-	t.Cleanup(func() {
-		os.RemoveAll(filepath.Join("internal")) // Remove the top-level dir created
-	})
-
-	return templateDir // Although not used by handler directly, good practice
+func setupTestTemplate(t *testing.T) (staticDir string, templatePath string) {
+	t.Helper()
+	// Create a temp static dir for this test
+	staticDir = t.TempDir()
+	templatesDir := filepath.Join(staticDir, "templates", "reports")
+	require.NoError(t, os.MkdirAll(templatesDir, 0755))
+	// Copy canonical template from project root
+	canonical := filepath.Join("templates", "reports", "report.md.tmpl")
+	content, err := os.ReadFile(canonical)
+	require.NoError(t, err, "Failed to read canonical report.md.tmpl")
+	templatePath = filepath.Join(templatesDir, "report.md.tmpl")
+	require.NoError(t, os.WriteFile(templatePath, content, 0644))
+	return staticDir, templatePath
 }
 
 // MockHandlerRecordManager implements HandlerRecordManager for testing
@@ -135,7 +129,9 @@ func TestReportAPIV2(t *testing.T) {
 	}
 
 	// Create a test config and logger
+	staticDir, _ := setupTestTemplate(t)
 	cfg := &config.Config{}
+	cfg.Server.StaticDir = staticDir
 	logger := logf.New(logf.Opts{
 		Writer: os.Stdout, // Enable output for debugging
 		Level:  logf.InfoLevel,
@@ -399,8 +395,8 @@ func TestReportAPIV2_Errors(t *testing.T) {
 func TestDownloadReport(t *testing.T) {
 	// Arrange
 	// 1. Setup real RecordManager and create a dummy record
-	_ = setupTestTemplate(t) // Ensure template exists, though its path isn't directly used in cfg for this handler
-	cfg := &config.Config{   // Minimal config with engine config for our test
+	staticDir, _ := setupTestTemplate(t) // Ensure template exists, though its path isn't directly used in cfg for this handler
+	cfg := &config.Config{               // Minimal config with engine config for our test
 		Setup: config.Setup{
 			App:     config.App{Version: "test-v0.1.0"},
 			Logging: config.Logging{Level: "error"},
@@ -412,6 +408,7 @@ func TestDownloadReport(t *testing.T) {
 			},
 		},
 	}
+	cfg.Server.StaticDir = staticDir
 	tempStorageDir := t.TempDir()
 	log := logf.New(logf.Opts{Level: logf.ErrorLevel})
 	realManager, err := storage.NewRecordManager(cfg, tempStorageDir, &log)

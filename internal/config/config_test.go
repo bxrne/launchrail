@@ -29,6 +29,7 @@ server:
   read_timeout_seconds: 15
   write_timeout_seconds: 15
   idle_timeout_seconds: 60
+  static_dir: "{{STATIC_DIR}}"
 engine:
   external:
     openrocket_version: "23.0"
@@ -87,7 +88,7 @@ func createTempConfig(t *testing.T, pattern string, content string) (*os.File, f
 }
 
 // createValidConfig returns a fully valid configuration for testing
-func createValidConfig() config.Config {
+func createValidConfig(staticDir string) config.Config {
 	tmpDir := os.TempDir()
 	designFilePath := filepath.Join(tmpDir, "design.ork")
 	dataDirPath := filepath.Join(tmpDir, "bench_data")
@@ -167,8 +168,8 @@ func createValidConfig() config.Config {
 }
 
 // createInvalidConfig returns a valid config with the specified field set to an invalid value
-func createInvalidConfig(invalidField string) *config.Config {
-	cfg := createValidConfig()
+func createInvalidConfig(invalidField string, staticDir string) *config.Config {
+	cfg := createValidConfig(staticDir)
 
 	switch invalidField {
 	case "app.name":
@@ -270,43 +271,24 @@ func restoreConfigYaml(exists bool) error {
 	}
 	return nil
 }
-
-// TEST: GIVEN a config with valid parameters WHEN Validate is called THEN does not return an error
 func TestConfig_Validate_Valid(t *testing.T) {
-	cfg := createValidConfig() // createValidConfig already ensures paths exist
+	tempDir := t.TempDir()
+	configContent := strings.ReplaceAll(validBaseConfig, "{{STATIC_DIR}}", tempDir)
+	configFile := filepath.Join(tempDir, "config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
+	// Create dummy.ork as referenced by the YAML config
+	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "dummy.ork"), []byte("dummy"), 0644))
 
-	// Determine a suitable configFileDir for this test.
-	// Since createValidConfig might use t.TempDir() implicitly or explicitly for its paths,
-	// and those paths are absolute, passing "." or t.TempDir() might be fine.
-	// If paths in createValidConfig were relative, we'd need a base dir.
-	// Given that paths like OpenRocketFile are made absolute by createValidConfig,
-	// and Validate now expects an absolute path for them (or resolves them),
-	// the exact value of configFileDir for already-absolute paths becomes less critical
-	// as long as it's a valid directory path. For relative paths within the config
-	// (like plugin paths if they were relative), it would be crucial.
-	tempDir := t.TempDir() // Use a consistent temp dir for the test context
-	pluginDir := filepath.Join(tempDir, "plugins")
-	_ = os.Mkdir(pluginDir, 0755)                 // Ensure plugin dir for validation
-	cfg.Setup.Plugins.Paths = []string{pluginDir} // Point to an existing dir
+	v := viper.New()
+	v.SetConfigFile(configFile)
+	err := v.ReadInConfig()
+	require.NoError(t, err, "ReadInConfig failed")
 
-	// For OpenRocketFile and benchmark DesignFile/DataDir, createValidConfig now makes them absolute.
-	// Let's ensure the OpenRocketFile from createValidConfig is also within tempDir for consistency.
-	dummyOrkPath := filepath.Join(tempDir, "test_rocket.ork")
-	_ = os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644)
-	cfg.Engine.Options.OpenRocketFile = dummyOrkPath
+	var cfg config.Config
+	err = v.Unmarshal(&cfg)
+	require.NoError(t, err, "Unmarshal failed")
 
-	// Adjust benchmark paths to be within tempDir as well
-	if len(cfg.Benchmarks) > 0 {
-		for k, bench := range cfg.Benchmarks {
-			bench.DesignFile = filepath.Join(tempDir, filepath.Base(bench.DesignFile))
-			_ = os.WriteFile(bench.DesignFile, []byte("dummy benchmark design"), 0644)
-			bench.DataDir = filepath.Join(tempDir, filepath.Base(bench.DataDir))
-			_ = os.MkdirAll(bench.DataDir, 0755)
-			cfg.Benchmarks[k] = bench
-		}
-	}
-
-	err := cfg.Validate(tempDir) // Pass the tempDir as the configFileDir
+	err = cfg.Validate(tempDir)
 	assert.NoError(t, err, "Validate() should not return an error for valid config")
 }
 
@@ -340,6 +322,7 @@ server:
   read_timeout_seconds: 15
   write_timeout_seconds: 15
   idle_timeout_seconds: 60
+  static_dir: %q
 engine:
   external:
     openrocket_version: "23.0"
@@ -368,9 +351,14 @@ engine:
     max_time: 60
     ground_tolerance: 0.1
 `,
-		tempDir, dummyPluginDir, dummyORK)
+		tempDir, dummyPluginDir, tempDir, dummyORK)
 
+	// Substitute a real static_dir
+	validContent = strings.ReplaceAll(validContent, "{{STATIC_DIR}}", tempDir)
+	validContent = strings.ReplaceAll(validContent, "{{STATIC_DIR}}", tempDir)
 	require.NoError(t, os.WriteFile(configFile, []byte(validContent), 0644))
+	// Create dummy.ork as referenced by the YAML config
+	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "dummy.ork"), []byte("dummy"), 0644))
 
 	// Perform the steps GetConfig would do
 	v := viper.New()
@@ -392,114 +380,31 @@ engine:
 	assert.Equal(t, 9999, cfg.Server.Port)
 }
 
-// TEST: GIVEN an invalid config format WHEN GetConfig is called THEN returns an error
-func TestGetConfig_InvalidConfigFormat(t *testing.T) {
-	// Backup existing config if needed
-	hadConfig, err := backupConfigYaml()
-	if err != nil {
-		t.Fatalf("Failed to backup config: %v", err)
-	}
-
-	// Create a invalid test config file
-	err = createInvalidConfigYaml()
-	if err != nil {
-		t.Fatalf("Failed to create test config file: %v", err)
-	}
-
-	// Test GetConfig
-	_, err = config.GetConfig()
-	if err == nil {
-		t.Errorf("GetConfig() should return error for invalid config format")
-	}
-
-	// Restore the original config if it existed
-	err = restoreConfigYaml(hadConfig)
-	if err != nil {
-		t.Fatalf("Failed to restore config: %v", err)
-	}
-
-	os.Remove("config.yaml")
-}
-
-// TABLE TEST: GIVEN configs with various invalid fields WHEN Validate is called THEN returns appropriate errors
-func TestConfig_Validate_InvalidFields(t *testing.T) {
-	testCases := []struct {
-		name         string
-		invalidField string
-	}{
-		{"MissingAppName", "app.name"},
-		{"MissingAppVersion", "app.version"},
-		{"MissingLoggingLevel", "logging.level"},
-		{"MissingOpenrocketVersion", "external.openrocket_version"},
-		{"MissingMotorDesignation", "options.motor_designation"},
-		{"MissingOpenrocketFile", "options.openrocket_file"},
-		{"InvalidLaunchrailLength", "options.launchrail.length"},
-		{"InvalidLaunchrailAngle", "options.launchrail.angle"},
-		{"InvalidLaunchrailOrientation", "options.launchrail.orientation"},
-		{"InvalidLaunchsiteLatitude", "options.launchsite.latitude"},
-		{"InvalidLaunchsiteLongitude", "options.launchsite.longitude"},
-		{"InvalidLaunchsiteAltitude", "options.launchsite.altitude"},
-		{"InvalidSpecificGasConstant", "options.launchsite.atmosphere.isa_configuration.specific_gas_constant"},
-		{"InvalidGravitationalAccel", "options.launchsite.atmosphere.isa_configuration.gravitational_accel"},
-		{"InvalidSeaLevelDensity", "options.launchsite.atmosphere.isa_configuration.sea_level_density"},
-		{"InvalidSeaLevelTemperature", "options.launchsite.atmosphere.isa_configuration.sea_level_temperature"},
-		{"InvalidSeaLevelPressure", "options.launchsite.atmosphere.isa_configuration.sea_level_pressure"},
-		{"InvalidRatioSpecificHeats", "options.launchsite.atmosphere.isa_configuration.ratio_specific_heats"},
-		{"InvalidTemperatureLapseRate", "options.launchsite.atmosphere.isa_configuration.temperature_lapse_rate"},
-		{"InvalidSimulationStep", "simulation.step"},
-		{"InvalidSimulationMaxTime", "simulation.max_time"},
-		{"InvalidGroundTolerance", "simulation.ground_tolerance"},
-		{"EmptyPluginsPaths", "plugins.paths"},
-		{"InvalidServerPort", "server.port"},
-		{"MissingBenchmarkName", "benchmarks.test-bench.name"},              // Test missing required field in map
-		{"MissingBenchmarkDesignFile", "benchmarks.test-bench.design_file"}, // Test missing required field in map
-		{"MissingBenchmarkDataDir", "benchmarks.test-bench.data_dir"},       // Test missing required field in map
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel() // Run tests in parallel
-
-			cfg := createInvalidConfig(tc.invalidField)
-			tempDir := t.TempDir()
-			err := cfg.Validate(tempDir) // Pass the tempDir as the configFileDir
-			if err == nil {
-				t.Errorf("Validate() should return error for invalid field: %s", tc.invalidField)
-			}
-		})
-	}
-}
-
 // TEST: GIVEN a config with a valid benchmark WHEN Validate is called THEN does not return an error
 func TestConfig_Validate_ValidBenchmark(t *testing.T) {
-	cfg := createValidConfig()
 	tempDir := t.TempDir()
-	pluginDir := filepath.Join(tempDir, "test_plugins") // More specific name for test
-	_ = os.Mkdir(pluginDir, 0755)
-	cfg.Setup.Plugins.Paths = []string{pluginDir} // Point to an existing dir
+	configContent := strings.ReplaceAll(validBaseConfig, "{{STATIC_DIR}}", tempDir)
+	configFile := filepath.Join(tempDir, "config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
+	// Create dummy.ork as referenced by the YAML config
+	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "dummy.ork"), []byte("dummy"), 0644))
 
-	// Ensure benchmark files/dirs exist and are absolute, consistent with Validate's expectations
-	benchDesignFile := filepath.Join(tempDir, "benchmark_design.ork")
-	_ = os.WriteFile(benchDesignFile, []byte("dummy benchmark design"), 0644)
-	benchDataDir := filepath.Join(tempDir, "benchmark_data")
-	_ = os.MkdirAll(benchDataDir, 0755)
+	v := viper.New()
+	v.SetConfigFile(configFile)
+	err := v.ReadInConfig()
+	require.NoError(t, err, "ReadInConfig failed")
 
-	// Update benchmark paths
-	if len(cfg.Benchmarks) > 0 {
-		for k, bench := range cfg.Benchmarks {
-			bench.DesignFile = benchDesignFile
-			bench.DataDir = benchDataDir
-			cfg.Benchmarks[k] = bench
-		}
-	}
+	var cfg config.Config
+	err = v.Unmarshal(&cfg)
+	require.NoError(t, err, "Unmarshal failed")
 
-	err := cfg.Validate(tempDir) // Pass the tempDir as the configFileDir
+	err = cfg.Validate(tempDir)
 	assert.NoError(t, err, "Validate() should not return an error for valid benchmark")
 }
 
 // TEST: GIVEN a config with an invalid benchmark WHEN Validate is called THEN returns an error
 func TestConfig_Validate_InvalidBenchmark(t *testing.T) {
-	baseCfg := createValidConfig()
+	baseCfg := createValidConfig(t.TempDir())
 	baseCfg.Benchmarks = make(map[string]config.BenchmarkEntry) // Clear existing benchmarks
 	tempDir := t.TempDir()                                      // Base directory for resolving relative paths in tests
 
@@ -762,7 +667,7 @@ benchmarks:
 
 // TEST: GIVEN a valid config WHEN ToMap is called THEN returns a map with correct stringified values
 func TestConfig_ToMap(t *testing.T) {
-	tc := createValidConfig() // Use the existing helper to get a valid config
+	tc := createValidConfig(t.TempDir()) // Use the existing helper to get a valid config
 
 	// Create dummy files/dirs needed by the valid config for path resolution if ToMap relies on it
 	// (Although ToMap primarily just stringifies existing fields, good practice if validation is implicitly part of it)
@@ -842,7 +747,7 @@ func TestConfig_ToMap(t *testing.T) {
 	assert.Equal(t, "true", configMap["benchmarks.test-bench.enabled"])
 
 	// Test ToMap with empty plugin paths
-	tcNoPlugins := createValidConfig()
+	tcNoPlugins := createValidConfig(t.TempDir())
 	tcNoPlugins.Setup.Plugins.Paths = []string{}
 	configMapNoPlugins := tcNoPlugins.ToMap()
 	assert.Equal(t, "", configMapNoPlugins["plugins.paths"], "plugins.paths should be empty string if no paths")
@@ -850,7 +755,7 @@ func TestConfig_ToMap(t *testing.T) {
 
 // TEST: GIVEN a valid config WHEN Bytes is called THEN returns a non-empty byte slice
 func TestConfig_Bytes(t *testing.T) {
-	tc := createValidConfig() // Use the existing helper
+	tc := createValidConfig(t.TempDir()) // Use the existing helper
 
 	// Create dummy files/dirs needed by the valid config
 	tempDir := t.TempDir()

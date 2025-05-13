@@ -327,7 +327,7 @@ func (tr *TemplateRenderer) GeneratePlots(data *ReportData) error {
 			tr.log.Warn("Skipping plot generation for empty plot key")
 			continue
 		}
-		plotPath := filepath.Join(tr.assetsDir, plotKey)
+		plotPath := filepath.Join(tr.assetsDir, plotKey+".svg")
 		tr.log.Debug("Generating plot", "key", plotKey, "path", plotPath)
 		if err := plotFunc(data, plotPath); err != nil {
 			tr.log.Error("Failed to generate plot", "key", plotKey, "path", plotPath, "error", err)
@@ -477,7 +477,7 @@ func (tr *TemplateRenderer) generateAccelerationVsTimePlot(data *ReportData, out
 // GenerateThrustVsTimePlot generates a plot for thrust vs. time, if motor data is available.
 func (tr *TemplateRenderer) GenerateThrustVsTimePlot(data *ReportData, outputPath string) error {
 	// Check if MotorData is present and has entries
-	if data.MotorData == nil || len(data.MotorData) == 0 {
+	if len(data.MotorData) == 0 {
 		tr.log.Warn("No motor data available for thrust vs. time plot", "outputPath", outputPath)
 		// Return a placeholder SVG or an error, depending on the desired behavior
 		return nil
