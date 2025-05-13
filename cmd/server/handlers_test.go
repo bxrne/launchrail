@@ -89,7 +89,11 @@ func TestReportAPIV2(t *testing.T) {
 	require.NoError(t, err, "Failed to create record directory")
 
 	// Create motion.csv with minimal test data
-	motionCSV := "time,x,altitude,z,vx,velocity_y,vz,ax,acceleration_y,az\n0.0,0,0,0,0,0,0,0,0,0\n1.0,0,100,0,0,10,0,0,0,0\n2.0,0,150,0,0,5,0,0,0,0\n"
+	motionCSV := `time,x,altitude,z,vx,velocity,vz,ax,acceleration,az
+0.0,0,0,0,0,0,0,0,0,0
+1.0,0,100,0,0,10,0,0,0,0
+2.0,0,150,0,0,5,0,0,0,0
+`
 	err = os.WriteFile(filepath.Join(recordDir, "motion.csv"), []byte(motionCSV), 0644)
 	require.NoError(t, err, "Failed to create motion.csv file")
 
@@ -132,7 +136,7 @@ func TestReportAPIV2(t *testing.T) {
 		records:    mockStorage,
 		Cfg:        cfg,
 		log:        &logger,
-		ProjectDir: "", // Not needed, template lookup uses staticDir
+		ProjectDir: "",  // Not needed, template lookup uses staticDir
 		AppConfig:  cfg, // Initialize AppConfig with test cfg
 	}
 
@@ -434,7 +438,7 @@ func TestDownloadReport(t *testing.T) {
 		records:    realManager,
 		Cfg:        cfg,
 		log:        &log,
-		ProjectDir: "", // Not needed for this test
+		ProjectDir: "",  // Not needed for this test
 		AppConfig:  cfg, // Initialize AppConfig with test cfg
 	}
 	router := gin.New()
@@ -529,7 +533,7 @@ func TestListRecordsAPI(t *testing.T) {
 		records:    realManager,
 		Cfg:        cfg,
 		log:        &log,
-		ProjectDir: "", // Not needed for this test
+		ProjectDir: "",  // Not needed for this test
 		AppConfig:  cfg, // Ensure AppConfig is initialized
 	}
 

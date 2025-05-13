@@ -817,7 +817,7 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 	// Render the main report template (e.g., report.md.tmpl)
 	// For now, assume 'report.md.tmpl' is the main/only template.
 	// The RenderToMarkdown method in the TemplateRenderer should use the configured templatesDir.
-	markdownContent, err := renderer.RenderToMarkdown(reportData, filepath.Join(reportDir, "report.md"))
+	markdownContent, err := renderer.RenderToMarkdown(reportData, "report.md.tmpl")
 	if err != nil {
 		h.log.Error("Failed to render report", "error", err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to render report"})
