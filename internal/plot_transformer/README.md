@@ -1,16 +1,13 @@
-## internal/plot_transformer
+# plot_transformer
 
-### Responsibility
-- Transforms simulation data into a format suitable for plotting.
-- Provides functions for converting data structures into plot data.
+Data transformation utility for converting simulation data into formats suitable for visualization and plotting.
 
-### Scope
-- Data transformation functions.
-- Plot data structure definitions.
-
-### Test Suite Overview
-- Tests should cover data transformation functions and ensure that the output is in the correct format.
-
-### Decisions & Potential Gotchas
-- Data transformation logic may need to be optimized for performance.
-- Output format should be well-defined and documented.
+## Notes
+- Transforms raw simulation data into plottable formats
+- Provides coordinate system transformations when needed
+- Handles data type conversions (e.g., string to float64)
+- Supports various plotting libraries and output formats
+- Implements data filtering and aggregation methods
+- Optimizes large datasets for visualization performance
+- Ensures consistent scaling and units across plot types
+- Maintains backward compatibility with existing visualization systems
