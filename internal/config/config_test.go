@@ -193,6 +193,95 @@ func TestConfig_Validate_Valid(t *testing.T) {
 	assert.NoError(t, err, "Validate() should not return an error for valid config")
 }
 
+// Test GetConfig with invalid config files and error conditions
+func TestGetConfig_NoConfigFile(t *testing.T) {
+	// Save current directory to restore later
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	
+	// Create a clean directory with no config file
+	tempDir := t.TempDir()
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+	
+	// Cleanup: change back to original directory afterward
+	defer func() {
+		err = os.Chdir(originalWd)
+		require.NoError(t, err)
+	}()
+	
+	// Attempt to get config, should fail with specific error
+	_, err = config.GetConfig()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read mandatory config file")
+}
+
+// Tests GetConfig with a malformed config file that can't be parsed
+func TestGetConfig_MalformedConfig(t *testing.T) {
+	// Save current directory to restore later
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	
+	// Create a temporary directory with a malformed config
+	tempDir := t.TempDir()
+	malformedContent := "this is not valid yaml"
+	configPath := filepath.Join(tempDir, "config.yaml")
+	err = os.WriteFile(configPath, []byte(malformedContent), 0644)
+	require.NoError(t, err)
+	
+	// Change to that directory
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+	
+	// Cleanup: change back to original directory afterward
+	defer func() {
+		err = os.Chdir(originalWd)
+		require.NoError(t, err)
+	}()
+	
+	// Attempt to get config, should fail during parsing
+	_, err = config.GetConfig()
+	require.Error(t, err)
+}
+
+// Test GetConfig with invalid configuration (validation failure)
+func TestGetConfig_InvalidConfig(t *testing.T) {
+	// Save current directory to restore later
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	
+	// Create a temporary directory with an invalid config
+	tempDir := t.TempDir()
+	invalidContent := `
+setup:
+  app:
+    name: TestApp
+    version: "1.0"
+  logging:
+    level: debug
+  plugins:
+    paths: []
+`
+	configPath := filepath.Join(tempDir, "config.yaml")
+	err = os.WriteFile(configPath, []byte(invalidContent), 0644)
+	require.NoError(t, err)
+	
+	// Change to that directory
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+	
+	// Cleanup: change back to original directory afterward
+	defer func() {
+		err = os.Chdir(originalWd)
+		require.NoError(t, err)
+	}()
+	
+	// Attempt to get config, should fail during validation
+	_, err = config.GetConfig()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to validate config")
+}
+
 // TEST: GIVEN a valid config file WHEN GetConfig is called THEN returns a valid config
 func TestGetConfig_ValidConfig(t *testing.T) {
 	// Refactored: Test the core logic GetConfig performs, but with a controlled temp file.
@@ -305,6 +394,379 @@ func TestConfig_Validate_ValidBenchmark(t *testing.T) {
 
 	err = cfg.Validate(tempDir)
 	assert.NoError(t, err, "Validate() should not return an error for valid benchmark")
+}
+
+// TestConfig_Validate_ServerOptions - Test validation of server configuration fields
+func TestConfig_Validate_ServerOptions(t *testing.T) {
+	tests := []struct {
+		name       string
+		mutateFunc func(*config.Config)
+		expectedErr string
+	}{
+		{
+			name: "Invalid port - too low",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Server.Port = 0
+			},
+			expectedErr: "server.port must be between 1 and 65535",
+		},
+		{
+			name: "Invalid port - too high",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Server.Port = 70000
+			},
+			expectedErr: "server.port must be between 1 and 65535",
+		},
+		{
+			name: "Invalid read timeout",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Server.ReadTimeout = 0
+			},
+			expectedErr: "server.read_timeout_seconds must be greater than zero",
+		},
+		{
+			name: "Invalid write timeout",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Server.WriteTimeout = 0
+			},
+			expectedErr: "server.write_timeout_seconds must be greater than zero",
+		},
+		{
+			name: "Invalid idle timeout",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Server.IdleTimeout = -1
+			},
+			expectedErr: "server.idle_timeout_seconds must be non-negative",
+		},
+		{
+			name: "Missing static dir",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Server.StaticDir = ""
+			},
+			expectedErr: "server.static_dir is required",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a temp dir for this test case
+			tempDir := t.TempDir()
+			
+			// Create a valid plugins directory
+			pluginsDir := filepath.Join(tempDir, "plugins")
+			require.NoError(t, os.MkdirAll(pluginsDir, 0755))
+			
+			// Create base config using the temp dir
+			cfg := createValidConfig(tempDir)
+			
+			// Set up valid plugin path
+			cfg.Setup.Plugins.Paths = []string{pluginsDir}
+			
+			// Apply the mutation to make the config invalid for the specific test
+			tc.mutateFunc(&cfg)
+			
+			// The validate function will use the current directory for relative paths
+			// We'll pass the temp dir as the config file directory for validation
+			err := cfg.Validate(tempDir)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
+}
+
+// TestConfig_Validate_SimulationOptions - Test validation of simulation configuration fields
+func TestConfig_Validate_SimulationOptions(t *testing.T) {
+	tests := []struct {
+		name       string
+		mutateFunc func(*config.Config)
+		expectedErr string
+	}{
+		{
+			name: "Invalid step - zero",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Simulation.Step = 0
+			},
+			expectedErr: "simulation.step must be greater than zero",
+		},
+		{
+			name: "Invalid step - negative",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Simulation.Step = -0.01
+			},
+			expectedErr: "simulation.step must be greater than zero",
+		},
+		{
+			name: "Invalid max time - zero",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Simulation.MaxTime = 0
+			},
+			expectedErr: "simulation.max_time must be greater than zero",
+		},
+		{
+			name: "Invalid max time - negative",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Simulation.MaxTime = -10
+			},
+			expectedErr: "simulation.max_time must be greater than zero",
+		},
+		{
+			name: "Invalid ground tolerance - negative",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Simulation.GroundTolerance = -0.1
+			},
+			expectedErr: "simulation.ground_tolerance must be non-negative",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a temp dir for this test case
+			tempDir := t.TempDir()
+			
+			// Create a valid plugins directory
+			pluginsDir := filepath.Join(tempDir, "plugins")
+			require.NoError(t, os.MkdirAll(pluginsDir, 0755))
+			
+			// Create dummy.ork file for validation
+			dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
+			require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
+			
+			// Create base config using the temp dir
+			cfg := createValidConfig(tempDir)
+			
+			// Set up valid plugin path and OpenRocket file
+			cfg.Setup.Plugins.Paths = []string{pluginsDir}
+			cfg.Engine.Options.OpenRocketFile = dummyOrkPath
+			
+			// Apply the mutation to make the config invalid for the specific test
+			tc.mutateFunc(&cfg)
+			
+			// The validate function will use the current directory for relative paths
+			// We'll pass the temp dir as the config file directory for validation
+			err := cfg.Validate(tempDir)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
+}
+
+// TestConfig_Validate_ISAConfiguration - Test validation of atmosphere/ISA configuration fields
+func TestConfig_Validate_ISAConfiguration(t *testing.T) {
+	tests := []struct {
+		name       string
+		mutateFunc func(*config.Config)
+		expectedErr string
+	}{
+		{
+			name: "Invalid gas constant - zero",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Options.Launchsite.Atmosphere.ISAConfiguration.SpecificGasConstant = 0
+			},
+			expectedErr: "options.launchsite.atmosphere.isa_configuration.specific_gas_constant is required",
+		},
+		{
+			name: "Invalid gravitational accel - zero",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Options.Launchsite.Atmosphere.ISAConfiguration.GravitationalAccel = 0
+			},
+			expectedErr: "options.launchsite.atmosphere.isa_configuration.gravitational_accel is required",
+		},
+		{
+			name: "Invalid sea level density - zero",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelDensity = 0
+			},
+			expectedErr: "options.launchsite.atmosphere.isa_configuration.sea_level_density is required",
+		},
+		{
+			name: "Invalid sea level temperature - below absolute zero",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelTemperature = -300
+			},
+			expectedErr: "options.launchsite.atmosphere.isa_configuration.sea_level_temperature must be above absolute zero",
+		},
+		{
+			name: "Invalid sea level pressure - zero",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Options.Launchsite.Atmosphere.ISAConfiguration.SeaLevelPressure = 0
+			},
+			expectedErr: "options.launchsite.atmosphere.isa_configuration.sea_level_pressure is required",
+		},
+		{
+			name: "Invalid ratio specific heats - equal to 1",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Options.Launchsite.Atmosphere.ISAConfiguration.RatioSpecificHeats = 1
+			},
+			expectedErr: "options.launchsite.atmosphere.isa_configuration.ratio_specific_heats must be greater than 1",
+		},
+		{
+			name: "Invalid temperature lapse rate - zero",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Options.Launchsite.Atmosphere.ISAConfiguration.TemperatureLapseRate = 0
+			},
+			expectedErr: "options.launchsite.atmosphere.isa_configuration.temperature_lapse_rate is required",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a temp dir for this test case
+			tempDir := t.TempDir()
+			
+			// Create a valid plugins directory
+			pluginsDir := filepath.Join(tempDir, "plugins")
+			require.NoError(t, os.MkdirAll(pluginsDir, 0755))
+			
+			// Create dummy.ork file for validation
+			dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
+			require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
+			
+			// Create base config using the temp dir
+			cfg := createValidConfig(tempDir)
+			
+			// Set up valid plugin path and OpenRocket file
+			cfg.Setup.Plugins.Paths = []string{pluginsDir}
+			cfg.Engine.Options.OpenRocketFile = dummyOrkPath
+			
+			// Apply the mutation to make the config invalid for the specific test
+			tc.mutateFunc(&cfg)
+			
+			// The validate function will use the current directory for relative paths
+			// We'll pass the temp dir as the config file directory for validation
+			err := cfg.Validate(tempDir)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
+}
+
+// TestConfig_Validate_PluginPaths tests validation of plugin paths
+func TestConfig_Validate_PluginPaths(t *testing.T) {
+	// Test empty plugin paths
+	t.Run("Empty plugin paths", func(t *testing.T) {
+		// Create a temp dir for this test case
+		tempDir := t.TempDir()
+		
+		// Create dummy.ork file for validation
+		dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
+		require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
+		
+		// Create base config using the temp dir
+		cfg := createValidConfig(tempDir)
+		cfg.Engine.Options.OpenRocketFile = dummyOrkPath
+		
+		// Set empty plugin paths to trigger validation error
+		cfg.Setup.Plugins.Paths = []string{}
+		
+		err := cfg.Validate(tempDir)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "plugins.paths must contain at least one valid path")
+	})
+	
+	// Test non-existent plugin path
+	t.Run("Non-existent plugin path", func(t *testing.T) {
+		// Create a temp dir for this test case
+		tempDir := t.TempDir()
+		
+		// Create dummy.ork file for validation
+		dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
+		require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
+		
+		// Create base config using the temp dir
+		cfg := createValidConfig(tempDir)
+		cfg.Engine.Options.OpenRocketFile = dummyOrkPath
+		
+		// Use absolute path to a non-existent directory
+		nonExistentPath := filepath.Join(tempDir, "non_existent_plugin_dir")
+		cfg.Setup.Plugins.Paths = []string{nonExistentPath}
+		
+		err := cfg.Validate(tempDir)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "plugins.paths[0] path does not exist")
+	})
+}
+
+// Test basic required fields of the config
+func TestConfig_Validate_RequiredFields(t *testing.T) {
+	tests := []struct {
+		name       string
+		mutateFunc func(*config.Config)
+		expectedErr string
+	}{
+		{
+			name: "Missing app name",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Setup.App.Name = ""
+			},
+			expectedErr: "app.name is required",
+		},
+		{
+			name: "Missing app version",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Setup.App.Version = ""
+			},
+			expectedErr: "app.version is required",
+		},
+		{
+			name: "Missing log level",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Setup.Logging.Level = ""
+			},
+			expectedErr: "logging.level is required",
+		},
+		{
+			name: "Missing OpenRocket version",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.External.OpenRocketVersion = ""
+			},
+			expectedErr: "external.openrocket_version is required",
+		},
+		{
+			name: "Missing motor designation",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Options.MotorDesignation = ""
+			},
+			expectedErr: "options.motor_designation is required",
+		},
+		{
+			name: "Missing OpenRocket file",
+			mutateFunc: func(cfg *config.Config) {
+				cfg.Engine.Options.OpenRocketFile = ""
+			},
+			expectedErr: "options.openrocket_file is required",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a temp dir for this test case
+			tempDir := t.TempDir()
+			
+			// Create a valid plugins directory
+			pluginsDir := filepath.Join(tempDir, "plugins")
+			require.NoError(t, os.MkdirAll(pluginsDir, 0755))
+			
+			// Create dummy.ork file for validation
+			dummyOrkPath := filepath.Join(tempDir, "dummy.ork")
+			require.NoError(t, os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644))
+			
+			// Create base config using the temp dir
+			cfg := createValidConfig(tempDir)
+			
+			// Set up valid plugin path and OpenRocket file
+			cfg.Setup.Plugins.Paths = []string{pluginsDir}
+			cfg.Engine.Options.OpenRocketFile = dummyOrkPath
+			
+			// Apply the mutation to make the config invalid for the specific test
+			tc.mutateFunc(&cfg)
+			
+			// The validate function will use the current directory for relative paths
+			// We'll pass the temp dir as the config file directory for validation
+			err := cfg.Validate(tempDir)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.expectedErr)
+		})
+	}
 }
 
 // TEST: GIVEN a config with an invalid benchmark WHEN Validate is called THEN returns an error
