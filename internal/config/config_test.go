@@ -279,6 +279,10 @@ func TestConfig_Validate_Valid(t *testing.T) {
 	// Create dummy.ork as referenced by the YAML config
 	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "dummy.ork"), []byte("dummy"), 0644))
 
+	// Create plugins directory as required by config validation
+	pluginsDir := filepath.Join(tempDir, "plugins")
+	require.NoError(t, os.MkdirAll(pluginsDir, 0755))
+
 	v := viper.New()
 	v.SetConfigFile(configFile)
 	err := v.ReadInConfig()
@@ -388,6 +392,10 @@ func TestConfig_Validate_ValidBenchmark(t *testing.T) {
 	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
 	// Create dummy.ork as referenced by the YAML config
 	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "dummy.ork"), []byte("dummy"), 0644))
+
+	// Create plugins directory as required by config validation
+	pluginsDir := filepath.Join(tempDir, "plugins")
+	require.NoError(t, os.MkdirAll(pluginsDir, 0755))
 
 	v := viper.New()
 	v.SetConfigFile(configFile)

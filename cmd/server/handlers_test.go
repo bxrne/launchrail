@@ -35,10 +35,10 @@ func setupTestTemplate(t *testing.T) (staticDir string, templatePath string) {
 	staticDir = t.TempDir()
 	templatesDir := filepath.Join(staticDir, "templates", "reports")
 	require.NoError(t, os.MkdirAll(templatesDir, 0755))
-	// Copy canonical template from project root
-	canonical := filepath.Join("templates", "reports", "report.md.tmpl")
+	// Adjust canonical path to be relative from cmd/server/ to project root's templates
+	canonical := filepath.Join("..", "..", "templates", "reports", "report.md.tmpl")
 	content, err := os.ReadFile(canonical)
-	require.NoError(t, err, "Failed to read canonical report.md.tmpl")
+	require.NoError(t, err, "Failed to read canonical template from: %s", canonical)
 	templatePath = filepath.Join(templatesDir, "report.md.tmpl")
 	require.NoError(t, os.WriteFile(templatePath, content, 0644))
 	return staticDir, templatePath
@@ -89,7 +89,7 @@ func TestReportAPIV2(t *testing.T) {
 	require.NoError(t, err, "Failed to create record directory")
 
 	// Create motion.csv with minimal test data
-	motionCSV := "t,x,y,z,vx,vy,vz,ax,ay,az\n0.0,0,0,0,0,0,0,0,0,0\n1.0,0,100,0,0,10,0,0,0,0\n2.0,0,150,0,0,5,0,0,0,0\n"
+	motionCSV := "time,x,altitude,z,vx,velocity_y,vz,ax,acceleration_y,az\n0.0,0,0,0,0,0,0,0,0,0\n1.0,0,100,0,0,10,0,0,0,0\n2.0,0,150,0,0,5,0,0,0,0\n"
 	err = os.WriteFile(filepath.Join(recordDir, "motion.csv"), []byte(motionCSV), 0644)
 	require.NoError(t, err, "Failed to create motion.csv file")
 
@@ -97,28 +97,7 @@ func TestReportAPIV2(t *testing.T) {
 	mockStorage := new(MockHandlerRecordManager)
 	mockStorage.storageDirPath = tempDir
 
-	// Setup the testdata templates directory which is checked first in handlers.go
-	testDataTemplatesDir := filepath.Join("testdata", "templates", "reports")
-	err = os.MkdirAll(testDataTemplatesDir, 0755)
-	require.NoError(t, err, "Failed to create templates directory in testdata")
-
-	// Create a simple report template matching our simplified template
-	templateContent := "# Simulation Report: {{.RecordID}}\n\nVersion: {{.Version}}\n\n## Summary\n\n* Max Altitude: {{printf \"%.1f\" .MotionMetrics.MaxAltitude}} meters\n* Max Velocity: {{printf \"%.1f\" .MotionMetrics.MaxVelocity}} m/s\n"
-
-	// Write the template only to the testdata location which is checked first
-	templateFile := filepath.Join(testDataTemplatesDir, "report.md.tmpl")
-	err = os.WriteFile(templateFile, []byte(templateContent), 0644)
-	require.NoError(t, err, "Failed to write template file")
-
-	// Copy the template to the cwd/templates/reports location for deployment tests
-	currentDirTemplatesDir := filepath.Join("templates", "reports")
-	err = os.MkdirAll(currentDirTemplatesDir, 0755)
-	if err == nil {
-		err = os.WriteFile(filepath.Join(currentDirTemplatesDir, "report.md.tmpl"), []byte(templateContent), 0644)
-		if err != nil {
-			t.Logf("Note: Failed to write template to current dir: %v (this is not critical)", err)
-		}
-	}
+	// No longer create or write templates in testdata or cwd. All tests use the canonical template copied by setupTestTemplate.
 
 	// Get the current directory to set as the project root
 	currDir, dirErr := os.Getwd()
@@ -130,7 +109,18 @@ func TestReportAPIV2(t *testing.T) {
 
 	// Create a test config and logger
 	staticDir, _ := setupTestTemplate(t)
-	cfg := &config.Config{}
+	cfg := &config.Config{
+		Setup: config.Setup{
+			App:     config.App{Version: "test-v0.1.0"},
+			Logging: config.Logging{Level: "info"},
+		},
+		Engine: config.Engine{
+			Options: config.Options{
+				OpenRocketFile:   "./testdata/l1.ork",
+				MotorDesignation: "TestMotor-ABC",
+			},
+		},
+	}
 	cfg.Server.StaticDir = staticDir
 	logger := logf.New(logf.Opts{
 		Writer: os.Stdout, // Enable output for debugging
@@ -142,10 +132,9 @@ func TestReportAPIV2(t *testing.T) {
 		records:    mockStorage,
 		Cfg:        cfg,
 		log:        &logger,
-		ProjectDir: currDir,
+		ProjectDir: "", // Not needed, template lookup uses staticDir
+		AppConfig:  cfg, // Initialize AppConfig with test cfg
 	}
-	// Set the project directory explicitly to find templates
-	dataHandler.ProjectDir = currDir
 
 	// Setup Gin router
 	gin.SetMode(gin.TestMode)
@@ -154,14 +143,9 @@ func TestReportAPIV2(t *testing.T) {
 
 	// Use the record ID and directory we set up earlier
 	// recordID and recordDir are already declared at the top of the function
-	err = os.MkdirAll(recordDir, 0755)
-	require.NoError(t, err, "Failed to create record directory")
-
-	// Create basic CSV files for motion data
-	motionData := "time,altitude,velocity\n0,0,0\n1,100,10\n2,180,5\n"
-	motionFilePath := filepath.Join(recordDir, "motion.csv")
-	err = os.WriteFile(motionFilePath, []byte(motionData), 0644)
-	require.NoError(t, err, "Failed to write motion data file")
+	// The following MkdirAll and WriteFile calls for motionData are removed
+	// as motionCSV is already written to recordDir/motion.csv earlier in the test.
+	// The more complete motionCSV should be used for plot generation.
 
 	// Let's create proper test files instead of mocks to avoid storage layer issues
 	// We'll also create a JSON config file since it's needed for the report
@@ -293,37 +277,22 @@ func TestReportAPIV2_Errors(t *testing.T) {
 		Level:  logf.WarnLevel,
 	})
 
-	// Get the current directory to set as project root
-	currDir, _ := os.Getwd()
+	// Use setupTestTemplate to set up canonical template in temp staticDir
+	staticDir, _ := setupTestTemplate(t)
+	cfg.Server.StaticDir = staticDir
 
 	// Create the handler with our mock
 	dataHandler := &DataHandler{
 		records:    mockStorage,
 		Cfg:        cfg,
 		log:        &logger,
-		ProjectDir: currDir,
+		ProjectDir: "",
+		AppConfig:  cfg,
 	}
 
 	// Setup router and register routes
 	router := gin.New()
 	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
-
-	// Create a mock templates directory with a report template
-	templatesDir := filepath.Join("testdata", "templates", "reports")
-	if err := os.MkdirAll(templatesDir, 0755); err != nil {
-		t.Fatalf("Failed to create templates directory: %v", err)
-	}
-
-	// Ensure we have at least the test template file
-	testTemplatePath := filepath.Join(templatesDir, "report.md.tmpl")
-	if _, err := os.Stat(testTemplatePath); os.IsNotExist(err) {
-		// Create a simple test template if it doesn't exist
-		testTemplate := "# Test Report: {{.RecordID}}\n\nVersion: {{.Version}}\n\n## Summary\n\n* Apogee: {{if .MotionMetrics}}{{printf \"%.1f\" .MotionMetrics.MaxAltitudeAGL}} meters{{else}}0.0{{end}}\n"
-		if err := os.WriteFile(testTemplatePath, []byte(testTemplate), 0644); err != nil {
-			t.Fatalf("Failed to create test template file: %v", err)
-		}
-	}
-	// Note: We've already set up tempDir above, no need to create it again
 
 	// Test cases for error conditions
 	testCases := []struct {
@@ -466,6 +435,7 @@ func TestDownloadReport(t *testing.T) {
 		Cfg:        cfg,
 		log:        &log,
 		ProjectDir: "", // Not needed for this test
+		AppConfig:  cfg, // Initialize AppConfig with test cfg
 	}
 	router := gin.New()
 	// The test was previously trying to hit /reports/{hash}/download, but ReportAPIV2 is mounted differently
@@ -560,6 +530,7 @@ func TestListRecordsAPI(t *testing.T) {
 		Cfg:        cfg,
 		log:        &log,
 		ProjectDir: "", // Not needed for this test
+		AppConfig:  cfg, // Ensure AppConfig is initialized
 	}
 
 	gin.SetMode(gin.TestMode)
