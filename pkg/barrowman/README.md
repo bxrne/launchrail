@@ -1,16 +1,13 @@
-## pkg/barrowman
+# barrowman
 
-### Responsibility
-- Provides functions for calculating the Barrowman coefficients of a rocket.
-- Implements the Barrowman method for calculating aerodynamic properties.
+Implementation of the Barrowman method for calculating rocket stability and aerodynamic properties.
 
-### Scope
-- Barrowman coefficient calculation functions.
-- Aerodynamic property calculation functions.
-
-### Test Suite Overview
-- Tests should cover Barrowman coefficient calculations and ensure that the output is accurate.
-
-### Decisions & Potential Gotchas
-- Barrowman method may not be accurate for all rocket geometries.
-- Calculation accuracy may need to be optimized for performance.
+## Notes
+- Calculates center of pressure (CP) for rocket configurations
+- Implements stability analysis based on CP and center of gravity
+- Accounts for fin, nose cone, and body tube geometries
+- Provides stability margin calculations for flight safety analysis
+- Handles both subsonic and transonic aerodynamic calculations
+- Includes corrections for different rocket configurations
+- Supports variable angle of attack calculations
+- Integrates with component models for comprehensive stability analysis

@@ -82,8 +82,7 @@ func writeMarkdownReport(runDir, tag string, results []BenchmarkResult) error {
 }
 
 func main() {
-	// --- Setup Logger ---
-	// Logger will be initialized after config is loaded.
+	var homeDir string
 
 	// --- Load Configuration ---
 	cfg, err := config.GetConfig()
@@ -91,20 +90,25 @@ func main() {
 		// Use standard log for critical early errors if config fails before logger is up
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
-	// Initialize logger with config level. This will be the first effective call.
-	benchLogger = logger.GetLogger(cfg.Setup.Logging.Level)
+
+	// Initialize logger using the new centralized function
+	// Override config level to ensure Debug/Warn messages are shown for benchmark analysis
+	benchLogger, err = logger.InitFileLogger("debug", "bench") // Use "debug" string
+	if err != nil {
+		log.Fatalf("CRITICAL: Failed to initialize file logger: %v", err) // Use standard log
+	}
 
 	benchLogger.Info("--- Starting Benchmark Run --- ")
 
-	// --- Create Base Output Directory ---
-	homeDir, err := os.UserHomeDir()
+	// --- Create Base Output Directory for benchmark results ---
+	homeDir, err = os.UserHomeDir()
 	if err != nil {
-		benchLogger.Fatal("Failed to get user home directory", "error", err)
+		benchLogger.Fatal("Failed to get user home directory for benchmark output", "error", err)
 	}
 	timestamp := time.Now().Format("20060102-150405")
 	baseOutputDir := filepath.Join(homeDir, ".launchrail", "benchmarks", timestamp)
 	if err := os.MkdirAll(baseOutputDir, 0755); err != nil {
-		benchLogger.Fatal("Failed to create base output directory", "path", baseOutputDir, "error", err)
+		benchLogger.Fatal("Failed to create base benchmark output directory", "path", baseOutputDir, "error", err)
 	}
 	benchLogger.Info("Benchmark results will be stored in", "directory", baseOutputDir)
 

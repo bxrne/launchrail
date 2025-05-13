@@ -1,16 +1,13 @@
-## pkg/designation
+# designation
 
-### Responsibility
-- Provides functions for parsing and describing motor designations.
-- Implements a regular expression for matching motor designation patterns.
+Motor designation system that implements standardized naming and classification for rocket motors.
 
-### Scope
-- Motor designation parsing functions.
-- Motor designation description functions.
-
-### Test Suite Overview
-- Tests should cover motor designation parsing and description.
-
-### Decisions & Potential Gotchas
-- Regular expression for motor designation patterns should be accurate and robust.
-- Parsing and description logic should be well-defined and documented.
+## Notes
+- Provides parsing and validation of standard motor designation codes
+- Implements motor classification according to total impulse ranges
+- Supports different motor designation standards (NAR, TRA, etc.)
+- Enables accurate identification of motor properties from designation codes
+- Handles specialized notation for reload, composite, and single-use motors
+- Includes utilities for motor categorization and comparison
+- Maintains compliance with industry-standard motor classification schemes
+- Facilitates integration with motor databases and catalogs

@@ -23,14 +23,35 @@ type TrapezoidFinset struct {
 	CrossSection   string         `xml:"crosssection"`
 	Cant           float64        `xml:"cant"`
 	TabHeight      float64        `xml:"tabheight"`
-	TabLength      float64        `xml:"tablength"`
+	TabLength      float64        `xml:"tablength,attr"`
 	TabPositions   []TabPosition  `xml:"tabposition"`
-	FilletRadius   float64        `xml:"filletradius"`
+	FilletRadius   float64        `xml:"filletradius,attr"`
 	FilletMaterial FilletMaterial `xml:"filletmaterial"`
-	RootChord      float64        `xml:"rootchord"`
-	TipChord       float64        `xml:"tipchord"`
-	SweepLength    float64        `xml:"sweeplength"`
+	RootChord      float64        `xml:"rootchord,attr"`
+	TipChord       float64        `xml:"tipchord,attr"`
+	SweepLength    float64        `xml:"sweeplength,attr"` // This might be sweep angle or sweep distance
 	Height         float64        `xml:"height"`
+	Subcomponents  struct {
+		Fillets []Fillet `xml:"fillet"`
+	} `xml:"subcomponents"`
+}
+
+// Fillet represents a fillet subcomponent within a fin set.
+type Fillet struct {
+	XMLName     xml.Name    `xml:"fillet"`
+	Name        string      `xml:"name"`
+	ID          string      `xml:"id"`
+	AxialOffset AxialOffset `xml:"axialoffset"`
+	Position    Position    `xml:"position"`
+	Length      float64     `xml:"length"`
+	Radius      float64     `xml:"radius"`
+	Material    Material    `xml:"material"` // Or could be a simpler surface material type
+}
+
+// String returns a string representation of the Fillet.
+func (f *Fillet) String() string {
+	return fmt.Sprintf("Fillet{Name='%s', ID='%s', Length=%.3f, Radius=%.3f, Material='%s'}",
+		f.Name, f.ID, f.Length, f.Radius, f.Material.Name)
 }
 
 // GetMass calculates mass based on material density and dimensions
@@ -51,7 +72,15 @@ func (t *TrapezoidFinset) String() string {
 		}
 	}
 
-	return fmt.Sprintf("TrapezoidFinset{Name=%s, ID=%s, InstanceCount=%d, FinCount=%d, RadiusOffset=%s, AngleOffset=%s, Rotation=%.2f, AxialOffset=%s, Position=%s, Finish=%s, Material=%s, Thickness=%.2f, CrossSection=%s, Cant=%.2f, TabHeight=%.2f, TabLength=%.2f, TabPositions=(%s), FilletRadius=%.2f, RootChord=%.2f, TipChord=%.2f, SweepLength=%.2f, Height=%.2f}", t.Name, t.ID, t.InstanceCount, t.FinCount, t.RadiusOffset.String(), t.AngleOffset.String(), t.Rotation, t.AxialOffset.String(), t.Position.String(), t.Finish, t.Material.String(), t.Thickness, t.CrossSection, t.Cant, t.TabHeight, t.TabLength, tabPosition, t.FilletRadius, t.RootChord, t.TipChord, t.SweepLength, t.Height)
+	var fillets string
+	for i, f := range t.Subcomponents.Fillets {
+		fillets += f.String()
+		if i < len(t.Subcomponents.Fillets)-1 {
+			fillets += ", "
+		}
+	}
+
+	return fmt.Sprintf("TrapezoidFinset{Name=%s, ID=%s, InstanceCount=%d, FinCount=%d, RadiusOffset=%s, AngleOffset=%s, Rotation=%.2f, AxialOffset=%s, Position=%s, Finish=%s, Material=%s, Thickness=%.2f, CrossSection=%s, Cant=%.2f, TabHeight=%.2f, TabLength=%.2f, TabPositions=(%s), FilletRadius=%.2f, FilletMaterial=%s, RootChord=%.2f, TipChord=%.2f, SweepLength=%.2f, Height=%.2f, Subcomponents={Fillets=(%s)}}", t.Name, t.ID, t.InstanceCount, t.FinCount, t.RadiusOffset.String(), t.AngleOffset.String(), t.Rotation, t.AxialOffset.String(), t.Position.String(), t.Finish, t.Material.String(), t.Thickness, t.CrossSection, t.Cant, t.TabHeight, t.TabLength, tabPosition, t.FilletRadius, t.FilletMaterial.String(), t.RootChord, t.TipChord, t.SweepLength, t.Height, fillets)
 }
 
 // TabPosition represents the tabposition element of the XML document

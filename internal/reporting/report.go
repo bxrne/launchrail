@@ -200,12 +200,12 @@ func parseSimData(log *logf.Logger, csvData []byte, delimiter string) ([]*plotSi
 
 // LoadSimulationData orchestrates loading all necessary data for a report.
 func LoadSimulationData(recordID string, rm *storage.RecordManager, reportSpecificDir string, appCfg *config.Config) (*ReportData, error) {
-	log := logger.GetLogger("reporting")
+	log := logger.GetLogger(appCfg.Setup.Logging.Level)
 	if log == nil {
 		return nil, fmt.Errorf("failed to initialize logger: logger.GetLogger returned nil")
 	}
 
-	log.Info("Loading simulation data for report", "recordID", recordID, "directory", reportSpecificDir)
+	log.Info("Loading simulation data for report", "recordID", recordID)
 
 	rData := &ReportData{
 		RecordID:         recordID,

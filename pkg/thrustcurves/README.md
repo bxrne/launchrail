@@ -1,26 +1,13 @@
-# pkg/thrustcurves
+# thrustcurves
 
-This package provides functionality for loading and managing thrust curve data.
+Motor thrust curve implementation that provides accurate thrust modeling for rocket motor simulation.
 
-## Responsibility
-
-*   Load thrust curve data from different sources.
-*   Manage the thrust curve data.
-
-## Scope
-
-*   Support different thrust curve file formats.
-*   Provide a consistent interface for accessing thrust curve data.
-
-## Gotchas
-
-*   Accuracy of the thrust curve data.
-*   Handling different thrust curve file formats.
-
-## Test Suite Overview
-
-The test suite includes unit tests for the core functionality of the package, including:
-
-*   Loading thrust curve data.
-*   Managing the thrust curve data.
-*   Handling different thrust curve file formats.
+## Notes
+- Manages motor thrust curves from standardized data files
+- Implements interpolation for precise thrust values at any time point
+- Calculates motor impulse and performance characteristics
+- Supports various motor types and configurations
+- Handles propellant mass consumption modeling during burns
+- Provides motor classification based on total impulse
+- Integrates with component system for realistic motor behavior
+- Enables custom thrust curve definition for specialized motors

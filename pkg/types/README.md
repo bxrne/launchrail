@@ -1,25 +1,13 @@
-# pkg/types
+# types
 
-This package defines the core types used throughout the launchrail application.
+Fundamental data types and mathematical structures for representing physical quantities in the simulation.
 
-## Responsibility
-
-*   Define the core types used throughout the launchrail application.
-*   Provide a consistent and well-defined type system.
-
-## Scope
-
-*   Include all necessary types for the application.
-*   Support different data types, such as integers, floats, and strings.
-
-## Gotchas
-
-*   Ensuring type safety throughout the application.
-*   Handling changes to the type system.
-
-## Test Suite Overview
-
-The test suite includes unit tests for the core types, including:
-
-*   Validating the type definitions.
-*   Ensuring type safety.
+## Notes
+- Implements core mathematical types such as Vector3, Quaternion, and Matrix3x3
+- Provides physical state representations (Position, Velocity, Acceleration)
+- Defines specialized types for mass, orientation, and other physical properties
+- Includes methods for vector operations and coordinate transformations
+- Implements quaternion-based rotation calculations for 3D space
+- Supports serialization of types for storage and communication
+- Ensures type safety and consistent units across the simulation
+- Provides utility functions for common mathematical operations

@@ -1,25 +1,13 @@
-# pkg/entities
+# entities
 
-This package defines the core entities used in the launchrail application.
+Entity definitions and management system for rocket simulation using the entity-component architecture.
 
-## Responsibility
-
-*   Define the data structures for rockets, flights, and other relevant entities.
-*   Provide a consistent and well-defined data model for the application.
-
-## Scope
-
-*   Include all necessary attributes for each entity.
-*   Support different units of measurement.
-
-## Gotchas
-
-*   Ensuring data consistency across the application.
-*   Handling changes to the data model.
-
-## Test Suite Overview
-
-The test suite includes unit tests for the core entities, including:
-
-*   Validating the data structures.
-*   Ensuring data consistency.
+## Notes
+- Implements core entity definitions (rockets, launch pads, etc.)
+- Aggregates components to build complete functional entities
+- Provides entity creation and initialization methods
+- Manages entity lifecycle through simulation phases
+- Calculates complex entity properties based on component data
+- Maintains physical properties like mass, center of gravity
+- Ensures proper component relationships and dependencies
+- Supports runtime querying and modification of entity attributes
