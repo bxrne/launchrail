@@ -31,15 +31,15 @@ type HandlerRecordManager interface {
 	ListRecords() ([]*storage.Record, error)
 	GetRecord(hash string) (*storage.Record, error)
 	DeleteRecord(hash string) error
-	GetStorageDir() string // Used by reporting.GenerateReportPackage
+	GetStorageDir() string
 }
 
 type DataHandler struct {
 	records    HandlerRecordManager
 	Cfg        *config.Config
 	log        *logf.Logger
-	ProjectDir string         // Path to project root directory for finding templates
-	AppConfig  *config.Config // Added AppConfig field
+	ProjectDir string
+	AppConfig  *config.Config
 }
 
 // NewDataHandler creates a new instance of DataHandler.
@@ -48,12 +48,9 @@ func NewDataHandler(records HandlerRecordManager, cfg *config.Config, log *logf.
 	execPath, err := os.Executable()
 	projectDir := ""
 	if err == nil {
-		// Use the executable's directory as a base and navigate up to find templates
 		projectDir = filepath.Dir(execPath)
-		// In production, the executable is likely in a binary directory, so we navigate up
 		potentialTemplateDir := filepath.Join(projectDir, "templates")
 		if _, err := os.Stat(potentialTemplateDir); os.IsNotExist(err) {
-			// Go up one directory for development scenarios
 			projectDir = filepath.Dir(projectDir)
 		}
 	}
@@ -63,7 +60,7 @@ func NewDataHandler(records HandlerRecordManager, cfg *config.Config, log *logf.
 		Cfg:        cfg,
 		log:        log,
 		ProjectDir: projectDir,
-		AppConfig:  appCfg, // Initialize AppConfig field
+		AppConfig:  appCfg,
 	}
 }
 
@@ -72,22 +69,18 @@ func NewDataHandler(records HandlerRecordManager, cfg *config.Config, log *logf.
 // Defaults to 200 OK otherwise.
 func (h *DataHandler) renderTempl(c *gin.Context, component templ.Component, statusCodes ...int) {
 	// Determine the status code to set
-	statusCode := http.StatusOK // Default to 200 OK
+	statusCode := http.StatusOK
 	setStatus := false
 	if len(statusCodes) > 0 && statusCodes[0] >= 400 {
 		statusCode = statusCodes[0]
-		setStatus = true // Mark that we intended to set a specific status
+		setStatus = true
 	}
 	c.Status(statusCode) // Set the status code
 
 	err := component.Render(c.Request.Context(), c.Writer)
 	if err != nil {
 		h.log.Error("Failed to render template", "intended_status", statusCode, "error", err)
-		// If we specifically set an error status code beforehand,
-		// don't overwrite it with a 500 just because rendering failed.
-		// Log the render error, but let the original status stand.
 		if !setStatus && !c.Writer.Written() {
-			// Only abort with 500 if we hadn't already set a specific error status
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to render template"})
 		}
 	}
@@ -114,7 +107,7 @@ func (h *DataHandler) ListRecords(c *gin.Context) {
 
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
-		h.renderTempl(c, pages.ErrorPage("Failed to list records"), http.StatusInternalServerError) // Pass status
+		h.renderTempl(c, pages.ErrorPage("Failed to list records"), http.StatusInternalServerError)
 		return
 	}
 
@@ -212,7 +205,6 @@ func (h *DataHandler) DeleteRecord(c *gin.Context) {
 		// Prepare props for the RecordList component (no pagination for this simple swap)
 		props := pages.DataProps{
 			Records: pageRecords,
-			// Pagination: pages.Pagination{}, // Omit pagination for now
 		}
 
 		// Set content type and render the component
@@ -431,7 +423,7 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 		return
 	}
 
-	_, data, err := storage.ReadHeadersAndData() // Use blank identifier for headers as it's not directly used here
+	_, data, err := storage.ReadHeadersAndData()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read data"})
 		return
@@ -442,10 +434,7 @@ func (h *DataHandler) ExplorerSortData(c *gin.Context) {
 	colIndex := -1
 	var sortHeaders []string
 	if len(data) > 0 {
-		// Assuming the first row of data contains headers if headers aren't fetched separately
-		// This needs verification based on how storage.ReadHeadersAndData works.
-		// Let's assume for now we need to fetch headers properly if they aren't in data[0]
-		headers, _, err := storage.ReadHeadersAndData() // Fetch headers specifically for sorting
+		headers, _, err := storage.ReadHeadersAndData()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read headers for sorting"})
 			return
@@ -954,8 +943,8 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 	baseReportDir := filepath.Join(currentUser.HomeDir, ".launchrail", "reports")
 
 	// Define reportDir and assetsDir based on the base path and recordID
-	reportDir := filepath.Join(baseReportDir, recordID) // e.g., ~/.launchrail/reports/RECORD_ID/
-	assetsDir := filepath.Join(reportDir, "assets")     // e.g., ~/.launchrail/reports/RECORD_ID/assets/
+	reportDir := filepath.Join(baseReportDir, recordID)
+	assetsDir := filepath.Join(reportDir, "assets")
 
 	// Ensure report directories exist. This should happen *before* any rendering attempt that needs assets.
 	h.log.Info("Ensuring report directories exist", "reportDir", reportDir, "assetsDir", assetsDir)
