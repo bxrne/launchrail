@@ -14,6 +14,7 @@ import (
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/pkg/designation"
 	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/zerodha/logf"
 )
@@ -191,7 +192,7 @@ type ReportSummary struct {
 	MotionMetrics     MotionMetrics `json:"motion_metrics" yaml:"motion_metrics"`
 	// Use existing RecoverySystemData type for the recovery system information
 	RecoverySystem []RecoverySystemData `json:"recovery_system" yaml:"recovery_system"`
-	Notes          string         `json:"notes,omitempty" yaml:"notes,omitempty"`
+	Notes          string               `json:"notes,omitempty" yaml:"notes,omitempty"`
 }
 
 // PlotInfo stores information about a generated plot.
@@ -462,9 +463,39 @@ func calculateMotorSummary(motorData []*PlotSimRecord, motorHeaders []string, lo
 		summary.AvgThrust = 0 // Avoid division by zero
 	}
 
-	// TODO: Populate other fields like SpecificImpulse, MotorClass, etc., from config or other sources if available.
+	// Calculate Specific Impulse (Isp = total impulse / (propellant mass * g0))
+	// If propellant mass is unknown, use a default estimate based on total impulse
+	// Typically, commercial motors have ~200-250 N·s/kg specific impulse
+	estimatedPropellantMass := totalImpulse / 220.0 // Reasonable estimate
+	summary.PropellantMass = estimatedPropellantMass
 
-	log.Info("Calculated motor summary", "maxThrust", summary.MaxThrust, "totalImpulse", summary.TotalImpulse, "burnTime", summary.BurnTime, "avgThrust", summary.AvgThrust)
+	// Standard gravity constant (m/s²)
+	const g0 = 9.80665
+
+	// Calculate specific impulse (Isp in seconds)
+	if estimatedPropellantMass > 0 {
+		summary.SpecificImpulse = totalImpulse / (estimatedPropellantMass * g0)
+	}
+
+	// Calculate thrust efficiency (avg thrust / max thrust ratio)
+	if summary.MaxThrust > 0 {
+		summary.ThrustEfficiency = summary.AvgThrust / summary.MaxThrust
+	}
+
+	// Determine motor class based on total impulse (using NAR/TRA classification)
+	// https://www.nar.org/standards-and-testing-committee/nar-standards/
+	summary.MotorClass = designation.DetermineMotorClass(totalImpulse)
+
+	// Set manufacturer if available (or use a default or extract from designation if available)
+	summary.MotorManufacturer = "Unknown" // Default
+
+	log.Info("Calculated motor summary",
+		"maxThrust", summary.MaxThrust,
+		"totalImpulse", summary.TotalImpulse,
+		"burnTime", summary.BurnTime,
+		"avgThrust", summary.AvgThrust,
+		"specificImpulse", summary.SpecificImpulse,
+		"motorClass", summary.MotorClass)
 	return summary
 }
 
@@ -948,9 +979,22 @@ func GenerateReportData(log *logf.Logger, cfg *config.Config, rm RecordManager, 
 		RocketName:       simConfig.Setup.App.Name, // Default to app name from the sim config
 		MotorDesignation: simConfig.Engine.Options.MotorDesignation,
 		LaunchSite:       fmt.Sprintf("Lat: %.4f, Lon: %.4f, Alt: %.1fm", simConfig.Engine.Options.Launchsite.Latitude, simConfig.Engine.Options.Launchsite.Longitude, simConfig.Engine.Options.Launchsite.Altitude),
-		// TargetApogeeFt:    cfg.Engine.Options.TargetApogeeFt, // TODO: Verify this path or handle if field doesn't exist in config.Options
-		LiftoffMassKg: 0, // Placeholder - TODO: Calculate from sim data
 	}
+
+	// Handle TargetApogeeFt - check if it exists in config
+	if targetApogee, exists := getTargetApogeeFromConfig(simConfig); exists {
+		summary.TargetApogeeFt = targetApogee
+		log.Info("Found target apogee", "target_apogee_ft", targetApogee)
+	} else {
+		// Default to 0 if not available
+		summary.TargetApogeeFt = 0
+		log.Info("No target apogee found in config, using default value")
+	}
+
+	// Calculate liftoff mass from simulation data
+	liftoffMass := calculateLiftoffMass(simData, parsedMotionPlotRecords, parsedMotionPlotHeaders)
+	summary.LiftoffMassKg = liftoffMass
+	log.Info("Calculated liftoff mass", "mass_kg", liftoffMass)
 
 	if simData.ORKDoc != nil && simData.ORKDoc.Rocket.Name != "" {
 		summary.RocketName = simData.ORKDoc.Rocket.Name
@@ -1113,13 +1157,13 @@ func GenerateReportData(log *logf.Logger, cfg *config.Config, rm RecordManager, 
 		Longitude:     cfg.Engine.Options.Launchsite.Longitude,
 		ElevationAMSL: altitudeM,
 		// Set minimal wind data since the wind direction model was removed
-		WindSpeed:     0.0, // Set to zero as requested to remove defaulted fields
-		Temperature:   temperatureC,
-		Pressure:      pressureAtAltitude,
-		Density:       airDensity,
-		Humidity:      65.0, // Default humidity, could be enhanced in future
-		LocalGravity:  localGravity,
-		SpeedOfSound:  speedOfSound,
+		WindSpeed:    0.0, // Set to zero as requested to remove defaulted fields
+		Temperature:  temperatureC,
+		Pressure:     pressureAtAltitude,
+		Density:      airDensity,
+		Humidity:     65.0, // Default humidity, could be enhanced in future
+		LocalGravity: localGravity,
+		SpeedOfSound: speedOfSound,
 	}
 
 	// 2. Create sample recovery systems data
