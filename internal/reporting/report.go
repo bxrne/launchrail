@@ -810,9 +810,9 @@ func FindParachuteEvents(eventsData [][]string, log *logf.Logger) []RecoverySyst
 }
 
 // processParachuteStatusColumn checks for parachute info in a dedicated status column
-func processParachuteStatusColumn(row []string, parachuteStatusIdx, eventNameIdx, parachuteTypeIdx int, 
+func processParachuteStatusColumn(row []string, parachuteStatusIdx, eventNameIdx, parachuteTypeIdx int,
 	deploymentTime float64, log *logf.Logger, parachuteMap map[string]RecoverySystemData) bool {
-	
+
 	// Skip if we don't have a dedicated parachute status column
 	if parachuteStatusIdx < 0 || parachuteStatusIdx >= len(row) {
 		return false
@@ -830,9 +830,9 @@ func processParachuteStatusColumn(row []string, parachuteStatusIdx, eventNameIdx
 }
 
 // processParachuteEventName looks for parachute info in event name
-func processParachuteEventName(row []string, eventNameIdx, statusIdx int, deploymentTime float64, 
+func processParachuteEventName(row []string, eventNameIdx, statusIdx int, deploymentTime float64,
 	log *logf.Logger, parachuteMap map[string]RecoverySystemData) bool {
-	
+
 	// Skip if we don't have event name column
 	if eventNameIdx < 0 || eventNameIdx >= len(row) {
 		return false
@@ -867,11 +867,11 @@ func processParachuteEventName(row []string, eventNameIdx, statusIdx int, deploy
 }
 
 // processParachuteInColumnValues searches all columns for parachute status information
-func processParachuteInColumnValues(row, headers []string, timeIdx, eventNameIdx, statusIdx int, 
+func processParachuteInColumnValues(row, headers []string, timeIdx, eventNameIdx, statusIdx int,
 	deploymentTime float64, log *logf.Logger, parachuteMap map[string]RecoverySystemData) bool {
-	
+
 	found := false
-	
+
 	for colIdx, colValue := range row {
 		// Skip already processed columns
 		if colIdx == timeIdx || colIdx == eventNameIdx || colIdx == statusIdx {

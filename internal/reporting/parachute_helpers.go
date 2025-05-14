@@ -112,9 +112,9 @@ func getDescentRate(parachuteType string) float64 {
 // processParachuteDeployment creates or updates recovery system data in the map
 func processParachuteDeployment(parachuteType string, deploymentTime float64, log *logf.Logger, parachuteMap map[string]RecoverySystemData) {
 	descentRate := getDescentRate(parachuteType)
-	
+
 	log.Info("Found parachute deployment event", "type", parachuteType, "time", deploymentTime)
-	
+
 	parachuteMap[parachuteType] = RecoverySystemData{
 		Type:        parachuteType,
 		Deployment:  deploymentTime,

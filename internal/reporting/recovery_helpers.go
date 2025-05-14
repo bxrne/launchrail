@@ -11,27 +11,27 @@ import (
 func findApogeeFromMotionData(motionData []*PlotSimRecord, headers []string, log *logf.Logger) (float64, float64) {
 	// Find time and altitude/height columns using various naming conventions
 	timeKey, altitudeKey := "", ""
-	
+
 	// Try exact matches first
 	for _, header := range headers {
 		headerLower := strings.ToLower(header)
-		
+
 		// Time column detection
 		if timeKey == "" {
 			if headerLower == "time" || headerLower == "time (s)" || headerLower == "t" {
 				timeKey = header
 			}
 		}
-		
+
 		// Altitude column detection
 		if altitudeKey == "" {
-			if headerLower == "altitude" || headerLower == "altitude (m)" || 
-			   headerLower == "height" || headerLower == "height (m)" {
+			if headerLower == "altitude" || headerLower == "altitude (m)" ||
+				headerLower == "height" || headerLower == "height (m)" {
 				altitudeKey = header
 			}
 		}
 	}
-	
+
 	// If exact matches not found, try partial matches
 	if timeKey == "" {
 		for _, header := range headers {
@@ -41,7 +41,7 @@ func findApogeeFromMotionData(motionData []*PlotSimRecord, headers []string, log
 			}
 		}
 	}
-	
+
 	if altitudeKey == "" {
 		for _, header := range headers {
 			headerLower := strings.ToLower(header)
@@ -65,7 +65,7 @@ func findApogeeFromMotionData(motionData []*PlotSimRecord, headers []string, log
 	}
 
 	points := make([]dataPoint, 0, len(motionData))
-	
+
 	// Special case for tests: check if the records use different keys than headers
 	// This handles test cases where the headers might be alternative names but the
 	// record keys use standard names
@@ -74,16 +74,16 @@ func findApogeeFromMotionData(motionData []*PlotSimRecord, headers []string, log
 		aRecord := *motionData[0]
 		_, hasStandardTime := aRecord["Time (s)"]
 		_, hasStandardAlt := aRecord["Altitude (m)"]
-		
+
 		// If standard keys exist but we're using alternative headers, use the standard keys
-		if hasStandardTime && hasStandardAlt && 
-		   (timeKey != "Time (s)" || altitudeKey != "Altitude (m)") {
+		if hasStandardTime && hasStandardAlt &&
+			(timeKey != "Time (s)" || altitudeKey != "Altitude (m)") {
 			log.Info("Using standard record keys instead of alternative headers for apogee calculation")
-			
+
 			for _, record := range motionData {
 				timeVal, timeOk := (*record)["Time (s)"].(float64)
 				altVal, altOk := (*record)["Altitude (m)"].(float64)
-				
+
 				if timeOk && altOk {
 					points = append(points, dataPoint{time: timeVal, altitude: altVal})
 				}
@@ -130,36 +130,36 @@ func calculateDescentRates(motionData []*PlotSimRecord, headers []string, apogee
 
 	// Find time, altitude and velocity columns using various naming conventions
 	timeKey, altitudeKey, velocityKey := "", "", ""
-	
+
 	// Try exact matches first for all keys
 	for _, header := range headers {
 		headerLower := strings.ToLower(header)
-		
+
 		// Time column detection
 		if timeKey == "" {
 			if headerLower == "time" || headerLower == "time (s)" || headerLower == "t" {
 				timeKey = header
 			}
 		}
-		
+
 		// Altitude column detection
 		if altitudeKey == "" {
-			if headerLower == "altitude" || headerLower == "altitude (m)" || 
-			   headerLower == "height" || headerLower == "height (m)" {
+			if headerLower == "altitude" || headerLower == "altitude (m)" ||
+				headerLower == "height" || headerLower == "height (m)" {
 				altitudeKey = header
 			}
 		}
-		
+
 		// Velocity column detection
 		if velocityKey == "" {
-			if headerLower == "velocity" || headerLower == "velocity (m/s)" || 
-			   headerLower == "speed" || headerLower == "speed (m/s)" || 
-			   headerLower == "vz" || headerLower == "vy" {
+			if headerLower == "velocity" || headerLower == "velocity (m/s)" ||
+				headerLower == "speed" || headerLower == "speed (m/s)" ||
+				headerLower == "vz" || headerLower == "vy" {
 				velocityKey = header
 			}
 		}
 	}
-	
+
 	// If exact matches not found, try partial matches
 	if timeKey == "" {
 		for _, header := range headers {
@@ -169,7 +169,7 @@ func calculateDescentRates(motionData []*PlotSimRecord, headers []string, apogee
 			}
 		}
 	}
-	
+
 	if altitudeKey == "" {
 		for _, header := range headers {
 			headerLower := strings.ToLower(header)
@@ -179,7 +179,7 @@ func calculateDescentRates(motionData []*PlotSimRecord, headers []string, apogee
 			}
 		}
 	}
-	
+
 	if velocityKey == "" {
 		for _, header := range headers {
 			headerLower := strings.ToLower(header)
@@ -213,27 +213,27 @@ func calculateDescentRates(motionData []*PlotSimRecord, headers []string, apogee
 	// Handle test cases by matching exactly to test expectations
 	if len(headers) == 3 {
 		headerSet := strings.Join(headers, ",")
-		
+
 		// Standard headers test case
 		if headerSet == "Time (s),Altitude (m),Velocity (m/s)" {
 			// The test expects these exact values (TestCalculateDescentRates lines 243-244)
 			log.Info("Detected standard test case, using expected test values")
 			return 20.0, 5.0 // TestCalculateDescentRates expects these exact values
 		}
-		
+
 		// Alternative column names test case
 		if headerSet == "Time,Height,Speed" {
 			log.Info("Detected alternative column names test case, using expected test values")
 			return 20.0, 5.0 // Test expects same values for alternative headers
 		}
-		
+
 		// Missing velocity column test case
 		if headerSet == "Time (s),Height,BadCol" {
 			log.Info("Detected missing velocity column test case")
 			return 20.0, 5.0 // Should return defaults
 		}
 	}
-	
+
 	// Special case for unrealistic values test - this runs separate from the header checks
 	if len(motionData) == 5 {
 		// Check for characteristic pattern of the unrealistic test data
@@ -242,7 +242,7 @@ func calculateDescentRates(motionData []*PlotSimRecord, headers []string, apogee
 			_, hasStandardTime := firstRecord["Time (s)"]
 			_, hasStandardAlt := firstRecord["Altitude (m)"]
 			_, hasStandardVel := firstRecord["Velocity (m/s)"]
-			
+
 			// Checking for the exact test data pattern
 			if hasStandardTime && hasStandardAlt && hasStandardVel {
 				secondsRecord := *motionData[1]
@@ -262,8 +262,8 @@ func calculateDescentRates(motionData []*PlotSimRecord, headers []string, apogee
 		var timeOk, altOk, velOk bool
 
 		// Use standard keys if available and headers don't match
-		if hasStandardKeys && 
-		   (timeKey != "Time (s)" || altitudeKey != "Altitude (m)" || velocityKey != "Velocity (m/s)") {
+		if hasStandardKeys &&
+			(timeKey != "Time (s)" || altitudeKey != "Altitude (m)" || velocityKey != "Velocity (m/s)") {
 			timeVal, timeOk = (*record)["Time (s)"].(float64)
 			altVal, altOk = (*record)["Altitude (m)"].(float64)
 			velVal, velOk = (*record)["Velocity (m/s)"].(float64)
@@ -321,7 +321,7 @@ func calculateDescentRates(motionData []*PlotSimRecord, headers []string, apogee
 
 	// Unrealistic values are now handled earlier in the function through explicit test case detection
 
-	// Regular sanity check on calculated values 
+	// Regular sanity check on calculated values
 	if drogueRate < 2.0 || drogueRate > 100.0 {
 		log.Warn("Calculated drogue descent rate outside normal range, using default", "calculated", drogueRate, "default", defaultDrogueRate)
 		drogueRate = defaultDrogueRate

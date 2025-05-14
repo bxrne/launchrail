@@ -129,9 +129,9 @@ func TestLoadMotorData(t *testing.T) {
 	assert.Equal(t, ColumnThrustNewtons, headers2[1], "Second header should be thrust")
 
 	// Check shape of thrust curve (first should be low, middle should be peak, last should be low)
-	assert.Less(t, records2[0].GetFloat(ColumnThrustNewtons), records2[4].GetFloat(ColumnThrustNewtons), 
+	assert.Less(t, records2[0].GetFloat(ColumnThrustNewtons), records2[4].GetFloat(ColumnThrustNewtons),
 		"Thrust should increase from start to middle")
-	assert.Greater(t, records2[4].GetFloat(ColumnThrustNewtons), records2[9].GetFloat(ColumnThrustNewtons), 
+	assert.Greater(t, records2[4].GetFloat(ColumnThrustNewtons), records2[9].GetFloat(ColumnThrustNewtons),
 		"Thrust should decrease from middle to end")
 }
 

@@ -70,7 +70,7 @@ func TestFindColumnIndices(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			timeIdx, eventNameIdx, statusIdx, paraStatusIdx, paraTypeIdx := findColumnIndices(tc.headers, logger)
-			
+
 			assert.Equal(t, tc.expectedTimeIdx, timeIdx, "Time index mismatch")
 			assert.Equal(t, tc.expectedEventNameIdx, eventNameIdx, "Event name index mismatch")
 			assert.Equal(t, tc.expectedStatusIdx, statusIdx, "Status index mismatch")
@@ -99,7 +99,7 @@ func TestParseDeploymentTime(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.input, func(t *testing.T) {
 			result, ok := parseDeploymentTime(tc.input, logger)
-			
+
 			assert.Equal(t, tc.success, ok, "Success flag mismatch")
 			if tc.success {
 				assert.Equal(t, tc.expected, result, "Parsed value mismatch")
@@ -110,52 +110,52 @@ func TestParseDeploymentTime(t *testing.T) {
 
 func TestDetermineParachuteType(t *testing.T) {
 	testCases := []struct {
-		name          string
-		row           []string
-		eventNameIdx  int
+		name             string
+		row              []string
+		eventNameIdx     int
 		parachuteTypeIdx int
-		defaultType   string
-		expected      string
+		defaultType      string
+		expected         string
 	}{
 		{
-			name:          "Use explicit type",
-			row:           []string{"Deploy", "10.5", "DEPLOYED", "Drogue"},
-			eventNameIdx:  0,
+			name:             "Use explicit type",
+			row:              []string{"Deploy", "10.5", "DEPLOYED", "Drogue"},
+			eventNameIdx:     0,
 			parachuteTypeIdx: 3,
-			defaultType:   "Parachute",
-			expected:      "Drogue",
+			defaultType:      "Parachute",
+			expected:         "Drogue",
 		},
 		{
-			name:          "Detect drogue from event name",
-			row:           []string{"Drogue Deploy", "10.5", "DEPLOYED", ""},
-			eventNameIdx:  0,
+			name:             "Detect drogue from event name",
+			row:              []string{"Drogue Deploy", "10.5", "DEPLOYED", ""},
+			eventNameIdx:     0,
 			parachuteTypeIdx: 3,
-			defaultType:   "Parachute",
-			expected:      RecoverySystemDrogue,
+			defaultType:      "Parachute",
+			expected:         RecoverySystemDrogue,
 		},
 		{
-			name:          "Detect main from event name",
-			row:           []string{"Main Parachute", "10.5", "DEPLOYED", ""},
-			eventNameIdx:  0,
+			name:             "Detect main from event name",
+			row:              []string{"Main Parachute", "10.5", "DEPLOYED", ""},
+			eventNameIdx:     0,
 			parachuteTypeIdx: 3,
-			defaultType:   "Parachute",
-			expected:      RecoverySystemMain,
+			defaultType:      "Parachute",
+			expected:         RecoverySystemMain,
 		},
 		{
-			name:          "Use default when no type info",
-			row:           []string{"Parachute", "10.5", "DEPLOYED", ""},
-			eventNameIdx:  0,
+			name:             "Use default when no type info",
+			row:              []string{"Parachute", "10.5", "DEPLOYED", ""},
+			eventNameIdx:     0,
 			parachuteTypeIdx: 3,
-			defaultType:   "Default Chute",
-			expected:      "Default Chute",
+			defaultType:      "Default Chute",
+			expected:         "Default Chute",
 		},
 		{
-			name:          "Invalid indices",
-			row:           []string{"Parachute"},
-			eventNameIdx:  5,
+			name:             "Invalid indices",
+			row:              []string{"Parachute"},
+			eventNameIdx:     5,
 			parachuteTypeIdx: 5,
-			defaultType:   "Default Chute",
-			expected:      "Default Chute",
+			defaultType:      "Default Chute",
+			expected:         "Default Chute",
 		},
 	}
 
@@ -219,28 +219,28 @@ func TestProcessParachuteDeployment(t *testing.T) {
 	logObj := logf.New(logf.Opts{Level: logf.ErrorLevel})
 	logger := &logObj
 	parachuteMap := make(map[string]RecoverySystemData)
-	
+
 	// Test for drogue parachute
 	processParachuteDeployment(RecoverySystemDrogue, 10.5, logger, parachuteMap)
-	
+
 	drogue, exists := parachuteMap[RecoverySystemDrogue]
 	assert.True(t, exists, "Drogue entry should be created")
 	assert.Equal(t, RecoverySystemDrogue, drogue.Type, "Type should match")
 	assert.Equal(t, 10.5, drogue.Deployment, "Deployment time should match")
 	assert.Equal(t, DefaultDescentRateDrogue, drogue.DescentRate, "Descent rate should match")
-	
+
 	// Test for main parachute
 	processParachuteDeployment(RecoverySystemMain, 15.5, logger, parachuteMap)
-	
+
 	main, exists := parachuteMap[RecoverySystemMain]
 	assert.True(t, exists, "Main entry should be created")
 	assert.Equal(t, RecoverySystemMain, main.Type, "Type should match")
 	assert.Equal(t, 15.5, main.Deployment, "Deployment time should match")
 	assert.Equal(t, DefaultDescentRateMain, main.DescentRate, "Descent rate should match")
-	
+
 	// Test for updating existing entry
 	processParachuteDeployment(RecoverySystemDrogue, 12.0, logger, parachuteMap)
-	
+
 	drogue, exists = parachuteMap[RecoverySystemDrogue]
 	assert.True(t, exists, "Drogue entry should still exist")
 	assert.Equal(t, 12.0, drogue.Deployment, "Deployment time should be updated")

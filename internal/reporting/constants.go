@@ -37,7 +37,7 @@ const (
 
 // Default values
 const (
-	DefaultDescentRateDrogue = 20.0 // m/s
-	DefaultDescentRateMain   = 5.0  // m/s
+	DefaultDescentRateDrogue  = 20.0  // m/s
+	DefaultDescentRateMain    = 5.0   // m/s
 	DefaultMainDeployAltitude = 300.0 // meters
 )
