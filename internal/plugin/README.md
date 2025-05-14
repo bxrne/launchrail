@@ -1,6 +1,6 @@
 # plugin
 
-Plugin system that enables extensibility of the LaunchRail application through dynamically loaded modules.
+Plugin system that enables extensibility of the Launchrail application through dynamically loaded modules.
 
 ## Notes
 - Provides infrastructure for loading and running Go plugins

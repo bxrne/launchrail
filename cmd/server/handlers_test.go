@@ -1,4 +1,4 @@
-package main
+package main_test
 
 import (
 	"encoding/json"
@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	main "github.com/bxrne/launchrail/cmd/server"
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/gin-gonic/gin"
@@ -174,232 +175,6 @@ func (m *MockHandlerRecordManager) GetStorageDir() string {
 	return m.storageDirPath
 }
 
-// TestReportAPIV2 tests the enhanced report rendering functionality
-// func TestReportAPIV2(t *testing.T) {
-// 	// Setup
-// 	tempDir, err := os.MkdirTemp("", "launchrail-tests-*")
-// 	require.NoError(t, err, "Failed to create temp dir")
-// 	defer os.RemoveAll(tempDir)
-
-// 	// Create test record directory
-// 	recordID := "testrecord123"
-// 	recordDir := filepath.Join(tempDir, recordID)
-// 	err = os.MkdirAll(recordDir, 0755)
-// 	require.NoError(t, err, "Failed to create record directory")
-
-// 	// Create motion.csv with minimal test data
-// 	motionCSV := `time,x,altitude,z,vx,velocity,vz,ax,acceleration,az,` + // Added trailing comma for header consistency
-// 		`"Mass (kg)","Iyy (kg*m^2)","Ixx (kg*m^2)","Izz (kg*m^2)",` + // Added mass and inertia
-// 		`"Propellant Mass (kg)","Mach Number","Angle of Attack (deg)","Angle of Sideslip (deg)",` + // Added more fields
-// 		`"Pitch Rate (rad/s)","Yaw Rate (rad/s)","Roll Rate (rad/s)",` + // Added rates
-// 		`"Thrust (N)","Drag Force (N)","Lift Force (N)","Side Force (N)",` + // Added forces
-// 		`"Pitch Moment (Nm)","Yaw Moment (Nm)","Roll Moment (Nm)","CG Location (m)","CP Location (m)","Static Margin (cal)"
-// ` + // Added moments and stability
-// 		`0.0,0,0,0,0,0,0,0,0,0,5.0,0.1,0.1,0.1,2.0,0,0,0,0,0,0,100,0,0,0,0,0,0,1.0,1.2,2.0
-// ` + // Data for all fields
-// 		`1.0,0,100,0,0,10,0,0,0,0,4.8,0.1,0.1,0.1,1.8,0.1,0.1,0,0,0,0,80,0.5,0,0,0,0,0,1.0,1.2,2.0
-// ` +
-// 		`2.0,0,150,0,0,5,0,0,0,0,4.5,0.1,0.1,0.1,1.5,0.2,0.2,0,0,0,0,0,1.0,0,0,0,0,0,1.0,1.2,2.0
-// `
-// 	err = os.WriteFile(filepath.Join(recordDir, "motion.csv"), []byte(motionCSV), 0644)
-// 	require.NoError(t, err, "Failed to create motion.csv file")
-
-// 	// Create engine_config.json with test motor designation
-// 	engineConfigJSON := `{
-// 		"options": {
-// 			"motor_designation": "TestRecordMotor-XYZ",
-// 			"launchrail": {
-// 				"length": 5.0
-// 			}
-// 		}
-// 	}`
-// 	err = os.WriteFile(filepath.Join(recordDir, "engine_config.json"), []byte(engineConfigJSON), 0644)
-// 	require.NoError(t, err, "Failed to create engine_config.json file")
-
-// 	// Create events.csv with minimal test data
-// 	eventsCSV := `Event,Time (s),Altitude (m AGL),Velocity (m/s),Acceleration (m/s^2),Details
-// ` + // Header
-// 		`"Launch",0.0,0,0,20,"Liftoff from pad"
-// ` + // Launch event
-// 		`"Rail Exit",0.5,5,20,18,"Cleared launch rail"
-// ` + // Rail exit event
-// 		`"Motor Burnout",2.0,200,100,0,"Motor burn complete"
-// ` + // Burnout event
-// 		`"Apogee",5.0,500,0,-9.81,"Reached peak altitude"
-// ` + // Apogee event
-// 		`"Drogue Ejection",5.1,495,-1,-9.81,"Drogue parachute deployed"
-// ` + // Drogue event
-// 		`"Main Ejection",10.0,200,-20,-9.81,"Main parachute deployed"
-// ` + // Main event
-// 		`"Touchdown",15.0,0,-5,-9.81,"Landed safely"
-// ` // Touchdown event
-// 	err = os.WriteFile(filepath.Join(recordDir, "events.csv"), []byte(eventsCSV), 0644)
-// 	require.NoError(t, err, "Failed to create events.csv file")
-
-// 	// Create a mock HandlerRecordManager
-// 	mockStorage := new(MockHandlerRecordManager)
-// 	mockStorage.storageDirPath = tempDir
-
-// 	// Create a test config (used by NewStorage and DataHandler)
-// 	staticDir, _ := setupTestTemplate(t)
-// 	cfg := &config.Config{
-// 		Setup: config.Setup{
-// 			App:     config.App{Version: "test-v0.1.0"},
-// 			Logging: config.Logging{Level: "info"}, // Use info for more verbose test logs if needed
-// 		},
-// 		Engine: config.Engine{
-// 			Options: config.Options{
-// 				OpenRocketFile:   "./testdata/l1.ork",
-// 				MotorDesignation: "TestMotor-ABC",
-// 			},
-// 		},
-// 	}
-// 	cfg.Server.StaticDir = staticDir // Set static dir for template loading
-
-// 	// Set fields for hand-written mock
-// 	mockStorage.recordDir = recordDir
-// 	mockStorage.cfg = cfg
-
-// 	// We don't set up expectations for GetRecord here - we'll do it for each test case
-// 	// instead so we get fresh storage instances each time
-
-// 	// No longer create or write templates in testdata or cwd. All tests use the canonical template copied by setupTestTemplate.
-
-// 	// Get the current directory to set as the project root
-// 	currDir, dirErr := os.Getwd()
-// 	if dirErr != nil {
-// 		t.Logf("Failed to get working directory: %v", dirErr)
-// 	} else {
-// 		t.Logf("Current working directory: %s", currDir)
-// 	}
-
-// 	// Create a test config and logger
-// 	logger := logf.New(logf.Opts{
-// 		Writer: os.Stdout, // Enable output for debugging
-// 		Level:  logf.InfoLevel,
-// 	})
-
-// 	// Create the handler with our mock and set project dir
-// 	dataHandler := &DataHandler{
-// 		records:    mockStorage,
-// 		Cfg:        cfg,
-// 		log:        &logger,
-// 		ProjectDir: "",  // Not needed, template lookup uses staticDir
-// 		AppConfig:  cfg, // Initialize AppConfig with test cfg
-// 	}
-
-// 	// Setup Gin router
-// 	gin.SetMode(gin.TestMode)
-// 	router := gin.New()
-// 	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
-
-// 	// Use the record ID and directory we set up earlier
-// 	// recordID and recordDir are already declared at the top of the function
-// 	// The following MkdirAll and WriteFile calls for motionData are removed
-// 	// as motionCSV is already written to recordDir/motion.csv earlier in the test.
-// 	// The more complete motionCSV should be used for plot generation.
-
-// 	// Let's create proper test files instead of mocks to avoid storage layer issues
-// 	// We'll also create a JSON config file since it's needed for the report
-// 	configData := []byte(`{"simulation": {"timestep": 0.01}, "launch": {"angle": 5}}`)
-// 	configFilePath := filepath.Join(recordDir, "config.json")
-// 	err = os.WriteFile(configFilePath, configData, 0644)
-// 	require.NoError(t, err, "Failed to write config file")
-
-// 	// Create a dummy engine data file to avoid errors
-// 	engineData := []byte(`{"name": "Test Engine", "thrust": [0, 10, 0]}`)
-// 	engineFilePath := filepath.Join(recordDir, "engine.json")
-// 	err = os.WriteFile(engineFilePath, engineData, 0644)
-// 	require.NoError(t, err, "Failed to write engine file")
-
-// 	// Create assets dir for the record
-// 	assetsDir := filepath.Join(recordDir, "assets")
-// 	err = os.MkdirAll(assetsDir, 0755)
-// 	require.NoError(t, err, "Failed to create assets directory")
-
-// 	// Create sample motion data for the main record directory
-// 	// This is commented out since we've already created the necessary files above
-// 	// detailedMotionData := "time,altitude,velocity\n0,0,0\n1,10,5\n2,50,20\n3,100,0\n4,50,-20\n5,0,-5\n"
-// 	// err = os.WriteFile(filepath.Join(recordDir, "MOTION.csv"), []byte(detailedMotionData), 0644)
-// 	// require.NoError(t, err, "Failed to create MOTION.csv")
-
-// 	// Create sample plot files (SVGs) in the expected assets directory for 'testrecord123'
-// 	// This assumes that the renderer will save plots to an 'assets' subdirectory
-// 	// of the record's specific path, which is recordDir for 'testrecord123'.
-// 	mockAssetsDir := filepath.Join(recordDir, "assets")
-// 	sampleSVG := `<svg width="800" height="600"><rect width="800" height="600" fill="#f0f0f0"></rect><text x="400" y="300" text-anchor="middle">Altitude vs Time</text></svg>`
-
-// 	// Write the sample SVG files
-// 	plotPaths := []string{"altitude_vs_time.svg", "velocity_vs_time.svg", "acceleration_vs_time.svg"}
-// 	for _, plotPath := range plotPaths {
-// 		err = os.WriteFile(filepath.Join(mockAssetsDir, plotPath), []byte(sampleSVG), 0644)
-// 		require.NoError(t, err, "Failed to create sample SVG file: "+plotPath)
-// 	}
-
-// 	// Test different output formats
-// 	testCases := []struct {
-// 		name         string
-// 		acceptHeader string
-// 		expectedCode int
-// 		expectedType string
-// 		contentCheck []string
-// 		skip         bool   // Skip test cases with rendering issues
-// 		skipReason   string // Reason for skipping
-// 	}{
-// 		{
-// 			name:         "JSON format",
-// 			acceptHeader: "application/json",
-// 			expectedCode: http.StatusOK,
-// 			expectedType: "application/json",
-// 			contentCheck: []string{"record_id", "version"}, // The JSON object has snake_case field names due to struct tags
-// 			skip:         false,
-// 		},
-// 		{
-// 			name:         "HTML format",
-// 			acceptHeader: "text/html",
-// 			expectedCode: http.StatusOK,
-// 			expectedType: "text/html",
-// 			contentCheck: []string{"<!DOCTYPE html>", recordID}, // Should contain basic HTML tags
-// 			skip:         false,
-// 		},
-// 		{
-// 			name:         "Markdown format",
-// 			acceptHeader: "text/markdown",
-// 			expectedCode: http.StatusOK,
-// 			expectedType: "text/markdown",
-// 			contentCheck: []string{"# Simulation Report", recordID},
-// 			skip:         false,
-// 		},
-// 	}
-
-// 	for _, tc := range testCases {
-// 		t.Run(tc.name, func(t *testing.T) {
-// 			// Skip test if marked to skip
-// 			if tc.skip {
-// 				t.Skip(tc.skipReason)
-// 			}
-
-// 			w := httptest.NewRecorder()
-// 			req, _ := http.NewRequest("GET", "/api/v0/explore/"+recordID+"/report", nil)
-// 			req.Header.Set("Accept", tc.acceptHeader)
-// 			router.ServeHTTP(w, req)
-
-// 			// Check status code
-// 			assert.Equal(t, tc.expectedCode, w.Code)
-
-// 			// Check content type
-// 			contentType := w.Header().Get("Content-Type")
-// 			assert.Contains(t, contentType, tc.expectedType)
-
-// 			// Check for expected content in the response body
-// 			responseBody := w.Body.String()
-// 			for _, content := range tc.contentCheck {
-// 				assert.Contains(t, responseBody, content, "Response should contain '%s'", content)
-// 			}
-// 		})
-// 	}
-// }
-
 // TestReportAPIV2_Errors tests error conditions in report rendering
 func TestReportAPIV2_Errors(t *testing.T) {
 	// Setup - create required directories and mock objects
@@ -420,17 +195,7 @@ func TestReportAPIV2_Errors(t *testing.T) {
 	})
 
 	// Create the handler with our mock
-	dataHandler := &DataHandler{
-		records:    mockStorage,
-		Cfg:        cfg,
-		log:        &logger,
-		ProjectDir: "",  // Not needed, template lookup uses staticDir
-		AppConfig:  cfg, // Initialize AppConfig with test cfg
-	}
-
-	// Setup router and register routes
-	router := gin.New()
-	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
+	dataHandler := main.NewDataHandler(mockStorage, cfg, &logger, cfg)
 
 	// Test cases for error conditions
 	testCases := []struct {
@@ -493,6 +258,10 @@ func TestReportAPIV2_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Set up the mock for this test case
 			tc.mockSetup()
+
+			// Use a fresh router for each subtest to avoid duplicate route registration
+			router := gin.New()
+			router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
 
 			w := httptest.NewRecorder()
 			url := "/api/v0/explore/" + tc.hash + "/report"
@@ -637,17 +406,12 @@ func TestDownloadReport(t *testing.T) {
 	err = dummyRecord.Close()
 	require.NoError(t, err, "Failed to close dummy record")
 
-	dataHandler := &DataHandler{
-		records:    realManager,
-		Cfg:        cfg,
-		log:        &log,
-		ProjectDir: "",  // Not needed for this test
-		AppConfig:  cfg, // Initialize AppConfig with test cfg
-	}
+	dataHandler := main.NewDataHandler(realManager, cfg, &log, cfg)
+
+	// ... (all data preparation code remains unchanged) ...
+
+	// Immediately before the request, create a fresh router and register the route
 	router := gin.New()
-	// The test was previously trying to hit /reports/{hash}/download, but ReportAPIV2 is mounted differently
-	// The actual route in main.go is /explore/:hash/report.
-	// For consistency with how TestDownloadReport_NotFound sets up the router, we'll use the versioned path.
 	router.GET("/api/v0/explore/:hash/report", dataHandler.ReportAPIV2)
 
 	w := httptest.NewRecorder()
@@ -711,13 +475,7 @@ func TestListRecordsAPI(t *testing.T) {
 
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
-	dataHandler := &DataHandler{
-		records:    realManager,
-		Cfg:        cfg,
-		log:        &log,
-		ProjectDir: "",  // Not needed for this test
-		AppConfig:  cfg, // Ensure AppConfig is initialized
-	}
+	dataHandler := main.NewDataHandler(realManager, cfg, &log, cfg)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -775,12 +533,7 @@ func TestDeleteRecord(t *testing.T) {
 
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
-	dataHandler := &DataHandler{
-		records:    realManager,
-		Cfg:        cfg,
-		log:        &log,
-		ProjectDir: "", // Not needed for this test
-	}
+	dataHandler := main.NewDataHandler(realManager, cfg, &log, cfg)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -841,12 +594,7 @@ func TestDeleteRecordAPI(t *testing.T) {
 
 	// 3. Setup real DataHandler and Router
 	// Initialize DataHandler with a logger
-	dataHandler := &DataHandler{
-		records:    realManager,
-		Cfg:        cfg,
-		log:        &log,
-		ProjectDir: "", // Not needed for this test
-	}
+	dataHandler := main.NewDataHandler(realManager, cfg, &log, cfg)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

@@ -384,13 +384,13 @@ func main() {
 				return
 			}
 			handleSimRunRequest(c, recordMgr, dataHandler.Cfg, dataHandler.log)
-		}) // Use our handleSimRunRequest function
+		})
 		api.GET("/data", dataHandler.ListRecordsAPI)
 		api.GET("/explore/:hash", dataHandler.GetExplorerData)
 		api.GET("/spec", func(c *gin.Context) {
 			c.Redirect(http.StatusMovedPermanently, "/swagger/spec")
 		})
-		api.GET("/explore/:hash/report", dataHandler.ReportAPIV2) // New endpoint for structured report data
+		api.GET("/explore/:hash/report", dataHandler.ReportAPIV2)
 	}
 
 	// Web routes
@@ -453,8 +453,8 @@ func main() {
 		}
 
 		pageStr := c.Query("page")
-		page, _ := utils.ParseInt(pageStr, "page") // Ignore error, check value instead
-		if page < 1 {                              // Default to page 1 if not specified, zero, negative, or parse error
+		page, _ := utils.ParseInt(pageStr, "page")
+		if page < 1 {
 			page = 1
 		}
 

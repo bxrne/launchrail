@@ -6,7 +6,7 @@ Implementation of OpenRocket file parsing and integration for importing rocket d
 - Parses OpenRocket (.ork) file format for rocket specifications
 - Converts OpenRocket components to simulation-compatible models
 - Preserves physical and aerodynamic properties from designs
-- Maps OpenRocket parameters to LaunchRail component structure
+- Maps OpenRocket parameters to Launchrail component structure
 - Handles different component types (nose cones, fins, body tubes)
 - Ensures dimensional consistency during import process
 - Supports validation of imported designs against constraints

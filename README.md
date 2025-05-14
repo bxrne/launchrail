@@ -7,9 +7,17 @@
 
 Launchrail is an open-source 6DOF High-Powered Rocket Simulator. It leverages [OpenRocket](http://openrocket.info/) design files for configuration and [ThrustCurve](https://www.thrustcurve.org/) API for motor curves. The project also explores using financial algorithms to model atmospheric turbulence.
 
-**Repository:** [https://github.com/bxrne/launchrail](https://github.com/bxrne/launchrail)
+<table border="0">
+    <tr>
+        <td><img src="./assets/index-page.png" alt="Index Page"></td>
+        <td><img src="./assets/data-page.png" alt="Data Page"></td>
+    </tr>
+    <tr>
+        <td><img src="./assets/explore-motion-page.png" alt="Explore Motion Page"></td>
+        <td><img src="./assets/explore-plot-page.png" alt="Explore Plot Page"></td>
+    </tr>
+</table>
 
----
 
 ## 🚀 Getting Started
 

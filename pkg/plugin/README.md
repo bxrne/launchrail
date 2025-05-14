@@ -1,6 +1,6 @@
 # plugin
 
-Plugin interface definitions that enable extension of the LaunchRail simulation with custom functionality.
+Plugin interface definitions that enable extension of the Launchrail simulation with custom functionality.
 
 ## Notes
 - Defines standard interfaces for simulation plugins

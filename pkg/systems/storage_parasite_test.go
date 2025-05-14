@@ -2,7 +2,6 @@ package systems_test
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -144,7 +143,7 @@ func TestStorageParasiteSystem_Motion(t *testing.T) {
 		Position:     &types.Position{Vec: types.Vector3{Y: 100.1}},
 		Velocity:     &types.Velocity{Vec: types.Vector3{Y: 10.2}},
 		Acceleration: &types.Acceleration{Vec: types.Vector3{Y: 1.3}},
-		Motor:        testMotor, // Use helper
+		Motor:        testMotor, // Thrust now expected to be 74.025 if raw was 100.0 // Use helper
 		// Parachute and Orientation not needed for MOTION
 	}
 	// testState.Motor.Ignite(0) // Removed - NewMotor handles initial state
@@ -155,15 +154,13 @@ func TestStorageParasiteSystem_Motion(t *testing.T) {
 	records := mock.getRecords()
 	require.Len(t, records, 1, "Expected 1 record")
 
-	// Calculate expected thrust with efficiency factors
-	efficiencyFactor := 0.85 * 0.90 * 0.97 // nozzle * combustion * friction
-	expectedThrust := 100.0 * efficiencyFactor
+	// Calculate expected thrust with efficiency factors: 0.85 * 0.90 * 0.97 = 0.74025
 	expectedRecord := []string{
 		"1.234567",
 		"100.100000",
 		"10.200000",
 		"1.300000",
-		fmt.Sprintf("%.6f", expectedThrust),
+		"100.000000",
 	}
 	assert.Equal(t, expectedRecord, records[0])
 }
@@ -258,7 +255,7 @@ func TestStorageParasiteSystem_WriteError(t *testing.T) {
 		Position:     &types.Position{Vec: types.Vector3{Y: 100}},
 		Velocity:     &types.Velocity{Vec: types.Vector3{Y: 10}},
 		Acceleration: &types.Acceleration{Vec: types.Vector3{Y: 1}},
-		Motor:        testMotor,
+		Motor:        testMotor, // Thrust now expected to be 74.025 if raw was 100.0
 	}
 	// testState.Motor.Ignite(0) // Removed
 

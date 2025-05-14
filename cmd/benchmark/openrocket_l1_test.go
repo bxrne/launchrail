@@ -1,4 +1,4 @@
-package main
+package main_test
 
 import (
 	"io"
@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	main "github.com/bxrne/launchrail/cmd/benchmark"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,13 +23,13 @@ func newTestLogger() *logf.Logger {
 
 func TestOpenRocketL1Benchmark_Name(t *testing.T) {
 	lg := newTestLogger()
-	bench := NewOpenRocketL1Benchmark(lg)
+	bench := main.NewOpenRocketL1Benchmark(lg)
 	assert.Equal(t, "OpenRocketL1Comparison", bench.Name())
 }
 
 func TestOpenRocketL1Benchmark_compareFloatMetric(t *testing.T) {
 	lg := newTestLogger()
-	bench := NewOpenRocketL1Benchmark(lg)
+	main.NewOpenRocketL1Benchmark(lg)
 
 	tests := []struct {
 		name             string
@@ -115,7 +116,8 @@ func TestOpenRocketL1Benchmark_compareFloatMetric(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			metricName := "TestMetric"
-			result := bench.compareFloatMetric(metricName, tt.expectedVal, tt.actualVal, tt.tolerancePercent)
+			bench := main.NewOpenRocketL1Benchmark(newTestLogger())
+			result := bench.CompareFloatMetric(metricName, tt.expectedVal, tt.actualVal, tt.tolerancePercent)
 
 			assert.Equal(t, metricName, result.Name)
 			assert.Equal(t, tt.expectedVal, result.Expected)
@@ -153,7 +155,7 @@ func TestOpenRocketL1Benchmark_loadOpenRocketExportData(t *testing.T) {
 # Version: OpenRocket 15.03
 # Exported on 2024-07-15 12:00:00
 #
-# Simulation #1: Apogee, Max Velocity, etc.
+# OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s),Vertical acceleration (m/s²),Total velocity (m/s),Total acceleration (m/s²),Position East (m),Position North (m),Lateral distance (m),Lateral direction (°),Latitude (deg),Longitude (deg),Gravitational acceleration (m/s²),Angle of attack (°),Roll rate (°/s),Pitch rate (°/s),Yaw rate (°/s),Mass (g),Propellant mass (g),Longitudinal moment of inertia (kg·m²),Rotational moment of inertia (kg·m²),CP location (cm),CG location (cm),Stability margin calibers (난류),Mach number (난류),Reynolds number (난류),Thrust (N),Drag coefficient (난류),Axial drag coefficient (난류),Pressure (Pa),Temperature (°C),Speed of sound (m/s),Air density (kg/m³),Dynamic viscosity (Pa·s)
 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,9.81,0.0,0.0,0.0,0.0,1000.0,100.0,0.1,0.01,50.0,40.0,1.5,0.0,0.0,0.0,0.0,0.0,101325.0,15.0,340.0,1.225,0.0000181
 1.0,50.0,100.0,10.0,100.0,10.0,0.0,0.0,0.0,0.0,0.0,0.0,9.81,0.0,0.0,0.0,0.0,950.0,50.0,0.1,0.01,50.0,40.0,1.5,0.3,100000.0,200.0,0.3,0.3,100000.0,10.0,330.0,1.2,0.0000180
@@ -167,21 +169,27 @@ Time (s),Altitude (m),Vertical velocity (m/s),Vertical acceleration (m/s²),Tota
 		},
 		{
 			name: "Valid CSV minimal data for apogee and max_vel",
-			csvContent: `# Simulation #1: Apogee, Max Velocity, etc.
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s)
 0.0,0.0,0.0
-1.0,50.0,100.0
-2.0,150.0,80.0
+1.0,100.0,10.0
+2.0,200.0,20.0
 3.0,180.0,0.0
 4.0,150.0,-50.0
 `,
-			wantApogee: 180.0,
-			wantMaxVel: 100.0,
+			wantApogee: 200.0,
+			wantMaxVel: 20.0,
 			wantErr:    false,
 		},
 		{
 			name: "CSV no data rows",
-			csvContent: `# Simulation #1: Apogee, Max Velocity, etc.
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s)
 `,
 			wantErr:       true,
@@ -189,7 +197,10 @@ Time (s),Altitude (m),Vertical velocity (m/s)
 		},
 		{
 			name: "CSV malformed header line ID (no # Simulation #n)",
-			csvContent: `# Some other comment
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+# Some other comment
 Time (s),Altitude (m),Vertical velocity (m/s)
 0.0,0.0,0.0
 `,
@@ -198,45 +209,57 @@ Time (s),Altitude (m),Vertical velocity (m/s)
 		},
 		{
 			name: "CSV missing Altitude column",
-			csvContent: `# Simulation #1: Apogee, Max Velocity, etc.
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Vertical velocity (m/s)
 0.0,0.0
 `,
 			wantErr:       true,
-			wantErrSubstr: "could not find required column 'Altitude (m)'",
+			wantErrSubstr: "could not find required column 'Altitude (m)'", // loader fails before column parsing
 		},
 		{
 			name: "CSV missing Vertical velocity column",
-			csvContent: `# Simulation #1: Apogee, Max Velocity, etc.
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Altitude (m)
 0.0,0.0
 `,
 			wantErr:       true,
-			wantErrSubstr: "could not find required column 'Vertical velocity (m/s)'",
+			wantErrSubstr: "could not find required column 'Vertical velocity (m/s)'", // loader fails before column parsing
 		},
 		{
 			name: "CSV non-numeric altitude",
-			csvContent: `# Simulation #1: Apogee, Max Velocity, etc.
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s)
 0.0,abc,0.0
 `,
 			wantErr:       true,
-			wantErrSubstr: "error parsing altitude",
+			wantErrSubstr: "error parsing altitude", // loader fails before value parsing
 		},
 		{
 			name: "CSV non-numeric vertical velocity",
-			csvContent: `# Simulation #1: Apogee, Max Velocity, etc.
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s)
 0.0,0.0,xyz
 `,
 			wantErr:       true,
-			wantErrSubstr: "error parsing vertical_velocity",
+			wantErrSubstr: "error parsing vertical_velocity", // loader fails before value parsing
 		},
 		{
 			name:          "Empty CSV file",
 			csvContent:    ``,
 			wantErr:       true,
-			wantErrSubstr: "could not find OpenRocket data header line", // or "no records found" or similar
+			wantErrSubstr: "could not find OpenRocket data header line",
 		},
 		{
 			name:          "Non-existent file",
@@ -255,7 +278,7 @@ Time (s),Altitude (m),Vertical velocity (m/s)
 				filePath = createTempCSV(t, tt.csvContent)
 			}
 
-			apogee, maxVel, _, err := loadOpenRocketExportData(filePath, lg)
+			apogee, maxVel, _, err := main.LoadOpenRocketExportData(filePath, lg)
 
 			if tt.wantErr {
 				require.Error(t, err)

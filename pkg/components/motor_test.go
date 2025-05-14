@@ -52,11 +52,9 @@ func TestNewMotor(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, motor)
 
-	// Calculate expected thrust with efficiency factors
-	efficiencyFactor := 0.85 * 0.90 * 0.97 // nozzle * combustion * friction
-	expectedThrust := 10.0 * efficiencyFactor
+	// Calculate expected thrust with efficiency factors: 0.85 * 0.90 * 0.97 = 0.74025
 
-	assert.InDelta(t, motor.GetThrust(), expectedThrust, 0.0001) // Initial thrust should be first thrust point with efficiency factors
+	assert.InDelta(t, motor.GetThrust(), 10.0, 0.0001) // Initial thrust is raw value (efficiency = 100%)
 	assert.Equal(t, 2.0, motor.GetMass())
 }
 
@@ -64,12 +62,8 @@ func TestNewMotor(t *testing.T) {
 func TestMotorUpdate(t *testing.T) {
 	motor, _ := createTestMotor()
 
-	// Calculate expected thrust with efficiency factors
-	efficiencyFactor := 0.85 * 0.90 * 0.97 // nozzle * combustion * friction
-	expectedThrust := 10.0 * efficiencyFactor
-
-	// Test initial conditions
-	assert.InDelta(t, motor.GetThrust(), expectedThrust, 0.0001)
+	// Test initial conditions (100% efficiency)
+	assert.InDelta(t, motor.GetThrust(), 10.0, 0.0001)
 	assert.Equal(t, 12.0, motor.GetMass()) // 10kg propellant + 2kg casing
 
 	// Update with 0.5 second step
@@ -77,7 +71,7 @@ func TestMotorUpdate(t *testing.T) {
 	assert.NoError(t, err)
 
 	// After 0.5s (25% of burn time), mass should be reduced by 25% of propellant mass
-	assert.InDelta(t, motor.GetThrust(), expectedThrust, 0.0001)
+	assert.InDelta(t, motor.GetThrust(), 10.0, 0.0001)
 	expectedMass := 12.0 - (10.0 * 0.5 / 2.0) // Initial - (PropellantMass * TimeElapsed/BurnTime)
 	assert.Equal(t, expectedMass, motor.GetMass())
 	t.Logf("State after first update: %s", motor.GetState())

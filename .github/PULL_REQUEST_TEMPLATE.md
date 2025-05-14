@@ -1,5 +1,5 @@
 <!--
-Thank you for contributing to LaunchRail! 
+Thank you for contributing to Launchrail! 
 Please provide a clear description of your changes.
 -->
 
