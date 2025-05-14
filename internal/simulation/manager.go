@@ -159,3 +159,11 @@ func (m *Manager) Close() error {
 func (m *Manager) GetStatus() ManagerStatus {
 	return m.status
 }
+
+// GetSim returns the underlying simulation instance.
+// This is useful for accessing detailed simulation results after a run.
+func (m *Manager) GetSim() *simulation.Simulation {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.sim
+}
