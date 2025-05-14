@@ -927,30 +927,110 @@ func GenerateReportData(log *logf.Logger, cfg *config.Config, rm RecordManager, 
 		MotorDesignation: cfg.Engine.Options.MotorDesignation,
 		LaunchSite:       fmt.Sprintf("Lat: %.4f, Lon: %.4f, Alt: %.1fm", cfg.Engine.Options.Launchsite.Latitude, cfg.Engine.Options.Launchsite.Longitude, cfg.Engine.Options.Launchsite.Altitude),
 		// TargetApogeeFt:    cfg.Engine.Options.TargetApogeeFt, // TODO: Verify this path or handle if field doesn't exist in config.Options
-		LiftoffMassKg:     0, // Placeholder - TODO: Calculate or extract from simData
-		CoastToApogeeTime: 0, // Placeholder - TODO: Calculate from simData
-		MotionMetrics:     MotionMetrics{ /* TODO: Populate from simData */ },
-		// MotorSummary:      MotorSummary{ /* TODO: Populate from simData.Motor or ORK */ },
-		// RecoverySystem:    RecoverySystem{ /* TODO: Populate from ORK or config */ },
+		LiftoffMassKg: 0, // Placeholder - TODO: Calculate from sim data
 	}
 
 	if simData.ORKDoc != nil && simData.ORKDoc.Rocket.Name != "" {
 		summary.RocketName = simData.ORKDoc.Rocket.Name
 	}
 
-	// TODO: Calculate summary metrics from simData (MotionData, EventsData, ORKDoc)
-	// e.g., apogee, max velocity, flight time, motor performance, etc.
-	// For now, we pass the raw data, and plotting functions will use it.
+	// Calculate motion metrics if we have motion data
+	var motionMetrics *MotionMetrics
+	if len(parsedMotionPlotRecords) > 0 && len(parsedMotionPlotHeaders) > 0 {
+		// Use the existing CalculateMotionMetrics function
+		// Default to 1.0m if launch rail length not specified
+		launchRailLength := 1.0
+		// Try to get launch rail length from config if available
+		if cfg.Engine.Options.Launchrail.Length > 0 {
+			launchRailLength = cfg.Engine.Options.Launchrail.Length
+		}
+		motionMetrics = CalculateMotionMetrics(parsedMotionPlotRecords, parsedMotionPlotHeaders, simData.EventsData, launchRailLength, log)
+		log.Info("Calculated motion metrics", "maxAltitude", motionMetrics.MaxAltitudeAGL, "maxSpeed", motionMetrics.MaxSpeed)
+	} else {
+		log.Warn("No motion data available for metrics calculation")
+		motionMetrics = &MotionMetrics{} // Initialize with empty values
+	}
+
+	// Calculate motor summary if we have motion data (motor data can be derived from it)
+	var motorSummary MotorSummaryData
+	if len(parsedMotionPlotRecords) > 0 && len(parsedMotionPlotHeaders) > 0 && record.Motion != nil {
+		motorSummary = calculateMotorSummary(parsedMotionPlotRecords, parsedMotionPlotHeaders, log)
+		log.Info("Calculated motor metrics", "maxThrust", motorSummary.MaxThrust, "burnTime", motorSummary.BurnTime, "totalImpulse", motorSummary.TotalImpulse)
+	} else {
+		log.Warn("No motor data available for motor summary calculation")
+	}
+
+	// Find flight events
+	var launchIdx, apogeeIdx, touchdownIdx int
+	// Unused but declared to match function signature: railExitIdx, burnoutIdx
+	var _, _ int
+	if len(simData.EventsData) > 0 {
+		launchIdx, _, _, apogeeIdx, touchdownIdx = FindFlightEvents(simData.EventsData, log)
+		log.Info("Found flight events", "apogeeIdx", apogeeIdx, "launchIdx", launchIdx, "touchdownIdx", touchdownIdx)
+	} else {
+		log.Warn("No events data available for event extraction")
+		launchIdx, apogeeIdx, touchdownIdx = -1, -1, -1
+	}
+
+	// Create phase summary data
+	phaseSummary := PhaseSummaryData{}
+
+	// If we have apogee data, add it to the phase summary
+	if apogeeIdx >= 0 && apogeeIdx < len(simData.EventsData) {
+		// Extract time from events data
+		apogeeTime, err := strconv.ParseFloat(simData.EventsData[apogeeIdx][1], 64)
+		if err == nil {
+			phaseSummary.ApogeeTimeSec = apogeeTime
+			phaseSummary.MaxAltitudeM = motionMetrics.MaxAltitudeAGL
+			log.Info("Added apogee to phase summary", "time", apogeeTime, "altitude", motionMetrics.MaxAltitudeAGL)
+		} else {
+			log.Warn("Could not parse apogee time", "error", err)
+		}
+	}
+
+	// We'll initialize an empty recovery systems slice for now
+	// This can be enhanced in the future when recovery system data structure is better defined
+
+	// Calculate flight time
+	var flightTime float64
+	if launchIdx >= 0 && touchdownIdx >= 0 && launchIdx < len(simData.EventsData) && touchdownIdx < len(simData.EventsData) {
+		launchTime, err := strconv.ParseFloat(simData.EventsData[launchIdx][1], 64)
+		if err == nil {
+			touchdownTime, err := strconv.ParseFloat(simData.EventsData[touchdownIdx][1], 64)
+			if err == nil {
+				flightTime = touchdownTime - launchTime
+				log.Info("Calculated flight time", "flightTime", flightTime)
+			} else {
+				log.Warn("Could not parse touchdown time", "error", err)
+			}
+		} else {
+			log.Warn("Could not parse launch time", "error", err)
+		}
+	}
+
+	// If we have calculated motion metrics but no flight time was found in events,
+	// update the flight time in the motion metrics
+	if motionMetrics != nil && flightTime > 0 && motionMetrics.FlightTime <= 0 {
+		motionMetrics.FlightTime = flightTime
+		log.Info("Updated motion metrics flight time from events", "flightTime", flightTime)
+	}
 
 	return &ReportData{
-		RecordID:      recordID,
-		GeneratedTime: time.Now().Format(time.RFC3339),
-		Config:        *cfg, // Store a copy of the config used for this report
-		Summary:       summary,
-		RawData:       simData,                 // This now contains loaded data
-		MotionData:    parsedMotionPlotRecords, // Populate with parsed []*PlotSimRecord
-		MotionHeaders: parsedMotionPlotHeaders, // Populate with headers from parseSimData
-		Plots:         make(map[string]string), // To be populated by GeneratePlots
-		Assets:        make(map[string]string), // To be populated by PrepareReportAssets
+		RecordID:        recordID,
+		Version:         cfg.Setup.App.Version,
+		GeneratedTime:   time.Now().Format(time.RFC3339),
+		Config:          *cfg,
+		Summary:         summary,
+		RawData:         simData,
+		MotionData:      parsedMotionPlotRecords,
+		MotionHeaders:   parsedMotionPlotHeaders,
+		Plots:           make(map[string]string),             // To be populated by GeneratePlots
+		Assets:          make(map[string]string),             // To be populated by PrepareReportAssets
+		MotionMetrics:   motionMetrics,                       // Add calculated motion metrics
+		MotorSummary:    motorSummary,                        // Add calculated motor summary
+		PhaseSummary:    phaseSummary,                        // Add flight phases
+		MotorName:       cfg.Engine.Options.MotorDesignation, // Motor name from config
+		RocketName:      summary.RocketName,                  // Rocket name from summary
+		RecoverySystems: []RecoverySystemData{},              // Empty slice for now
 	}, nil
 }

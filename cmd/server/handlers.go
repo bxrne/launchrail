@@ -875,6 +875,8 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 			format = "json"
 		} else if strings.Contains(acceptHeader, "text/html") {
 			format = "html"
+		} else if strings.Contains(acceptHeader, "text/markdown") {
+			format = "markdown"
 		} else {
 			// Default to html if no specific format requested via query or Accept header
 			format = "html"
@@ -1003,10 +1005,42 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 		// Set content type and serve the HTML file
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		c.File(htmlPath)
+	case "json":
+		// Return the report data as JSON
+		jsonData, jsonErr := json.MarshalIndent(reportData, "", "  ")
+		if jsonErr != nil {
+			h.log.Error("Failed to marshal report data to JSON", "recordID", recordID, "error", jsonErr)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate JSON report"})
+			return
+		}
+		// Set content type and serve the JSON data
+		c.Header("Content-Type", "application/json; charset=utf-8")
+		c.Data(http.StatusOK, "application/json; charset=utf-8", jsonData)
+
+	case "markdown":
+		// Render Markdown report directly
+		mdString, mdErr := rendrr.RenderToMarkdown(reportData, "report.md.tmpl")
+		if mdErr != nil {
+			h.log.Error("Failed to render Markdown report", "recordID", recordID, "error", mdErr)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to render Markdown report"})
+			return
+		}
+		// Define path for the Markdown file
+		mdPath := filepath.Join(reportDir, "report.md")
+		// Write Markdown to file
+		if err := os.WriteFile(mdPath, []byte(mdString), 0644); err != nil {
+			h.log.Error("Failed to write Markdown report file", "path", mdPath, "error", err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to save Markdown report"})
+			return
+		}
+		// Set content type and serve the Markdown file
+		c.Header("Content-Type", "text/markdown; charset=utf-8")
+		c.File(mdPath)
+
 	default:
-		// If format is not "json" (handled earlier) and not "html", it's unsupported.
+		// If format is not one of the supported formats, it's unsupported.
 		h.log.Warn("Unsupported report format requested", "format", format, "recordID", recordID)
-		c.AbortWithStatusJSON(http.StatusUnsupportedMediaType, gin.H{"error": fmt.Sprintf("Unsupported report format: %s. Supported formats are: json, html.", format)})
+		c.AbortWithStatusJSON(http.StatusUnsupportedMediaType, gin.H{"error": fmt.Sprintf("Unsupported report format: %s. Supported formats are: json, html, markdown.", format)})
 	}
 }
 
