@@ -1,3 +1,14 @@
+## v1.0.0 (2025-05-14)
+
+### Refactor
+
+- *****: Renamed LaunchRail mistakes to Launchrail where they are not referring to the physical launch rail and fixed up some tests
+- update OpenRocket CSV parsing and remove motor efficiency factors
+- clean up comments and move test package to main_test
+- move handlers_test to main_test package and use NewDataHandler constructor
+- remove redundant comments and move server tests to separate package
+- move benchmark tests to separate test package and export public methods
+
 ## v0.10.0 (2025-05-14)
 
 ### Feat
