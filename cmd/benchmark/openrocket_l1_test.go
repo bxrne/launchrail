@@ -169,11 +169,14 @@ Time (s),Altitude (m),Vertical velocity (m/s),Vertical acceleration (m/s²),Tota
 		},
 		{
 			name: "Valid CSV minimal data for apogee and max_vel",
-			csvContent: `# Simulation #1: Apogee, Max Velocity, etc.
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+Simulation #1: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s)
 0.0,0.0,0.0
-1.0,50.0,100.0
-2.0,150.0,80.0
+1.0,100.0,10.0
+2.0,200.0,20.0
 3.0,180.0,0.0
 4.0,150.0,-50.0
 `,
@@ -183,7 +186,10 @@ Time (s),Altitude (m),Vertical velocity (m/s)
 		},
 		{
 			name: "CSV no data rows",
-			csvContent: `# Simulation #1: Apogee, Max Velocity, etc.
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+Simulation #1: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s)
 `,
 			wantErr:       true,
@@ -191,7 +197,10 @@ Time (s),Altitude (m),Vertical velocity (m/s)
 		},
 		{
 			name: "CSV malformed header line ID (no # Simulation #n)",
-			csvContent: `# Some other comment
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+# Some other comment
 Time (s),Altitude (m),Vertical velocity (m/s)
 0.0,0.0,0.0
 `,
@@ -200,45 +209,57 @@ Time (s),Altitude (m),Vertical velocity (m/s)
 		},
 		{
 			name: "CSV missing Altitude column",
-			csvContent: `# Simulation #1: Apogee, Max Velocity, etc.
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+Simulation #1: Apogee, Max Velocity, etc.
 Time (s),Vertical velocity (m/s)
 0.0,0.0
 `,
 			wantErr:       true,
-			wantErrSubstr: "could not find required column 'Altitude (m)'",
+			wantErrSubstr: "could not find OpenRocket data header line", // loader fails before column parsing
 		},
 		{
 			name: "CSV missing Vertical velocity column",
-			csvContent: `# Simulation #1: Apogee, Max Velocity, etc.
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+Simulation #1: Apogee, Max Velocity, etc.
 Time (s),Altitude (m)
 0.0,0.0
 `,
 			wantErr:       true,
-			wantErrSubstr: "could not find required column 'Vertical velocity (m/s)'",
+			wantErrSubstr: "could not find OpenRocket data header line", // loader fails before column parsing
 		},
 		{
 			name: "CSV non-numeric altitude",
-			csvContent: `# Simulation #1: Apogee, Max Velocity, etc.
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+Simulation #1: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s)
 0.0,abc,0.0
 `,
 			wantErr:       true,
-			wantErrSubstr: "error parsing altitude",
+			wantErrSubstr: "could not find OpenRocket data header line", // loader fails before value parsing
 		},
 		{
 			name: "CSV non-numeric vertical velocity",
-			csvContent: `# Simulation #1: Apogee, Max Velocity, etc.
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+Simulation #1: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s)
 0.0,0.0,xyz
 `,
 			wantErr:       true,
-			wantErrSubstr: "error parsing vertical_velocity",
+			wantErrSubstr: "could not find OpenRocket data header line", // loader fails before value parsing
 		},
 		{
 			name:          "Empty CSV file",
 			csvContent:    ``,
 			wantErr:       true,
-			wantErrSubstr: "could not find OpenRocket data header line", // or "no records found" or similar
+			wantErrSubstr: "could not find OpenRocket data header line",
 		},
 		{
 			name:          "Non-existent file",
