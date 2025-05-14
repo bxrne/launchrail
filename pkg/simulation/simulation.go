@@ -246,6 +246,13 @@ func (s *Simulation) Run() error {
 
 	s.CurrentTime = 0 // Reset current time at the start of each run
 
+	// Validate simulation step size for numerical stability
+	step := s.config.Engine.Simulation.Step
+	if step <= 0 || step > 0.05 {
+		s.logger.Error("Invalid simulation step size", "step", step)
+		return fmt.Errorf("invalid simulation step: %f", step)
+	}
+
 	if s.rocket == nil {
 		return fmt.Errorf("rocket not loaded into simulation")
 	}
