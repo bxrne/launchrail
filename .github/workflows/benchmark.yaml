@@ -1,5 +1,4 @@
-name: Benchmarks
-
+name: Build and Test
 permissions:
   contents: read
   pull-requests: write
@@ -14,8 +13,8 @@ on:
       - main
 
 jobs:
-  run_benchmarks:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest 
 
     steps:
       - name: Check out the repository
@@ -24,24 +23,21 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.23 # Using the same Go version as in build_test.yaml
+          go-version: 1.23
 
       - name: Install dependencies
         run: go mod download
 
-      - name: Build the application (optional, ensures code compiles)
+      - name: Build the simulation
         run: go build ./cmd/... ./pkg/... ./internal/...
 
       - name: Build individual plugins
         run: |
           for dir in ./plugins/*; do
             if [ -d "$dir" ]; then
-              plugin_name=$(basename "$dir")
-              # Compile to ./plugins/<plugin_name>.so
-              go build -buildmode=plugin -o "./plugins/${plugin_name}.so" "$dir"
+              go build -buildmode=plugin -o "./$dir/plugin.so" "./$dir"
             fi
           done
-      
-      - name: Run benchmarks
-        run: |
-          go run ./cmd/bench/...
+        
+      - name: Run benchmark
+        run: go run ./cmd/benchmark

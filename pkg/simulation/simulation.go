@@ -38,10 +38,12 @@ type Simulation struct {
 	doneChan          chan struct{}
 	stateChan         chan *states.PhysicsState
 	launchRailSystem  *systems.LaunchRailSystem
-	currentTime       float64
+	CurrentTime       float64
 	systems           []systems.System
 	pluginManager     *plugin.Manager
 	gravity           float64
+	MaxAltitude       float64
+	MaxSpeed          float64
 }
 
 // NewSimulation creates a new rocket simulation
@@ -55,8 +57,11 @@ func NewSimulation(cfg *config.Config, log logf.Logger, stores *storage.Stores) 
 		updateChan:    make(chan struct{}),
 		doneChan:      make(chan struct{}),
 		stateChan:     make(chan *states.PhysicsState, 100),
-		pluginManager: plugin.NewManager(log, cfg), // Add cfg argument
+		pluginManager: plugin.NewManager(log, cfg),
 		gravity:       9.81,
+		MaxAltitude:   math.Inf(-1),
+		MaxSpeed:      0.0,
+		CurrentTime:   0.0,
 	}
 
 	for _, pluginPath := range cfg.Setup.Plugins.Paths {
@@ -220,13 +225,13 @@ func assertMotorStateAndLog(s *Simulation, state *entities.RocketEntity) error {
 
 // logPeriodicSimState logs the sim state every 100ms, with or without motor.
 func logPeriodicSimState(s *Simulation, state *entities.RocketEntity, hasMotor bool) {
-	if int(s.currentTime*1000)%100 != 0 {
+	if int(s.CurrentTime*1000)%100 != 0 {
 		return
 	}
 	if hasMotor {
-		s.logger.Debug("Sim state", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value, "thrust", state.Motor.GetThrust())
+		s.logger.Debug("Sim state", "t", s.CurrentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value, "thrust", state.Motor.GetThrust())
 	} else {
-		s.logger.Warn("Sim state: Motor is nil", "t", s.currentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value)
+		s.logger.Warn("Sim state: Motor is nil", "t", s.CurrentTime, "alt", state.Position.Vec.Y, "vy", state.Velocity.Vec.Y, "ay", state.Acceleration.Vec.Y, "mass", state.Mass.Value)
 	}
 }
 
@@ -239,28 +244,50 @@ func (s *Simulation) Run() error {
 		s.dynamicsParasite.Stop()
 	}()
 
-	if s.config.Engine.Simulation.Step <= 0 || s.config.Engine.Simulation.Step > 0.01 {
-		return fmt.Errorf("invalid simulation step: must be between 0 and 0.01")
+	s.CurrentTime = 0 // Reset current time at the start of each run
+
+	// Validate simulation step size for numerical stability
+	step := s.config.Engine.Simulation.Step
+	if step <= 0 || step > 0.05 {
+		s.logger.Error("Invalid simulation step size", "step", step)
+		return fmt.Errorf("invalid simulation step: %f", step)
+	}
+
+	if s.rocket == nil {
+		return fmt.Errorf("rocket not loaded into simulation")
+	}
+
+	// Initialize state with motor and mass before starting simulation loop
+	motor := getComponent[*components.Motor](s.rocket, "motor")
+	mass := s.getSafeMass(motor, s.rocket.Mass)
+	initialState := s.buildPhysicsState(motor, mass)
+
+	// Send initial state to channel before simulation loop
+	select {
+	case s.stateChan <- initialState:
+	default:
+		s.logger.Warn("state channel full at initial send, dropping frame")
 	}
 
 	for {
-		if err := s.updateSystems(); err != nil {
-			return err
-		}
-		state := s.rocket // This variable is used by assertAndLogPhysicsSanity
-		if err := s.assertAndLogPhysicsSanity(state); err != nil {
-			return err
-		}
-
-		// Check simulation exit conditions
+		s.logger.Debug("Simulation loop iteration", "currentTime", s.CurrentTime)
 		if s.shouldStopSimulation() {
+			s.logger.Info("Stopping simulation due to conditions.")
 			break
 		}
 
-		s.currentTime += s.config.Engine.Simulation.Step
+		s.CurrentTime += s.config.Engine.Simulation.Step
+
+		if err := s.updateSystems(); err != nil {
+			return err
+		}
+		state := s.rocket
+		if err := s.assertAndLogPhysicsSanity(state); err != nil {
+			return err
+		}
 	}
 
-	close(s.doneChan)
+	s.logger.Info("Simulation run finished", "totalTime", s.CurrentTime, "maxAltitude", s.MaxAltitude, "maxSpeed", s.MaxSpeed)
 	return nil
 }
 
@@ -276,7 +303,7 @@ func (s *Simulation) shouldStopSimulation() bool {
 	// Ground collision check (using clamped s.rocket.Position.Vec.Y)
 	// Ensure currentTime > 0 to allow simulation to start if rocket is initially on the ground (e.g., Y <= tolerance)
 	// Compare with Timestep to ensure at least one step has run
-	if s.rocket.Position.Vec.Y <= s.config.Engine.Simulation.GroundTolerance && s.currentTime > s.config.Engine.Simulation.Step {
+	if s.rocket.Position.Vec.Y <= s.config.Engine.Simulation.GroundTolerance && s.CurrentTime > s.config.Engine.Simulation.Step {
 		s.logger.Info("Ground impact detected: Rocket altitude at or below ground tolerance. Stopping simulation.",
 			"altitude", s.rocket.Position.Vec.Y, "tolerance", s.config.Engine.Simulation.GroundTolerance, "vy", s.rocket.Velocity.Vec.Y)
 		return true
@@ -284,13 +311,13 @@ func (s *Simulation) shouldStopSimulation() bool {
 
 	// Rules system land event check
 	// Avoid stopping at t=0 if initial state is Land
-	if s.rulesSystem.GetLastEvent() == types.Land && s.currentTime > s.config.Engine.Simulation.Step {
+	if s.rulesSystem.GetLastEvent() == types.Land && s.CurrentTime > s.config.Engine.Simulation.Step {
 		s.logger.Info("RulesSystem reported Land event. Stopping simulation.", "lastEvent", s.rulesSystem.GetLastEvent())
 		return true
 	}
 
 	// Max simulation time check
-	if s.currentTime >= s.config.Engine.Simulation.MaxTime {
+	if s.CurrentTime >= s.config.Engine.Simulation.MaxTime {
 		s.logger.Info("Reached maximum simulation time. Stopping simulation.", "maxTime", s.config.Engine.Simulation.MaxTime)
 		return true
 	}
@@ -299,13 +326,29 @@ func (s *Simulation) shouldStopSimulation() bool {
 }
 
 // getComponent safely retrieves and type-asserts a component from the rocket.
-func getComponent[T any](rocket *entities.RocketEntity, name string) *T {
-	c := rocket.GetComponent(name)
-	if c == nil {
-		return nil
+// T is the type the caller expects (e.g. *components.Motor).
+func getComponent[T any](rocket *entities.RocketEntity, name string) T {
+	var zero T // Zero value of type T, used for returning in case of error
+
+	if rocket == nil {
+		// Log or handle rocket is nil
+		return zero
 	}
-	comp, _ := c.(*T)
-	return comp
+
+	compGeneric := rocket.GetComponent(name)
+	if compGeneric == nil {
+		// Log or handle component not found
+		return zero
+	}
+
+	typedComp, ok := compGeneric.(T)
+	if !ok {
+		// Log or handle type assertion failure
+		// e.g. logger.Error("Component type assertion failed", "name", name, "expectedType", reflect.TypeOf(zero), "actualType", reflect.TypeOf(compGeneric))
+		return zero
+	}
+
+	return typedComp
 }
 
 // getSafeMass returns a valid mass pointer, falling back to 1.0 if nil or invalid.
@@ -326,7 +369,7 @@ func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass
 	// TODO: Replace with more accurate inertia calculation, possibly from OpenRocket data
 	// that considers all components and their relative positions for parallel axis theorem.
 	var Ixx, Iyy, Izz float64
-	bodytube := getComponent[components.Bodytube](s.rocket, "bodytube")
+	bodytube := getComponent[*components.Bodytube](s.rocket, "bodytube")
 
 	if bodytube != nil && mass != nil && mass.Value > 0 && bodytube.Radius > 0 {
 		r := bodytube.Radius
@@ -362,7 +405,7 @@ func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass
 	}
 
 	return &states.PhysicsState{
-		Time:                     s.currentTime,
+		Time:                     s.CurrentTime,
 		BasicEntity:              *s.rocket.BasicEntity,
 		Position:                 s.rocket.Position,
 		Orientation:              s.rocket.Orientation,
@@ -372,10 +415,10 @@ func (s *Simulation) buildPhysicsState(motor *components.Motor, mass *types.Mass
 		Acceleration:             s.rocket.Acceleration,
 		Mass:                     mass,
 		Motor:                    motor,
-		Bodytube:                 getComponent[components.Bodytube](s.rocket, "bodytube"),
-		Nosecone:                 getComponent[components.Nosecone](s.rocket, "nosecone"),
-		Finset:                   getComponent[components.TrapezoidFinset](s.rocket, "finset"),
-		Parachute:                getComponent[components.Parachute](s.rocket, "parachute"),
+		Bodytube:                 getComponent[*components.Bodytube](s.rocket, "bodytube"),
+		Nosecone:                 getComponent[*components.Nosecone](s.rocket, "nosecone"),
+		Finset:                   getComponent[*components.TrapezoidFinset](s.rocket, "finset"),
+		Parachute:                getComponent[*components.Parachute](s.rocket, "parachute"),
 		InertiaTensorBody:        inertiaBodyCalculated,     // Use dynamically calculated value (Matrix3x3)
 		InverseInertiaTensorBody: *invInertiaBodyCalculated, // Use its inverse (*Matrix3x3)
 	}
@@ -393,11 +436,11 @@ func runPlugins(plugins []pluginapi.SimulationPlugin, hook func(pluginapi.Simula
 
 // updateSystems updates all systems in the simulation
 func (s *Simulation) updateSystems() error {
-	s.logger.Debug("updateSystems started", "currentTime", s.currentTime)
+	s.logger.Debug("updateSystems started", "currentTime", s.CurrentTime)
 	if s.rocket == nil {
 		return fmt.Errorf("no rocket entity loaded")
 	}
-	motor := getComponent[components.Motor](s.rocket, "motor")
+	motor := getComponent[*components.Motor](s.rocket, "motor")
 
 	// --- Update Rocket's Mass Property ---
 	currentMassKg := s.rocket.GetCurrentMassKg() // Includes motor mass potentially from *previous* step
@@ -646,6 +689,17 @@ func (s *Simulation) updateSystems() error {
 	// s.rocket.Orientation.Quat = finalOrientation // TODO: Restore when finalOrientation is available from RK4
 	// s.rocket.Mass is updated by MotorSystem.Update()
 
+	// Update Max Altitude and Max Speed
+	if s.rocket.Position != nil && s.rocket.Position.Vec.Y > s.MaxAltitude {
+		s.MaxAltitude = s.rocket.Position.Vec.Y
+	}
+	if s.rocket.Velocity != nil {
+		currentSpeed := s.rocket.Velocity.Vec.Magnitude()
+		if currentSpeed > s.MaxSpeed {
+			s.MaxSpeed = currentSpeed
+		}
+	}
+
 	// --- Ground Collision Detection and Response on s.rocket ---
 	if s.rocket.Position.Vec.Y < s.config.Engine.Simulation.GroundTolerance && s.rocket.Velocity.Vec.Y < 0 {
 		s.logger.Debug("Ground impact: clamping Y position and velocity on s.rocket",
@@ -670,7 +724,7 @@ func (s *Simulation) updateSystems() error {
 	// Populate the 'state' object that will be recorded and passed to plugins/channels.
 	// This 'state' object was passed into updateSystems.
 	// *state.AngularAcceleration was already set using netAngularAccelerationWorld.
-	finalState.Time = s.currentTime                 // Assuming PhysicsState has a 'Time' field
+	finalState.Time = s.CurrentTime                 // Assuming PhysicsState has a 'Time' field
 	finalState.Position = s.rocket.Position         // Reflects clamped position
 	finalState.Velocity = s.rocket.Velocity         // Reflects clamped velocity
 	finalState.Acceleration = s.rocket.Acceleration // This is k1ADeriv (accel at start of step)
