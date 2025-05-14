@@ -42,14 +42,6 @@ func FindEventIndex(eventsData [][]string, eventName string) int {
 	return -1 // Event not found
 }
 
-func getHeaderKey(headers []string, keyName string) string {
-	for _, h := range headers {
-		if strings.EqualFold(h, keyName) {
-			return h
-		}
-	}
-	return "" // Return empty if not found
-}
 
 // ConvertMarkdownToSimpleHTML converts a markdown string to a very basic HTML representation.
 func ConvertMarkdownToSimpleHTML(mdContent string, recordID string) string {
@@ -676,14 +668,25 @@ func CalculateMotionMetrics(motionData []*PlotSimRecord, motionHeaders []string,
 func FindMotionDataIndices(motionHeaders []string) (timeIdx, altitudeIdx, velocityIdx, accelIdx int) {
 	timeIdx, altitudeIdx, velocityIdx, accelIdx = -1, -1, -1, -1
 	for i, header := range motionHeaders {
-		switch strings.ToLower(strings.TrimSpace(header)) {
-		case "time", "time (s)":
+		cleanHeader := strings.ToLower(strings.TrimSpace(header))
+
+		// Check for time column
+		if timeIdx == -1 && (cleanHeader == "time" || cleanHeader == "time (s)" || strings.Contains(cleanHeader, "time")) {
 			timeIdx = i
-		case "altitude agl (m)":
+		}
+
+		// Check for altitude column
+		if altitudeIdx == -1 && (cleanHeader == "altitude" || cleanHeader == "altitude agl (m)" || strings.Contains(cleanHeader, "altitude")) {
 			altitudeIdx = i
-		case "total velocity (m/s)":
+		}
+
+		// Check for velocity column
+		if velocityIdx == -1 && (cleanHeader == "velocity" || cleanHeader == "total velocity (m/s)" || strings.Contains(cleanHeader, "velocity")) {
 			velocityIdx = i
-		case "total acceleration (m/s^2)":
+		}
+
+		// Check for acceleration column
+		if accelIdx == -1 && (cleanHeader == "acceleration" || cleanHeader == "total acceleration (m/s^2)" || strings.Contains(cleanHeader, "acceleration")) {
 			accelIdx = i
 		}
 	}
