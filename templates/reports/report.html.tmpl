@@ -114,7 +114,7 @@
             {{if .Plots}}
                 {{range $key, $path := .Plots}}
                     <div class="plot-container">
-                        <h3>{{$key | replace "_" " " | title}}</h3>
+                        <h3>{{ title (replace $key "_" " ") }}</h3>
                         {{ embedSVG $path $key }}
                     </div>
                 {{end}}

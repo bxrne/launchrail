@@ -1,0 +1,50 @@
+# Simulation Report: {{.RecordID}}
+
+## Summary
+- **Rocket**: {{.RocketName}}
+- **Motor**: {{.MotorName}}
+- **Version**: {{.Version}}
+- **Generated**: {{.GeneratedTime}}
+
+## Flight Metrics
+- **Apogee**: {{.MotionMetrics.MaxAltitudeAGL}} m
+- **Max Speed**: {{.MotionMetrics.MaxSpeed}} m/s
+- **Flight Time**: {{.MotionMetrics.FlightTime}} s
+- **Max Acceleration**: {{.MotionMetrics.MaxAcceleration}} m/s²
+- **Time to Apogee**: {{.MotionMetrics.TimeToApogee}} s
+- **Total Flight Time**: {{.MotionMetrics.TotalFlightTime}} s
+- **Landing Speed**: {{.MotionMetrics.LandingSpeed}} m/s
+
+## Motor Performance
+- **Max Thrust**: {{.MotorSummary.MaxThrust}} N
+- **Average Thrust**: {{.MotorSummary.AvgThrust}} N
+- **Total Impulse**: {{.MotorSummary.TotalImpulse}} Ns
+- **Burn Time**: {{.MotorSummary.BurnTime}} s
+
+## Launch Conditions
+- **Launch Site**: {{.Summary.LaunchSite}}
+- **Latitude**: {{.Weather.Latitude}}°
+- **Longitude**: {{.Weather.Longitude}}°
+- **Elevation**: {{.Weather.ElevationAMSL}} m
+- **Temperature**: {{.Weather.Temperature}} °C
+- **Pressure**: {{.Weather.Pressure}} Pa
+- **Density**: {{.Weather.Density}} kg/m³
+- **Local Gravity**: {{.Weather.LocalGravity}} m/s²
+- **Speed of Sound**: {{.Weather.SpeedOfSound}} m/s
+
+## Recovery Systems
+{{range .RecoverySystems}}
+- **Type**: {{.Type}}
+- **Deployment Time**: {{.Deployment}} s
+- **Descent Rate**: {{.DescentRate}} m/s
+{{end}}
+
+## Flight Phases
+- **Apogee Time**: {{.PhaseSummary.ApogeeTimeSec}} s
+- **Maximum Altitude**: {{.PhaseSummary.MaxAltitudeM}} m
+
+## Plots
+{{range $key, $path := .Plots}}
+### {{$key}}
+![{{$key}}](assets/{{$path}})
+{{end}}
