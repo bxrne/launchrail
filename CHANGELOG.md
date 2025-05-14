@@ -1,3 +1,47 @@
+## v0.9.0 (2025-05-14)
+
+### Feat
+
+- add reporting module with simulation data processing and parachute helpers
+- add intelligent recovery system inference from motion data
+- enhance parachute detection and refactor weather data model with improved atmospheric metrics
+- add motor class determination and mass calculation for flight reports
+- add comprehensive weather and recovery data to simulation reports
+- improve motion data parsing with flexible header matching and enhance report link styling
+- add markdown report format support and improve motion metrics calculation
+- implement markdown report generation with template and data loading
+- enhance motor data model and reporting metrics calculation
+- improve placeholder visualization for missing SVG charts and motor data
+- add format detection via Accept header and JSON response support in report API
+- add debug logging for record keys in plotSimRecord function
+- add static directory config and report template with improved test coverage
+- refactor report generation with plot support and metric calculations
+- implement report template rendering with Markdown and HTML support
+
+### Fix
+
+- standardize thrust curve column headers and add dynamic header detection
+- update report template to use AGL altitude instead of raw altitude
+- update template path handling and improve CSV test data formatting
+
+### Refactor
+
+- simplify report templates by removing raw data section and markdown format
+- remove unused getHeaderKey function and whitespace in reporting package
+- improve test data handling and fix template references in report generation
+- remove LaunchSiteName field from WeatherData and move CSS to external stylesheet
+- streamline report generation to use HTML templates directly with improved weather data
+- migrate report template from markdown to HTML with improved styling
+- update plot handling to use embedSVG template function instead of direct paths
+- update flight data headers and event names for consistency
+- simplify report generation with new SimulationData structure
+- improve flight event detection and time calculations in report generation
+- enhance motion metrics with comprehensive flight data analysis
+- remove unused test helper functions from config_test.go
+- enhance report data structures and template handling for markdown reports
+- migrate parseInt to utils.ParseInt and add content negotiation for reports
+- move report template from internal to templates directory
+
 ## v0.8.0 (2025-05-13)
 
 ### Feat
