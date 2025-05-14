@@ -1,4 +1,4 @@
-package main
+package main_test
 
 import (
 	"errors"
@@ -6,18 +6,19 @@ import (
 	"testing"
 	"time"
 
+	main "github.com/bxrne/launchrail/cmd/benchmark"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestMetricResult_String(t *testing.T) {
 	tests := []struct {
 		name     string
-		mr       MetricResult
+		mr       main.MetricResult
 		wantSubs []string // Substrings we expect to find in the output
 	}{
 		{
 			name: "PASS scenario",
-			mr: MetricResult{
+			mr: main.MetricResult{
 				Name:   "TestMetricPass",
 				Passed: true,
 			},
@@ -25,7 +26,7 @@ func TestMetricResult_String(t *testing.T) {
 		},
 		{
 			name: "FAIL scenario with diff",
-			mr: MetricResult{
+			mr: main.MetricResult{
 				Name:     "TestMetricFailDiff",
 				Expected: 10,
 				Actual:   5,
@@ -36,7 +37,7 @@ func TestMetricResult_String(t *testing.T) {
 		},
 		{
 			name: "FAIL scenario with error",
-			mr: MetricResult{
+			mr: main.MetricResult{
 				Name:     "TestMetricFailErr",
 				Expected: "foo",
 				Actual:   "bar",
@@ -47,7 +48,7 @@ func TestMetricResult_String(t *testing.T) {
 		},
 		{
 			name: "FAIL scenario with diff and error",
-			mr: MetricResult{
+			mr: main.MetricResult{
 				Name:     "TestMetricFailDiffErr",
 				Expected: true,
 				Actual:   false,
@@ -70,19 +71,19 @@ func TestMetricResult_String(t *testing.T) {
 }
 
 func TestBenchmarkResult_String(t *testing.T) {
-	dummyMetricPass := MetricResult{Name: "SubMetricPass", Passed: true}
-	dummyMetricFail := MetricResult{Name: "SubMetricFail", Expected: 1, Actual: 0, Passed: false, Diff: "-1"}
+	dummyMetricPass := main.MetricResult{Name: "SubMetricPass", Passed: true}
+	dummyMetricFail := main.MetricResult{Name: "SubMetricFail", Expected: 1, Actual: 0, Passed: false, Diff: "-1"}
 
 	tests := []struct {
 		name     string
-		br       BenchmarkResult
+		br       main.BenchmarkResult
 		wantSubs []string
 	}{
 		{
 			name: "PASSED benchmark",
-			br: BenchmarkResult{
+			br: main.BenchmarkResult{
 				Name:     "TestBenchOverallPass",
-				Metrics:  []MetricResult{dummyMetricPass, {Name: "AnotherPass", Passed: true}},
+				Metrics:  []main.MetricResult{dummyMetricPass, {Name: "AnotherPass", Passed: true}},
 				Passed:   true,
 				Duration: 123 * time.Millisecond,
 			},
@@ -90,9 +91,9 @@ func TestBenchmarkResult_String(t *testing.T) {
 		},
 		{
 			name: "FAILED benchmark",
-			br: BenchmarkResult{
+			br: main.BenchmarkResult{
 				Name:     "TestBenchOverallFail",
-				Metrics:  []MetricResult{dummyMetricPass, dummyMetricFail},
+				Metrics:  []main.MetricResult{dummyMetricPass, dummyMetricFail},
 				Passed:   false,
 				Duration: 456 * time.Second,
 			},
@@ -100,7 +101,7 @@ func TestBenchmarkResult_String(t *testing.T) {
 		},
 		{
 			name: "Benchmark with SetupError",
-			br: BenchmarkResult{
+			br: main.BenchmarkResult{
 				Name:       "TestBenchSetupErr",
 				Passed:     false, // Typically false if setup fails
 				Duration:   10 * time.Millisecond,
@@ -110,7 +111,7 @@ func TestBenchmarkResult_String(t *testing.T) {
 		},
 		{
 			name: "Benchmark with RunError",
-			br: BenchmarkResult{
+			br: main.BenchmarkResult{
 				Name:     "TestBenchRunErr",
 				Passed:   false,
 				Duration: 20 * time.Millisecond,
@@ -120,9 +121,9 @@ func TestBenchmarkResult_String(t *testing.T) {
 		},
 		{
 			name: "Benchmark with ReportNotes",
-			br: BenchmarkResult{
+			br: main.BenchmarkResult{
 				Name:        "TestBenchNotes",
-				Metrics:     []MetricResult{dummyMetricPass},
+				Metrics:     []main.MetricResult{dummyMetricPass},
 				Passed:      true,
 				Duration:    50 * time.Millisecond,
 				ReportNotes: "All systems nominal.",
@@ -131,9 +132,9 @@ func TestBenchmarkResult_String(t *testing.T) {
 		},
 		{
 			name: "Benchmark with all bells and whistles (failed)",
-			br: BenchmarkResult{
+			br: main.BenchmarkResult{
 				Name:        "TestBenchComplexFail",
-				Metrics:     []MetricResult{dummyMetricPass, dummyMetricFail},
+				Metrics:     []main.MetricResult{dummyMetricPass, dummyMetricFail},
 				Passed:      false,
 				Duration:    1 * time.Second,
 				SetupError:  errors.New("bad setup"),

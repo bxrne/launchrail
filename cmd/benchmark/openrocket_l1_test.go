@@ -1,4 +1,4 @@
-package main
+package main_test
 
 import (
 	"io"
@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	main "github.com/bxrne/launchrail/cmd/benchmark"
 	"github.com/bxrne/launchrail/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,13 +23,13 @@ func newTestLogger() *logf.Logger {
 
 func TestOpenRocketL1Benchmark_Name(t *testing.T) {
 	lg := newTestLogger()
-	bench := NewOpenRocketL1Benchmark(lg)
+	bench := main.NewOpenRocketL1Benchmark(lg)
 	assert.Equal(t, "OpenRocketL1Comparison", bench.Name())
 }
 
 func TestOpenRocketL1Benchmark_compareFloatMetric(t *testing.T) {
 	lg := newTestLogger()
-	bench := NewOpenRocketL1Benchmark(lg)
+	main.NewOpenRocketL1Benchmark(lg)
 
 	tests := []struct {
 		name             string
@@ -115,7 +116,8 @@ func TestOpenRocketL1Benchmark_compareFloatMetric(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			metricName := "TestMetric"
-			result := bench.compareFloatMetric(metricName, tt.expectedVal, tt.actualVal, tt.tolerancePercent)
+			bench := main.NewOpenRocketL1Benchmark(newTestLogger())
+			result := bench.CompareFloatMetric(metricName, tt.expectedVal, tt.actualVal, tt.tolerancePercent)
 
 			assert.Equal(t, metricName, result.Name)
 			assert.Equal(t, tt.expectedVal, result.Expected)
@@ -255,7 +257,7 @@ Time (s),Altitude (m),Vertical velocity (m/s)
 				filePath = createTempCSV(t, tt.csvContent)
 			}
 
-			apogee, maxVel, _, err := loadOpenRocketExportData(filePath, lg)
+			apogee, maxVel, _, err := main.LoadOpenRocketExportData(filePath, lg)
 
 			if tt.wantErr {
 				require.Error(t, err)

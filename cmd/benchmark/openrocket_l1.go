@@ -44,7 +44,7 @@ const (
 
 // loadOpenRocketExportData parses an OpenRocket simulation export CSV file to extract key flight metrics.
 // It looks for maximum altitude, maximum velocity, and the flight time until apogee is reached.
-func loadOpenRocketExportData(filePath string, log *logf.Logger) (apogee float64, maxVelocity float64, flightTimeToApogee float64, err error) {
+func LoadOpenRocketExportData(filePath string, log *logf.Logger) (apogee float64, maxVelocity float64, flightTimeToApogee float64, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Error("Failed to open OpenRocket export file", "path", filePath, "error", err)
@@ -257,7 +257,7 @@ func (b *OpenRocketL1Benchmark) Run(appCfg *config.Config, benchdataPath string)
 	csvFilePath := filepath.Join(benchdataPath, "openrocket_l1", "export.csv")
 	b.log.Info("Attempting to read OpenRocket export data from", "path", csvFilePath)
 
-	expectedApogee, expectedMaxVelocity, expectedFlightTime, err := loadOpenRocketExportData(csvFilePath, b.log)
+	expectedApogee, expectedMaxVelocity, expectedFlightTime, err := LoadOpenRocketExportData(csvFilePath, b.log)
 	if err != nil {
 		return &BenchmarkResult{
 			Name:       b.Name(),
@@ -274,25 +274,14 @@ func (b *OpenRocketL1Benchmark) Run(appCfg *config.Config, benchdataPath string)
 	simulationName := "LaunchRail_vs_OpenRocketL1"
 	b.log.Info("Processing simulation case", "name", simulationName, "rocketFile_from_config", appCfg.Engine.Options.OpenRocketFile, "motor_from_config", appCfg.Engine.Options.MotorDesignation)
 
-	// --- LaunchRail Simulation ---
 	var simRunError error
-
-	// Create a deep copy of appCfg to modify for this specific simulation case
-	// No, for this simplified version, we assume appCfg is already set for the L1 rocket.
-	// If rocket/motor needs to be overridden, it should be done before calling Run or via appCfg.
 
 	// Setup simulation manager
 	simLoggerOpts := logger.GetDefaultOpts() // Get base options from our logger package
 	simLoggerOpts.DefaultFields = []any{"service", "simulation-manager", "benchmark_case", simulationName}
 	simManagerLogger := logf.New(simLoggerOpts) // logf.New returns logf.Logger (value type)
 
-	simManager := simulation.NewManager(appCfg, simManagerLogger) // Pass value type logger
-	// TODO: Review if NewManager can intrinsically fail in a way that needs pre-check before Initialize.
-	// For now, errors are caught during Initialize or Run phases.
-
-	// Setup storage (unique for each benchmark run to avoid conflicts if run in parallel, though not currently)
-	// For now, use a timestamp or a fixed sub-directory for benchmark outputs.
-	// TODO: Use appCfg.Storage.RecordDir once StorageConfig is properly implemented in internal/config/config.go
+	simManager := simulation.NewManager(appCfg, simManagerLogger)
 	benchmarkOutputDir := filepath.Join(benchdataPath, "launchrail_outputs", simulationName+"_"+startTime.Format("20060102_150405"))
 
 	if err := os.MkdirAll(benchmarkOutputDir, 0755); err != nil {
@@ -350,14 +339,14 @@ func (b *OpenRocketL1Benchmark) Run(appCfg *config.Config, benchdataPath string)
 
 							// Compare Apogee - using high tolerance due to different simulation models
 							// between LaunchRail and OpenRocket
-							apogeeMetric := b.compareFloatMetric(fmt.Sprintf("%s-Apogee_METERS", simulationName), expectedApogee, actualApogee, 4.0) // 400% tolerance
+							apogeeMetric := b.CompareFloatMetric(fmt.Sprintf("%s-Apogee_METERS", simulationName), expectedApogee, actualApogee, 4.0) // 400% tolerance
 							metrics = append(metrics, apogeeMetric)
 							if !apogeeMetric.Passed {
 								overallPassed = false
 							}
 
 							// Compare Max Velocity - using high tolerance due to different aero models
-							maxVelMetric := b.compareFloatMetric(fmt.Sprintf("%s-MaxVelocity_MPS", simulationName), expectedMaxVelocity, actualMaxVelocity, 1.0) // 100% tolerance
+							maxVelMetric := b.CompareFloatMetric(fmt.Sprintf("%s-MaxVelocity_MPS", simulationName), expectedMaxVelocity, actualMaxVelocity, 1.0) // 100% tolerance
 							metrics = append(metrics, maxVelMetric)
 							if !maxVelMetric.Passed {
 								overallPassed = false
@@ -366,7 +355,7 @@ func (b *OpenRocketL1Benchmark) Run(appCfg *config.Config, benchdataPath string)
 							// Compare Total Flight Time
 							// Note: OpenRocket apogee time vs LaunchRail full flight duration are fundamentally different
 							// We use a very high tolerance as we're only checking order-of-magnitude correctness
-							flightTimeMetric := b.compareFloatMetric(fmt.Sprintf("%s-FlightTime_SECONDS", simulationName), expectedFlightTime, actualFlightTime, 49.0) // 4900% tolerance
+							flightTimeMetric := b.CompareFloatMetric(fmt.Sprintf("%s-FlightTime_SECONDS", simulationName), expectedFlightTime, actualFlightTime, 49.0) // 4900% tolerance
 							metrics = append(metrics, flightTimeMetric)
 							if !flightTimeMetric.Passed {
 								overallPassed = false
@@ -402,7 +391,7 @@ func (b *OpenRocketL1Benchmark) Run(appCfg *config.Config, benchdataPath string)
 // tolerance is a relative value (0.05 = 5%)
 // For cross-simulator comparisons (e.g., OpenRocket vs LaunchRail), higher tolerance values
 // may be necessary due to differences in physical models, initial conditions, and numerical methods.
-func (b *OpenRocketL1Benchmark) compareFloatMetric(name string, expected, actual, tolerancePercent float64) MetricResult {
+func (b *OpenRocketL1Benchmark) CompareFloatMetric(name string, expected, actual, tolerancePercent float64) MetricResult {
 	diff := actual - expected
 	percentDiff := 0.0
 	if expected != 0 {
