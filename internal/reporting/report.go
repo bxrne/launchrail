@@ -1446,25 +1446,40 @@ func GenerateReportData(log *logf.Logger, cfg *config.Config, rm RecordManager, 
 	// 2. Create recovery systems data from actual parachute deployment events
 	recoverySystems := FindParachuteEvents(simData.EventsData, log)
 
-	// If no parachute events were found in the events data, create reasonable defaults based on apogee time
+	// If no parachute events were found in the events data, infer them from motion data
 	if len(recoverySystems) == 0 {
-		log.Info("No parachute events found in simulation data, using defaults based on apogee time")
+		log.Info("No parachute events found in simulation data, attempting to infer from motion data")
 
-		recoveryTimeDeployment := 11.5 // Default sample apogee time
+		// Get apogee time from motion metrics
+		recoveryTimeDeployment := 0.0
 		if motionMetrics != nil && motionMetrics.TimeToApogee > 0 {
 			recoveryTimeDeployment = motionMetrics.TimeToApogee
+		} else {
+			// Try to find apogee from motion data
+			apogeeTime, maxAlt := findApogeeFromMotionData(parsedMotionPlotRecords, parsedMotionPlotHeaders, log)
+			if apogeeTime > 0 {
+				recoveryTimeDeployment = apogeeTime
+				log.Info("Found apogee from motion data", "time", apogeeTime, "altitude", maxAlt)
+			} else {
+				// Fallback to reasonable value based on typical rocket flight
+				recoveryTimeDeployment = 10.0
+				log.Warn("Could not determine apogee time, using default value", "default_time", recoveryTimeDeployment)
+			}
 		}
+
+		// Calculate realistic descent rates based on motion data if available
+		drogueDescentRate, mainDescentRate := calculateDescentRates(parsedMotionPlotRecords, parsedMotionPlotHeaders, recoveryTimeDeployment, log)
 
 		recoverySystems = []RecoverySystemData{
 			{
 				Type:        "Drogue Parachute",
 				Deployment:  recoveryTimeDeployment,
-				DescentRate: 20.0,
+				DescentRate: drogueDescentRate,
 			},
 			{
 				Type:        "Main Parachute",
-				Deployment:  recoveryTimeDeployment + 5.0, // 5 seconds after apogee
-				DescentRate: 5.0,
+				Deployment:  recoveryTimeDeployment + 5.0, // Typically deployed 5 seconds after drogue
+				DescentRate: mainDescentRate,
 			},
 		}
 	} else {

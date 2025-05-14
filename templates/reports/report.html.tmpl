@@ -131,7 +131,6 @@
                         {{with .Weather.Latitude}}<tr><td>Latitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
                         {{with .Weather.Longitude}}<tr><td>Longitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
                         {{with .Weather.ElevationAMSL}}<tr><td>Elevation (AMSL)</td><td>{{printf "%.1f" .}} m</td></tr>{{end}}
-                        {{with .Weather.TemperatureK}}<tr><td>Temperature</td><td>{{printf "%.1f" (sub . 273.15)}} °C</td></tr>{{end}}
                         {{with .Weather.Pressure}}<tr><td>Pressure (Launch Site)</td><td>{{printf "%.1f" .}} Pa</td></tr>{{end}}
                         {{with .Weather.SeaLevelPressure}}<tr><td>Pressure (Sea Level)</td><td>{{printf "%.1f" .}} Pa</td></tr>{{end}}
                         {{with .Weather.Density}}<tr><td>Air Density</td><td>{{printf "%.4f" .}} kg/m³</td></tr>{{end}}
