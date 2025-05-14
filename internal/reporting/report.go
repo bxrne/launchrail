@@ -42,7 +42,6 @@ func FindEventIndex(eventsData [][]string, eventName string) int {
 	return -1 // Event not found
 }
 
-
 // ConvertMarkdownToSimpleHTML converts a markdown string to a very basic HTML representation.
 func ConvertMarkdownToSimpleHTML(mdContent string, recordID string) string {
 	htmlOutput := "<!DOCTYPE html>\n"
@@ -313,16 +312,6 @@ func parseSimData(log *logf.Logger, headers []string, data [][]string) ([]*PlotS
 	log.Debug("Parsed data records", "num_records", len(records))
 	return records, nil
 }
-
-// getHeaderKey is unused
-// func getHeaderKey(headers []string, keyName string) string {
-// 	for _, h := range headers {
-// 		if strings.EqualFold(h, keyName) {
-// 			return h
-// 		}
-// 	}
-// 	return "" // Return empty if not found
-// }
 
 // motorPoint represents a single data point of motor thrust over time
 type motorPoint struct {
