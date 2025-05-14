@@ -131,9 +131,12 @@
                         {{with .Weather.Latitude}}<tr><td>Latitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
                         {{with .Weather.Longitude}}<tr><td>Longitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
                         {{with .Weather.ElevationAMSL}}<tr><td>Elevation (AMSL)</td><td>{{printf "%.1f" .}} m</td></tr>{{end}}
-                        {{with .Weather.Temperature}}<tr><td>Temperature</td><td>{{printf "%.1f" .}} °C</td></tr>{{end}}
-                        {{with .Weather.Pressure}}<tr><td>Pressure</td><td>{{printf "%.1f" .}} Pa</td></tr>{{end}}
-                        {{with .Weather.Humidity}}<tr><td>Humidity</td><td>{{printf "%.1f" .}} %</td></tr>{{end}}
+                        {{with .Weather.TemperatureK}}<tr><td>Temperature</td><td>{{printf "%.1f" (sub . 273.15)}} °C</td></tr>{{end}}
+                        {{with .Weather.Pressure}}<tr><td>Pressure (Launch Site)</td><td>{{printf "%.1f" .}} Pa</td></tr>{{end}}
+                        {{with .Weather.SeaLevelPressure}}<tr><td>Pressure (Sea Level)</td><td>{{printf "%.1f" .}} Pa</td></tr>{{end}}
+                        {{with .Weather.Density}}<tr><td>Air Density</td><td>{{printf "%.4f" .}} kg/m³</td></tr>{{end}}
+                        {{with .Weather.SpeedOfSound}}<tr><td>Speed of Sound</td><td>{{printf "%.1f" .}} m/s</td></tr>{{end}}
+                        {{with .Weather.LocalGravity}}<tr><td>Local Gravity</td><td>{{printf "%.2f" .}} m/s²</td></tr>{{end}}
                         {{with .Weather.WindSpeed}}<tr><td>Wind Speed</td><td>{{printf "%.1f" .}} m/s</td></tr>{{end}}
                         {{with .Weather.WindDirection}}<tr><td>Wind Direction (from)</td><td>{{printf "%.1f" .}}°</td></tr>{{end}}
                     </tbody>

@@ -26,11 +26,12 @@
 - **Latitude**: {{.Weather.Latitude}}°
 - **Longitude**: {{.Weather.Longitude}}°
 - **Elevation**: {{.Weather.ElevationAMSL}} m
-- **Temperature**: {{.Weather.Temperature}} °C
-- **Pressure**: {{.Weather.Pressure}} Pa
-- **Density**: {{.Weather.Density}} kg/m³
-- **Local Gravity**: {{.Weather.LocalGravity}} m/s²
+- **Air Density**: {{.Weather.Density}} kg/m³
+- **Pressure (Launch Site)**: {{.Weather.Pressure}} Pa
+- **Pressure (Sea Level)**: {{.Weather.SeaLevelPressure}} Pa
 - **Speed of Sound**: {{.Weather.SpeedOfSound}} m/s
+- **Local Gravity**: {{.Weather.LocalGravity}} m/s²
+- **Temperature**: {{printf "%.2f" (sub .Weather.TemperatureK 273.15)}} °C
 
 ## Recovery Systems
 {{range .RecoverySystems}}

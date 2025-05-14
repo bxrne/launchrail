@@ -13,9 +13,11 @@ import (
 	"time"
 
 	"github.com/bxrne/launchrail/internal/config"
+	"github.com/bxrne/launchrail/internal/http_client"
 	"github.com/bxrne/launchrail/internal/storage"
 	"github.com/bxrne/launchrail/pkg/designation"
 	"github.com/bxrne/launchrail/pkg/openrocket"
+	"github.com/bxrne/launchrail/pkg/thrustcurves"
 	"github.com/zerodha/logf"
 )
 
@@ -248,18 +250,18 @@ type ForcesAndMomentsData struct {
 
 // WeatherData holds atmospheric conditions data
 type WeatherData struct {
-	Latitude              float64 // Added
-	Longitude             float64 // Added
-	ElevationAMSL         float64 // Added
+	Latitude              float64
+	Longitude             float64
+	ElevationAMSL         float64
 	WindSpeed             float64
 	WindDirection         float64
 	WindDirectionCardinal string
-	Temperature           float64
-	Pressure              float64
-	Density               float64
-	Humidity              float64
-	LocalGravity          float64 // Local gravity at launch site
-	SpeedOfSound          float64 // Speed of sound at launch conditions
+	Pressure              float64 // Atmospheric pressure at launch site altitude (Pa)
+	SeaLevelPressure      float64 // Standard sea level pressure (Pa)
+	Density               float64 // Air density at launch site (kg/m³)
+	LocalGravity          float64 // Local gravity at launch site (m/s²)
+	SpeedOfSound          float64 // Speed of sound in current conditions (m/s)
+	TemperatureK          float64 // Temperature in Kelvin
 }
 
 // Note: EventSummary is defined above with the required fields for the FRR report
@@ -721,44 +723,262 @@ func FindMotionDataIndices(motionHeaders []string) (timeIdx, altitudeIdx, veloci
 func FindFlightEvents(eventsData [][]string, log *logf.Logger) (launchIdx, railExitIdx, burnoutIdx, apogeeEventIdx, touchdownIdx int) {
 	launchIdx, railExitIdx, burnoutIdx, apogeeEventIdx, touchdownIdx = -1, -1, -1, -1, -1
 
-	if len(eventsData) < 1 { // Need at least one data row (headers are not passed in eventsData from GenerateReportData)
-		log.Warn("eventsData has insufficient rows to find flight events", "num_rows", len(eventsData))
-		return launchIdx, railExitIdx, burnoutIdx, apogeeEventIdx, touchdownIdx // Explicitly return the values
+	if len(eventsData) == 0 {
+		log.Warn("No event data available for finding flight events.")
+		return // Return with all -1
 	}
 
-	// In GenerateReportData, eventsData is passed as rawMotionData[1:] after headers are stripped.
-	// So, eventsData[i][0] is event name, eventsData[i][1] is time.
-	for i, eventRow := range eventsData {
-		if len(eventRow) < 2 { // Need at least name and time
-			log.Warn("Event data row too short for event name/time", "row_index", i, "row_len", len(eventRow))
+	// First, try to directly find events by name
+	launchIdx = FindEventIndex(eventsData, "Launch")
+	railExitIdx = FindEventIndex(eventsData, "Rail Exit")
+	burnoutIdx = FindEventIndex(eventsData, "Motor Burnout")
+	apogeeEventIdx = FindEventIndex(eventsData, "Apogee")
+	touchdownIdx = FindEventIndex(eventsData, "Touchdown")
+
+	// If we didn't find all events, try looser matching (case-insensitive)
+	for i, row := range eventsData {
+		if len(row) < 1 {
 			continue
 		}
 
-		eventName := strings.TrimSpace(eventRow[0])
+		eventName := row[0]
 		switch {
 		case strings.EqualFold(eventName, "Launch"):
 			if launchIdx == -1 {
-				launchIdx = FindEventIndex(eventsData, "Launch")
+				launchIdx = i
 			}
-		case strings.Contains(strings.ToLower(eventName), "burnout"):
+		case strings.EqualFold(eventName, "Motor Burnout"):
 			if burnoutIdx == -1 {
-				burnoutIdx = FindEventIndex(eventsData, eventName)
-			} // Use actual eventName if it contains 'burnout'
+				burnoutIdx = i
+			}
 		case strings.EqualFold(eventName, "Rail Exit"):
 			if railExitIdx == -1 {
 				railExitIdx = FindEventIndex(eventsData, "Rail Exit")
 			}
 		case strings.EqualFold(eventName, "Apogee"):
 			if apogeeEventIdx == -1 {
-				apogeeEventIdx = FindEventIndex(eventsData, "Apogee")
+				apogeeEventIdx = i
 			}
 		case strings.EqualFold(eventName, "Touchdown"):
 			if touchdownIdx == -1 {
-				touchdownIdx = FindEventIndex(eventsData, "Touchdown")
+				touchdownIdx = i
 			}
 		}
 	}
 	return launchIdx, railExitIdx, burnoutIdx, apogeeEventIdx, touchdownIdx // Explicitly return the values
+}
+
+// FindParachuteEvents searches the event data for parachute deployment events with DEPLOYED status
+func FindParachuteEvents(eventsData [][]string, log *logf.Logger) []RecoverySystemData {
+	if len(eventsData) == 0 {
+		log.Warn("No event data available for finding parachute events.")
+		return nil
+	}
+
+	// Find the column indices for important data from headers
+	var timeIdx, eventNameIdx, statusIdx int = -1, -1, -1
+	var parachuteStatusIdx, parachuteTypeIdx int = -1, -1
+
+	// Check headers to find which columns contain our data
+	if len(eventsData) > 0 && len(eventsData[0]) > 0 {
+		headers := eventsData[0]
+		for i, header := range headers {
+			headerLower := strings.ToLower(header)
+			switch {
+			case strings.Contains(headerLower, "time"):
+				timeIdx = i
+			case strings.Contains(headerLower, "event") || strings.Contains(headerLower, "name"):
+				eventNameIdx = i
+			case strings.Contains(headerLower, "status"):
+				statusIdx = i
+			case strings.Contains(headerLower, "parachute_status"):
+				parachuteStatusIdx = i
+			case strings.Contains(headerLower, "parachute_type"):
+				parachuteTypeIdx = i
+			}
+		}
+	}
+
+	// Default to standard positions if we couldn't find columns
+	if timeIdx == -1 {
+		timeIdx = 1 // Typically second column in events data
+		log.Warn("Could not find time column in events data, using default (column 1)")
+	}
+	if eventNameIdx == -1 {
+		eventNameIdx = 0 // Typically first column in events data
+		log.Warn("Could not find event name column in events data, using default (column 0)")
+	}
+
+	// Map to store unique parachute types and their deployment times
+	parachuteMap := make(map[string]RecoverySystemData)
+
+	// Search for parachute deployment events - start from 1 to skip headers
+	for i := 1; i < len(eventsData); i++ {
+		row := eventsData[i]
+		if len(row) <= timeIdx { // Need at least time value
+			continue
+		}
+
+		// Get time value early as we'll need it in all cases
+		deploymentTime, err := strconv.ParseFloat(row[timeIdx], 64)
+		if err != nil {
+			log.Debug("Failed to parse parachute deployment time", "time_value", row[timeIdx], "error", err)
+			continue
+		}
+
+		// CASE 1: Check for dedicated parachute status column
+		if parachuteStatusIdx >= 0 && parachuteStatusIdx < len(row) {
+			statusValue := strings.ToUpper(strings.TrimSpace(row[parachuteStatusIdx]))
+
+			// Only process events where parachute is DEPLOYED
+			if statusValue == "DEPLOYED" {
+				// Determine parachute type
+				parachuteType := "Parachute"
+
+				// Try to get specific type if we have that column
+				if parachuteTypeIdx >= 0 && parachuteTypeIdx < len(row) {
+					typeValue := strings.TrimSpace(row[parachuteTypeIdx])
+					if typeValue != "" {
+						parachuteType = typeValue
+					}
+				}
+
+				// Fall back to detecting from event name
+				if parachuteType == "Parachute" && eventNameIdx >= 0 && eventNameIdx < len(row) {
+					eventName := strings.ToLower(row[eventNameIdx])
+					if strings.Contains(eventName, "drogue") {
+						parachuteType = "Drogue Parachute"
+					} else if strings.Contains(eventName, "main") {
+						parachuteType = "Main Parachute"
+					}
+				}
+
+				// Determine descent rate based on parachute type
+				descentRate := 15.0 // Default
+				lowerType := strings.ToLower(parachuteType)
+				if strings.Contains(lowerType, "drogue") {
+					descentRate = 20.0
+				} else if strings.Contains(lowerType, "main") {
+					descentRate = 5.0
+				}
+
+				log.Info("Found parachute deployment event", "type", parachuteType, "time", deploymentTime)
+
+				// Add or update the parachute data
+				parachuteMap[parachuteType] = RecoverySystemData{
+					Type:        parachuteType,
+					Deployment:  deploymentTime,
+					DescentRate: descentRate,
+				}
+			}
+
+			// Skip other cases if we found status in dedicated column
+			continue
+		}
+
+		// CASE 2: Look for events with "parachute" in the name with status in another column
+		if eventNameIdx >= 0 && eventNameIdx < len(row) {
+			eventName := strings.ToLower(row[eventNameIdx])
+
+			if strings.Contains(eventName, "parachute") || strings.Contains(eventName, "recovery") {
+				// Check if we have status column and it indicates deployed
+				deployed := true // Assume deployed if not specified
+				if statusIdx >= 0 && statusIdx < len(row) {
+					statusValue := strings.ToUpper(strings.TrimSpace(row[statusIdx]))
+					deployed = statusValue == "DEPLOYED" || statusValue == "TRUE" || statusValue == "1"
+				}
+
+				if !deployed {
+					continue // Skip non-deployed parachutes
+				}
+
+				// Try to determine parachute type from event name
+				parachuteType := "Parachute"
+				if strings.Contains(eventName, "drogue") {
+					parachuteType = "Drogue Parachute"
+				} else if strings.Contains(eventName, "main") {
+					parachuteType = "Main Parachute"
+				}
+
+				// Default descent rates based on parachute type
+				descentRate := 15.0 // Default
+				if parachuteType == "Drogue Parachute" {
+					descentRate = 20.0
+				} else if parachuteType == "Main Parachute" {
+					descentRate = 5.0
+				}
+
+				log.Info("Found parachute event by name", "type", parachuteType, "time", deploymentTime)
+
+				// Add or update the parachute data
+				parachuteMap[parachuteType] = RecoverySystemData{
+					Type:        parachuteType,
+					Deployment:  deploymentTime,
+					DescentRate: descentRate,
+				}
+			}
+		}
+
+		// CASE 3: Check all columns for parachute_status keyword
+		for colIdx, colValue := range row {
+			if colIdx == timeIdx || colIdx == eventNameIdx || colIdx == statusIdx {
+				continue // Skip already processed columns
+			}
+
+			// Check if this column has parachute status info
+			colValueLower := strings.ToLower(colValue)
+			if strings.Contains(colValueLower, "parachute") && strings.Contains(colValueLower, "status") {
+				// Check if the value indicates DEPLOYED status
+				statusValue := strings.ToUpper(strings.TrimSpace(colValue))
+				if statusValue == "DEPLOYED" {
+					// Try to determine parachute type
+					parachuteType := "Parachute"
+					for j, header := range eventsData[0] {
+						headerLower := strings.ToLower(header)
+						if strings.Contains(headerLower, "type") && j < len(row) {
+							typeVal := strings.TrimSpace(row[j])
+							if typeVal != "" {
+								parachuteType = typeVal
+								break
+							}
+						}
+					}
+
+					// Determine descent rate based on type
+					descentRate := 15.0 // Default
+					lowerType := strings.ToLower(parachuteType)
+					if strings.Contains(lowerType, "drogue") {
+						descentRate = 20.0
+					} else if strings.Contains(lowerType, "main") {
+						descentRate = 5.0
+					}
+
+					log.Info("Found parachute with status in columns", "type", parachuteType, "time", deploymentTime)
+
+					// Add or update the parachute data
+					parachuteMap[parachuteType] = RecoverySystemData{
+						Type:        parachuteType,
+						Deployment:  deploymentTime,
+						DescentRate: descentRate,
+					}
+				}
+			}
+		}
+	}
+
+	// Convert map to slice
+	var recoverySystems []RecoverySystemData
+	for _, system := range parachuteMap {
+		recoverySystems = append(recoverySystems, system)
+	}
+
+	// Sort by deployment time
+	sort.Slice(recoverySystems, func(i, j int) bool {
+		return recoverySystems[i].Deployment < recoverySystems[j].Deployment
+	})
+
+	log.Info("Found recovery systems", "count", len(recoverySystems))
+	return recoverySystems
 }
 
 // ExtractMotionPoints converts raw motion data records to structured motionPoint slices.
@@ -1017,12 +1237,71 @@ func GenerateReportData(log *logf.Logger, cfg *config.Config, rm RecordManager, 
 		motionMetrics = &MotionMetrics{} // Initialize with empty values
 	}
 
-	// Calculate motor summary if we have motion data (motor data can be derived from it)
+	// Try to load real motor data from the ThrustCurve API if a motor designation is available
 	var motorSummary MotorSummaryData
-	if len(parsedMotionPlotRecords) > 0 && len(parsedMotionPlotHeaders) > 0 && record.Motion != nil {
+	var motorData []*PlotSimRecord = nil
+	var motorHeaders []string = []string{"Time (s)", "Thrust (N)"}
+
+	if cfg.Engine.Options.MotorDesignation != "" {
+		log.Info("Attempting to load motor data from ThrustCurve API", "designation", cfg.Engine.Options.MotorDesignation)
+
+		// Create an HTTP client for the thrustcurves package
+		httpClient := http_client.NewHTTPClient()
+
+		// Load motor data from ThrustCurve API
+		motorProps, err := thrustcurves.Load(cfg.Engine.Options.MotorDesignation, httpClient, *log)
+		if err == nil && motorProps != nil {
+			log.Info("Successfully loaded motor data from ThrustCurve API",
+				"designation", cfg.Engine.Options.MotorDesignation,
+				"motorID", motorProps.ID,
+				"thrust_points", len(motorProps.Thrust))
+
+			// Convert the thrust curve to PlotSimRecord format
+			motorData = make([]*PlotSimRecord, len(motorProps.Thrust))
+			for i, point := range motorProps.Thrust {
+				record := make(PlotSimRecord)
+				record["Time (s)"] = point[0]
+				record["Thrust (N)"] = point[1]
+				motorData[i] = &record
+			}
+
+			// Create a motor summary from the loaded data
+			motorSummary = MotorSummaryData{
+				MaxThrust:         motorProps.MaxThrust,
+				BurnTime:          motorProps.BurnTime,
+				TotalImpulse:      motorProps.TotalImpulse,
+				AvgThrust:         motorProps.AvgThrust,
+				PropellantMass:    motorProps.WetMass,
+				MotorClass:        string(motorProps.Designation)[0:1], // Get class from first letter of designation
+				ThrustEfficiency:  motorProps.AvgThrust / motorProps.MaxThrust,
+				MotorManufacturer: "ThrustCurve", // Default, ideally this would come from the API
+			}
+
+			// Calculate specific impulse if propellant mass is available
+			if motorProps.WetMass > 0 {
+				const g0 = 9.80665 // Standard gravity (m/s²)
+				motorSummary.SpecificImpulse = motorProps.TotalImpulse / (motorProps.WetMass * g0)
+			}
+
+			log.Info("Populated motor summary from ThrustCurve API data",
+				"maxThrust", motorSummary.MaxThrust,
+				"burnTime", motorSummary.BurnTime,
+				"totalImpulse", motorSummary.TotalImpulse,
+				"propellantMass", motorSummary.PropellantMass,
+				"motorClass", motorSummary.MotorClass)
+		} else {
+			log.Warn("Failed to load motor data from ThrustCurve API, falling back to calculated summary",
+				"designation", cfg.Engine.Options.MotorDesignation,
+				"error", err)
+		}
+	}
+
+	// Fall back to calculating motor summary from simulation data if we couldn't get it from ThrustCurve
+	if motorSummary.MaxThrust == 0 && len(parsedMotionPlotRecords) > 0 && len(parsedMotionPlotHeaders) > 0 && record.Motion != nil {
+		log.Info("Using simulation data to calculate motor summary")
 		motorSummary = calculateMotorSummary(parsedMotionPlotRecords, parsedMotionPlotHeaders, log)
-		log.Info("Calculated motor metrics", "maxThrust", motorSummary.MaxThrust, "burnTime", motorSummary.BurnTime, "totalImpulse", motorSummary.TotalImpulse)
-	} else {
+		log.Info("Calculated motor metrics from simulation data", "maxThrust", motorSummary.MaxThrust, "burnTime", motorSummary.BurnTime, "totalImpulse", motorSummary.TotalImpulse)
+	} else if motorSummary.MaxThrust == 0 {
 		log.Warn("No motor data available for motor summary calculation")
 	}
 
@@ -1117,8 +1396,6 @@ func GenerateReportData(log *logf.Logger, cfg *config.Config, rm RecordManager, 
 
 	// Adjust temperature for altitude
 	temperatureK = temperatureK - tempLapseRate*altitudeM
-	temperatureC := temperatureK - 273.15
-
 	// Calculate speed of sound: c = sqrt(gamma * R * T)
 	// Where gamma is ratio of specific heats, R is specific gas constant, T is temperature in Kelvin
 	gamma := 1.4 // Ratio of specific heats for air
@@ -1149,7 +1426,7 @@ func GenerateReportData(log *logf.Logger, cfg *config.Config, rm RecordManager, 
 	// Calculate air density: ρ = P/(R*T)
 	airDensity := pressureAtAltitude / (specificGasConstant * temperatureK)
 
-	// Simplified weather model - we'll only include basic atmospheric properties
+	// Simplified weather model with comprehensive atmospheric properties
 	// No wind direction modeling as requested
 
 	weatherData := WeatherData{
@@ -1157,32 +1434,41 @@ func GenerateReportData(log *logf.Logger, cfg *config.Config, rm RecordManager, 
 		Longitude:     cfg.Engine.Options.Launchsite.Longitude,
 		ElevationAMSL: altitudeM,
 		// Set minimal wind data since the wind direction model was removed
-		WindSpeed:    0.0, // Set to zero as requested to remove defaulted fields
-		Temperature:  temperatureC,
-		Pressure:     pressureAtAltitude,
-		Density:      airDensity,
-		Humidity:     65.0, // Default humidity, could be enhanced in future
-		LocalGravity: localGravity,
-		SpeedOfSound: speedOfSound,
+		WindSpeed:        0.0,                // Set to zero as requested to remove defaulted fields
+		Pressure:         pressureAtAltitude, // Atmospheric pressure at the launch site (Pa)
+		SeaLevelPressure: seaLevelPressure,   // Sea level pressure reference (Pa)
+		Density:          airDensity,         // Air density (kg/m³)
+		LocalGravity:     localGravity,       // Local gravity (m/s²)
+		SpeedOfSound:     speedOfSound,       // Speed of sound in air (m/s)
+		TemperatureK:     temperatureK,       // Temperature in Kelvin
 	}
 
-	// 2. Create sample recovery systems data
-	recoveryTimeDeployment := 11.5 // Default sample apogee time
-	if motionMetrics != nil && motionMetrics.TimeToApogee > 0 {
-		recoveryTimeDeployment = motionMetrics.TimeToApogee
-	}
+	// 2. Create recovery systems data from actual parachute deployment events
+	recoverySystems := FindParachuteEvents(simData.EventsData, log)
 
-	recoverySystems := []RecoverySystemData{
-		{
-			Type:        "Drogue Parachute",
-			Deployment:  recoveryTimeDeployment,
-			DescentRate: 20.0,
-		},
-		{
-			Type:        "Main Parachute",
-			Deployment:  recoveryTimeDeployment + 5.0, // 5 seconds after apogee
-			DescentRate: 5.0,
-		},
+	// If no parachute events were found in the events data, create reasonable defaults based on apogee time
+	if len(recoverySystems) == 0 {
+		log.Info("No parachute events found in simulation data, using defaults based on apogee time")
+
+		recoveryTimeDeployment := 11.5 // Default sample apogee time
+		if motionMetrics != nil && motionMetrics.TimeToApogee > 0 {
+			recoveryTimeDeployment = motionMetrics.TimeToApogee
+		}
+
+		recoverySystems = []RecoverySystemData{
+			{
+				Type:        "Drogue Parachute",
+				Deployment:  recoveryTimeDeployment,
+				DescentRate: 20.0,
+			},
+			{
+				Type:        "Main Parachute",
+				Deployment:  recoveryTimeDeployment + 5.0, // 5 seconds after apogee
+				DescentRate: 5.0,
+			},
+		}
+	} else {
+		log.Info("Using parachute events from simulation data", "count", len(recoverySystems))
 	}
 
 	// 3. Make sure phase summary has valid data
@@ -1211,10 +1497,12 @@ func GenerateReportData(log *logf.Logger, cfg *config.Config, rm RecordManager, 
 		RawData:         simData,
 		MotionData:      parsedMotionPlotRecords,
 		MotionHeaders:   parsedMotionPlotHeaders,
+		MotorData:       motorData,                           // Real motor thrust data from ThrustCurve API
+		MotorHeaders:    motorHeaders,                        // Motor headers for the thrust data
 		Plots:           make(map[string]string),             // To be populated by GeneratePlots
 		Assets:          make(map[string]string),             // To be populated by PrepareReportAssets
 		MotionMetrics:   motionMetrics,                       // Add calculated motion metrics
-		MotorSummary:    motorSummary,                        // Add calculated motor summary
+		MotorSummary:    motorSummary,                        // Add calculated motor summary from ThrustCurve API
 		PhaseSummary:    phaseSummary,                        // Add flight phases with actual/sample data
 		MotorName:       cfg.Engine.Options.MotorDesignation, // Motor name from config
 		RocketName:      summary.RocketName,                  // Rocket name from summary

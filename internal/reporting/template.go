@@ -59,6 +59,9 @@ func NewTemplateRenderer(log *logf.Logger, templatesDir, assetsDir string) (*Tem
 
 	// Define custom template functions
 	funcMap := template.FuncMap{
+		"sub": func(a, b float64) float64 {
+			return a - b
+		},
 		"embedSVG": func(plotFileName string, altText string) (template.HTML, error) {
 			if plotFileName == "" {
 				log.Warn("embedSVG called with empty plotFileName")
