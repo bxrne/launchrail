@@ -210,6 +210,13 @@ func (s *Storage) Close() error {
 	return firstErr
 }
 
+// FilePath returns the absolute path to the storage file.
+func (s *Storage) FilePath() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.filePath
+}
+
 // GetFilePath returns the file path of the storage service.
 func (s *Storage) GetFilePath() string {
 	return s.filePath

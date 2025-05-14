@@ -1,4 +1,4 @@
-package main
+package main_test
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 	"github.com/bxrne/launchrail/internal/config"
 	logf "github.com/zerodha/logf"
 
+	bench "github.com/bxrne/launchrail/cmd/bench"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +16,7 @@ type MockBenchmark struct {
 	MockName        string
 	MockSetupErr    error
 	MockRunErr      error
-	MockResults     []BenchmarkResult
+	MockResults     []bench.BenchmarkResult
 	MockLoadDataErr error
 	LoadDataCalled  bool
 	SetupCalled     bool
@@ -38,14 +39,14 @@ func (m *MockBenchmark) Setup() error {
 	return m.MockSetupErr
 }
 
-func (m *MockBenchmark) Run(entry config.BenchmarkEntry, logger *logf.Logger, runDir string) ([]BenchmarkResult, error) {
+func (m *MockBenchmark) Run(entry config.BenchmarkEntry, logger *logf.Logger, runDir string) ([]bench.BenchmarkResult, error) {
 	m.RunCalled = true
 	return m.MockResults, m.MockRunErr
 }
 
 func TestNewBenchmarkSuite(t *testing.T) {
-	config := BenchmarkConfig{BenchdataPath: "/tmp/benchdata"}
-	suite := NewBenchmarkSuite(config)
+	config := bench.BenchmarkConfig{BenchdataPath: "/tmp/benchdata"}
+	suite := bench.NewBenchmarkSuite(config)
 	require.NotNil(t, suite)
 	assert.Equal(t, config, suite.Config)
 	assert.NotNil(t, suite.Benchmarks)
@@ -53,13 +54,10 @@ func TestNewBenchmarkSuite(t *testing.T) {
 }
 
 func TestBenchmarkSuite_AddBenchmark(t *testing.T) {
-	suite := NewBenchmarkSuite(BenchmarkConfig{})
+	suite := bench.NewBenchmarkSuite(bench.BenchmarkConfig{})
 	mockBench := &MockBenchmark{MockName: "TestBench"}
 	suite.AddBenchmark(mockBench)
 
 	require.Len(t, suite.Benchmarks, 1)
 	assert.Equal(t, mockBench, suite.Benchmarks[0])
 }
-
-// TODO: Add TestBenchmarkSuite_RunAll_Failure cases
-// func TestBenchmarkSuite_Run_Single(t *testing.T) { ... } // Example for future single run test

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulation Report: {{.RecordID}}</title>
+    <link rel="stylesheet" type="text/css" href="/static/css/main.css">
+    <style>
+        a {
+            color: #f27121; /* Orange color for links */
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        #toc a {
+            color: #f27121; /* Ensure table of contents links are also orange */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Simulation Report: {{.RecordID}}</h1>
+            <p>Version: {{.Version}} | Generated: {{.GenerationDate}}</p>
+        </header>
+
+        <nav id="toc">
+            <h2>Table of Contents</h2>
+            <ul>
+                <li><a href="#executive-summary">Executive Summary</a></li>
+                <li><a href="#motor-performance">Motor Performance</a></li>
+                <li><a href="#recovery-systems">Recovery Systems</a></li>
+                <li><a href="#flight-phases">Flight Phases</a></li>
+                <li><a href="#telemetry-plots">Telemetry Plots</a></li>
+                <li><a href="#launch-conditions">Launch Conditions</a></li>
+                <li><a href="#rocket-configuration">Rocket Configuration</a></li>
+            </ul>
+        </nav>
+
+        <section id="executive-summary">
+            <h2>Executive Summary</h2>
+            <table>
+                <thead>
+                    <tr><th>Key Metric</th><th>Value</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Maximum Altitude</td><td>{{printf "%.1f" .MotionMetrics.MaxAltitudeAGL}} meters</td></tr>
+                    <tr><td>Maximum Velocity</td><td>{{printf "%.1f" .MotionMetrics.MaxSpeed}} m/s</td></tr>
+                    <tr><td>Maximum Acceleration</td><td>{{printf "%.1f" .MotionMetrics.MaxAcceleration}} m/s²</td></tr>
+                    <tr><td>Apogee</td><td>{{printf "%.1f" .MotionMetrics.TimeToApogee}} seconds since liftoff</td></tr>
+                    <tr><td>Flight Time</td><td>{{printf "%.1f" .MotionMetrics.FlightTime}} seconds</td></tr>
+                    <tr><td>Landing Velocity</td><td>{{printf "%.1f" .MotionMetrics.LandingSpeed}} m/s</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="motor-performance">
+            <h2>Motor Performance</h2>
+            {{with .MotorSummary}}
+                <table>
+                    <thead>
+                        <tr><th>Metric</th><th>Value</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Burn Time</td><td>{{printf "%.2f" .BurnTime}} seconds</td></tr>
+                        <tr><td>Peak Thrust</td><td>{{printf "%.2f" .MaxThrust}} N</td></tr>
+                        <tr><td>Average Thrust</td><td>{{printf "%.2f" .AvgThrust}} N</td></tr>
+                        <tr><td>Total Impulse</td><td>{{printf "%.2f" .TotalImpulse}} Ns</td></tr>
+                    </tbody>
+                </table>
+            {{else}}
+                <p class="no-data">Motor performance data not available.</p>
+            {{end}}
+        </section>
+
+        <section id="recovery-systems">
+            <h2>Recovery Systems</h2>
+            {{if .RecoverySystems}}
+                <table>
+                    <thead>
+                        <tr><th>Type</th><th>Deployment Time (s)</th><th>Descent Rate (m/s)</th></tr>
+                    </thead>
+                    <tbody>
+                        {{range .RecoverySystems}}
+                        <tr>
+                            <td>{{.Type}}</td>
+                            <td>{{printf "%.2f" .Deployment}}</td>
+                            <td>{{printf "%.2f" .DescentRate}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            {{else}}
+                <p class="no-data">No recovery systems data available.</p>
+            {{end}}
+        </section>
+
+        <section id="flight-phases">
+            <h2>Flight Phases</h2>
+            <table>
+                 <thead>
+                    <tr><th>Phase</th><th>Time (s)</th><th>Altitude (m)</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Apogee</td><td>{{printf "%.2f" .PhaseSummary.ApogeeTimeSec}}</td><td>{{printf "%.2f" .PhaseSummary.MaxAltitudeM}}</td></tr>
+                    {{/* Add other phases if available in PhaseSummary */}}
+                </tbody>
+            </table>
+        </section>
+
+        <section id="telemetry-plots">
+            <h2>Telemetry Plots</h2>
+            {{if .Plots}}
+                {{range $key, $path := .Plots}}
+                    <div class="plot-container">
+                        <h3>{{ title (replace $key "_" " ") }}</h3>
+                        {{ embedSVG $path $key }}
+                    </div>
+                {{end}}
+            {{else}}
+                <p class="no-data">No telemetry plots available for this simulation.</p>
+            {{end}}
+        </section>
+
+        <section id="launch-conditions">
+            <h2>Launch Conditions</h2>
+            {{if .Weather}}
+                <table>
+                    <tbody>
+                        {{with .Weather.Latitude}}<tr><td>Latitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
+                        {{with .Weather.Longitude}}<tr><td>Longitude</td><td>{{printf "%.4f" .}}°</td></tr>{{end}}
+                        {{with .Weather.ElevationAMSL}}<tr><td>Elevation (AMSL)</td><td>{{printf "%.1f" .}} m</td></tr>{{end}}
+                        {{with .Weather.Pressure}}<tr><td>Pressure (Launch Site)</td><td>{{printf "%.1f" .}} Pa</td></tr>{{end}}
+                        {{with .Weather.SeaLevelPressure}}<tr><td>Pressure (Sea Level)</td><td>{{printf "%.1f" .}} Pa</td></tr>{{end}}
+                        {{with .Weather.Density}}<tr><td>Air Density</td><td>{{printf "%.4f" .}} kg/m³</td></tr>{{end}}
+                        {{with .Weather.SpeedOfSound}}<tr><td>Speed of Sound</td><td>{{printf "%.1f" .}} m/s</td></tr>{{end}}
+                        {{with .Weather.LocalGravity}}<tr><td>Local Gravity</td><td>{{printf "%.2f" .}} m/s²</td></tr>{{end}}
+                        {{with .Weather.WindSpeed}}<tr><td>Wind Speed</td><td>{{printf "%.1f" .}} m/s</td></tr>{{end}}
+                        {{with .Weather.WindDirection}}<tr><td>Wind Direction (from)</td><td>{{printf "%.1f" .}}°</td></tr>{{end}}
+                    </tbody>
+                </table>
+            {{else}}
+                <p class="no-data">Launch condition data not available.</p>
+            {{end}}
+        </section>
+
+        <section id="rocket-configuration">
+            <h2>Rocket Configuration</h2>
+            <p><strong>Rocket:</strong> {{.RocketName | default "N/A"}}</p>
+            <p><strong>Motor:</strong> {{.MotorName | default "N/A"}}</p>
+            {{/* Add more configuration details if available */}}
+        </section>
+
+        <footer>
+            <p>Launchrail Simulation Report Generator</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -73,7 +73,7 @@ func (s *BenchmarkSuite) RunAll(logLevel string) (map[string][]BenchmarkResult, 
 }
 
 // compareFloat compares two floats within a tolerance, handling zero expected values.
-func compareFloat(name, description string, expected, actual, tolerancePercent float64) BenchmarkResult {
+func CompareFloat(name, description string, expected, actual, tolerancePercent float64) BenchmarkResult {
 	passed := false
 	diff := actual - expected
 	absoluteDiff := math.Abs(diff)

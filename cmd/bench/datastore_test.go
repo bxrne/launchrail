@@ -1,12 +1,13 @@
-package main
+package main_test
 
 import (
-	"fmt"
 	"math"
 	"os"
 	"path/filepath"
 	"testing"
 
+	bench "github.com/bxrne/launchrail/cmd/bench"
+	"github.com/bxrne/launchrail/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,7 +30,7 @@ func TestLoadFlightInfo(t *testing.T) {
 ` // Added apogee data point
 	filePath := createTempCSV(t, csvContent)
 
-	data, err := LoadFlightInfo(filePath)
+	data, err := bench.LoadFlightInfo(filePath)
 	require.NoError(t, err, "LoadFlightInfo failed")
 	require.Len(t, data, 3, "Incorrect number of records loaded")
 
@@ -77,7 +78,7 @@ func TestLoadFlightInfo_ErrorHandling(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filePath := createTempCSV(t, tt.csvContent)
-			data, err := LoadFlightInfo(filePath)
+			data, err := bench.LoadFlightInfo(filePath)
 
 			if tt.expectedErr != "" {
 				require.Error(t, err)
@@ -98,7 +99,7 @@ func TestLoadEventInfo(t *testing.T) {
 	tests := []struct {
 		name         string
 		csvContent   string
-		expectedData []EventInfo
+		expectedData []bench.EventInfo
 		expectedErr  string
 	}{
 		{
@@ -109,7 +110,7 @@ func TestLoadEventInfo(t *testing.T) {
 1,30.5,APOGEE
 2,60.2,LANDED
 `,
-			expectedData: []EventInfo{
+			expectedData: []bench.EventInfo{
 				{Timestamp: 0.0, Event: "LAUNCH"},
 				{Timestamp: 30.5, Event: "APOGEE"},
 				{Timestamp: 60.2, Event: "LANDED"},
@@ -149,7 +150,7 @@ func TestLoadEventInfo(t *testing.T) {
 			csvContent: `id,timestamp_val,event_text
 0,1.0,EVENT
 `,
-			expectedData: []EventInfo{{Timestamp: 1.0, Event: "EVENT"}},
+			expectedData: []bench.EventInfo{{Timestamp: 1.0, Event: "EVENT"}},
 			expectedErr:  "",
 		},
 	}
@@ -157,7 +158,7 @@ func TestLoadEventInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filePath := createTempCSV(t, tt.csvContent)
-			data, err := LoadEventInfo(filePath)
+			data, err := bench.LoadEventInfo(filePath)
 
 			if tt.expectedErr != "" {
 				require.Error(t, err, "Expected an error for test case: %s", tt.name)
@@ -175,7 +176,7 @@ func TestLoadFlightStates(t *testing.T) {
 	tests := []struct {
 		name         string
 		csvContent   string
-		expectedData []FlightState
+		expectedData []bench.FlightState
 		expectedErr  string
 	}{
 		{
@@ -184,7 +185,7 @@ func TestLoadFlightStates(t *testing.T) {
 0.1,PRELAUNCH
 10.5,POWERED_ASCENT
 25.2,COAST`,
-			expectedData: []FlightState{
+			expectedData: []bench.FlightState{
 				{Timestamp: 0.1, State: "PRELAUNCH"},
 				{Timestamp: 10.5, State: "POWERED_ASCENT"},
 				{Timestamp: 25.2, State: "COAST"},
@@ -219,7 +220,7 @@ func TestLoadFlightStates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filePath := createTempCSV(t, tt.csvContent)
-			data, err := LoadFlightStates(filePath)
+			data, err := bench.LoadFlightStates(filePath)
 
 			if tt.expectedErr != "" {
 				require.Error(t, err)
@@ -245,24 +246,20 @@ func TestParseFloat(t *testing.T) {
 	}{
 		{"Valid Float", "123.45", 5, "TestCol", "test.csv", 123.45, ""},
 		{"Valid Negative Float", "-0.99", 1, "NegVal", "neg.csv", -0.99, ""},
-		{"Invalid Float String", "abc", 10, "Alpha", "alpha.csv", 0, "invalid float value 'abc'"},
-		{"Empty String", "", 2, "Empty", "empty.csv", 0, "invalid float value ''"},
-		{"Float with Extra Chars", "1.2x", 8, "Extra", "extra.csv", 0, "invalid float value '1.2x'"},
+		{"Invalid Float String", "abc", 10, "Alpha", "alpha.csv", 0, "must be a valid number: strconv.ParseFloat: parsing \"abc\": invalid syntax"},
+		{"Empty String", "", 2, "Empty", "empty.csv", 0, "is required"},
+		{"Float with Extra Chars", "1.2x", 8, "Extra", "extra.csv", 0, "must be a valid number: strconv.ParseFloat: parsing \"1.2x\": invalid syntax"},
 		{"NaN String", "NaN", 3, "NotNum", "nan.csv", math.NaN(), ""},
 		{"Inf String", "Inf", 4, "Infinite", "inf.csv", math.Inf(1), ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			val, err := parseFloat(tt.inputStr, tt.rowIdx, tt.colName, tt.fileName)
+			val, err := utils.ParseFloat(tt.inputStr, tt.colName)
 
 			if tt.expectedErr != "" {
 				require.Error(t, err)
 				assert.ErrorContains(t, err, tt.expectedErr)
-				// Check that row, col, filename are in error message
-				assert.ErrorContains(t, err, fmt.Sprintf("row %d", tt.rowIdx+2)) // +2 for 1-based and header
-				assert.ErrorContains(t, err, fmt.Sprintf("column %s", tt.colName))
-				assert.ErrorContains(t, err, filepath.Base(tt.fileName))
 			} else {
 				require.NoError(t, err)
 				// Special handling for NaN comparison
