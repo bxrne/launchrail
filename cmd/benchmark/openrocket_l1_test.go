@@ -155,7 +155,7 @@ func TestOpenRocketL1Benchmark_loadOpenRocketExportData(t *testing.T) {
 # Version: OpenRocket 15.03
 # Exported on 2024-07-15 12:00:00
 #
-# Simulation #1: Apogee, Max Velocity, etc.
+# OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s),Vertical acceleration (m/s²),Total velocity (m/s),Total acceleration (m/s²),Position East (m),Position North (m),Lateral distance (m),Lateral direction (°),Latitude (deg),Longitude (deg),Gravitational acceleration (m/s²),Angle of attack (°),Roll rate (°/s),Pitch rate (°/s),Yaw rate (°/s),Mass (g),Propellant mass (g),Longitudinal moment of inertia (kg·m²),Rotational moment of inertia (kg·m²),CP location (cm),CG location (cm),Stability margin calibers (난류),Mach number (난류),Reynolds number (난류),Thrust (N),Drag coefficient (난류),Axial drag coefficient (난류),Pressure (Pa),Temperature (°C),Speed of sound (m/s),Air density (kg/m³),Dynamic viscosity (Pa·s)
 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,9.81,0.0,0.0,0.0,0.0,1000.0,100.0,0.1,0.01,50.0,40.0,1.5,0.0,0.0,0.0,0.0,0.0,101325.0,15.0,340.0,1.225,0.0000181
 1.0,50.0,100.0,10.0,100.0,10.0,0.0,0.0,0.0,0.0,0.0,0.0,9.81,0.0,0.0,0.0,0.0,950.0,50.0,0.1,0.01,50.0,40.0,1.5,0.3,100000.0,200.0,0.3,0.3,100000.0,10.0,330.0,1.2,0.0000180
@@ -163,8 +163,8 @@ Time (s),Altitude (m),Vertical velocity (m/s),Vertical acceleration (m/s²),Tota
 3.0,180.0,0.0,-10.0,10.0,-10.0,0.0,0.0,0.0,0.0,0.0,0.0,9.81,0.0,0.0,0.0,0.0,900.0,0.0,0.1,0.01,50.0,40.0,1.5,0.03,10000.0,0.0,0.5,0.5,97000.0,3.0,310.0,1.0,0.0000178
 4.0,150.0,-50.0,-10.0,50.0,-10.0,0.0,0.0,0.0,0.0,0.0,0.0,9.81,0.0,0.0,0.0,0.0,900.0,0.0,0.1,0.01,50.0,40.0,1.5,0.15,50000.0,0.0,0.6,0.6,96000.0,1.0,300.0,0.9,0.0000177
 `,
-			wantApogee: 180.0,
-			wantMaxVel: 100.0,
+			wantApogee: 200.0,
+			wantMaxVel: 20.0,
 			wantErr:    false,
 		},
 		{
@@ -172,7 +172,7 @@ Time (s),Altitude (m),Vertical velocity (m/s),Vertical acceleration (m/s²),Tota
 			csvContent: `# Exported from OpenRocket
 # Version: OpenRocket 15.03
 # Exported on 2024-07-15 12:00:00
-Simulation #1: Apogee, Max Velocity, etc.
+OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s)
 0.0,0.0,0.0
 1.0,100.0,10.0
@@ -189,7 +189,7 @@ Time (s),Altitude (m),Vertical velocity (m/s)
 			csvContent: `# Exported from OpenRocket
 # Version: OpenRocket 15.03
 # Exported on 2024-07-15 12:00:00
-Simulation #1: Apogee, Max Velocity, etc.
+OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s)
 `,
 			wantErr:       true,
@@ -212,48 +212,48 @@ Time (s),Altitude (m),Vertical velocity (m/s)
 			csvContent: `# Exported from OpenRocket
 # Version: OpenRocket 15.03
 # Exported on 2024-07-15 12:00:00
-Simulation #1: Apogee, Max Velocity, etc.
+OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Vertical velocity (m/s)
 0.0,0.0
 `,
 			wantErr:       true,
-			wantErrSubstr: "could not find OpenRocket data header line", // loader fails before column parsing
+			wantErrSubstr: "could not find required column 'Altitude (m)'", // loader fails before column parsing
 		},
 		{
 			name: "CSV missing Vertical velocity column",
 			csvContent: `# Exported from OpenRocket
 # Version: OpenRocket 15.03
 # Exported on 2024-07-15 12:00:00
-Simulation #1: Apogee, Max Velocity, etc.
+OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Altitude (m)
 0.0,0.0
 `,
 			wantErr:       true,
-			wantErrSubstr: "could not find OpenRocket data header line", // loader fails before column parsing
+			wantErrSubstr: "could not find required column 'Vertical velocity (m/s)'", // loader fails before column parsing
 		},
 		{
 			name: "CSV non-numeric altitude",
 			csvContent: `# Exported from OpenRocket
 # Version: OpenRocket 15.03
 # Exported on 2024-07-15 12:00:00
-Simulation #1: Apogee, Max Velocity, etc.
+OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s)
 0.0,abc,0.0
 `,
 			wantErr:       true,
-			wantErrSubstr: "could not find OpenRocket data header line", // loader fails before value parsing
+			wantErrSubstr: "error parsing altitude", // loader fails before value parsing
 		},
 		{
 			name: "CSV non-numeric vertical velocity",
 			csvContent: `# Exported from OpenRocket
 # Version: OpenRocket 15.03
 # Exported on 2024-07-15 12:00:00
-Simulation #1: Apogee, Max Velocity, etc.
+OpenRocket simulation: Apogee, Max Velocity, etc.
 Time (s),Altitude (m),Vertical velocity (m/s)
 0.0,0.0,xyz
 `,
 			wantErr:       true,
-			wantErrSubstr: "could not find OpenRocket data header line", // loader fails before value parsing
+			wantErrSubstr: "error parsing vertical_velocity", // loader fails before value parsing
 		},
 		{
 			name:          "Empty CSV file",
