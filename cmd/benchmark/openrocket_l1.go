@@ -331,6 +331,14 @@ func (b *OpenRocketL1Benchmark) compareFloatMetric(name string, expected, actual
 	percentDiff := 0.0
 	if expected != 0 {
 		percentDiff = (diff / expected) * 100
+	} else if diff != 0 { // expected is 0, actual is not. diff == actual.
+		if diff > 0 {
+			percentDiff = math.Inf(1)
+		} else {
+			percentDiff = math.Inf(-1)
+		}
+	} else { // expected is 0, actual is 0. diff is 0.
+		percentDiff = math.NaN()
 	}
 
 	passed := false
