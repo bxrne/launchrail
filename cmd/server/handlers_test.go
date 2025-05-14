@@ -74,6 +74,27 @@ func setupTestTemplate(t *testing.T) (staticDir string, templatePath string) {
 type MockHandlerRecordManager struct {
 	mock.Mock
 	storageDirPath string
+	recordDir      string
+	cfg            *config.Config
+}
+
+// Hand-written mock for GetRecord to always return a new record
+func (m *MockHandlerRecordManager) GetRecord(hash string) (*storage.Record, error) {
+	motionStorageTest, errMotion := storage.NewStorage(m.recordDir, storage.MOTION, m.cfg)
+	if errMotion != nil {
+		panic(fmt.Errorf("mock GetRecord: failed to create motion storage: %w", errMotion))
+	}
+	eventsStorageTest, errEvents := storage.NewStorage(m.recordDir, storage.EVENTS, m.cfg)
+	if errEvents != nil {
+		panic(fmt.Errorf("mock GetRecord: failed to create events storage: %w", errEvents))
+	}
+	return &storage.Record{
+		Hash:         hash,
+		Path:         m.recordDir,
+		CreationTime: time.Now(),
+		Motion:       motionStorageTest,
+		Events:       eventsStorageTest,
+	}, nil
 }
 
 func (m *MockHandlerRecordManager) ListRecords() ([]*storage.Record, error) {
@@ -82,14 +103,6 @@ func (m *MockHandlerRecordManager) ListRecords() ([]*storage.Record, error) {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*storage.Record), args.Error(1)
-}
-
-func (m *MockHandlerRecordManager) GetRecord(hash string) (*storage.Record, error) {
-	args := m.Called(hash)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*storage.Record), args.Error(1)
 }
 
 func (m *MockHandlerRecordManager) DeleteRecord(hash string) error {
@@ -167,14 +180,25 @@ func TestReportAPIV2(t *testing.T) {
 	mockStorage := new(MockHandlerRecordManager)
 	mockStorage.storageDirPath = tempDir
 
-	// Setup mock for GetRecord to be used by HTML, Markdown, and JSON tests for 'testrecord123'
-	expectedRecord := &storage.Record{
-		Hash:         recordID,  // "testrecord123"
-		Path:         recordDir, // This is the path to the record's directory with test files
-		CreationTime: time.Now(),
-		// OrmData, CSVData, EventsData can be nil or empty for this mock if LoadSimulationData primarily relies on files from record.Path
+	// Create a test config (used by NewStorage and DataHandler)
+	staticDir, _ := setupTestTemplate(t)
+	cfg := &config.Config{
+		Setup: config.Setup{
+			App:     config.App{Version: "test-v0.1.0"},
+			Logging: config.Logging{Level: "info"}, // Use info for more verbose test logs if needed
+		},
+		Engine: config.Engine{
+			Options: config.Options{
+				OpenRocketFile:   "./testdata/l1.ork",
+				MotorDesignation: "TestMotor-ABC",
+			},
+		},
 	}
-	mockStorage.On("GetRecord", recordID).Return(expectedRecord, nil)
+	cfg.Server.StaticDir = staticDir // Set static dir for template loading
+
+	// Set fields for hand-written mock
+	mockStorage.recordDir = recordDir
+	mockStorage.cfg = cfg
 
 	// No longer create or write templates in testdata or cwd. All tests use the canonical template copied by setupTestTemplate.
 
@@ -187,20 +211,6 @@ func TestReportAPIV2(t *testing.T) {
 	}
 
 	// Create a test config and logger
-	staticDir, _ := setupTestTemplate(t)
-	cfg := &config.Config{
-		Setup: config.Setup{
-			App:     config.App{Version: "test-v0.1.0"},
-			Logging: config.Logging{Level: "info"},
-		},
-		Engine: config.Engine{
-			Options: config.Options{
-				OpenRocketFile:   "./testdata/l1.ork",
-				MotorDesignation: "TestMotor-ABC",
-			},
-		},
-	}
-	cfg.Server.StaticDir = staticDir
 	logger := logf.New(logf.Opts{
 		Writer: os.Stdout, // Enable output for debugging
 		Level:  logf.InfoLevel,
@@ -345,10 +355,6 @@ func TestReportAPIV2_Errors(t *testing.T) {
 		Writer: io.Discard, // Suppress log output for tests
 		Level:  logf.WarnLevel,
 	})
-
-	// Use setupTestTemplate to set up canonical template in temp staticDir
-	staticDir, _ := setupTestTemplate(t)
-	cfg.Server.StaticDir = staticDir
 
 	// Create the handler with our mock
 	dataHandler := &DataHandler{

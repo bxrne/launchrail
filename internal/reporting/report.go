@@ -294,10 +294,10 @@ func parseSimData(log *logf.Logger, headers []string, data [][]string) ([]*PlotS
 	var records []*PlotSimRecord
 	for rowIndex, row := range data {
 		if len(row) != len(headers) {
-			log.Warn("Skipping row due to mismatched column count", 
-				"row_index", rowIndex, 
-				"expected_cols", len(headers), 
-				"actual_cols", len(row), 
+			log.Warn("Skipping row due to mismatched column count",
+				"row_index", rowIndex,
+				"expected_cols", len(headers),
+				"actual_cols", len(row),
 				"row_data", row)
 			continue
 		}
