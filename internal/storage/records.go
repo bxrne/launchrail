@@ -80,17 +80,28 @@ func NewRecord(baseDir string, hash string, appCfg *config.Config) (*Record, err
 // Close closes all associated storage services
 func (r *Record) Close() error {
 	var errs []error
-	if err := r.Motion.Close(); err != nil {
-		errs = append(errs, err)
+	if r.Motion != nil { // Add nil check
+		if err := r.Motion.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to close motion store: %w", err)) // Clarify error source
+		}
 	}
-	if err := r.Events.Close(); err != nil {
-		errs = append(errs, err)
+	if r.Events != nil { // Add nil check
+		if err := r.Events.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to close events store: %w", err)) // Clarify error source
+		}
 	}
-	if err := r.Dynamics.Close(); err != nil {
-		errs = append(errs, err)
+	if r.Dynamics != nil { // Add nil check
+		if err := r.Dynamics.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to close dynamics store: %w", err)) // Clarify error source
+		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("failed to close one or more stores: %v", errs)
+		// Combine multiple errors into a single error message
+		var errorStrings []string
+		for _, e := range errs {
+			errorStrings = append(errorStrings, e.Error())
+		}
+		return fmt.Errorf("failed to close one or more stores: %s", strings.Join(errorStrings, "; "))
 	}
 	return nil
 }

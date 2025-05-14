@@ -927,18 +927,18 @@ func (h *DataHandler) ReportAPIV2(c *gin.Context) {
 
 	h.log.Info("Using direct simulation data with motor metrics", "motorName", simData.Motor.Name, "maxThrust", simData.Motor.MaxThrust)
 
-	// Assert h.records to *storage.RecordManager
-	recordManager, ok := h.records.(*storage.RecordManager)
-	if !ok {
-		h.log.Error("Failed to assert h.records to *storage.RecordManager in ReportAPIV2")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-		return
-	}
-
-	reportData, err := reporting.GenerateReportData(h.log, h.AppConfig, recordManager, recordID)
+	// The h.records (HandlerRecordManager) is compatible with reporting.RecordManager interface.
+	// No need to assert to *storage.RecordManager, which caused issues with mocks.
+	reportData, err := reporting.GenerateReportData(h.log, h.AppConfig, h.records, recordID) // Pass h.records directly
 	if err != nil {
-		h.log.Error("Failed to load simulation data for report", "recordID", recordID, "format", format, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load simulation data"})
+		// Check for specific error type for record not found
+		if errors.Is(err, storage.ErrRecordNotFound) { // Assuming storage.ErrRecordNotFound exists
+			h.log.Warn("Report not found", "recordID", recordID, "format", format, "error", err)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Report not found"})
+		} else {
+			h.log.Error("Failed to load report data", "recordID", recordID, "format", format, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load report data"})
+		}
 		return
 	}
 

@@ -1,12 +1,11 @@
 package reporting
 
 import (
-	"bytes"
-	"encoding/csv"
+	"errors"
 	"fmt"
-	"html"
-	"io"
 	"math"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,8 +13,20 @@ import (
 
 	"github.com/bxrne/launchrail/internal/config"
 	"github.com/bxrne/launchrail/internal/storage"
+	"github.com/bxrne/launchrail/pkg/openrocket"
 	"github.com/zerodha/logf"
 )
+
+// RecordManager defines the interface for accessing record data, used by GenerateReportData.
+// This allows for easier testing and decoupling from concrete storage implementations.
+// It is satisfied by *storage.RecordManager and test mocks.
+// Ensure HandlerRecordManager in cmd/server/handlers.go is compatible.
+type RecordManager interface {
+	GetRecord(hash string) (*storage.Record, error)
+	GetStorageDir() string
+	// Add other methods if GenerateReportData needs them, e.g., ListRecords, DeleteRecord.
+	// For now, only GetRecord and GetStorageDir seem to be used based on ReportAPIV2's needs.
+}
 
 // findEventIndex searches for an event by name in the eventsData and returns its index.
 // Assumes event name is in the first column (index 0) of each event row.
@@ -56,16 +67,17 @@ func ConvertMarkdownToSimpleHTML(mdContent string, recordID string) string {
 			codeBlock := strings.TrimPrefix(paragraph, "```")
 			codeBlock = strings.TrimSuffix(codeBlock, "```")
 			codeBlock = strings.TrimSpace(codeBlock)
-			escapedCode := html.EscapeString(codeBlock)
+			escapedCode := strings.ReplaceAll(codeBlock, "<", "&lt;")
+			escapedCode = strings.ReplaceAll(escapedCode, ">", "&gt;")
 			htmlOutput += "<pre><code>" + escapedCode + "</code></pre>\n"
 		} else if strings.HasPrefix(paragraph, "### ") {
-			htmlOutput += "<h3>" + html.EscapeString(strings.TrimPrefix(paragraph, "### ")) + "</h3>\n"
+			htmlOutput += "<h3>" + strings.ReplaceAll(strings.TrimPrefix(paragraph, "### "), "<", "&lt;") + "</h3>\n"
 		} else if strings.HasPrefix(paragraph, "## ") {
-			htmlOutput += "<h2>" + html.EscapeString(strings.TrimPrefix(paragraph, "## ")) + "</h2>\n"
+			htmlOutput += "<h2>" + strings.ReplaceAll(strings.TrimPrefix(paragraph, "## "), "<", "&lt;") + "</h2>\n"
 		} else if strings.HasPrefix(paragraph, "# ") {
-			htmlOutput += "<h1>" + html.EscapeString(strings.TrimPrefix(paragraph, "# ")) + "</h1>\n"
+			htmlOutput += "<h1>" + strings.ReplaceAll(strings.TrimPrefix(paragraph, "# "), "<", "&lt;") + "</h1>\n"
 		} else if strings.TrimSpace(paragraph) != "" {
-			htmlOutput += "<p>" + html.EscapeString(paragraph) + "</p>\n"
+			htmlOutput += "<p>" + strings.ReplaceAll(paragraph, "<", "&lt;") + "</p>\n"
 		}
 	}
 
@@ -76,35 +88,36 @@ func ConvertMarkdownToSimpleHTML(mdContent string, recordID string) string {
 
 // ReportData holds all data required to generate a report.
 type ReportData struct {
-	RecordID         string                 `json:"record_id" yaml:"record_id"`
-	Version          string                 `json:"version" yaml:"version"`
-	RocketName       string                 `json:"rocket_name" yaml:"rocket_name"`
-	MotorName        string                 `json:"motor_name" yaml:"motor_name"`
-	LiftoffMassKg    float64                `json:"liftoff_mass_kg" yaml:"liftoff_mass_kg"`
-	GeneratedTime    string                 `json:"generated_time" yaml:"generated_time"`
-	ConfigSummary    *config.Config         `json:"config_summary" yaml:"config_summary"`
-	Summary          ReportSummary          `json:"summary" yaml:"summary"`
-	Plots            map[string]string      `json:"plots" yaml:"plots"`
-	MotionMetrics    *MotionMetrics         `json:"motion_metrics" yaml:"motion_metrics"`
-	MotorSummary     MotorSummaryData       `json:"motor_summary" yaml:"motor_summary"`
-	ParachuteSummary ParachuteSummaryData   `json:"parachute_summary" yaml:"parachute_summary"`
-	PhaseSummary     PhaseSummaryData       `json:"phase_summary" yaml:"phase_summary"`
-	LaunchRail       LaunchRailData         `json:"launch_rail" yaml:"launch_rail"`
-	ForcesAndMoments ForcesAndMomentsData   `json:"forces_and_moments" yaml:"forces_and_moments"`
-	Weather          WeatherData            `json:"weather" yaml:"weather"`
-	AllEvents        []EventSummary         `json:"all_events" yaml:"all_events"`
-	Stages           []StageData            `json:"stages" yaml:"stages"`
-	RecoverySystems  []RecoverySystemData   `json:"recovery_systems" yaml:"recovery_systems"`
-	MotionData       []*PlotSimRecord       `json:"motion_data" yaml:"motion_data"`
-	MotionHeaders    []string               `json:"motion_headers" yaml:"motion_headers"`
-	EventsData       [][]string             `json:"events_data" yaml:"events_data"`
-	Log              *logf.Logger           `json:"-"`
-	ReportTitle      string                 `json:"report_title" yaml:"report_title"`
-	GenerationDate   string                 `json:"generation_date" yaml:"generation_date"`
-	MotorData        []*PlotSimRecord       `json:"motor_data" yaml:"motor_data"`
-	MotorHeaders     []string               `json:"motor_headers" yaml:"motor_headers"`
-	Extensions       map[string]interface{} `json:"extensions,omitempty" yaml:"extensions,omitempty"`
-	Assets           map[string]string      `json:"assets,omitempty" yaml:"assets,omitempty"`
+	RecordID         string                  `json:"record_id" yaml:"record_id"`
+	Version          string                  `json:"version" yaml:"version"`
+	RocketName       string                  `json:"rocket_name" yaml:"rocket_name"`
+	MotorName        string                  `json:"motor_name" yaml:"motor_name"`
+	LiftoffMassKg    float64                 `json:"liftoff_mass_kg" yaml:"liftoff_mass_kg"`
+	GeneratedTime    string                  `json:"generated_time" yaml:"generated_time"`
+	Config           config.Config           `json:"config" yaml:"config"`
+	Summary          ReportSummary           `json:"summary" yaml:"summary"`
+	Plots            map[string]string       `json:"plots" yaml:"plots"`
+	MotionMetrics    *MotionMetrics          `json:"motion_metrics" yaml:"motion_metrics"`
+	MotorSummary     MotorSummaryData        `json:"motor_summary" yaml:"motor_summary"`
+	ParachuteSummary ParachuteSummaryData    `json:"parachute_summary" yaml:"parachute_summary"`
+	PhaseSummary     PhaseSummaryData        `json:"phase_summary" yaml:"phase_summary"`
+	LaunchRail       LaunchRailData          `json:"launch_rail" yaml:"launch_rail"`
+	ForcesAndMoments ForcesAndMomentsData    `json:"forces_and_moments" yaml:"forces_and_moments"`
+	Weather          WeatherData             `json:"weather" yaml:"weather"`
+	AllEvents        []EventSummary          `json:"all_events" yaml:"all_events"`
+	Stages           []StageData             `json:"stages" yaml:"stages"`
+	RecoverySystems  []RecoverySystemData    `json:"recovery_systems" yaml:"recovery_systems"`
+	MotionData       []*PlotSimRecord        `json:"motion_data" yaml:"motion_data"`
+	MotionHeaders    []string                `json:"motion_headers" yaml:"motion_headers"`
+	EventsData       [][]string              `json:"events_data" yaml:"events_data"`
+	Log              *logf.Logger            `json:"-"`
+	ReportTitle      string                  `json:"report_title" yaml:"report_title"`
+	GenerationDate   string                  `json:"generation_date" yaml:"generation_date"`
+	MotorData        []*PlotSimRecord        `json:"motor_data" yaml:"motor_data"`
+	MotorHeaders     []string                `json:"motor_headers" yaml:"motor_headers"`
+	Extensions       map[string]interface{}  `json:"extensions,omitempty" yaml:"extensions,omitempty"`
+	Assets           map[string]string       `json:"assets,omitempty" yaml:"assets,omitempty"`
+	RawData          *storage.SimulationData `json:"raw_data" yaml:"raw_data"`
 }
 
 // MotionMetrics holds summary statistics about the rocket's motion during flight.
@@ -177,12 +190,16 @@ type EventSummary struct {
 
 // ReportSummary aggregates all summary statistics for the report.
 type ReportSummary struct {
-	MotionMetrics    MotionMetrics
-	MotorSummary     MotorSummaryData
-	ParachuteSummary ParachuteSummaryData
-	PhaseSummary     PhaseSummaryData
-	EventsTimeline   []EventSummary // e.g., liftoff, burnout, apogee, parachute deploy
-	// Add other summary sections as needed
+	RocketName        string        `json:"rocket_name" yaml:"rocket_name"`
+	MotorDesignation  string        `json:"motor_designation" yaml:"motor_designation"`
+	LaunchSite        string        `json:"launch_site" yaml:"launch_site"`
+	TargetApogeeFt    float64       `json:"target_apogee_ft" yaml:"target_apogee_ft"` // Ensure this field exists in config or is handled
+	LiftoffMassKg     float64       `json:"liftoff_mass_kg" yaml:"liftoff_mass_kg"`
+	CoastToApogeeTime float64       `json:"coast_to_apogee_time" yaml:"coast_to_apogee_time"`
+	MotionMetrics     MotionMetrics `json:"motion_metrics" yaml:"motion_metrics"`
+	// MotorSummary      MotorSummary   `json:"motor_summary" yaml:"motor_summary"` // TODO: Define MotorSummary struct
+	RecoverySystem RecoverySystem `json:"recovery_system" yaml:"recovery_system"` // TODO: Define RecoverySystem struct or ensure it exists
+	Notes          string         `json:"notes,omitempty" yaml:"notes,omitempty"`
 }
 
 // PlotInfo stores information about a generated plot.
@@ -254,85 +271,66 @@ type WeatherData struct {
 
 // parseSimData parses raw CSV data into a slice of PlotSimRecord and headers.
 // It attempts to convert numeric fields to float64, otherwise stores as string.
-func parseSimData(log *logf.Logger, csvData []byte, delimiter string) ([]*PlotSimRecord, []string, error) {
+// REFACTORED: Now accepts pre-read headers and data rows, instead of raw bytes.
+func parseSimData(log *logf.Logger, headers []string, data [][]string) ([]*PlotSimRecord, error) {
 	if log == nil {
-		return nil, nil, fmt.Errorf("parseSimData called with nil logger")
+		return nil, fmt.Errorf("parseSimData called with nil logger")
 	}
 
-	log.Debug("Parsing sim data", "length_bytes", len(csvData))
-	if len(csvData) == 0 {
-		log.Warn("CSV data is empty.")
-		return []*PlotSimRecord{}, []string{}, nil
+	log.Debug("Parsing sim data from pre-read content", "num_headers", len(headers), "num_data_rows", len(data))
+
+	if len(headers) == 0 {
+		log.Warn("Headers are empty.")
+		// Depending on strictness, this could be an error or return empty.
+		// For now, assume it's valid to have no headers, meaning no processable data for plots.
+		return []*PlotSimRecord{}, nil
 	}
 
-	reader := csv.NewReader(bytes.NewReader(csvData))
-	if len(delimiter) == 0 {
-		delimiter = ","
+	if len(data) == 0 {
+		log.Warn("Data rows are empty.")
+		return []*PlotSimRecord{}, nil
 	}
-	reader.Comma = rune(delimiter[0])
-	reader.TrimLeadingSpace = true
-	reader.FieldsPerRecord = -1 // Allow variable number of fields for header row
-
-	headers, err := reader.Read()
-	if err == io.EOF {
-		log.Warn("CSV data is empty or contains only EOF.")
-		return []*PlotSimRecord{}, []string{}, nil
-	}
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read CSV headers: %w", err)
-	}
-	log.Debug("CSV Headers", "headers", headers)
-
-	reader.FieldsPerRecord = len(headers) // Enforce field count for data rows
 
 	var records []*PlotSimRecord
-	rowIndex := 0
-	for {
-		row, err := reader.Read()
-		rowIndex++
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			if parseErr, ok := err.(*csv.ParseError); ok && parseErr.Err == csv.ErrFieldCount {
-				log.Warn("Skipping row due to mismatched column count", "row_index", rowIndex, "expected_cols", len(headers), "actual_cols", len(row), "row_data", row, "error", err)
-				continue
-			}
-			log.Warn("Error reading CSV row", "row_index", rowIndex, "row_data", row, "error", err)
+	for rowIndex, row := range data {
+		if len(row) != len(headers) {
+			log.Warn("Skipping row due to mismatched column count", 
+				"row_index", rowIndex, 
+				"expected_cols", len(headers), 
+				"actual_cols", len(row), 
+				"row_data", row)
 			continue
 		}
 
 		record := make(PlotSimRecord)
 		for i, header := range headers {
-			if i < len(row) {
-				rawValue := row[i]
-				if valFloat, errFloat := strconv.ParseFloat(rawValue, 64); errFloat == nil {
-					record[header] = valFloat
-				} else {
-					record[header] = rawValue
-				}
+			rawValue := row[i]
+			if valFloat, errFloat := strconv.ParseFloat(rawValue, 64); errFloat == nil {
+				record[header] = valFloat
 			} else {
-				record[header] = "" // Handle rows shorter than headers
-				log.Warn("Row shorter than headers", "row_index", rowIndex, "header_missing", header)
+				record[header] = rawValue
 			}
 		}
 		records = append(records, &record)
 	}
 
-	if len(records) == 0 && len(headers) > 0 {
-		log.Warn("CSV data contained headers but no data rows.")
+	if len(records) == 0 && len(data) > 0 {
+		log.Warn("Data rows were provided but no records could be parsed (e.g., all rows had mismatched columns).")
 	}
 
-	log.Debug("Parsed data records", "num_records", len(records), "num_headers", len(headers))
-	return records, headers, nil
+	log.Debug("Parsed data records", "num_records", len(records))
+	return records, nil
 }
 
-// HandlerRecordManager defines the interface required for record management in reports.
-// This allows the reporting package to interact with storage without a direct dependency on cmd/server types.
-type HandlerRecordManager interface {
-	GetRecord(hash string) (*storage.Record, error)
-	GetStorageDir() string
-}
+// getHeaderKey is unused
+// func getHeaderKey(headers []string, keyName string) string {
+// 	for _, h := range headers {
+// 		if strings.EqualFold(h, keyName) {
+// 			return h
+// 		}
+// 	}
+// 	return "" // Return empty if not found
+// }
 
 // motorPoint represents a single data point of motor thrust over time
 type motorPoint struct {
@@ -835,27 +833,124 @@ func FindClosestMotionPoint(motionPoints []motionPoint, timestamp float64) *moti
 
 // GenerateReportData creates a new ReportData struct, populating it with information
 // from the specified recordID, configuration, and storage backend.
-// It handles loading raw simulation data, parsing it, and calculating summary metrics.
-func GenerateReportData(log *logf.Logger, cfg *config.Config, rs *storage.RecordManager, recordID string) (*ReportData, error) {
-	if log == nil {
-		// Create a default logger if nil to prevent panics, though ideally, a logger should always be passed.
-		defaultLogger := logf.New(logf.Opts{})
-		log = &defaultLogger
-		log.Warn("GenerateReportData called with nil logger, using default.")
-	}
-	log.Info("GenerateReportData called (minimal implementation for syntax fix)", "recordID", recordID)
+// It now accepts a RecordManager interface instead of a concrete *storage.RecordManager.
+func GenerateReportData(log *logf.Logger, cfg *config.Config, rm RecordManager, recordID string) (*ReportData, error) {
+	log.Info("Generating report data", "recordID", recordID)
 
-	// TODO: This is a minimal implementation to fix syntax.
-	// The original, full implementation of GenerateReportData needs to be restored or verified.
-	// For now, return a basic ReportData struct and no error.
+	// Get the record using the RecordManager interface
+	record, err := rm.GetRecord(recordID)
+	if err != nil {
+		if errors.Is(err, storage.ErrRecordNotFound) {
+			log.Warn("Record not found for report generation", "recordID", recordID, "error", err)
+			return nil, storage.ErrRecordNotFound // Propagate the specific error
+		}
+		log.Error("Failed to get record for report", "recordID", recordID, "error", err)
+		return nil, fmt.Errorf("failed to retrieve record %s: %w", recordID, err)
+	}
+	// Ensure record and its necessary components are not nil
+	if record == nil {
+		log.Error("Retrieved record is nil", "recordID", recordID)
+		return nil, fmt.Errorf("retrieved record %s is nil", recordID)
+	}
+
+	// Initialize SimulationData struct
+	simData := &storage.SimulationData{}
+
+	// Attempt to read OpenRocket document if available
+	orkFilePath := filepath.Join(record.Path, "simulation.ork")
+	if _, err := os.Stat(orkFilePath); err == nil {
+		// Use openrocket.Load with file path and version from config
+		orkDoc, loadErr := openrocket.Load(orkFilePath, cfg.Engine.External.OpenRocketVersion)
+		if loadErr != nil {
+			log.Warn("Failed to load .ork file, proceeding without it", "path", orkFilePath, "error", loadErr)
+		} else {
+			simData.ORKDoc = orkDoc
+			log.Info("Successfully parsed .ork file", "path", orkFilePath)
+		}
+	} else {
+		log.Info(".ork file not found, proceeding without it", "path", orkFilePath)
+	}
+
+	// Load data from CSV files (Motion, Events, Dynamics)
+	if record.Motion != nil {
+		simData.MotionHeaders, simData.MotionData, err = record.Motion.ReadHeadersAndData()
+		if err != nil {
+			log.Error("Failed to read motion data", "recordID", recordID, "error", err)
+			// Depending on requirements, this might be a critical error. For now, log and continue.
+		} else {
+			log.Info("Successfully read motion data", "recordID", recordID, "headers_count", len(simData.MotionHeaders), "data_rows", len(simData.MotionData))
+		}
+	} else {
+		log.Warn("Motion data store is nil for record", "recordID", recordID)
+	}
+
+	// Prepare data for plotting (parsed from motion.csv)
+	var parsedMotionPlotRecords []*PlotSimRecord
+	var parsedMotionPlotHeaders []string
+
+	// If we have raw motion data (already loaded into simData.MotionData and simData.MotionHeaders),
+	// parse it for plotting using the refactored parseSimData.
+	if record.Motion != nil && len(simData.MotionData) > 0 && len(simData.MotionHeaders) > 0 {
+		log.Debug("Attempting to parse pre-loaded motion data for plotting", "num_headers", len(simData.MotionHeaders), "num_rows", len(simData.MotionData))
+		var parseErr error
+		parsedMotionPlotRecords, parseErr = parseSimData(log, simData.MotionHeaders, simData.MotionData)
+		if parseErr != nil {
+			log.Error("Failed to parse motion data from pre-loaded content", "error", parseErr)
+			// Depending on requirements, this might be a critical error or just mean no plots.
+		} else {
+			parsedMotionPlotHeaders = simData.MotionHeaders // Headers are passed directly
+			log.Info("Successfully parsed pre-loaded motion data into PlotSimRecord format", "num_records", len(parsedMotionPlotRecords), "num_headers", len(parsedMotionPlotHeaders))
+		}
+	} else {
+		log.Warn("Skipping parsing of motion data for plotting due to missing pre-loaded data or headers",
+			"recordID", recordID,
+			"motion_store_nil", record.Motion == nil,
+			"motion_data_empty", len(simData.MotionData) == 0,
+			"motion_headers_empty", len(simData.MotionHeaders) == 0)
+	}
+
+	if record.Events != nil {
+		simData.EventsHeaders, simData.EventsData, err = record.Events.ReadHeadersAndData()
+		if err != nil {
+			log.Error("Failed to read events data", "recordID", recordID, "error", err)
+			// Continue if possible, or return error
+		} else {
+			log.Info("Successfully read events data", "recordID", recordID, "headers_count", len(simData.EventsHeaders), "data_rows", len(simData.EventsData))
+		}
+	} else {
+		log.Warn("Events data store is nil for record", "recordID", recordID)
+	}
+
+	// Populate ReportSummary from config and placeholders
+	summary := ReportSummary{
+		RocketName:       cfg.Setup.App.Name, // Default to app name, can be overridden by ORK if available
+		MotorDesignation: cfg.Engine.Options.MotorDesignation,
+		LaunchSite:       fmt.Sprintf("Lat: %.4f, Lon: %.4f, Alt: %.1fm", cfg.Engine.Options.Launchsite.Latitude, cfg.Engine.Options.Launchsite.Longitude, cfg.Engine.Options.Launchsite.Altitude),
+		// TargetApogeeFt:    cfg.Engine.Options.TargetApogeeFt, // TODO: Verify this path or handle if field doesn't exist in config.Options
+		LiftoffMassKg:     0, // Placeholder - TODO: Calculate or extract from simData
+		CoastToApogeeTime: 0, // Placeholder - TODO: Calculate from simData
+		MotionMetrics:     MotionMetrics{ /* TODO: Populate from simData */ },
+		// MotorSummary:      MotorSummary{ /* TODO: Populate from simData.Motor or ORK */ },
+		// RecoverySystem:    RecoverySystem{ /* TODO: Populate from ORK or config */ },
+	}
+
+	if simData.ORKDoc != nil && simData.ORKDoc.Rocket.Name != "" {
+		summary.RocketName = simData.ORKDoc.Rocket.Name
+	}
+
+	// TODO: Calculate summary metrics from simData (MotionData, EventsData, ORKDoc)
+	// e.g., apogee, max velocity, flight time, motor performance, etc.
+	// For now, we pass the raw data, and plotting functions will use it.
+
 	return &ReportData{
 		RecordID:      recordID,
 		GeneratedTime: time.Now().Format(time.RFC3339),
-		// Initialize other essential fields if known to prevent nil pointer issues downstream
-		Summary: ReportSummary{
-			MotionMetrics: MotionMetrics{}, // Ensure nested structs are initialized
-		},
-		Plots:  make(map[string]string),
-		Assets: make(map[string]string),
+		Config:        *cfg, // Store a copy of the config used for this report
+		Summary:       summary,
+		RawData:       simData,                 // This now contains loaded data
+		MotionData:    parsedMotionPlotRecords, // Populate with parsed []*PlotSimRecord
+		MotionHeaders: parsedMotionPlotHeaders, // Populate with headers from parseSimData
+		Plots:         make(map[string]string), // To be populated by GeneratePlots
+		Assets:        make(map[string]string), // To be populated by PrepareReportAssets
 	}, nil
 }
