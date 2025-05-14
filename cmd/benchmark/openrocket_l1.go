@@ -72,10 +72,8 @@ func loadOpenRocketExportData(filePath string, log *logf.Logger) (apogee float64
 		// Handle both quoted and unquoted variants
 		cleanLine := line
 
-		// Handle quoted format - check if line starts with a quote and trim it
-		if strings.HasPrefix(cleanLine, "\"") {
-			cleanLine = strings.TrimPrefix(cleanLine, "\"")
-		}
+		// Handle quoted format - unconditionally trim quote prefix if present
+		cleanLine = strings.TrimPrefix(cleanLine, "\"")
 
 		// Check if this might be a header line (contains column names)
 		if (strings.Contains(cleanLine, "Time (s)") && strings.Contains(cleanLine, "Altitude (m)")) ||
@@ -375,10 +373,9 @@ func (b *OpenRocketL1Benchmark) Run(appCfg *config.Config, benchdataPath string)
 		// Ensure a generic error metric if no specific metrics were added or if they don't capture the sim error.
 		if len(metrics) == 0 {
 			metrics = append(metrics, MetricResult{Name: simulationName + "_SIMULATION_RUN_ERROR", Passed: false, Error: simRunError})
-		} else {
-			// Optionally, append error to existing metrics or add a new one.
-			// For simplicity, we assume earlier metric creation for sim errors handles this, or rely on overallPassed.
 		}
+		// Optionally, append error to existing metrics or add a new one.
+		// For simplicity, we assume earlier metric creation for sim errors handles this, or rely on overallPassed.
 	}
 
 	return &BenchmarkResult{

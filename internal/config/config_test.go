@@ -61,6 +61,8 @@ engine:
 
 // createTempConfig creates a temporary file with the given content for testing.
 // It returns the file handle and a cleanup function.
+//
+//nolint:unused // Keep this helper function for future tests
 func createTempConfig(t *testing.T, pattern string, content string) (*os.File, func()) {
 	t.Helper()
 

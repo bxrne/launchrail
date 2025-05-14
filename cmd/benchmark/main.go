@@ -111,7 +111,7 @@ func (s *BenchmarkServer) printDetailedBenchmarkResult(result *BenchmarkResult) 
 				errorStr = metric.Error.Error()
 			}
 
-			table.Append([]string{
+			_ = table.Append([]string{
 				metric.Name,
 				expectedStr,
 				actualStr,
@@ -120,7 +120,7 @@ func (s *BenchmarkServer) printDetailedBenchmarkResult(result *BenchmarkResult) 
 				errorStr,
 			})
 		}
-		table.Render()
+		_ = table.Render()
 	}
 
 	if result.ReportNotes != "" {
@@ -141,14 +141,14 @@ func (s *BenchmarkServer) printTable(results []BenchmarkResult) {
 			errorStr = result.RunError.Error()
 		}
 
-		table.Append([]string{
+		_ = table.Append([]string{
 			result.Name,
 			fmt.Sprintf("%t", result.Passed),
 			result.Duration.String(),
 			errorStr,
 		})
 	}
-	table.Render()
+	_ = table.Render()
 }
 
 func main() {
