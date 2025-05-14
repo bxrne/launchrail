@@ -1,3 +1,22 @@
+## v0.10.0 (2025-05-14)
+
+### Feat
+
+- add simulation step size validation to prevent numerical instability
+- implement OpenRocket export data parser for benchmark comparisons
+- add benchmark tool with OpenRocket L1 comparison suite
+- add benchmark data and initial skeleton for OpenRocket L1 simulation
+
+### Fix
+
+- handle table.Append/Render errors and simplify CSV quote handling
+
+### Refactor
+
+- increase benchmark tolerances and improve OpenRocket CSV parsing flexibility
+- improve OpenRocket CSV parsing to handle quoted and unquoted formats
+- **benchdata, cmd/bench, config**: Removed hipr benchmark and using openrocket as benchmark
+
 ## v0.9.0 (2025-05-14)
 
 ### Feat
