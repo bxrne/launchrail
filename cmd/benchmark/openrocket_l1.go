@@ -271,7 +271,7 @@ func (b *OpenRocketL1Benchmark) Run(appCfg *config.Config, benchdataPath string)
 	overallPassed := true
 
 	// Simulation Name for reporting purposes
-	simulationName := "LaunchRail_vs_OpenRocketL1"
+	simulationName := "Launchrail_vs_OpenRocketL1"
 	b.log.Info("Processing simulation case", "name", simulationName, "rocketFile_from_config", appCfg.Engine.Options.OpenRocketFile, "motor_from_config", appCfg.Engine.Options.MotorDesignation)
 
 	var simRunError error
@@ -326,19 +326,19 @@ func (b *OpenRocketL1Benchmark) Run(appCfg *config.Config, benchdataPath string)
 							actualApogee := simInstance.MaxAltitude
 							actualMaxVelocity := simInstance.MaxSpeed
 							actualFlightTime := simInstance.CurrentTime // This is total simulation time, not necessarily apogee time.
-							// For a more accurate flight time comparison, LaunchRail sim should also report apogee time.
+							// For a more accurate flight time comparison, Launchrail sim should also report apogee time.
 							// Using expectedFlightTime which is APOGEE time from OpenRocket for now.
 
-							// NOTE: OpenRocket and LaunchRail are different simulation systems with different
+							// NOTE: OpenRocket and Launchrail are different simulation systems with different
 							// physical models, initial conditions, and numerical methods. The benchmarks below
 							// are meant to track general similarity in trends rather than exact matches.
 							// The tolerances are set high to account for these fundamental differences.
 
 							// For benchmarking, we're more interested in detecting major regressions
-							// in LaunchRail rather than getting exact matches with OpenRocket.
+							// in Launchrail rather than getting exact matches with OpenRocket.
 
 							// Compare Apogee - using high tolerance due to different simulation models
-							// between LaunchRail and OpenRocket
+							// between Launchrail and OpenRocket
 							apogeeMetric := b.CompareFloatMetric(fmt.Sprintf("%s-Apogee_METERS", simulationName), expectedApogee, actualApogee, 4.0) // 400% tolerance
 							metrics = append(metrics, apogeeMetric)
 							if !apogeeMetric.Passed {
@@ -353,7 +353,7 @@ func (b *OpenRocketL1Benchmark) Run(appCfg *config.Config, benchdataPath string)
 							}
 
 							// Compare Total Flight Time
-							// Note: OpenRocket apogee time vs LaunchRail full flight duration are fundamentally different
+							// Note: OpenRocket apogee time vs Launchrail full flight duration are fundamentally different
 							// We use a very high tolerance as we're only checking order-of-magnitude correctness
 							flightTimeMetric := b.CompareFloatMetric(fmt.Sprintf("%s-FlightTime_SECONDS", simulationName), expectedFlightTime, actualFlightTime, 49.0) // 4900% tolerance
 							metrics = append(metrics, flightTimeMetric)
@@ -389,7 +389,7 @@ func (b *OpenRocketL1Benchmark) Run(appCfg *config.Config, benchdataPath string)
 
 // compareFloatMetric compares a floating point metric with an expected value using a relative tolerance.
 // tolerance is a relative value (0.05 = 5%)
-// For cross-simulator comparisons (e.g., OpenRocket vs LaunchRail), higher tolerance values
+// For cross-simulator comparisons (e.g., OpenRocket vs Launchrail), higher tolerance values
 // may be necessary due to differences in physical models, initial conditions, and numerical methods.
 func (b *OpenRocketL1Benchmark) CompareFloatMetric(name string, expected, actual, tolerancePercent float64) MetricResult {
 	diff := actual - expected

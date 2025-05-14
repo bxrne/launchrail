@@ -1,6 +1,6 @@
 # server
 
-Backend web server for the LaunchRail application that handles HTTP requests, serves API endpoints for accessing simulation data, and manages simulation control functionalities.
+Backend web server for the Launchrail application that handles HTTP requests, serves API endpoints for accessing simulation data, and manages simulation control functionalities.
 
 ## Notes
 - Initializes and configures the Gin HTTP server based on configuration files
