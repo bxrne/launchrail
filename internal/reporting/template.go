@@ -514,8 +514,74 @@ func (tr *TemplateRenderer) generateAccelerationVsTimePlot(data *ReportData, out
 
 // GenerateThrustVsTimePlot generates a plot for thrust vs. time, if motor data is available.
 func (tr *TemplateRenderer) GenerateThrustVsTimePlot(data *ReportData, outputPath string) error {
-	// Check if MotorData is present and has entries
-	if len(data.MotorData) == 0 || data.MotorSummary.MaxThrust == 0 {
+	// Check if we have actual motor data to plot
+	hasData := false
+
+	// First see if we have motor data points
+	if len(data.MotorData) > 0 {
+		// Verify we have at least one point with non-zero thrust
+		for _, record := range data.MotorData {
+			thrustKey := ""
+			for _, h := range data.MotorHeaders {
+				if strings.Contains(strings.ToLower(h), "thrust") {
+					thrustKey = h
+					break
+				}
+			}
+
+			if thrustKey != "" {
+				if thrustVal, ok := (*record)[thrustKey].(float64); ok && thrustVal > 0 {
+					hasData = true
+					break
+				}
+			}
+		}
+	}
+
+	// If no data points and summary has thrust values, we can create a simple idealized thrust curve
+	if !hasData && data.MotorSummary.MaxThrust > 0 && data.MotorSummary.BurnTime > 0 {
+		tr.log.Info("Creating simulated thrust curve from summary data",
+			"maxThrust", data.MotorSummary.MaxThrust,
+			"burnTime", data.MotorSummary.BurnTime)
+
+		// Create an idealized thrust curve
+		simpleData := make([]*PlotSimRecord, 4)
+		simpleHeaders := []string{"time", "thrust"}
+
+		// Typical thrust curve: quick ramp up, plateau, taper off
+		riseTime := data.MotorSummary.BurnTime * 0.1    // 10% rise time
+		plateauTime := data.MotorSummary.BurnTime * 0.7 // 70% plateau
+		// Last 20% is taper - calculated by adding rise + plateau
+
+		// Create points: start, ramp up complete, plateau end, burnout
+		r0 := make(PlotSimRecord)
+		r0["time"] = 0.0
+		r0["thrust"] = 0.0
+		simpleData[0] = &r0
+
+		r1 := make(PlotSimRecord)
+		r1["time"] = riseTime
+		r1["thrust"] = data.MotorSummary.MaxThrust
+		simpleData[1] = &r1
+
+		r2 := make(PlotSimRecord)
+		r2["time"] = riseTime + plateauTime
+		r2["thrust"] = data.MotorSummary.MaxThrust
+		simpleData[2] = &r2
+
+		r3 := make(PlotSimRecord)
+		r3["time"] = data.MotorSummary.BurnTime
+		r3["thrust"] = 0.0
+		simpleData[3] = &r3
+
+		// Use this synthetic data
+		data.MotorData = simpleData
+		data.MotorHeaders = simpleHeaders
+		hasData = true
+	}
+
+	// If we still don't have usable data, create placeholder
+	if !hasData {
 		tr.log.Warn("No motor data available for thrust vs. time plot", "outputPath", outputPath)
 		// Create a placeholder SVG with basic information
 		p := plot.New()

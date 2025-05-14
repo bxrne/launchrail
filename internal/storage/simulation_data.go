@@ -1,10 +1,21 @@
 package storage
 
-// MotorData holds information about the rocket motor.
-// This is a basic structure and can be expanded as needed.
+// ThrustPoint represents a single point on a motor thrust curve
+type ThrustPoint struct {
+	Time   float64
+	Thrust float64
+}
+
+// MotorData represents motor-specific simulation data
 type MotorData struct {
-	Name string `json:"name" yaml:"name"`
-	// Add other motor-specific fields here, e.g., Manufacturer, ThrustCurve, etc.
+	Name          string
+	MaxThrust     float64
+	TotalImpulse  float64
+	BurnTime      float64
+	AverageThrust float64
+	ThrustData    []ThrustPoint
+	Headers       []string   // Headers for the data columns
+	Data          [][]string // Raw CSV data for motor
 }
 
 // SimulationData holds overall data from a simulation run that isn't part of the static config.

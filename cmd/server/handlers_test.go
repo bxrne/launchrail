@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -29,16 +30,41 @@ var (
 	dummyOrkData    = []byte(`<openrocket/>`)
 )
 
+func getProjectRoot() (string, error) {
+	_, b, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", fmt.Errorf("cannot get caller information")
+	}
+	currentDir := filepath.Dir(b)
+	for {
+		goModPath := filepath.Join(currentDir, "go.mod")
+		if _, err := os.Stat(goModPath); err == nil {
+			return currentDir, nil
+		}
+		parentDir := filepath.Dir(currentDir)
+		if parentDir == currentDir {
+			return "", fmt.Errorf("go.mod not found")
+		}
+		currentDir = parentDir
+	}
+}
+
 func setupTestTemplate(t *testing.T) (staticDir string, templatePath string) {
 	t.Helper()
-	// Create a temp static dir for this test
 	staticDir = t.TempDir()
 	templatesDir := filepath.Join(staticDir, "templates", "reports")
 	require.NoError(t, os.MkdirAll(templatesDir, 0755))
-	// Adjust canonical path to be relative from cmd/server/ to project root's templates
-	canonical := filepath.Join("..", "..", "templates", "reports", "report.md.tmpl")
+
+	projectRoot, err := getProjectRoot()
+	require.NoError(t, err, "Failed to get project root")
+	
+	canonical := filepath.Join(projectRoot, "templates", "reports", "report.md.tmpl")
+	
 	content, err := os.ReadFile(canonical)
-	require.NoError(t, err, "Failed to read canonical template from: %s", canonical)
+	// Add CWD to error message for better debugging
+	wd, _ := os.Getwd() 
+	require.NoError(t, err, "Failed to read canonical template from: %s. CWD: %s", canonical, wd)
+	
 	templatePath = filepath.Join(templatesDir, "report.md.tmpl")
 	require.NoError(t, os.WriteFile(templatePath, content, 0644))
 	return staticDir, templatePath
