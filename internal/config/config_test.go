@@ -154,16 +154,6 @@ func createValidConfig(staticDir string) config.Config {
 				GroundTolerance: 0.1,
 			},
 		},
-		Benchmarks: map[string]config.BenchmarkEntry{
-			"test-bench": {
-				Name:             "Test Benchmark",
-				Description:      "Detailed description of Test Benchmark",
-				DesignFile:       designFilePath,
-				DataDir:          dataDirPath,
-				Enabled:          true,
-				MotorDesignation: "M1297", // Corrected field
-			},
-		},
 	}
 }
 
@@ -1193,269 +1183,6 @@ func TestConfig_Validate_LaunchsiteOptions(t *testing.T) {
 	}
 }
 
-// TEST: GIVEN a config with an invalid benchmark WHEN Validate is called THEN returns an error
-func TestConfig_Validate_InvalidBenchmark(t *testing.T) {
-	baseCfg := createValidConfig(t.TempDir())
-	baseCfg.Benchmarks = make(map[string]config.BenchmarkEntry) // Clear existing benchmarks
-	tempDir := t.TempDir()                                      // Base directory for resolving relative paths in tests
-
-	// Create dummy files/dirs that ARE expected to exist for other parts of the config
-	dummyOrkPath := filepath.Join(tempDir, "main_rocket.ork")
-	_ = os.WriteFile(dummyOrkPath, []byte("dummy data"), 0644)
-	baseCfg.Engine.Options.OpenRocketFile = dummyOrkPath
-
-	dummyPluginDir := filepath.Join(tempDir, "test_plugins")
-	_ = os.Mkdir(dummyPluginDir, 0755)
-	baseCfg.Setup.Plugins.Paths = []string{dummyPluginDir}
-
-	tests := []struct {
-		name          string
-		content       string
-		expectedError string
-	}{
-		{
-			name: "MissingBenchmarkName",
-			content: `
-benchmarks:
-  test-bench:
-    design_file: "./existing_design.ork"
-    data_dir: "./existing_data_dir"
-    enabled: true
-`,
-			expectedError: "benchmark 'test-bench': benchmark.name is required",
-		},
-		{
-			name: "MissingBenchmarkDesignFile",
-			content: `
-benchmarks:
-  test-bench:
-    name: "Test Benchmark"
-    data_dir: "./existing_data_dir"
-    enabled: true
-`,
-			expectedError: "benchmark 'test-bench': benchmark.design_file is required",
-		},
-		{
-			name: "MissingBenchmarkDataDir",
-			content: `
-benchmarks:
-  test-bench:
-    name: "Test Benchmark"
-    design_file: "./existing_design.ork"
-    enabled: true
-`,
-			expectedError: "benchmark 'test-bench': benchmark.data_dir is required",
-		},
-		{
-			name: "InvalidBenchmarkEnabled",
-			content: `
-benchmarks:
-  test-bench:
-    name: "Test Benchmark"
-    design_file: "./existing_design.ork"
-    data_dir: "./existing_data_dir"
-    enabled: "invalid"
-`,
-			expectedError: "cannot parse 'benchmarks[test-bench].enabled' as bool: strconv.ParseBool: parsing \"invalid\": invalid syntax",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			// Combine base config with test case content
-			fullContent := validBaseConfig + tc.content
-			// Need dummy base file AND plugin dir for the base config part
-			tempDir := t.TempDir()
-			baseOrkPath := filepath.Join(tempDir, "dummy_base.ork") // Base ORK for the main config part
-			_ = os.WriteFile(baseOrkPath, []byte("dummy base ork"), 0644)
-			basePluginDir := filepath.Join(tempDir, "base_plugins")
-			_ = os.Mkdir(basePluginDir, 0755)
-
-			// Update fullContent to use these absolute paths for the base part if necessary,
-			// or ensure GetConfig (when it unmarshals) will resolve them correctly based on configFileDir.
-			// For simplicity, let's assume the `validBaseConfig` string uses relative paths like './dummy.ork'
-			// and the test below will use `tempDir` as `configFileDir`.
-
-			cfgFile, cleanup := createTempConfig(t, "nonexistent_paths*.yaml", fullContent)
-			defer cleanup()
-
-			// Need dummy files/dirs for the paths that *are* present in the tc.content (benchmark part)
-			// These are typically relative in tc.content, so they'll be resolved against tempDir.
-			_ = os.WriteFile(filepath.Join(tempDir, "existing_design.ork"), []byte("dummy benchmark design"), 0644)
-			_ = os.Mkdir(filepath.Join(tempDir, "existing_data_dir"), 0755)
-
-			v := viper.New()
-			v.SetConfigFile(cfgFile.Name())
-			err := v.ReadInConfig() // Read the specific temp config
-			require.NoError(t, err, "ReadInConfig should succeed for structurally valid YAML, got: %v", err)
-
-			var cfg config.Config // Declare cfg INSIDE the closure
-			err = v.Unmarshal(&cfg)
-
-			// Handle InvalidBenchmarkEnabled specifically: expect Unmarshal error
-			if strings.Contains(tc.name, "InvalidBenchmarkEnabled") {
-				require.Error(t, err, "Unmarshal should fail for invalid boolean syntax string in test [%s]", tc.name)
-				assert.Contains(t, err.Error(), tc.expectedError, "Expected Unmarshal syntax error for invalid boolean string in test [%s]", tc.name)
-				return // Test passes here
-			}
-
-			// For other test cases, Unmarshal MUST succeed
-			require.NoError(t, err, "Unmarshal failed unexpectedly for test case [%s]: %v", tc.name, err)
-
-			t.Logf("Config struct before Validate for [%s]: %+v", tc.name, cfg)
-			// For Validate, configFileDir is the directory relative to which paths in config are resolved.
-			// Since we're constructing paths with tempDir, use tempDir.
-			configFileDir := filepath.Dir(cfgFile.Name())
-
-			// Critical: Ensure the unmarshaled cfg has its base paths (OpenRocketFile, PluginDirs) updated
-			// to reflect the files created in tempDir if they were defined relatively in validBaseConfig.
-			// If `validBaseConfig` has e.g. `openrocket_file: ./dummy.ork`
-			// and `plugins_paths: [./plugins]`
-			// then we must update them after unmarshal before Validate, or ensure Validate resolves them correctly.
-			// The `GetConfig` function itself handles this by passing `configFileDir` to `Validate`.
-			// Here, we mimic that behavior.
-			// Let's assume `validBaseConfig` uses relative paths `dummy.ork` and `plugins`
-			cfg.Engine.Options.OpenRocketFile = baseOrkPath   // Override with the one we created
-			cfg.Setup.Plugins.Paths = []string{basePluginDir} // Override with the one we created
-
-			err = cfg.Validate(configFileDir)
-			require.Error(t, err, "Validate should return an error")
-
-			// Check if the error is about non-existent paths or missing required fields
-			if strings.Contains(tc.name, "Path") {
-				assert.Regexp(t, `benchmark 'test-bench'.*(does not exist|is required)`, err.Error(), "Error should be about non-existent path or missing field")
-			} else {
-				assert.Contains(t, err.Error(), tc.expectedError, "Validation error message mismatch for required fields")
-			}
-		})
-	}
-}
-
-// TEST: GIVEN a config with a valid benchmark WHEN Validate is called THEN does not return an error
-func TestConfig_Validate_ValidBenchmarkNonExistentPaths(t *testing.T) {
-	tests := []struct {
-		name          string
-		content       string
-		expectedError string
-	}{
-		{
-			name: "MissingBenchmarkName",
-			content: `
-benchmarks:
-  test-bench:
-    design_file: "./existing_design.ork"
-    data_dir: "./existing_data_dir"
-    enabled: true
-`,
-			expectedError: "benchmark 'test-bench': benchmark.name is required",
-		},
-		{
-			name: "MissingBenchmarkDesignFile",
-			content: `
-benchmarks:
-  test-bench:
-    name: "Test Benchmark"
-    data_dir: "./existing_data_dir"
-    enabled: true
-`,
-			expectedError: "benchmark 'test-bench': benchmark.design_file is required",
-		},
-		{
-			name: "MissingBenchmarkDataDir",
-			content: `
-benchmarks:
-  test-bench:
-    name: "Test Benchmark"
-    design_file: "./existing_design.ork"
-    enabled: true
-`,
-			expectedError: "benchmark 'test-bench': benchmark.data_dir is required",
-		},
-		{
-			name: "InvalidBenchmarkEnabled",
-			content: `
-benchmarks:
-  test-bench:
-    name: "Test Benchmark"
-    design_file: "./existing_design.ork"
-    data_dir: "./existing_data_dir"
-    enabled: "invalid"
-`,
-			expectedError: "cannot parse 'benchmarks[test-bench].enabled' as bool: strconv.ParseBool: parsing \"invalid\": invalid syntax",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			// Combine base config with test case content
-			fullContent := validBaseConfig + tc.content
-			// Need dummy base file AND plugin dir for the base config part
-			tempDir := t.TempDir()
-			baseOrkPath := filepath.Join(tempDir, "dummy_base.ork") // Base ORK for the main config part
-			_ = os.WriteFile(baseOrkPath, []byte("dummy base ork"), 0644)
-			basePluginDir := filepath.Join(tempDir, "base_plugins")
-			_ = os.Mkdir(basePluginDir, 0755)
-
-			// Update fullContent to use these absolute paths for the base part if necessary,
-			// or ensure GetConfig (when it unmarshals) will resolve them correctly based on configFileDir.
-			// For simplicity, let's assume the `validBaseConfig` string uses relative paths like './dummy.ork'
-			// and the test below will use `tempDir` as `configFileDir`.
-
-			cfgFile, cleanup := createTempConfig(t, "nonexistent_paths*.yaml", fullContent)
-			defer cleanup()
-
-			// Need dummy files/dirs for the paths that *are* present in the tc.content (benchmark part)
-			// These are typically relative in tc.content, so they'll be resolved against tempDir.
-			_ = os.WriteFile(filepath.Join(tempDir, "existing_design.ork"), []byte("dummy benchmark design"), 0644)
-			_ = os.Mkdir(filepath.Join(tempDir, "existing_data_dir"), 0755)
-
-			v := viper.New()
-			v.SetConfigFile(cfgFile.Name())
-			err := v.ReadInConfig() // Read the specific temp config
-			require.NoError(t, err, "ReadInConfig should succeed for structurally valid YAML, got: %v", err)
-
-			var cfg config.Config // Declare cfg INSIDE the closure
-			err = v.Unmarshal(&cfg)
-
-			// Handle InvalidBenchmarkEnabled specifically: expect Unmarshal error
-			if strings.Contains(tc.name, "InvalidBenchmarkEnabled") {
-				require.Error(t, err, "Unmarshal should fail for invalid boolean syntax string in test [%s]", tc.name)
-				assert.Contains(t, err.Error(), tc.expectedError, "Expected Unmarshal syntax error for invalid boolean string in test [%s]", tc.name)
-				return // Test passes here
-			}
-
-			// For other test cases, Unmarshal MUST succeed
-			require.NoError(t, err, "Unmarshal failed unexpectedly for test case [%s]: %v", tc.name, err)
-
-			t.Logf("Config struct before Validate for [%s]: %+v", tc.name, cfg)
-			// For Validate, configFileDir is the directory relative to which paths in config are resolved.
-			// Since we're constructing paths with tempDir, use tempDir.
-			configFileDir := filepath.Dir(cfgFile.Name())
-
-			// Critical: Ensure the unmarshaled cfg has its base paths (OpenRocketFile, PluginDirs) updated
-			// to reflect the files created in tempDir if they were defined relatively in validBaseConfig.
-			// If `validBaseConfig` has e.g. `openrocket_file: ./dummy.ork`
-			// and `plugins_paths: [./plugins]`
-			// then we must update them after unmarshal before Validate, or ensure Validate resolves them correctly.
-			// The `GetConfig` function itself handles this by passing `configFileDir` to `Validate`.
-			// Here, we mimic that behavior.
-			// Let's assume `validBaseConfig` uses relative paths `dummy.ork` and `plugins`
-			cfg.Engine.Options.OpenRocketFile = baseOrkPath   // Override with the one we created
-			cfg.Setup.Plugins.Paths = []string{basePluginDir} // Override with the one we created
-
-			err = cfg.Validate(configFileDir)
-			require.Error(t, err, "Validate should return an error")
-
-			// Check if the error is about non-existent paths or missing required fields
-			if strings.Contains(tc.name, "Path") {
-				assert.Regexp(t, `benchmark 'test-bench'.*(does not exist|is required)`, err.Error(), "Error should be about non-existent path or missing field")
-			} else {
-				assert.Contains(t, err.Error(), tc.expectedError, "Validation error message mismatch for required fields")
-			}
-		})
-	}
-}
-
 // TEST: GIVEN a valid config WHEN ToMap is called THEN returns a map with correct stringified values
 func TestConfig_ToMap(t *testing.T) {
 	tc := createValidConfig(t.TempDir()) // Use the existing helper to get a valid config
@@ -1480,12 +1207,6 @@ func TestConfig_ToMap(t *testing.T) {
 	dummyBenchDataDir := filepath.Join(tempDir, "bench_data_dir")
 	err = os.Mkdir(dummyBenchDataDir, 0755)
 	require.NoError(t, err)
-
-	for k, bench := range tc.Benchmarks {
-		bench.DesignFile = dummyBenchDesignFile.Name()
-		bench.DataDir = dummyBenchDataDir
-		tc.Benchmarks[k] = bench
-	}
 
 	configMap := tc.ToMap()
 
@@ -1529,14 +1250,6 @@ func TestConfig_ToMap(t *testing.T) {
 	expectedPluginPathString := fmt.Sprintf("[%s]", dummyPluginDir) // For a single path
 	assert.Equal(t, expectedPluginPathString, configMap["plugins.paths"])
 
-	// Benchmarks - check one entry
-	assert.Equal(t, "Test Benchmark", configMap["benchmarks.test-bench.name"])
-	assert.Equal(t, "Detailed description of Test Benchmark", configMap["benchmarks.test-bench.description"])
-	assert.Equal(t, dummyBenchDesignFile.Name(), configMap["benchmarks.test-bench.design_file"])
-	assert.Equal(t, dummyBenchDataDir, configMap["benchmarks.test-bench.data_dir"])
-	assert.Equal(t, "M1297", configMap["benchmarks.test-bench.motor_designation"])
-	assert.Equal(t, "true", configMap["benchmarks.test-bench.enabled"])
-
 	// Test ToMap with empty plugin paths
 	tcNoPlugins := createValidConfig(t.TempDir())
 	tcNoPlugins.Setup.Plugins.Paths = []string{}
@@ -1567,12 +1280,6 @@ func TestConfig_Bytes(t *testing.T) {
 	dummyBenchDataDir := filepath.Join(tempDir, "bench_data_dir")
 	err = os.Mkdir(dummyBenchDataDir, 0755)
 	require.NoError(t, err)
-
-	for k, bench := range tc.Benchmarks {
-		bench.DesignFile = dummyBenchDesignFile.Name()
-		bench.DataDir = dummyBenchDataDir
-		tc.Benchmarks[k] = bench
-	}
 
 	configBytes := tc.Bytes()
 

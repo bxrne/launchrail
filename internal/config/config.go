@@ -144,22 +144,11 @@ type Server struct {
 	StaticDir    string `mapstructure:"static_dir"` // Added StaticDir for serving static files/templates
 }
 
-// BenchmarkEntry defines the configuration for a single benchmark.
-type BenchmarkEntry struct {
-	Name             string `mapstructure:"name" validate:"required"`
-	Description      string `mapstructure:"description"` // Added missing field
-	DesignFile       string `mapstructure:"design_file" validate:"required,file"`
-	DataDir          string `mapstructure:"data_dir" validate:"required,dir"`
-	MotorDesignation string `mapstructure:"motor_designation"` // Added motor designation
-	Enabled          bool   `mapstructure:"enabled" validate:"boolean"`
-}
-
 // Config represents the overall application configuration.
 type Config struct {
-	Setup      Setup                     `mapstructure:"setup"`
-	Server     Server                    `mapstructure:"server"`
-	Engine     Engine                    `mapstructure:"engine"`
-	Benchmarks map[string]BenchmarkEntry `mapstructure:"benchmarks"`
+	Setup  Setup  `mapstructure:"setup"`
+	Server Server `mapstructure:"server"`
+	Engine Engine `mapstructure:"engine"`
 }
 
 // ToMap converts the configuration to a map of strings.
@@ -216,16 +205,6 @@ func (c *Config) ToMap() map[string]string {
 	marshalled["server.write_timeout_seconds"] = fmt.Sprintf("%d", c.Server.WriteTimeout)
 	marshalled["server.idle_timeout_seconds"] = fmt.Sprintf("%d", c.Server.IdleTimeout)
 	marshalled["server.static_dir"] = c.Server.StaticDir
-
-	for tag, benchmark := range c.Benchmarks {
-		marshalled["benchmarks."+tag+".name"] = benchmark.Name
-		marshalled["benchmarks."+tag+".description"] = benchmark.Description
-		marshalled["benchmarks."+tag+".design_file"] = benchmark.DesignFile
-		marshalled["benchmarks."+tag+".data_dir"] = benchmark.DataDir
-		marshalled["benchmarks."+tag+".motor_designation"] = benchmark.MotorDesignation
-		marshalled["benchmarks."+tag+".enabled"] = fmt.Sprintf("%v", benchmark.Enabled)
-	}
-
 	return marshalled
 }
 
@@ -360,46 +339,5 @@ func (cfg *Config) Validate(configFileDir string) error {
 	if cfg.Server.StaticDir == "" {
 		return fmt.Errorf("server.static_dir is required")
 	}
-
-	// Benchmarks
-	for tag, benchmark := range cfg.Benchmarks {
-		if benchmark.Name == "" {
-			return fmt.Errorf("benchmark '%s': benchmark.name is required", tag)
-		}
-		if benchmark.DesignFile == "" {
-			return fmt.Errorf("benchmark '%s': benchmark.design_file is required", tag)
-		}
-		if benchmark.DataDir == "" {
-			return fmt.Errorf("benchmark '%s': benchmark.data_dir is required", tag)
-		}
-		if benchmark.MotorDesignation == "" { // Added validation
-			return fmt.Errorf("benchmark '%s': benchmark.motor_designation is required", tag)
-		}
-
-		// Resolve DesignFile path relative to config file's directory
-		designFilePath := benchmark.DesignFile
-		if !filepath.IsAbs(designFilePath) {
-			designFilePath = filepath.Join(configFileDir, designFilePath)
-		}
-		if _, err := os.Stat(designFilePath); os.IsNotExist(err) {
-			return fmt.Errorf("benchmark '%s' designFile path does not exist: %s (resolved from %s)", tag, designFilePath, benchmark.DesignFile)
-		} else if err != nil {
-			return fmt.Errorf("error checking benchmark '%s' designFile path '%s': %w", tag, designFilePath, err)
-		}
-
-		// Resolve DataDir path relative to config file's directory
-		dataDirPath := benchmark.DataDir
-		if !filepath.IsAbs(dataDirPath) {
-			dataDirPath = filepath.Join(configFileDir, dataDirPath)
-		}
-		if stat, err := os.Stat(dataDirPath); os.IsNotExist(err) {
-			return fmt.Errorf("benchmark '%s' dataDir path does not exist: %s (resolved from %s)", tag, dataDirPath, benchmark.DataDir)
-		} else if err != nil {
-			return fmt.Errorf("error checking benchmark '%s' dataDir path '%s': %w", tag, dataDirPath, err)
-		} else if !stat.IsDir() {
-			return fmt.Errorf("benchmark '%s' dataDir path is not a directory: %s (resolved from %s)", tag, dataDirPath, benchmark.DataDir)
-		}
-	}
-
 	return nil
 }
