@@ -14,14 +14,14 @@ import (
 func main() {
 	cfg, err := config.GetConfig()
 	if err != nil {
-		fmt.Printf("CRITICAL: Failed to load configuration: %v\n", err) // Use fmt for pre-logger errors
+		fmt.Printf("CRITICAL: Failed to load configuration: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Initialize logger using the new centralized function
 	log, err := logger.InitFileLogger(cfg.Setup.Logging.Level, "launchrail-cli")
 	if err != nil {
-		fmt.Printf("CRITICAL: Failed to initialize file logger: %v\n", err) // Use fmt for pre-logger errors
+		fmt.Printf("CRITICAL: Failed to initialize file logger: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -36,7 +36,7 @@ func main() {
 	}
 
 	// Create and initialize simulation manager
-	simManager := simulation.NewManager(cfg, *log) // Dereference pointer to pass interface value
+	simManager := simulation.NewManager(cfg, *log)
 
 	// Create storage for the run using the run-specific directory
 	motionStore, err := storage.NewStorage(hash, storage.MOTION, cfg)
@@ -49,7 +49,7 @@ func main() {
 	}
 	eventsStore, err := storage.NewStorage(hash, storage.EVENTS, cfg)
 	if err != nil {
-		motionStore.Close() // Clean up previously opened store
+		motionStore.Close()
 		log.Fatal("Failed to create events storage", "error", err)
 	}
 	if err := eventsStore.Init(); err != nil {
