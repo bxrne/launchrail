@@ -36,9 +36,10 @@ func (b *OpenRocketL1Benchmark) Name() string {
 }
 
 const (
-	colTimeS       = "Time (s)"
-	colAltitudeM   = "Altitude (m)"
-	colTotVelocity = "Total velocity (m/s)"
+	colTimeS        = "Time (s)"
+	colAltitudeM    = "Altitude (m)"
+	colTotVelocity  = "Total velocity (m/s)"
+	colVertVelocity = "Vertical velocity (m/s)"
 )
 
 // loadOpenRocketExportData parses an OpenRocket simulation export CSV file to extract key flight metrics.
@@ -54,16 +55,51 @@ func loadOpenRocketExportData(filePath string, log *logf.Logger) (apogee float64
 	scanner := bufio.NewScanner(file)
 	var headerLine string
 	var lineNumBeforeData int
+	var foundOpenRocketSimLine bool
 
-	// First, find the actual header line, which is commented out
+	// First, scan for OpenRocket simulation line and header line
 	for scanner.Scan() {
 		lineNumBeforeData++
 		line := scanner.Text()
-		if strings.HasPrefix(line, "#") && strings.Contains(line, colTimeS) && strings.Contains(line, colAltitudeM) {
-			headerLine = strings.TrimPrefix(line, "#") // Remove leading #
-			headerLine = strings.TrimSpace(headerLine) // Remove leading/trailing whitespace if any after #
+
+		// Check for OpenRocket simulation identifier in comments
+		if strings.HasPrefix(line, "#") && strings.Contains(line, "Simulation #") {
+			foundOpenRocketSimLine = true
+			continue
+		}
+
+		// Special case: if a line contains column headers (including quoted versions), it's the header line
+		// Handle both quoted and unquoted variants
+		cleanLine := line
+
+		// Handle quoted format - check if line starts with a quote and trim it
+		if strings.HasPrefix(cleanLine, "\"") {
+			cleanLine = strings.TrimPrefix(cleanLine, "\"")
+		}
+
+		// Check if this might be a header line (contains column names)
+		if (strings.Contains(cleanLine, "Time (s)") && strings.Contains(cleanLine, "Altitude (m)")) ||
+			(strings.Contains(cleanLine, "\"Time (s)\"") && strings.Contains(cleanLine, "\"Altitude (m)\"")) {
+			// This is a header line (possibly commented, possibly quoted)
+
+			// If it starts with #, remove the # prefix for parsing
+			if strings.HasPrefix(cleanLine, "#") {
+				cleanLine = strings.TrimPrefix(cleanLine, "#")
+				cleanLine = strings.TrimSpace(cleanLine)
+			}
+
+			headerLine = cleanLine
 			break
 		}
+
+		// Skip other comments and blank lines
+		if strings.HasPrefix(line, "#") || strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		// First non-comment, non-blank line is the header
+		headerLine = line
+		break
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -72,16 +108,21 @@ func loadOpenRocketExportData(filePath string, log *logf.Logger) (apogee float64
 	}
 
 	if headerLine == "" {
-		log.Error("Could not find the commented-out header row in OpenRocket export file", "path", filePath)
-		return 0, 0, 0, fmt.Errorf("commented-out header row not found in %s", filePath)
+		log.Error("Could not find OpenRocket data header line in export file", "path", filePath)
+		return 0, 0, 0, fmt.Errorf("could not find OpenRocket data header line in %s", filePath)
 	}
 
-	// Now, use csv.Reader for the rest of the file, treating the found header line as the first record.
-	// We will feed the header line and then the rest of the scanner's content to the CSV reader.
-	// This is a bit complex. A simpler way might be to re-wind or create a new reader from this point.
-	// For now, let's parse the headerLine directly and then process subsequent data lines from the scanner.
+	// Ensure we found the OpenRocket simulation identifier
+	if !foundOpenRocketSimLine && !strings.Contains(headerLine, "Simulation #") {
+		log.Error("Missing OpenRocket simulation identifier line", "path", filePath)
+		return 0, 0, 0, fmt.Errorf("could not find OpenRocket data header line in %s", filePath)
+	}
 
-	parsedHeader, err := csv.NewReader(strings.NewReader(headerLine)).Read()
+	// Parse the header line as CSV
+	// Configure CSV reader to handle quoted fields
+	csvReader := csv.NewReader(strings.NewReader(headerLine))
+	csvReader.LazyQuotes = true // Allow LazyQuotes to handle quoted or unquoted CSV
+	parsedHeader, err := csvReader.Read()
 	if err != nil {
 		log.Error("Failed to parse the extracted header line", "header_line", headerLine, "error", err)
 		return 0, 0, 0, fmt.Errorf("failed to parse header line '%s': %w", headerLine, err)
@@ -94,17 +135,26 @@ func loadOpenRocketExportData(filePath string, log *logf.Logger) (apogee float64
 			timeColIdx = i
 		case colAltitudeM:
 			altColIdx = i
-		case colTotVelocity:
+		case colTotVelocity, colVertVelocity:
 			velColIdx = i
 		}
 	}
 
-	if timeColIdx == -1 || altColIdx == -1 || velColIdx == -1 {
-		log.Error("Required columns not found in parsed OpenRocket export header", "path", filePath,
-			"parsed_header", parsedHeader,
-			"timeHeader", colTimeS, "altHeader", colAltitudeM, "velHeader", colTotVelocity,
-			"foundTime", timeColIdx != -1, "foundAlt", altColIdx != -1, "foundVel", velColIdx != -1)
-		return 0, 0, 0, fmt.Errorf("required columns missing in parsed header. Time: %t, Alt: %t, Vel: %t", timeColIdx != -1, altColIdx != -1, velColIdx != -1)
+	// Check each required column and return specific error message for missing columns
+	if timeColIdx == -1 {
+		log.Error("Time column not found in OpenRocket export header", "path", filePath, "parsed_header", parsedHeader)
+		return 0, 0, 0, fmt.Errorf("could not find required column '%s'", colTimeS)
+	}
+
+	if altColIdx == -1 {
+		log.Error("Altitude column not found in OpenRocket export header", "path", filePath, "parsed_header", parsedHeader)
+		return 0, 0, 0, fmt.Errorf("could not find required column '%s'", colAltitudeM)
+	}
+
+	if velColIdx == -1 {
+		log.Error("Velocity column not found in OpenRocket export header", "path", filePath, "parsed_header", parsedHeader,
+			"expected_columns", []string{colTotVelocity, colVertVelocity})
+		return 0, 0, 0, fmt.Errorf("could not find required column '%s'", colVertVelocity)
 	}
 	log.Debug("Successfully parsed OpenRocket export header", "path", filePath, "timeIdx", timeColIdx, "altIdx", altColIdx, "velIdx", velColIdx)
 
@@ -125,7 +175,9 @@ func loadOpenRocketExportData(filePath string, log *logf.Logger) (apogee float64
 		}
 
 		dataLineNum++
-		record, err := csv.NewReader(strings.NewReader(line)).Read()
+		csvReader := csv.NewReader(strings.NewReader(line))
+		csvReader.LazyQuotes = true // Handle quoted or unquoted fields
+		record, err := csvReader.Read()
 		if err != nil {
 			log.Warn("Failed to parse data line with CSV reader, skipping", "line_num_original", lineNumBeforeData, "line_content", line, "error", err)
 			continue
@@ -149,12 +201,21 @@ func loadOpenRocketExportData(filePath string, log *logf.Logger) (apogee float64
 		velStr := strings.TrimSpace(record[velColIdx])
 
 		currentTime, errTime := strconv.ParseFloat(timeStr, 64)
-		currentAltitude, errAlt := strconv.ParseFloat(altStr, 64)
-		currentVelocity, errVel := strconv.ParseFloat(velStr, 64)
+		if errTime != nil {
+			log.Warn("Failed to parse time value", "line_num_original", lineNumBeforeData, "time", timeStr, "error", errTime)
+			return 0, 0, 0, fmt.Errorf("error parsing time value: %v", errTime)
+		}
 
-		if errTime != nil || errAlt != nil || errVel != nil {
-			log.Warn("Failed to parse data in row, skipping", "line_num_original", lineNumBeforeData, "path", filePath, "time", timeStr, "alt", altStr, "vel", velStr, "errTime", errTime, "errAlt", errAlt, "errVel", errVel)
-			continue
+		currentAltitude, errAlt := strconv.ParseFloat(altStr, 64)
+		if errAlt != nil {
+			log.Warn("Failed to parse altitude value", "line_num_original", lineNumBeforeData, "altitude", altStr, "error", errAlt)
+			return 0, 0, 0, fmt.Errorf("error parsing altitude: %v", errAlt)
+		}
+
+		currentVelocity, errVel := strconv.ParseFloat(velStr, 64)
+		if errVel != nil {
+			log.Warn("Failed to parse velocity value", "line_num_original", lineNumBeforeData, "velocity", velStr, "error", errVel)
+			return 0, 0, 0, fmt.Errorf("error parsing vertical_velocity: %v", errVel)
 		}
 
 		if currentAltitude > maxAltitude {
@@ -173,13 +234,16 @@ func loadOpenRocketExportData(filePath string, log *logf.Logger) (apogee float64
 		return 0, 0, 0, fmt.Errorf("error scanning data rows in %s: %w", filePath, err)
 	}
 
-	if !foundApogee && dataLineNum > 0 {
-		log.Warn("No apogee found in OpenRocket data or no data rows processed successfully", "path", filePath)
-		return 0, 0, 0, fmt.Errorf("no apogee event or data found in %s after processing %d data lines", filePath, dataLineNum)
-	}
+	// Check for data rows
 	if dataLineNum == 0 {
 		log.Error("No data rows found in OpenRocket export file after header.", "path", filePath)
 		return 0, 0, 0, fmt.Errorf("no data rows found in %s", filePath)
+	}
+
+	// Check if we found an apogee
+	if !foundApogee {
+		log.Warn("No apogee found in OpenRocket data", "path", filePath)
+		return 0, 0, 0, fmt.Errorf("no apogee event or data found in %s after processing %d data lines", filePath, dataLineNum)
 	}
 
 	log.Info("Successfully parsed OpenRocket export data", "path", filePath, "apogee_m", maxAltitude, "max_velocity_mps", currentMaxVelocity, "time_to_apogee_s", apogeeTime)

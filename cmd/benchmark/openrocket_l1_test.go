@@ -149,12 +149,12 @@ func TestOpenRocketL1Benchmark_loadOpenRocketExportData(t *testing.T) {
 	}{
 		{
 			name: "Valid CSV full data",
-			csvContent: `"# Exported from OpenRocket"
-"# Version: OpenRocket 15.03"
-"# Exported on 2024-07-15 12:00:00"
-"#"
-"# Simulation #1: Apogee, Max Velocity, etc."
-"# Time (s)","Altitude (m)","Vertical velocity (m/s)","Vertical acceleration (m/s²)","Total velocity (m/s)","Total acceleration (m/s²)","Position East (m)","Position North (m)","Lateral distance (m)","Lateral direction (°)","Latitude (deg)","Longitude (deg)","Gravitational acceleration (m/s²)","Angle of attack (°)","Roll rate (°/s)","Pitch rate (°/s)","Yaw rate (°/s)","Mass (g)","Propellant mass (g)","Longitudinal moment of inertia (kg·m²)","Rotational moment of inertia (kg·m²)","CP location (cm)","CG location (cm)","Stability margin calibers (난류)","Mach number (난류)","Reynolds number (난류)","Thrust (N)","Drag coefficient (난류)","Axial drag coefficient (난류)","Pressure (Pa)","Temperature (°C)","Speed of sound (m/s)","Air density (kg/m³)","Dynamic viscosity (Pa·s)"
+			csvContent: `# Exported from OpenRocket
+# Version: OpenRocket 15.03
+# Exported on 2024-07-15 12:00:00
+#
+# Simulation #1: Apogee, Max Velocity, etc.
+Time (s),Altitude (m),Vertical velocity (m/s),Vertical acceleration (m/s²),Total velocity (m/s),Total acceleration (m/s²),Position East (m),Position North (m),Lateral distance (m),Lateral direction (°),Latitude (deg),Longitude (deg),Gravitational acceleration (m/s²),Angle of attack (°),Roll rate (°/s),Pitch rate (°/s),Yaw rate (°/s),Mass (g),Propellant mass (g),Longitudinal moment of inertia (kg·m²),Rotational moment of inertia (kg·m²),CP location (cm),CG location (cm),Stability margin calibers (난류),Mach number (난류),Reynolds number (난류),Thrust (N),Drag coefficient (난류),Axial drag coefficient (난류),Pressure (Pa),Temperature (°C),Speed of sound (m/s),Air density (kg/m³),Dynamic viscosity (Pa·s)
 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,9.81,0.0,0.0,0.0,0.0,1000.0,100.0,0.1,0.01,50.0,40.0,1.5,0.0,0.0,0.0,0.0,0.0,101325.0,15.0,340.0,1.225,0.0000181
 1.0,50.0,100.0,10.0,100.0,10.0,0.0,0.0,0.0,0.0,0.0,0.0,9.81,0.0,0.0,0.0,0.0,950.0,50.0,0.1,0.01,50.0,40.0,1.5,0.3,100000.0,200.0,0.3,0.3,100000.0,10.0,330.0,1.2,0.0000180
 2.0,150.0,80.0,-20.0,80.0,-20.0,0.0,0.0,0.0,0.0,0.0,0.0,9.81,0.0,0.0,0.0,0.0,900.0,0.0,0.1,0.01,50.0,40.0,1.5,0.2,80000.0,0.0,0.4,0.4,98000.0,5.0,320.0,1.1,0.0000179
