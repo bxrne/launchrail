@@ -84,9 +84,9 @@ func NewMotor(id ecs.BasicEntity, md *thrustcurves.MotorData, logger logf.Logger
 		currentPropellantMass: initialPropellantMass,
 
 		// Set default efficiency factors
-		nozzleEff:     0.85, // 85% nozzle efficiency (lower end of typical range)
-		combustionEff: 0.90, // 90% combustion efficiency (lower end of typical range)
-		frictionEff:   0.97, // 97% friction efficiency (typical losses)
+		nozzleEff:     0.95, // 95% nozzle efficiency
+		combustionEff: 0.95, // 95% combustion efficiency
+		frictionEff:   0.95, // 95% friction efficiency
 	}
 
 	// Initialize thrust to first data point if available and burn time > 0

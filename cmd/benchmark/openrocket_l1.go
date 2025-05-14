@@ -62,8 +62,8 @@ func LoadOpenRocketExportData(filePath string, log *logf.Logger) (apogee float64
 		lineNumBeforeData++
 		line := scanner.Text()
 
-		// Check for OpenRocket simulation identifier in comments
-		if strings.HasPrefix(line, "#") && strings.Contains(line, "Simulation #") {
+		// Check for OpenRocket simulation identifier (robust: allow comment or non-comment, any variant)
+		if strings.Contains(line, "OpenRocket simulation") {
 			foundOpenRocketSimLine = true
 			continue
 		}

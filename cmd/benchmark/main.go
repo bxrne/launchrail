@@ -174,7 +174,7 @@ func main() {
 		lg.Info("Logger initialized with default settings for benchmark tool")
 	}
 
-	lg.Info("Starting LaunchRail Benchmark Tool", "version", appCfg.Setup.App.Version)
+	lg.Info("Starting Launchrail Benchmark Tool", "version", appCfg.Setup.App.Version)
 
 	benchdataPath := "./benchdata"
 	lg.Info("Using benchmark data from", "path", benchdataPath)
