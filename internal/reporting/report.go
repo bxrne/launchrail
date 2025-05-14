@@ -751,9 +751,9 @@ func FindFlightEvents(eventsData [][]string, log *logf.Logger) (launchIdx, railE
 			if burnoutIdx == -1 {
 				burnoutIdx = i
 			}
-		case strings.EqualFold(eventName, "Rail Exit"):
+		case strings.EqualFold(eventName, EventRailExit):
 			if railExitIdx == -1 {
-				railExitIdx = FindEventIndex(eventsData, "Rail Exit")
+				railExitIdx = FindEventIndex(eventsData, EventRailExit)
 			}
 		case strings.EqualFold(eventName, "Apogee"):
 			if apogeeEventIdx == -1 {
@@ -775,198 +775,143 @@ func FindParachuteEvents(eventsData [][]string, log *logf.Logger) []RecoverySyst
 		return nil
 	}
 
-	// Find the column indices for important data from headers
-	var timeIdx, eventNameIdx, statusIdx int = -1, -1, -1
-	var parachuteStatusIdx, parachuteTypeIdx int = -1, -1
-
-	// Check headers to find which columns contain our data
-	if len(eventsData) > 0 && len(eventsData[0]) > 0 {
-		headers := eventsData[0]
-		for i, header := range headers {
-			headerLower := strings.ToLower(header)
-			switch {
-			case strings.Contains(headerLower, "time"):
-				timeIdx = i
-			case strings.Contains(headerLower, "event") || strings.Contains(headerLower, "name"):
-				eventNameIdx = i
-			case strings.Contains(headerLower, "status"):
-				statusIdx = i
-			case strings.Contains(headerLower, "parachute_status"):
-				parachuteStatusIdx = i
-			case strings.Contains(headerLower, "parachute_type"):
-				parachuteTypeIdx = i
-			}
-		}
-	}
-
-	// Default to standard positions if we couldn't find columns
-	if timeIdx == -1 {
-		timeIdx = 1 // Typically second column in events data
-		log.Warn("Could not find time column in events data, using default (column 1)")
-	}
-	if eventNameIdx == -1 {
-		eventNameIdx = 0 // Typically first column in events data
-		log.Warn("Could not find event name column in events data, using default (column 0)")
-	}
+	// Find column indices once at the beginning
+	timeIdx, eventNameIdx, statusIdx, parachuteStatusIdx, parachuteTypeIdx := findColumnIndices(eventsData[0], log)
 
 	// Map to store unique parachute types and their deployment times
 	parachuteMap := make(map[string]RecoverySystemData)
 
-	// Search for parachute deployment events - start from 1 to skip headers
+	// Process each row of event data (skip header row)
 	for i := 1; i < len(eventsData); i++ {
 		row := eventsData[i]
 		if len(row) <= timeIdx { // Need at least time value
 			continue
 		}
 
-		// Get time value early as we'll need it in all cases
-		deploymentTime, err := strconv.ParseFloat(row[timeIdx], 64)
-		if err != nil {
-			log.Debug("Failed to parse parachute deployment time", "time_value", row[timeIdx], "error", err)
+		// Parse deployment time
+		deploymentTime, ok := parseDeploymentTime(row[timeIdx], log)
+		if !ok {
 			continue
 		}
 
-		// CASE 1: Check for dedicated parachute status column
-		if parachuteStatusIdx >= 0 && parachuteStatusIdx < len(row) {
-			statusValue := strings.ToUpper(strings.TrimSpace(row[parachuteStatusIdx]))
-
-			// Only process events where parachute is DEPLOYED
-			if statusValue == "DEPLOYED" {
-				// Determine parachute type
-				parachuteType := "Parachute"
-
-				// Try to get specific type if we have that column
-				if parachuteTypeIdx >= 0 && parachuteTypeIdx < len(row) {
-					typeValue := strings.TrimSpace(row[parachuteTypeIdx])
-					if typeValue != "" {
-						parachuteType = typeValue
-					}
-				}
-
-				// Fall back to detecting from event name
-				if parachuteType == "Parachute" && eventNameIdx >= 0 && eventNameIdx < len(row) {
-					eventName := strings.ToLower(row[eventNameIdx])
-					if strings.Contains(eventName, "drogue") {
-						parachuteType = "Drogue Parachute"
-					} else if strings.Contains(eventName, "main") {
-						parachuteType = "Main Parachute"
-					}
-				}
-
-				// Determine descent rate based on parachute type
-				descentRate := 15.0 // Default
-				lowerType := strings.ToLower(parachuteType)
-				if strings.Contains(lowerType, "drogue") {
-					descentRate = 20.0
-				} else if strings.Contains(lowerType, "main") {
-					descentRate = 5.0
-				}
-
-				log.Info("Found parachute deployment event", "type", parachuteType, "time", deploymentTime)
-
-				// Add or update the parachute data
-				parachuteMap[parachuteType] = RecoverySystemData{
-					Type:        parachuteType,
-					Deployment:  deploymentTime,
-					DescentRate: descentRate,
-				}
-			}
-
-			// Skip other cases if we found status in dedicated column
-			continue
+		// Process each detection method in order
+		if processParachuteStatusColumn(row, parachuteStatusIdx, eventNameIdx, parachuteTypeIdx, deploymentTime, log, parachuteMap) {
+			continue // Skip other methods if already found
 		}
 
-		// CASE 2: Look for events with "parachute" in the name with status in another column
-		if eventNameIdx >= 0 && eventNameIdx < len(row) {
-			eventName := strings.ToLower(row[eventNameIdx])
-
-			if strings.Contains(eventName, "parachute") || strings.Contains(eventName, "recovery") {
-				// Check if we have status column and it indicates deployed
-				deployed := true // Assume deployed if not specified
-				if statusIdx >= 0 && statusIdx < len(row) {
-					statusValue := strings.ToUpper(strings.TrimSpace(row[statusIdx]))
-					deployed = statusValue == "DEPLOYED" || statusValue == "TRUE" || statusValue == "1"
-				}
-
-				if !deployed {
-					continue // Skip non-deployed parachutes
-				}
-
-				// Try to determine parachute type from event name
-				parachuteType := "Parachute"
-				if strings.Contains(eventName, "drogue") {
-					parachuteType = "Drogue Parachute"
-				} else if strings.Contains(eventName, "main") {
-					parachuteType = "Main Parachute"
-				}
-
-				// Default descent rates based on parachute type
-				descentRate := 15.0 // Default
-				if parachuteType == "Drogue Parachute" {
-					descentRate = 20.0
-				} else if parachuteType == "Main Parachute" {
-					descentRate = 5.0
-				}
-
-				log.Info("Found parachute event by name", "type", parachuteType, "time", deploymentTime)
-
-				// Add or update the parachute data
-				parachuteMap[parachuteType] = RecoverySystemData{
-					Type:        parachuteType,
-					Deployment:  deploymentTime,
-					DescentRate: descentRate,
-				}
-			}
+		if processParachuteEventName(row, eventNameIdx, statusIdx, deploymentTime, log, parachuteMap) {
+			continue // Skip next method if already found
 		}
 
-		// CASE 3: Check all columns for parachute_status keyword
-		for colIdx, colValue := range row {
-			if colIdx == timeIdx || colIdx == eventNameIdx || colIdx == statusIdx {
-				continue // Skip already processed columns
-			}
-
-			// Check if this column has parachute status info
-			colValueLower := strings.ToLower(colValue)
-			if strings.Contains(colValueLower, "parachute") && strings.Contains(colValueLower, "status") {
-				// Check if the value indicates DEPLOYED status
-				statusValue := strings.ToUpper(strings.TrimSpace(colValue))
-				if statusValue == "DEPLOYED" {
-					// Try to determine parachute type
-					parachuteType := "Parachute"
-					for j, header := range eventsData[0] {
-						headerLower := strings.ToLower(header)
-						if strings.Contains(headerLower, "type") && j < len(row) {
-							typeVal := strings.TrimSpace(row[j])
-							if typeVal != "" {
-								parachuteType = typeVal
-								break
-							}
-						}
-					}
-
-					// Determine descent rate based on type
-					descentRate := 15.0 // Default
-					lowerType := strings.ToLower(parachuteType)
-					if strings.Contains(lowerType, "drogue") {
-						descentRate = 20.0
-					} else if strings.Contains(lowerType, "main") {
-						descentRate = 5.0
-					}
-
-					log.Info("Found parachute with status in columns", "type", parachuteType, "time", deploymentTime)
-
-					// Add or update the parachute data
-					parachuteMap[parachuteType] = RecoverySystemData{
-						Type:        parachuteType,
-						Deployment:  deploymentTime,
-						DescentRate: descentRate,
-					}
-				}
-			}
-		}
+		processParachuteInColumnValues(row, eventsData[0], timeIdx, eventNameIdx, statusIdx, deploymentTime, log, parachuteMap)
 	}
 
-	// Convert map to slice
+	return sortRecoverySystems(parachuteMap, log)
+}
+
+// processParachuteStatusColumn checks for parachute info in a dedicated status column
+func processParachuteStatusColumn(row []string, parachuteStatusIdx, eventNameIdx, parachuteTypeIdx int, 
+	deploymentTime float64, log *logf.Logger, parachuteMap map[string]RecoverySystemData) bool {
+	
+	// Skip if we don't have a dedicated parachute status column
+	if parachuteStatusIdx < 0 || parachuteStatusIdx >= len(row) {
+		return false
+	}
+
+	statusValue := strings.ToUpper(strings.TrimSpace(row[parachuteStatusIdx]))
+	if statusValue != StatusDeployed {
+		return false
+	}
+
+	// Determine parachute type from available data
+	parachuteType := determineParachuteType(row, eventNameIdx, parachuteTypeIdx, "Parachute")
+	processParachuteDeployment(parachuteType, deploymentTime, log, parachuteMap)
+	return true
+}
+
+// processParachuteEventName looks for parachute info in event name
+func processParachuteEventName(row []string, eventNameIdx, statusIdx int, deploymentTime float64, 
+	log *logf.Logger, parachuteMap map[string]RecoverySystemData) bool {
+	
+	// Skip if we don't have event name column
+	if eventNameIdx < 0 || eventNameIdx >= len(row) {
+		return false
+	}
+
+	eventName := strings.ToLower(row[eventNameIdx])
+	if !strings.Contains(eventName, "parachute") && !strings.Contains(eventName, "recovery") {
+		return false
+	}
+
+	// Check if deployed status
+	deployed := true // Assume deployed if not specified
+	if statusIdx >= 0 && statusIdx < len(row) {
+		deployed = isDeployedStatus(row[statusIdx])
+	}
+
+	if !deployed {
+		return false
+	}
+
+	// Determine parachute type from event name
+	parachuteType := "Parachute"
+	if strings.Contains(eventName, "drogue") {
+		parachuteType = RecoverySystemDrogue
+	} else if strings.Contains(eventName, "main") {
+		parachuteType = RecoverySystemMain
+	}
+
+	log.Info("Found parachute event by name", "type", parachuteType, "time", deploymentTime)
+	processParachuteDeployment(parachuteType, deploymentTime, log, parachuteMap)
+	return true
+}
+
+// processParachuteInColumnValues searches all columns for parachute status information
+func processParachuteInColumnValues(row, headers []string, timeIdx, eventNameIdx, statusIdx int, 
+	deploymentTime float64, log *logf.Logger, parachuteMap map[string]RecoverySystemData) bool {
+	
+	found := false
+	
+	for colIdx, colValue := range row {
+		// Skip already processed columns
+		if colIdx == timeIdx || colIdx == eventNameIdx || colIdx == statusIdx {
+			continue
+		}
+
+		// Check if this column has parachute status info
+		colValueLower := strings.ToLower(colValue)
+		if !strings.Contains(colValueLower, "parachute") || !strings.Contains(colValueLower, "status") {
+			continue
+		}
+
+		// Check for DEPLOYED status
+		if !isDeployedStatus(colValue) {
+			continue
+		}
+
+		// Try to determine parachute type
+		parachuteType := "Parachute"
+		for j, header := range headers {
+			headerLower := strings.ToLower(header)
+			if strings.Contains(headerLower, "type") && j < len(row) {
+				typeVal := strings.TrimSpace(row[j])
+				if typeVal != "" {
+					parachuteType = typeVal
+					break
+				}
+			}
+		}
+
+		log.Info("Found parachute with status in columns", "type", parachuteType, "time", deploymentTime)
+		processParachuteDeployment(parachuteType, deploymentTime, log, parachuteMap)
+		found = true
+	}
+
+	return found
+}
+
+// sortRecoverySystems converts the map to a sorted slice
+func sortRecoverySystems(parachuteMap map[string]RecoverySystemData, log *logf.Logger) []RecoverySystemData {
 	var recoverySystems []RecoverySystemData
 	for _, system := range parachuteMap {
 		recoverySystems = append(recoverySystems, system)
@@ -1472,12 +1417,12 @@ func GenerateReportData(log *logf.Logger, cfg *config.Config, rm RecordManager, 
 
 		recoverySystems = []RecoverySystemData{
 			{
-				Type:        "Drogue Parachute",
+				Type:        RecoverySystemDrogue,
 				Deployment:  recoveryTimeDeployment,
 				DescentRate: drogueDescentRate,
 			},
 			{
-				Type:        "Main Parachute",
+				Type:        RecoverySystemMain,
 				Deployment:  recoveryTimeDeployment + 5.0, // Typically deployed 5 seconds after drogue
 				DescentRate: mainDescentRate,
 			},
