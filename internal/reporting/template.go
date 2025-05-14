@@ -549,7 +549,7 @@ func (tr *TemplateRenderer) GenerateThrustVsTimePlot(data *ReportData, outputPat
 
 		// Create an idealized thrust curve
 		simpleData := make([]*PlotSimRecord, 4)
-		simpleHeaders := []string{"time", "thrust"}
+		simpleHeaders := []string{"Time (s)", "Thrust (N)"} // Use the same header format as ThrustCurve API
 
 		// Typical thrust curve: quick ramp up, plateau, taper off
 		riseTime := data.MotorSummary.BurnTime * 0.1    // 10% rise time
@@ -558,23 +558,23 @@ func (tr *TemplateRenderer) GenerateThrustVsTimePlot(data *ReportData, outputPat
 
 		// Create points: start, ramp up complete, plateau end, burnout
 		r0 := make(PlotSimRecord)
-		r0["time"] = 0.0
-		r0["thrust"] = 0.0
+		r0["Time (s)"] = 0.0
+		r0["Thrust (N)"] = 0.0
 		simpleData[0] = &r0
 
 		r1 := make(PlotSimRecord)
-		r1["time"] = riseTime
-		r1["thrust"] = data.MotorSummary.MaxThrust
+		r1["Time (s)"] = riseTime
+		r1["Thrust (N)"] = data.MotorSummary.MaxThrust
 		simpleData[1] = &r1
 
 		r2 := make(PlotSimRecord)
-		r2["time"] = riseTime + plateauTime
-		r2["thrust"] = data.MotorSummary.MaxThrust
+		r2["Time (s)"] = riseTime + plateauTime
+		r2["Thrust (N)"] = data.MotorSummary.MaxThrust
 		simpleData[2] = &r2
 
 		r3 := make(PlotSimRecord)
-		r3["time"] = data.MotorSummary.BurnTime
-		r3["thrust"] = 0.0
+		r3["Time (s)"] = data.MotorSummary.BurnTime
+		r3["Thrust (N)"] = 0.0
 		simpleData[3] = &r3
 
 		// Use this synthetic data
@@ -610,7 +610,21 @@ func (tr *TemplateRenderer) GenerateThrustVsTimePlot(data *ReportData, outputPat
 	}
 
 	// Extract thrust vs time data from MotorData
-	pts, err := tr.extractPlotData(data.MotorData, "time", "thrust")
+	// First, determine the actual time and thrust column names by inspecting headers
+	timeKey := "time"
+	thrustKey := "thrust"
+
+	for _, h := range data.MotorHeaders {
+		if strings.Contains(strings.ToLower(h), "time") {
+			timeKey = h
+		}
+		if strings.Contains(strings.ToLower(h), "thrust") {
+			thrustKey = h
+		}
+	}
+
+	tr.log.Debug("Using thrust curve data column keys", "timeKey", timeKey, "thrustKey", thrustKey)
+	pts, err := tr.extractPlotData(data.MotorData, timeKey, thrustKey)
 	if err != nil {
 		return fmt.Errorf("failed to extract thrust vs time data: %w", err)
 	}
