@@ -57,14 +57,14 @@ func setupTestTemplate(t *testing.T) (staticDir string, templatePath string) {
 
 	projectRoot, err := getProjectRoot()
 	require.NoError(t, err, "Failed to get project root")
-	
+
 	canonical := filepath.Join(projectRoot, "templates", "reports", "report.md.tmpl")
-	
+
 	content, err := os.ReadFile(canonical)
 	// Add CWD to error message for better debugging
-	wd, _ := os.Getwd() 
+	wd, _ := os.Getwd()
 	require.NoError(t, err, "Failed to read canonical template from: %s. CWD: %s", canonical, wd)
-	
+
 	templatePath = filepath.Join(templatesDir, "report.md.tmpl")
 	require.NoError(t, os.WriteFile(templatePath, content, 0644))
 	return staticDir, templatePath

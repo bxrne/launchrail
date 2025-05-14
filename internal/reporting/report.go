@@ -839,13 +839,13 @@ func FindClosestMotionPoint(motionPoints []motionPoint, timestamp float64) *moti
 func GenerateReportData(log *logf.Logger, cfg *config.Config, rs *storage.RecordManager, recordID string) (*ReportData, error) {
 	if log == nil {
 		// Create a default logger if nil to prevent panics, though ideally, a logger should always be passed.
-		defaultLogger := logf.New(logf.Opts{}) 
+		defaultLogger := logf.New(logf.Opts{})
 		log = &defaultLogger
 		log.Warn("GenerateReportData called with nil logger, using default.")
 	}
 	log.Info("GenerateReportData called (minimal implementation for syntax fix)", "recordID", recordID)
-	
-	// TODO: This is a minimal implementation to fix syntax. 
+
+	// TODO: This is a minimal implementation to fix syntax.
 	// The original, full implementation of GenerateReportData needs to be restored or verified.
 	// For now, return a basic ReportData struct and no error.
 	return &ReportData{
@@ -855,7 +855,7 @@ func GenerateReportData(log *logf.Logger, cfg *config.Config, rs *storage.Record
 		Summary: ReportSummary{
 			MotionMetrics: MotionMetrics{}, // Ensure nested structs are initialized
 		},
-		Plots: make(map[string]string),
+		Plots:  make(map[string]string),
 		Assets: make(map[string]string),
 	}, nil
 }
