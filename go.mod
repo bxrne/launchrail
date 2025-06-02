@@ -3,7 +3,7 @@ module github.com/bxrne/launchrail
 go 1.23.1
 
 require (
-	github.com/a-h/templ v0.3.865
+	github.com/a-h/templ v0.3.887
 	github.com/olekukonko/tablewriter v1.0.4
 	github.com/spf13/viper v1.20.1
 	golang.org/x/text v0.24.0
