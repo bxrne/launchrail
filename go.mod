@@ -3,7 +3,7 @@ module github.com/bxrne/launchrail
 go 1.23.1
 
 require (
-	github.com/a-h/templ v0.3.924
+	github.com/a-h/templ v0.3.943
 	github.com/olekukonko/tablewriter v1.0.8
 	github.com/spf13/viper v1.20.1
 	golang.org/x/text v0.28.0
@@ -56,9 +56,9 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.12.0 // indirect
-	golang.org/x/crypto v0.37.0 // indirect
+	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/image v0.25.0 // indirect
-	golang.org/x/net v0.39.0 // indirect
+	golang.org/x/net v0.42.0 // indirect
 	google.golang.org/protobuf v1.36.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
@@ -69,5 +69,5 @@ require (
 	github.com/looplab/fsm v1.0.3
 	github.com/stretchr/testify v1.10.0
 	github.com/zerodha/logf v0.5.5
-	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
 )
