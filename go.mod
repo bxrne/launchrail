@@ -67,7 +67,7 @@ require (
 	github.com/EngoEngine/ecs v1.0.5
 	github.com/gin-gonic/gin v1.10.1
 	github.com/looplab/fsm v1.0.3
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/zerodha/logf v0.5.5
 	golang.org/x/sys v0.32.0 // indirect
 )
