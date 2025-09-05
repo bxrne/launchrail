@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0 # Fetch all history for version bump analysis
           token: ${{ secrets.GITHUB_TOKEN }} # Token needed to push changes
@@ -59,7 +59,7 @@ jobs:
 
     steps:
       - name: Checkout code at new tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Checkout the specific tag created by the bump-version job
           ref: ${{ needs.bump-version.outputs.new_tag }}
