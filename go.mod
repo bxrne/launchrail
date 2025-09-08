@@ -1,12 +1,12 @@
 module github.com/bxrne/launchrail
 
-go 1.23.1
+go 1.24.0
 
 require (
 	github.com/a-h/templ v0.3.943
 	github.com/olekukonko/tablewriter v1.0.8
 	github.com/spf13/viper v1.20.1
-	golang.org/x/text v0.28.0
+	golang.org/x/text v0.29.0
 	gonum.org/v1/plot v0.16.0
 )
 
